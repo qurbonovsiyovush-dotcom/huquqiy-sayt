@@ -11,7 +11,6 @@ import {
 
 import {
   useRouter,
-  useSearchParams,
 } from "next/navigation";
 
 /* =========================================================
@@ -176,11 +175,15 @@ export default function TestEditorPage() {
   const router =
     useRouter();
 
-  const searchParams =
-    useSearchParams();
+  const [
+    editingId,
+    setEditingId,
+  ] = useState<string | null>(null);
 
-  const editingId =
-    searchParams.get("id");
+  const [
+    paramsReady,
+    setParamsReady,
+  ] = useState(false);
 
   const editorRef =
     useRef<HTMLDivElement | null>(
@@ -207,9 +210,7 @@ export default function TestEditorPage() {
   const [
     loadingTest,
     setLoadingTest,
-  ] = useState(
-    Boolean(editingId)
-  );
+  ] = useState(false);
 
   const [
     saving,
@@ -305,6 +306,24 @@ export default function TestEditorPage() {
         selectedShapeId,
       ]
     );
+
+  /* =======================================================
+     URL PARAMETRINI CLIENT TOMONDA O‘QISH
+     Vercel prerender paytida useSearchParams xatosini
+     oldini oladi.
+  ======================================================= */
+
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    setEditingId(
+      params.get("id")
+    );
+
+    setParamsReady(true);
+  }, []);
 
   /* =======================================================
      ADMIN CHECK
@@ -1566,6 +1585,7 @@ export default function TestEditorPage() {
   ======================================================= */
 
   if (
+    !paramsReady ||
     !adminChecked ||
     loadingTest
   ) {
