@@ -135,23 +135,8 @@ export default function Home() {
         keyin asosiy sahifa ochiladi.
       */
 
-      sessionStorage.setItem(
-        "qurbonov-session",
-        "approved"
-      );
-
-      sessionStorage.setItem(
-        "qurbonov-role",
-        data.role || "user"
-      );
-
-      setIsAdmin(
-        data.role === "admin"
-      );
-
-      setAuthenticated(true);
-
-      setCode("");
+      window.location.replace("/");
+return;
 
     } catch {
       setLoginError(
