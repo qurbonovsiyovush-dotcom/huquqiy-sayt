@@ -464,7 +464,8 @@ export default function TestSolvePage() {
       totalSeconds - Math.max(0, remainingSeconds)
     );
 
-    async function saveResult() {
+async function saveResult() {
+  if (!test) return;
       try {
         const response = await fetch("/api/results", {
           method: "POST",
