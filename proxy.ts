@@ -41,6 +41,8 @@ export function proxy(
     ) ||
     pathname ===
       "/favicon.ico" ||
+    pathname ===
+  "/sitemap.xml" ||
     pathname.startsWith(
       "/images"
     ) ||
