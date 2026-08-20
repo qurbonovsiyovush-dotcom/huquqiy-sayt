@@ -2412,8 +2412,8 @@ const pageStyles = `
   }
 
   .resultItem {
-    min-height: 100px;
-    padding: 15px;
+    min-height: 72px;
+    padding: 10px;
 
     display: flex;
     flex-direction: column;
