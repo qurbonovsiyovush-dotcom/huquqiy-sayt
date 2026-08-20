@@ -1236,16 +1236,22 @@ async function saveResult() {
               </div>
 
               <div className="questionContent">
-                <div
-                  className="questionHtml"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      getQuestionText(
-                        currentQuestion
-                      ) ||
-                      "Savol matni mavjud emas.",
-                  }}
-                />
+                <div className="question3DCard">
+                  <div className="question3DLabel">
+                    SAVOL MATNI
+                  </div>
+
+                  <div
+                    className="questionHtml"
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        getQuestionText(
+                          currentQuestion
+                        ) ||
+                        "Savol matni mavjud emas.",
+                    }}
+                  />
+                </div>
 
                 {renderQuestionShapes(currentQuestion)}
 
@@ -2045,16 +2051,107 @@ const pageStyles = `
       0 5px 0 #555d61;
   }
 
+  .question3DCard {
+    position: relative;
+    margin: 0 0 34px;
+    padding: 42px 34px 32px;
+
+    border: 2px solid #8a959d;
+    border-radius: 22px;
+
+    background:
+      linear-gradient(
+        145deg,
+        #ffffff 0%,
+        #f7f8f9 38%,
+        #e7eaec 72%,
+        #d3d7da 100%
+      );
+
+    box-shadow:
+      inset 0 7px 6px rgba(255,255,255,.98),
+      inset 0 -7px 12px rgba(60,70,78,.18),
+      0 7px 0 #6d767c,
+      0 15px 24px rgba(0,0,0,.22);
+  }
+
+  .question3DCard::before {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,.82);
+    border-radius: 16px;
+  }
+
+  .question3DLabel {
+    position: absolute;
+    top: -19px;
+    left: 30px;
+
+    min-width: 155px;
+    min-height: 40px;
+    padding: 7px 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 2px solid #174461;
+    border-radius: 10px;
+
+    background:
+      linear-gradient(
+        #c9f1ff 0%,
+        #76c9ef 46%,
+        #4ca6d1 100%
+      );
+
+    box-shadow:
+      inset 0 4px 4px rgba(255,255,255,.78),
+      0 4px 0 #17415c,
+      0 8px 13px rgba(0,0,0,.2);
+
+    color: #073b68;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+  }
+
   .questionHtml {
-    margin-bottom: 30px;
+    margin: 0;
 
     direction: ltr;
     text-align: left;
 
     overflow-wrap: anywhere;
 
-    font-size: 22px;
-    line-height: 1.6;
+    color: #111315;
+    font-size: clamp(22px, 2vw, 30px);
+    line-height: 1.72;
+    font-weight: 500;
+
+    text-shadow: 0 1px 0 rgba(255,255,255,.9);
+  }
+
+  .questionHtml :global(p) {
+    margin: 0 0 18px;
+  }
+
+  .questionHtml :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .questionHtml :global(a) {
+    color: #008b88;
+    font-weight: 700;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0,139,136,.35);
+  }
+
+  .questionHtml :global(strong),
+  .questionHtml :global(b) {
+    color: #082f4d;
   }
 
   .questionHtml :global(img),
@@ -2476,6 +2573,22 @@ const pageStyles = `
   /* RESPONSIVE */
 
   @media (max-width: 900px) {
+    .question3DCard {
+      padding: 36px 22px 24px;
+      border-radius: 17px;
+    }
+
+    .question3DLabel {
+      left: 20px;
+      min-width: 135px;
+      font-size: 12px;
+    }
+
+    .questionHtml {
+      font-size: 21px;
+      line-height: 1.6;
+    }
+
     .testLayout {
       grid-template-columns: 1fr;
     }
