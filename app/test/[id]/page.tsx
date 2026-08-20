@@ -2609,8 +2609,326 @@ const pageStyles = `
   }
 
   @media (max-width: 650px) {
-    .page {
-      padding: 10px 6px 60px;
+  .page {
+    padding: 10px 6px 50px;
+  }
+
+  .topHeader,
+  .testHeader {
+    width: 100%;
+    min-height: auto;
+    padding: 12px;
+    flex-direction: column;
+    gap: 12px;
+    border-radius: 16px;
+  }
+
+  .headerName {
+    width: 100%;
+    min-width: 0;
+    min-height: 50px;
+    padding: 8px 12px;
+    font-size: 21px;
+  }
+
+  .topHeader .grayButton {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .testHeaderLeft {
+    width: 100%;
+    text-align: center;
+  }
+
+  .testHeaderLeft strong {
+    font-size: 20px;
+  }
+
+  .timer {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 12px;
+  }
+
+  .timer strong {
+    font-size: 24px;
+  }
+
+  .progressPanel {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px 14px;
+  }
+
+  .progressTrack {
+    height: 10px;
+  }
+
+  .panel,
+  .reviewPanel {
+    width: 100%;
+    margin-top: 65px;
+    padding: 55px 8px 15px;
+    border-radius: 18px;
+  }
+
+  .floatingTitle {
+    top: -27px;
+    min-width: 190px;
+    min-height: 52px;
+    padding: 7px 18px;
+    font-size: 20px;
+    border-radius: 12px;
+  }
+
+  .introCard,
+  .resultBox,
+  .reviewInner {
+    padding: 16px 10px;
+    border-radius: 13px;
+  }
+
+  .introCard h1,
+  .resultBox h1 {
+    margin: 8px 0 10px;
+    font-size: 25px;
+  }
+
+  .subject,
+  .resultSubject {
+    font-size: 17px;
+  }
+
+  .description {
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .introInformation {
+    margin: 18px 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .info {
+    min-height: 72px;
+    padding: 9px;
+  }
+
+  .info strong {
+    font-size: 21px;
+  }
+
+  .instruction {
+    margin: 17px 0;
+    padding: 14px;
+  }
+
+  .instruction strong {
+    font-size: 18px;
+  }
+
+  .instruction p {
+    font-size: 14px;
+  }
+
+  .startButton {
+    min-height: 52px;
+    font-size: 16px;
+  }
+
+  .testLayout {
+    width: 100%;
+    margin-top: 18px;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .navigator {
+    position: static;
+    padding: 16px 12px;
+  }
+
+  .navigator h3 {
+    margin-bottom: 12px;
+    font-size: 19px;
+  }
+
+  .questionNumbers {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+
+  .legend {
+    margin-top: 15px;
+    padding: 10px;
+  }
+
+  .finishSideButton {
+    min-height: 46px;
+    margin-top: 14px;
+  }
+
+  .questionPanel {
+    border-radius: 16px;
+  }
+
+  .questionTop {
+    min-height: 65px;
+    padding: 10px 14px;
+  }
+
+  .questionTop strong {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .questionContent {
+    margin: 9px;
+    padding: 16px 9px;
+  }
+
+  .question3DCard {
+    margin-bottom: 25px;
+    padding: 32px 15px 20px;
+    border-radius: 15px;
+  }
+
+  .question3DLabel {
+    top: -16px;
+    left: 14px;
+    min-width: 120px;
+    min-height: 34px;
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+
+  .questionHtml {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+
+  .options {
+    gap: 10px;
+  }
+
+  .option {
+    min-height: 58px;
+    grid-template-columns: 38px minmax(0, 1fr) 24px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .optionLetter {
+    width: 34px;
+    height: 34px;
+  }
+
+  .optionText {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .radio {
+    font-size: 21px;
+  }
+
+  .questionActions {
+    padding: 0 9px 16px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .questionActions button {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+  }
+
+  /* NATIJA SAHIFASI */
+
+  .resultCircle {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 15px;
+    border-width: 6px;
+  }
+
+  .resultCircle strong {
+    font-size: 32px;
+  }
+
+  .resultCircle span {
+    font-size: 14px;
+  }
+
+  .resultGrid {
+    margin: 18px 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .resultItem {
+    min-height: 70px;
+    padding: 8px 6px;
+  }
+
+  .resultItem span {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .resultItem strong {
+    font-size: 21px;
+  }
+
+  .resultMessage {
+    margin: 15px 0;
+    padding: 12px 10px;
+    font-size: 16px;
+  }
+
+  .resultActions {
+    gap: 9px;
+  }
+
+  .resultActions button {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 12px;
+  }
+
+  /* JAVOBLARNI KO‘RIB CHIQISH */
+
+  .reviewQuestion {
+    margin-bottom: 15px;
+    padding: 14px 10px;
+  }
+
+  .reviewNumber {
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+
+  .reviewOption {
+    padding: 10px;
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .answerStatus {
+    margin-top: 10px;
+    padding: 9px;
+    font-size: 14px;
+  }
+
+  .shapeResultScroll {
+    margin-bottom: 18px;
+  }
+}
     }
 
     .topHeader,
