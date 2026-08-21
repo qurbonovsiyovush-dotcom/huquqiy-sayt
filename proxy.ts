@@ -42,7 +42,7 @@ export function proxy(
     pathname ===
       "/favicon.ico" ||
     pathname ===
-  "/sitemap.xml" ||
+      "/sitemap.xml" ||
     pathname.startsWith(
       "/images"
     ) ||
@@ -95,6 +95,20 @@ export function proxy(
   }
 
   /* =======================================================
+     VOCABULARY GET API
+     HAMMAGA OCHIQ
+  ======================================================= */
+
+  if (
+    pathname ===
+      "/api/vocabulary" &&
+    request.method.toUpperCase() ===
+      "GET"
+  ) {
+    return NextResponse.next();
+  }
+
+  /* =======================================================
      LOGIN QILMAGAN FOYDALANUVCHI
   ======================================================= */
 
@@ -107,6 +121,9 @@ export function proxy(
       /admin
       va boshqa himoyalangan
       sahifalarga kira olmaydi.
+
+      Faqat yuqorida alohida
+      ochilgan API lar ishlaydi.
     */
 
     if (
@@ -206,6 +223,54 @@ export function proxy(
 
           message:
             "Administrator huquqi talab qilinadi.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    return NextResponse.next();
+  }
+
+  /* =======================================================
+     VOCABULARY API
+  ======================================================= */
+
+  if (
+    pathname ===
+      "/api/vocabulary" ||
+    pathname.startsWith(
+      "/api/vocabulary/"
+    )
+  ) {
+    /*
+      GET:
+      hamma foydalanuvchi
+      vocabulary ma'lumotlarini
+      o‘qishi mumkin.
+
+      POST / PUT / PATCH /
+      DELETE:
+      faqat administrator.
+    */
+
+    const method =
+      request.method.toUpperCase();
+
+    if (
+      method === "GET"
+    ) {
+      return NextResponse.next();
+    }
+
+    if (!isAdmin) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          message:
+            "Vocabulary ma’lumotlarini faqat administrator o‘zgartira oladi.",
         },
         {
           status: 403,
