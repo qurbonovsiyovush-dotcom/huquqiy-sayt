@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { get, put } from "@vercel/blob";
 import fs from "fs";
 import path from "path";
 
-const DATA_DIRECTORY = path.join(
-  process.cwd(),
-  "data-storage"
-);
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const TESTS_FILE = path.join(
-  DATA_DIRECTORY,
+/* =========================================================
+   BLOB
+========================================================= */
+
+const BLOB_PATH = "huquqiy-sayt/tests.json";
+
+/*
+  Eski tests.json faqat birinchi migratsiya uchun o‘qiladi.
+  Endi unga HECH QACHON yozilmaydi.
+*/
+const LEGACY_TESTS_FILE = path.join(
+  process.cwd(),
+  "data-storage",
   "tests.json"
 );
 
@@ -16,49 +26,44 @@ const TESTS_FILE = path.join(
    TYPES
 ========================================================= */
 
+type TestStatus = "draft" | "published";
+
 type TestData = {
   id: string;
   title?: string;
   subject?: string;
   duration?: number;
   description?: string;
-  status?: "draft" | "published";
+  status?: TestStatus;
   questions?: unknown[];
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
 };
 
+type StoreData = {
+  tests: TestData[];
+  etag?: string;
+};
+
 /* =========================================================
-   PAPKA VA FAYLNI TEKSHIRISH
+   HELPERS
 ========================================================= */
 
-function ensureStorage() {
-  if (!fs.existsSync(DATA_DIRECTORY)) {
-    fs.mkdirSync(DATA_DIRECTORY, {
-      recursive: true,
-    });
-  }
-
-  if (!fs.existsSync(TESTS_FILE)) {
-    fs.writeFileSync(
-      TESTS_FILE,
-      JSON.stringify([], null, 2),
-      "utf-8"
-    );
-  }
+function normalizeTests(value: unknown): TestData[] {
+  return Array.isArray(value)
+    ? (value as TestData[])
+    : [];
 }
 
-/* =========================================================
-   TESTLARNI O'QISH
-========================================================= */
-
-function readTests(): TestData[] {
-  ensureStorage();
-
+function readLegacyTests(): TestData[] {
   try {
+    if (!fs.existsSync(LEGACY_TESTS_FILE)) {
+      return [];
+    }
+
     const content = fs.readFileSync(
-      TESTS_FILE,
+      LEGACY_TESTS_FILE,
       "utf-8"
     );
 
@@ -66,14 +71,12 @@ function readTests(): TestData[] {
       return [];
     }
 
-    const parsed = JSON.parse(content);
-
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
+    return normalizeTests(
+      JSON.parse(content)
+    );
   } catch (error) {
     console.error(
-      "tests.json o‘qish xatosi:",
+      "LEGACY tests.json O‘QISH XATOSI:",
       error
     );
 
@@ -82,17 +85,108 @@ function readTests(): TestData[] {
 }
 
 /* =========================================================
-   TESTLARNI YOZISH
+   BLOBGA YOZISH
 ========================================================= */
 
-function writeTests(tests: TestData[]) {
-  ensureStorage();
+async function writeTests(
+  tests: TestData[],
+  etag?: string
+) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
+  }
 
-  fs.writeFileSync(
-    TESTS_FILE,
-    JSON.stringify(tests, null, 2),
-    "utf-8"
+  await put(
+    BLOB_PATH,
+    JSON.stringify(
+      tests,
+      null,
+      2
+    ),
+    {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge: 60,
+
+      /*
+        Agar biz o‘qiganimizdan keyin boshqa request
+        faylni o‘zgartirgan bo‘lsa, tasodifan ustidan
+        yozib yubormaslik uchun.
+      */
+      ...(etag
+        ? {
+            ifMatch: etag,
+          }
+        : {}),
+    }
   );
+}
+
+/* =========================================================
+   BLOB'DAN O‘QISH
+========================================================= */
+
+async function readTests(): Promise<StoreData> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
+  }
+
+  const result = await get(
+    BLOB_PATH,
+    {
+      access: "private",
+    }
+  );
+
+  /*
+    Blob hali mavjud bo‘lmasa:
+    GitHub/Verceldagi eski tests.json ni bir marta
+    Blob'ga ko‘chiramiz.
+  */
+  if (!result) {
+    const legacyTests =
+      readLegacyTests();
+
+    await writeTests(
+      legacyTests
+    );
+
+    return {
+      tests: legacyTests,
+    };
+  }
+
+  if (
+    result.statusCode !== 200 ||
+    !result.stream
+  ) {
+    throw new Error(
+      `Blob o‘qilmadi. Status: ${result.statusCode}`
+    );
+  }
+
+  const text =
+    await new Response(
+      result.stream
+    ).text();
+
+  const tests = text.trim()
+    ? normalizeTests(
+        JSON.parse(text)
+      )
+    : [];
+
+  return {
+    tests,
+    etag: result.blob.etag,
+  };
 }
 
 /* =========================================================
@@ -101,13 +195,18 @@ function writeTests(tests: TestData[]) {
 
 async function getId(
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
-  const params = await context.params;
+  const params =
+    await context.params;
 
   return decodeURIComponent(
-    String(params.id || "")
+    String(
+      params.id || ""
+    )
   ).trim();
 }
 
@@ -119,17 +218,21 @@ async function getId(
 export async function GET(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
-    const id = await getId(context);
+    const id =
+      await getId(context);
 
     if (!id) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test ID berilmagan.",
+          message:
+            "Test ID berilmagan.",
         },
         {
           status: 400,
@@ -137,28 +240,22 @@ export async function GET(
       );
     }
 
-    const tests = readTests();
+    const { tests } =
+      await readTests();
 
-    const test = tests.find(
-      (item) =>
-        String(item.id) === String(id)
-    );
+    const test =
+      tests.find(
+        (item) =>
+          String(item.id) ===
+          String(id)
+      );
 
     if (!test) {
-      console.log(
-        "TEST TOPILMADI. ID:",
-        id
-      );
-
-      console.log(
-        "MAVJUD ID LAR:",
-        tests.map((item) => item.id)
-      );
-
       return NextResponse.json(
         {
           success: false,
-          message: "Test topilmadi.",
+          message:
+            "Test topilmadi.",
         },
         {
           status: 404,
@@ -173,6 +270,10 @@ export async function GET(
       },
       {
         status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
       }
     );
   } catch (error) {
@@ -196,23 +297,27 @@ export async function GET(
 
 /* =========================================================
    PUT
-   TESTNI TAHRIRLASH
+   TESTNI TO‘LIQ TAHRIRLASH
 ========================================================= */
 
 export async function PUT(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
-    const id = await getId(context);
+    const id =
+      await getId(context);
 
     if (!id) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test ID berilmagan.",
+          message:
+            "Test ID berilmagan.",
         },
         {
           status: 400,
@@ -220,20 +325,27 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
-    const tests = readTests();
+    const {
+      tests,
+      etag,
+    } = await readTests();
 
-    const index = tests.findIndex(
-      (item) =>
-        String(item.id) === String(id)
-    );
+    const index =
+      tests.findIndex(
+        (item) =>
+          String(item.id) ===
+          String(id)
+      );
 
     if (index === -1) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test topilmadi.",
+          message:
+            "Test topilmadi.",
         },
         {
           status: 404,
@@ -241,17 +353,98 @@ export async function PUT(
       );
     }
 
-    const oldTest = tests[index];
+    const oldTest =
+      tests[index];
+
+    const title =
+      String(
+        body?.title ??
+          oldTest.title ??
+          ""
+      ).trim();
+
+    if (!title) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Test nomi kiritilmagan.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const questions =
+      Array.isArray(
+        body?.questions
+      )
+        ? body.questions
+        : Array.isArray(
+            oldTest.questions
+          )
+        ? oldTest.questions
+        : [];
+
+    if (
+      questions.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kamida bitta savol bo‘lishi kerak.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const updatedTest: TestData = {
       ...oldTest,
       ...body,
 
       /*
-        ID ni client o'zgartira olmaydi.
+        ID o‘zgarmaydi.
       */
-
       id: oldTest.id,
+
+      title,
+
+      subject: String(
+        body?.subject ??
+          oldTest.subject ??
+          ""
+      ).trim(),
+
+      duration: Math.max(
+        1,
+        Number(
+          body?.duration ??
+            oldTest.duration
+        ) || 30
+      ),
+
+      description:
+        String(
+          body?.description ??
+            oldTest.description ??
+            ""
+        ),
+
+      questions,
+
+      status:
+        body?.status ===
+        "published"
+          ? "published"
+          : body?.status ===
+            "draft"
+          ? "draft"
+          : oldTest.status ||
+            "draft",
 
       createdAt:
         oldTest.createdAt ||
@@ -261,9 +454,13 @@ export async function PUT(
         new Date().toISOString(),
     };
 
-    tests[index] = updatedTest;
+    tests[index] =
+      updatedTest;
 
-    writeTests(tests);
+    await writeTests(
+      tests,
+      etag
+    );
 
     return NextResponse.json(
       {
@@ -297,32 +494,55 @@ export async function PUT(
 
 /* =========================================================
    PATCH
-   FAQAT AYRIM MAYDONLARNI O'ZGARTIRISH
+   FAQAT KERAKLI MAYDONLARNI O‘ZGARTIRISH
 ========================================================= */
 
 export async function PATCH(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
-    const id = await getId(context);
+    const id =
+      await getId(context);
 
-    const body = await request.json();
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Test ID berilmagan.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
-    const tests = readTests();
+    const body =
+      await request.json();
 
-    const index = tests.findIndex(
-      (item) =>
-        String(item.id) === String(id)
-    );
+    const {
+      tests,
+      etag,
+    } = await readTests();
+
+    const index =
+      tests.findIndex(
+        (item) =>
+          String(item.id) ===
+          String(id)
+      );
 
     if (index === -1) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test topilmadi.",
+          message:
+            "Test topilmadi.",
         },
         {
           status: 404,
@@ -330,7 +550,8 @@ export async function PATCH(
       );
     }
 
-    const oldTest = tests[index];
+    const oldTest =
+      tests[index];
 
     const updatedTest: TestData = {
       ...oldTest,
@@ -338,19 +559,32 @@ export async function PATCH(
 
       id: oldTest.id,
 
+      createdAt:
+        oldTest.createdAt,
+
       updatedAt:
         new Date().toISOString(),
     };
 
-    tests[index] = updatedTest;
+    tests[index] =
+      updatedTest;
 
-    writeTests(tests);
+    await writeTests(
+      tests,
+      etag
+    );
 
-    return NextResponse.json({
-      success: true,
-      message: "Test yangilandi.",
-      test: updatedTest,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message:
+          "Test yangilandi.",
+        test: updatedTest,
+      },
+      {
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error(
       "PATCH /api/tests/[id] ERROR:",
@@ -361,7 +595,7 @@ export async function PATCH(
       {
         success: false,
         message:
-          "Testni yangilashda xatolik.",
+          "Testni yangilashda xatolik yuz berdi.",
       },
       {
         status: 500,
@@ -372,23 +606,27 @@ export async function PATCH(
 
 /* =========================================================
    DELETE
-   TESTNI BUTUNLAY O'CHIRISH
+   TESTNI BUTUNLAY O‘CHIRISH
 ========================================================= */
 
 export async function DELETE(
   request: NextRequest,
   context: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
-    const id = await getId(context);
+    const id =
+      await getId(context);
 
     if (!id) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test ID berilmagan.",
+          message:
+            "Test ID berilmagan.",
         },
         {
           status: 400,
@@ -396,18 +634,24 @@ export async function DELETE(
       );
     }
 
-    const tests = readTests();
+    const {
+      tests,
+      etag,
+    } = await readTests();
 
-    const testExists = tests.some(
-      (item) =>
-        String(item.id) === String(id)
-    );
+    const exists =
+      tests.some(
+        (item) =>
+          String(item.id) ===
+          String(id)
+      );
 
-    if (!testExists) {
+    if (!exists) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test topilmadi.",
+          message:
+            "Test topilmadi.",
         },
         {
           status: 404,
@@ -418,10 +662,14 @@ export async function DELETE(
     const remainingTests =
       tests.filter(
         (item) =>
-          String(item.id) !== String(id)
+          String(item.id) !==
+          String(id)
       );
 
-    writeTests(remainingTests);
+    await writeTests(
+      remainingTests,
+      etag
+    );
 
     return NextResponse.json(
       {
