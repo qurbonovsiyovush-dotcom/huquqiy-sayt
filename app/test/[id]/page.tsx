@@ -97,6 +97,11 @@ export default function TestSolvePage() {
 
   const [showReview, setShowReview] = useState(false);
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
+  const [reviewMode, setReviewMode] = useState<"all" | "wrong">("all");
+  const [zoomQuestionId, setZoomQuestionId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
+  const [isOnline, setIsOnline] = useState(true);
+  const restoredRef = useRef(false);
 
   const finishLock = useRef(false);
   const resultSavedRef = useRef(false);
@@ -216,6 +221,33 @@ export default function TestSolvePage() {
       setRemainingSeconds(
         normalizedTest.duration * 60
       );
+
+      // Avvalgi tugallanmagan urinish bo‘lsa, shu qurilmada avtomatik tiklaymiz.
+      try {
+        const raw = window.localStorage.getItem(`quiz-progress:${normalizedTest.id}`);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved?.started === true && saved?.finished !== true) {
+            setAnswers(saved.answers && typeof saved.answers === "object" ? saved.answers : {});
+            setFlagged(saved.flagged && typeof saved.flagged === "object" ? saved.flagged : {});
+            setCurrentIndex(
+              Math.min(
+                Math.max(0, Number(saved.currentIndex) || 0),
+                Math.max(0, normalizedTest.questions.length - 1)
+              )
+            );
+            setRemainingSeconds(
+              Math.max(1, Number(saved.remainingSeconds) || normalizedTest.duration * 60)
+            );
+            setStarted(true);
+            setFinished(false);
+          }
+        }
+      } catch (restoreError) {
+        console.error("TEST PROGRESS RESTORE ERROR:", restoreError);
+      } finally {
+        restoredRef.current = true;
+      }
     } catch (err) {
       console.error("TEST LOAD ERROR:", err);
 
@@ -277,7 +309,13 @@ export default function TestSolvePage() {
     setCurrentIndex(0);
     setFinished(false);
     setShowReview(false);
+    setReviewMode("all");
     setFlagged({});
+    setZoomQuestionId(null);
+
+    try {
+      window.localStorage.removeItem(`quiz-progress:${test.id}`);
+    } catch {}
 
     setRemainingSeconds(
       Math.max(1, Number(test.duration)) * 60
@@ -321,6 +359,11 @@ export default function TestSolvePage() {
 
     setFinished(true);
     setStarted(false);
+    setZoomQuestionId(null);
+
+    try {
+      window.localStorage.removeItem(`quiz-progress:${test.id}`);
+    } catch {}
 
     window.scrollTo({
       top: 0,
@@ -359,6 +402,114 @@ export default function TestSolvePage() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [started, finished, test]);
+
+  /* =====================================================
+     AUTOSAVE / CHIQISHDAN HIMOYA / ONLINE HOLATI
+  ===================================================== */
+
+  useEffect(() => {
+    const syncOnline = () => setIsOnline(window.navigator.onLine);
+    syncOnline();
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOnline);
+    return () => {
+      window.removeEventListener("online", syncOnline);
+      window.removeEventListener("offline", syncOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!test || !started || finished || !restoredRef.current) return;
+
+    setSaveState("saving");
+    const timeout = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          `quiz-progress:${test.id}`,
+          JSON.stringify({
+            version: 1,
+            testId: test.id,
+            started: true,
+            finished: false,
+            answers,
+            flagged,
+            currentIndex,
+            remainingSeconds,
+            savedAt: Date.now(),
+          })
+        );
+        setSaveState("saved");
+      } catch (saveError) {
+        console.error("TEST PROGRESS SAVE ERROR:", saveError);
+        setSaveState("saved");
+      }
+    }, 180);
+
+    return () => window.clearTimeout(timeout);
+  }, [test, started, finished, answers, flagged, currentIndex, remainingSeconds]);
+
+  useEffect(() => {
+    if (!started || finished) return;
+
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [started, finished]);
+
+  /* =====================================================
+     KLAVIATURA: A/B/C/D VA ←/→
+  ===================================================== */
+
+  useEffect(() => {
+    if (!started || finished || !test) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable ||
+        zoomQuestionId
+      ) {
+        return;
+      }
+
+      const question = test.questions[currentIndex];
+      if (!question) return;
+
+      const key = event.key.toLowerCase();
+      const optionIndex = ["a", "b", "c", "d"].indexOf(key);
+
+      if (optionIndex >= 0) {
+        const option = question.options?.[optionIndex];
+        if (option) {
+          event.preventDefault();
+          selectAnswer(question.id, option.id);
+        }
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setCurrentIndex((current) => Math.max(0, current - 1));
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setCurrentIndex((current) =>
+          Math.min(test.questions.length - 1, current + 1)
+        );
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [started, finished, test, currentIndex, zoomQuestionId]);
 
   /* =====================================================
      VARIANT TANLASH
@@ -559,7 +710,11 @@ async function saveResult() {
       )
     : 0;
 
-  function renderQuestionShapes(question: TestQuestion) {
+  const spentSeconds = test
+    ? Math.max(0, Math.max(1, Number(test.duration)) * 60 - remainingSeconds)
+    : 0;
+
+  function renderQuestionShapes(question: TestQuestion, zoomed = false) {
     const shapes = Array.isArray(question.shapes)
       ? question.shapes
       : [];
@@ -594,7 +749,13 @@ async function saveResult() {
     const stageHeight = Math.max(1, Math.ceil(maxY - minY));
 
     return (
-      <div className="shapeResultScroll">
+      <div
+        className={zoomed ? "shapeResultScroll shapeResultZoomed" : "shapeResultScroll shapeResultClickable"}
+        onClick={() => {
+          if (!zoomed) setZoomQuestionId(question.id);
+        }}
+        title={zoomed ? undefined : "Kattalashtirib ko‘rish"}
+      >
         <div
           className="shapeResultStage"
           style={{
@@ -929,6 +1090,11 @@ async function saveResult() {
                   {result.totalPoints}
                 </strong>
               </div>
+
+              <div className="resultItem">
+                <span>Sarflangan vaqt</span>
+                <strong>{formatTime(spentSeconds)}</strong>
+              </div>
             </div>
 
             <div className="resultMessage">
@@ -945,15 +1111,29 @@ async function saveResult() {
               <button
                 type="button"
                 className="reviewButton"
-                onClick={() =>
-                  setShowReview(
-                    (current) => !current
-                  )
-                }
+                onClick={() => {
+                  if (showReview && reviewMode === "all") {
+                    setShowReview(false);
+                  } else {
+                    setReviewMode("all");
+                    setShowReview(true);
+                  }
+                }}
               >
-                {showReview
+                {showReview && reviewMode === "all"
                   ? "Javoblarni yopish"
-                  : "Javoblarni ko‘rib chiqish"}
+                  : "Barcha javoblarni ko‘rish"}
+              </button>
+
+              <button
+                type="button"
+                className="wrongOnlyButton"
+                onClick={() => {
+                  setReviewMode("wrong");
+                  setShowReview(true);
+                }}
+              >
+                Faqat xatolarni ko‘rish
               </button>
 
               <button
@@ -984,8 +1164,17 @@ async function saveResult() {
             </div>
 
             <div className="reviewInner">
-              {test.questions.map(
-                (question, index) => {
+              {test.questions
+                .map((question, index) => ({ question, index }))
+                .filter(({ question }) => {
+                  if (reviewMode === "all") return true;
+                  const selectedId = answers[question.id];
+                  const selectedOption = question.options?.find(
+                    (option) => String(option.id) === String(selectedId)
+                  );
+                  return !selectedOption || !optionIsCorrect(selectedOption);
+                })
+                .map(({ question, index }) => {
                   const selectedId =
                     answers[question.id];
 
@@ -1085,6 +1274,29 @@ async function saveResult() {
                         )}
                       </div>
 
+                      <div className="reviewAnswerSummary">
+                        <div>
+                          <strong>Siz tanlagan:</strong>{" "}
+                          {selectedOption
+                            ? getOptionText(selectedOption).replace(/<[^>]*>/g, "") || "—"
+                            : "Javob berilmagan"}
+                        </div>
+                        <div>
+                          <strong>To‘g‘ri javob:</strong>{" "}
+                          {(() => {
+                            const correctOption = question.options?.find(optionIsCorrect);
+                            return correctOption
+                              ? getOptionText(correctOption).replace(/<[^>]*>/g, "") || "—"
+                              : "Ko‘rsatilmagan";
+                          })()}
+                        </div>
+                        <div>
+                          <strong>Ball:</strong>{" "}
+                          {correct ? (Number(question.points) > 0 ? Number(question.points) : 1) : 0}/
+                          {Number(question.points) > 0 ? Number(question.points) : 1}
+                        </div>
+                      </div>
+
                       <div
                         className={
                           correct
@@ -1100,8 +1312,7 @@ async function saveResult() {
                       </div>
                     </article>
                   );
-                }
-              )}
+                })}
             </div>
           </section>
         )}
@@ -1122,6 +1333,17 @@ async function saveResult() {
           <span>{test.subject}</span>
 
           <strong>{test.title}</strong>
+        </div>
+
+        <div className="saveIndicatorWrap">
+          <span className={isOnline ? "onlineDot" : "offlineDot"} />
+          <span>
+            {isOnline
+              ? saveState === "saving"
+                ? "Saqlanmoqda..."
+                : "Saqlandi"
+              : "Internet yo‘q · lokal saqlandi"}
+          </span>
         </div>
 
         <div
@@ -1403,6 +1625,32 @@ async function saveResult() {
           )}
         </section>
       </div>
+
+      {zoomQuestionId && (() => {
+        const zoomQuestion = test.questions.find((q) => q.id === zoomQuestionId);
+        if (!zoomQuestion) return null;
+        return (
+          <div
+            className="zoomOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setZoomQuestionId(null)}
+          >
+            <div className="zoomPanel" onClick={(event) => event.stopPropagation()}>
+              <button
+                type="button"
+                className="zoomClose"
+                onClick={() => setZoomQuestionId(null)}
+                aria-label="Yopish"
+              >
+                ×
+              </button>
+              <div className="zoomTitle">Savol tasviri · kattalashtirilgan</div>
+              {renderQuestionShapes(zoomQuestion, true)}
+            </div>
+          </div>
+        );
+      })()}
 
       <style jsx>{pageStyles}</style>
     </main>
@@ -2645,6 +2893,113 @@ const pageStyles = `
     background: #f6dada;
   }
 
+  .saveIndicatorWrap {
+    margin-left: auto;
+    min-height: 42px;
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #6f7b82;
+    border-radius: 11px;
+    background: rgba(255,255,255,.78);
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .onlineDot,
+  .offlineDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+
+  .onlineDot { background: #25944d; }
+  .offlineDot { background: #b32929; }
+
+  .shapeResultClickable {
+    cursor: zoom-in;
+    border-radius: 12px;
+    transition: box-shadow .15s ease, transform .15s ease;
+  }
+
+  .shapeResultClickable:hover {
+    box-shadow: 0 0 0 3px rgba(22,143,201,.18);
+  }
+
+  .zoomOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13,20,25,.88);
+    backdrop-filter: blur(5px);
+  }
+
+  .zoomPanel {
+    position: relative;
+    width: min(1200px, 96vw);
+    max-height: 92vh;
+    overflow: auto;
+    padding: 64px 28px 28px;
+    border: 2px solid #79c7ee;
+    border-radius: 20px;
+    background: linear-gradient(#fff, #e9edf0);
+    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+  }
+
+  .zoomTitle {
+    position: absolute;
+    top: 20px;
+    left: 28px;
+    color: #073b68;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .zoomClose {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 50%;
+    background: #25343d;
+    color: white;
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .shapeResultZoomed {
+    min-height: 100px;
+    overflow: auto;
+    margin-bottom: 0;
+  }
+
+  .wrongOnlyButton {
+    border: 2px solid #8e1515;
+    background: linear-gradient(#ffd7d7, #ef8d8d);
+    box-shadow: 0 4px 0 #831515;
+    color: #711313;
+  }
+
+  .reviewAnswerSummary {
+    margin-top: 15px;
+    padding: 14px;
+    display: grid;
+    gap: 7px;
+    border: 1px solid #9aa5ac;
+    border-radius: 9px;
+    background: #f4f7f8;
+    line-height: 1.45;
+  }
+
   /* RESPONSIVE */
 
   @media (max-width: 900px) {
@@ -3023,6 +3378,33 @@ const pageStyles = `
 
   .shapeResultScroll {
     margin-bottom: 18px;
+  }
+
+  .saveIndicatorWrap {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .zoomOverlay {
+    padding: 8px;
+  }
+
+  .zoomPanel {
+    width: 100%;
+    max-height: 96vh;
+    padding: 58px 10px 16px;
+    border-radius: 14px;
+  }
+
+  .zoomTitle {
+    left: 14px;
+    font-size: 15px;
+  }
+
+  .reviewAnswerSummary {
+    padding: 10px;
+    font-size: 13px;
   }
 }
     }
