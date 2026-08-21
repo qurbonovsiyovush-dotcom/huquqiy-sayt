@@ -1,389 +1,1059 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useState,
+} from "react";
 
 export default function LoginPage() {
   const [code, setCode] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [loading, setLoading] =
+    useState(false);
+  const [message, setMessage] =
+    useState("");
+  const [messageType, setMessageType] =
+    useState<"error" | "success" | "">("");
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkSession() {
-      try {
-        const response = await fetch("/api/me", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-        });
-
-        if (cancelled) return;
-
-        if (response.ok) {
-          window.location.replace("/");
-          return;
-        }
-      } catch {
-        // Sessiya bo'lmasa login sahifasi ko'rinadi.
-      } finally {
-        if (!cancelled) {
-          setCheckingSession(false);
-        }
-      }
-    }
-
-    checkSession();
-
-    return () => {
-      cancelled = true;
-    };
+    /*
+      Login sahifasi ochilganda
+      oldingi xabarni tozalaymiz.
+    */
+    setMessage("");
+    setMessageType("");
   }, []);
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  async function login(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
-    const cleanCode = code.trim();
+    const cleanCode = code
+      .trim()
+      .toUpperCase();
 
     if (!cleanCode) {
-      setLoginError("Maxsus kirish kodini kiriting.");
+      setMessage(
+        "Maxsus kirish kodini kiriting."
+      );
+      setMessageType("error");
       return;
     }
 
-    setLoginError("");
-    setLoginLoading(true);
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+    setMessageType("");
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          code: cleanCode,
-        }),
-      });
+      const response = await fetch(
+        "/api/login",
+        {
+          method: "POST",
 
-      const data = await response.json().catch(() => ({}));
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-      if (!response.ok) {
-        setLoginError(
-          data?.error ||
-            data?.message ||
+          body: JSON.stringify({
+            code: cleanCode,
+          }),
+        }
+      );
+
+      let data: {
+        success?: boolean;
+        error?: string;
+        message?: string;
+        redirect?: string;
+        role?: string;
+      } = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok || !data.success) {
+        setMessage(
+          data.error ||
+            data.message ||
             "Kirish amalga oshmadi."
         );
+
+        setMessageType("error");
         return;
       }
 
-      // Server cookie-ni o'rnatgach asosiy sahifani to'liq qayta yuklaymiz.
-      window.location.replace("/");
-    } catch (error) {
-      console.error("LOGIN ERROR:", error);
-      setLoginError("Server bilan bog‘lanishda xatolik yuz berdi.");
-    } finally {
-      setLoginLoading(false);
-    }
-  }
+      setMessage("Kirish muvaffaqiyatli.");
+      setMessageType("success");
 
-  if (checkingSession) {
-    return (
-      <main className="checkingPage">
-        Tekshirilmoqda...
-        <style jsx>{`
-          .checkingPage {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #05283e;
-            color: white;
-            font-family: "Bell MT", "Times New Roman", serif;
-            font-size: 22px;
-            font-weight: 700;
-          }
-        `}</style>
-      </main>
-    );
+      /*
+        Proxy /login?next=...
+        qilib yuborgan bo‘lsa,
+        o‘sha sahifaga qaytaramiz.
+      */
+
+      const params =
+        new URLSearchParams(
+          window.location.search
+        );
+
+      const next =
+        params.get("next");
+
+      const safeNext =
+        next &&
+        next.startsWith("/") &&
+        !next.startsWith("//")
+          ? next
+          : null;
+
+      const redirectTo =
+        safeNext ||
+        data.redirect ||
+        "/";
+
+      window.setTimeout(() => {
+        window.location.replace(
+          redirectTo
+        );
+      }, 250);
+    } catch (error) {
+      console.error(
+        "LOGIN ERROR:",
+        error
+      );
+
+      setMessage(
+        "Server bilan bog‘lanishda xatolik yuz berdi."
+      );
+
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <main className="loginPage">
+      <div className="backgroundGlow glowOne" />
+      <div className="backgroundGlow glowTwo" />
+
       <section className="loginCard">
-        <div className="nameOuter">
-          <div className="nameInner">
-            Qurbonov Siyovush Jamaliddinzoda
-          </div>
-        </div>
+        <div className="innerFrame">
 
-        <form onSubmit={handleLogin}>
-          <label className="label">
-            Maxsus kirish kodi
-          </label>
+          {/* ISM */}
 
-          <div className="inputWrapper">
-            <span className="icon">🔐</span>
+          <div className="namePlate">
+            <span>
+              Qurbonov Siyovush
+            </span>
 
-            <input
-              className="input"
-              type="text"
-              value={code}
-              disabled={loginLoading}
-              autoComplete="off"
-              autoFocus
-              placeholder="Kirish kodini kiriting"
-              onChange={(event) => {
-                setCode(event.target.value.toUpperCase());
-                setLoginError("");
-              }}
-            />
+            <span>
+              Jamaliddinzoda
+            </span>
           </div>
 
-          {loginError && (
-            <div className="error">
-              {loginError}
-            </div>
-          )}
+          {/* LOGIN */}
 
-          <button
-            type="submit"
-            className="loginButton"
-            disabled={loginLoading}
+          <form
+            className="loginForm"
+            onSubmit={login}
           >
-            {loginLoading
-              ? "Tekshirilmoqda..."
-              : "Kirish"}
-          </button>
-        </form>
+            <div className="loginTitle">
+              Maxsus kirish kodi
+            </div>
 
-        <div className="info">
-          Platformaga faqat administrator tomonidan berilgan maxsus kod orqali kirish mumkin.
+            <label
+              className="inputBox"
+              htmlFor="access-code"
+            >
+              <span className="keyIcon">
+                ◆
+              </span>
+
+              <input
+                id="access-code"
+                type="text"
+                value={code}
+                onChange={(event) => {
+                  setCode(
+                    event.target.value
+                  );
+
+                  if (message) {
+                    setMessage("");
+                    setMessageType("");
+                  }
+                }}
+                placeholder="Kirish kodini kiriting"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                maxLength={80}
+                disabled={loading}
+              />
+            </label>
+
+            {message && (
+              <div
+                className={`message ${
+                  messageType ===
+                  "success"
+                    ? "successMessage"
+                    : "errorMessage"
+                }`}
+              >
+                {message}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="loginButton"
+              disabled={loading}
+            >
+              <span>
+                {loading
+                  ? "Kutilmoqda..."
+                  : "Kirish"}
+              </span>
+            </button>
+          </form>
+
+          {/* PASTKI IZOH */}
+
+          <div className="infoArea">
+            <div className="infoLine" />
+
+            <p>
+              Platformaga faqat
+              administrator tomonidan
+              berilgan maxsus kod orqali
+              kirish mumkin.
+            </p>
+          </div>
         </div>
       </section>
 
       <style jsx>{`
+
         * {
           box-sizing: border-box;
         }
 
         .loginPage {
-          min-height: 100vh;
+          position: relative;
+
+          width: 100%;
+          min-height: 100svh;
+
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 30px 20px;
+
+          overflow: hidden;
+
+          padding: 24px;
+
           background:
             radial-gradient(
-              circle at 50% 0%,
-              #16547d 0%,
-              #0b3b5a 35%,
-              #05283e 65%,
-              #021824 100%
+              circle at 50% 18%,
+              rgba(21, 125, 177, .30),
+              transparent 38%
+            ),
+            linear-gradient(
+              180deg,
+              #0a4669 0%,
+              #043754 35%,
+              #022b42 70%,
+              #011f31 100%
             );
-          font-family: "Bell MT", "Times New Roman", serif;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+        }
+
+        .backgroundGlow {
+          position: absolute;
+          pointer-events: none;
+
+          border-radius: 50%;
+
+          filter: blur(50px);
+
+          opacity: .3;
+        }
+
+        .glowOne {
+          width: 300px;
+          height: 300px;
+
+          top: -100px;
+          left: -100px;
+
+          background: #41c9ff;
+        }
+
+        .glowTwo {
+          width: 270px;
+          height: 270px;
+
+          right: -110px;
+          bottom: -100px;
+
+          background: #005d88;
         }
 
         .loginCard {
-          width: min(720px, 100%);
-          padding: 50px 55px 55px;
-          border: 1px solid #368bc0;
-          border-radius: 40px;
+          position: relative;
+          z-index: 2;
+
+          width:
+            min(
+              470px,
+              100%
+            );
+
+          padding: 2px;
+
+          border: 1px solid
+            rgba(
+              107,
+              216,
+              255,
+              .68
+            );
+
+          border-radius: 30px;
+
           background:
             linear-gradient(
               145deg,
-              #16496d 0%,
-              #0b3857 45%,
-              #06273e 100%
+              rgba(
+                106,
+                214,
+                255,
+                .18
+              ),
+              rgba(
+                0,
+                54,
+                80,
+                .28
+              )
             );
+
           box-shadow:
-            inset 4px 4px 10px rgba(255,255,255,.10),
-            inset -8px -8px 18px rgba(0,0,0,.32),
-            0 30px 60px rgba(0,0,0,.45);
+            inset 0 1px 0
+              rgba(255,255,255,.24),
+            0 22px 55px
+              rgba(0,0,0,.35);
         }
 
-        .nameOuter {
-          padding: 5px;
-          margin-bottom: 48px;
-          border: 1px solid #101010;
-          border-radius: 28px;
+        .innerFrame {
+          padding:
+            38px
+            30px
+            28px;
+
+          border-radius: 27px;
+
           background:
             linear-gradient(
               180deg,
-              #f7f7f7 0%,
-              #bdbdbd 25%,
-              #777 65%,
-              #292929 100%
+              rgba(
+                2,
+                55,
+                82,
+                .88
+              ),
+              rgba(
+                0,
+                37,
+                57,
+                .92
+              )
             );
-          box-shadow:
-            0 8px 0 #181818,
-            0 15px 22px rgba(0,0,0,.45);
         }
 
-        .nameInner {
-          min-height: 125px;
+        /* =====================
+           ISM PANELI
+        ===================== */
+
+        .namePlate {
+          width: 100%;
+
+          min-height: 115px;
+
+          padding:
+            16px
+            20px;
+
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 20px;
+
+          gap: 2px;
+
+          border:
+            3px solid
+            #575f64;
+
           border-radius: 22px;
-          background:
-            linear-gradient(
-              145deg,
-              #eee 0%,
-              #d6d6d6 40%,
-              #bdbdbd 100%
-            );
-          box-shadow:
-            inset 7px 7px 10px rgba(255,255,255,.95),
-            inset -7px -7px 12px rgba(0,0,0,.24);
-          text-align: center;
-          font-size: clamp(26px, 4vw, 36px);
-          font-weight: 700;
-          text-shadow: 1px 1px 0 white;
-        }
 
-        .label {
-          display: block;
-          margin-bottom: 12px;
-          color: white;
-          text-align: center;
-          font-size: 27px;
-          font-weight: 700;
-          text-shadow: 0 2px 4px rgba(0,0,0,.5);
-        }
-
-        .inputWrapper {
-          width: 100%;
-          height: 78px;
-          display: flex;
-          align-items: center;
-          overflow: hidden;
-          border: 1px solid #29baff;
-          border-radius: 21px;
-          background:
-            linear-gradient(
-              145deg,
-              #031b2c,
-              #0c4167
-            );
-          box-shadow:
-            inset 7px 7px 13px rgba(0,0,0,.55),
-            0 5px 10px rgba(0,0,0,.20);
-        }
-
-        .inputWrapper:focus-within {
-          border-color: #8ae4ff;
-          box-shadow:
-            inset 7px 7px 13px rgba(0,0,0,.55),
-            0 0 14px rgba(49,190,255,.35);
-        }
-
-        .icon {
-          width: 75px;
-          flex-shrink: 0;
-          text-align: center;
-          font-size: 28px;
-        }
-
-        .input {
-          width: 100%;
-          height: 100%;
-          min-width: 0;
-          padding-right: 25px;
-          border: none;
-          outline: none;
-          background: transparent;
-          color: white;
-          font: inherit;
-          font-size: 23px;
-          font-weight: 700;
-          letter-spacing: 2px;
-        }
-
-        .input::placeholder {
-          color: #8296a7;
-          font-weight: 400;
-          letter-spacing: 0;
-        }
-
-        .error {
-          margin: 18px 0 0;
-          padding: 13px 15px;
-          border: 1px solid rgba(255,100,100,.65);
-          border-radius: 13px;
-          background: rgba(150,20,20,.30);
-          color: #ffe3e3;
-          text-align: center;
-          font-size: 17px;
-        }
-
-        .loginButton {
-          width: 100%;
-          height: 82px;
-          margin-top: 24px;
-          border: 1px solid #9eeaff;
-          border-radius: 21px;
-          cursor: pointer;
-          color: white;
-          font: inherit;
-          font-size: 31px;
-          font-weight: 700;
           background:
             linear-gradient(
               180deg,
-              #5bd3fb 0%,
-              #27b4ed 35%,
-              #0b83bd 75%,
-              #07658f 100%
+              #ffffff 0%,
+              #ededed 28%,
+              #cfcfcf 63%,
+              #a8aaab 100%
             );
+
           box-shadow:
-            inset 0 5px 5px rgba(255,255,255,.45),
-            inset 0 -5px 7px rgba(0,0,0,.15),
-            0 9px 0 #034c70,
-            0 15px 22px rgba(0,0,0,.35);
+            inset 0 7px 6px
+              rgba(255,255,255,.95),
+            inset 0 -7px 8px
+              rgba(0,0,0,.18),
+            0 8px 0
+              #26343b,
+            0 15px 22px
+              rgba(0,0,0,.34);
+
+          color: #073b5b;
+
+          text-align: center;
+
+          font-size: 28px;
+          font-weight: 700;
+          line-height: 1.16;
+
+          text-shadow:
+            0 2px 0
+              rgba(255,255,255,.8);
+        }
+
+        /* =====================
+           FORM
+        ===================== */
+
+        .loginForm {
+          margin-top: 46px;
+        }
+
+        .loginTitle {
+          margin-bottom: 18px;
+
+          color: white;
+
+          text-align: center;
+
+          font-size: 25px;
+          font-weight: 700;
+
+          text-shadow:
+            0 3px 5px
+              rgba(0,0,0,.42);
+        }
+
+        /* =====================
+           INPUT
+        ===================== */
+
+        .inputBox {
+          width: 100%;
+          height: 64px;
+
+          padding:
+            0
+            18px;
+
+          display: flex;
+          align-items: center;
+
+          gap: 14px;
+
+          overflow: hidden;
+
+          border:
+            2px solid
+            #6ed8ff;
+
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              180deg,
+              rgba(
+                0,
+                45,
+                69,
+                .82
+              ),
+              rgba(
+                0,
+                34,
+                53,
+                .92
+              )
+            );
+
+          box-shadow:
+            inset 0 4px 8px
+              rgba(0,0,0,.34),
+            inset 0 1px 0
+              rgba(255,255,255,.12),
+            0 4px 12px
+              rgba(0,0,0,.20);
+        }
+
+        .inputBox:focus-within {
+          border-color: #b9efff;
+
+          box-shadow:
+            inset 0 4px 8px
+              rgba(0,0,0,.34),
+            0 0 0 3px
+              rgba(
+                71,
+                197,
+                245,
+                .16
+              ),
+            0 5px 16px
+              rgba(0,0,0,.23);
+        }
+
+        .keyIcon {
+          flex: 0 0 auto;
+
+          color: #ffc83d;
+
+          font-size: 19px;
+
+          text-shadow:
+            0 2px 4px
+              rgba(0,0,0,.45);
+        }
+
+        .inputBox input {
+          width: 100%;
+          min-width: 0;
+
+          border: none;
+          outline: none;
+
+          background:
+            transparent;
+
+          color: white;
+
+          font-family: inherit;
+          font-size: 18px;
+
+          text-transform:
+            uppercase;
+        }
+
+        .inputBox input::placeholder {
+          color:
+            rgba(
+              218,
+              230,
+              237,
+              .55
+            );
+
+          text-transform: none;
+        }
+
+        /* =====================
+           XABAR
+        ===================== */
+
+        .message {
+          margin-top: 13px;
+          padding:
+            10px
+            12px;
+
+          border-radius: 10px;
+
+          text-align: center;
+
+          font-family:
+            Arial,
+            sans-serif;
+
+          font-size: 13px;
+          line-height: 1.35;
+        }
+
+        .errorMessage {
+          border:
+            1px solid
+            rgba(
+              255,
+              119,
+              119,
+              .65
+            );
+
+          background:
+            rgba(
+              125,
+              15,
+              15,
+              .35
+            );
+
+          color: #ffd5d5;
+        }
+
+        .successMessage {
+          border:
+            1px solid
+            rgba(
+              108,
+              229,
+              158,
+              .65
+            );
+
+          background:
+            rgba(
+              16,
+              105,
+              55,
+              .33
+            );
+
+          color: #d7ffe7;
+        }
+
+        /* =====================
+           KIRISH TUGMASI
+        ===================== */
+
+        .loginButton {
+          position: relative;
+
+          width: 100%;
+          height: 64px;
+
+          margin-top: 20px;
+
+          border:
+            2px solid
+            #75dcff;
+
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #64d7ff 0%,
+              #26b9ed 45%,
+              #0788c1 100%
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(255,255,255,.55),
+            inset 0 -6px 7px
+              rgba(0,62,96,.28),
+            0 7px 0
+              #035d85,
+            0 13px 20px
+              rgba(0,0,0,.30);
+
+          color: white;
+
+          font-family: inherit;
+          font-size: 27px;
+          font-weight: 700;
+
+          text-shadow:
+            0 2px 3px
+              rgba(0,0,0,.28);
+
+          cursor: pointer;
+
+          transition:
+            transform .12s ease,
+            box-shadow .12s ease,
+            filter .12s ease;
+        }
+
+        .loginButton:hover {
+          filter:
+            brightness(1.05);
+        }
+
+        .loginButton:active {
+          transform:
+            translateY(5px);
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(255,255,255,.45),
+            inset 0 -4px 6px
+              rgba(0,62,96,.24),
+            0 2px 0
+              #035d85,
+            0 7px 12px
+              rgba(0,0,0,.24);
         }
 
         .loginButton:disabled {
-          opacity: .65;
+          opacity: .7;
           cursor: wait;
         }
 
-        .info {
-          margin-top: 35px;
-          padding-top: 22px;
-          border-top: 1px solid rgba(255,255,255,.15);
-          color: rgba(255,255,255,.65);
-          text-align: center;
-          font-size: 16px;
-          line-height: 1.5;
+        /* =====================
+           IZOH
+        ===================== */
+
+        .infoArea {
+          margin-top: 38px;
         }
 
-        @media (max-width: 600px) {
+        .infoLine {
+          width: 100%;
+          height: 1px;
+
+          margin-bottom: 21px;
+
+          background:
+            rgba(
+              177,
+              224,
+              244,
+              .25
+            );
+        }
+
+        .infoArea p {
+          max-width: 345px;
+
+          margin:
+            0
+            auto;
+
+          color:
+            rgba(
+              222,
+              235,
+              241,
+              .76
+            );
+
+          text-align: center;
+
+          font-size: 15px;
+          line-height: 1.55;
+        }
+
+        /* =====================
+           PLANSHET
+        ===================== */
+
+        @media (
+          max-width: 700px
+        ) {
+          .loginPage {
+            padding: 14px;
+          }
+
           .loginCard {
-            padding: 35px 20px 40px;
-            border-radius: 28px;
+            width:
+              min(
+                430px,
+                100%
+              );
+
+            border-radius: 24px;
           }
 
-          .nameInner {
-            min-height: 100px;
+          .innerFrame {
+            padding:
+              26px
+              22px
+              22px;
+
+            border-radius: 21px;
           }
 
-          .label {
+          .namePlate {
+            min-height: 91px;
+
+            padding:
+              12px
+              15px;
+
+            border-radius: 17px;
+
+            font-size: 23px;
+          }
+
+          .loginForm {
+            margin-top: 34px;
+          }
+
+          .loginTitle {
+            margin-bottom: 14px;
+
             font-size: 22px;
           }
 
-          .inputWrapper {
-            height: 68px;
+          .inputBox {
+            height: 57px;
+
+            border-radius: 15px;
           }
 
-          .input {
-            font-size: 19px;
+          .inputBox input {
+            font-size: 16px;
           }
 
           .loginButton {
-            height: 70px;
-            font-size: 26px;
+            height: 57px;
+
+            margin-top: 17px;
+
+            border-radius: 15px;
+
+            font-size: 23px;
+          }
+
+          .infoArea {
+            margin-top: 29px;
+          }
+
+          .infoLine {
+            margin-bottom: 16px;
+          }
+
+          .infoArea p {
+            font-size: 14px;
+          }
+        }
+
+        /* =====================
+           TELEFON
+        ===================== */
+
+        @media (
+          max-width: 480px
+        ) {
+          .loginPage {
+            min-height: 100svh;
+
+            padding:
+              10px
+              12px;
+          }
+
+          .loginCard {
+            width: 100%;
+
+            border-radius: 21px;
+          }
+
+          .innerFrame {
+            padding:
+              21px
+              17px
+              18px;
+
+            border-radius: 19px;
+          }
+
+          .namePlate {
+            min-height: 76px;
+
+            padding:
+              10px
+              10px;
+
+            border-width: 2px;
+            border-radius: 14px;
+
+            box-shadow:
+              inset 0 5px 5px
+                rgba(
+                  255,
+                  255,
+                  255,
+                  .95
+                ),
+              inset 0 -5px 5px
+                rgba(
+                  0,
+                  0,
+                  0,
+                  .17
+                ),
+              0 5px 0
+                #26343b,
+              0 10px 15px
+                rgba(
+                  0,
+                  0,
+                  0,
+                  .28
+                );
+
+            font-size:
+              clamp(
+                20px,
+                6vw,
+                24px
+              );
+
+            line-height: 1.08;
+          }
+
+          .loginForm {
+            margin-top: 27px;
+          }
+
+          .loginTitle {
+            margin-bottom: 12px;
+
+            font-size: 20px;
+          }
+
+          .inputBox {
+            height: 52px;
+
+            padding:
+              0
+              14px;
+
+            gap: 10px;
+
+            border-radius: 14px;
+          }
+
+          .keyIcon {
+            font-size: 16px;
+          }
+
+          .inputBox input {
+            font-size: 15px;
+          }
+
+          .loginButton {
+            height: 52px;
+
+            margin-top: 15px;
+
+            border-radius: 14px;
+
+            font-size: 21px;
+
+            box-shadow:
+              inset 0 5px 4px
+                rgba(
+                  255,
+                  255,
+                  255,
+                  .55
+                ),
+              inset 0 -5px 5px
+                rgba(
+                  0,
+                  62,
+                  96,
+                  .26
+                ),
+              0 5px 0
+                #035d85,
+              0 9px 14px
+                rgba(
+                  0,
+                  0,
+                  0,
+                  .27
+                );
+          }
+
+          .infoArea {
+            margin-top: 25px;
+          }
+
+          .infoLine {
+            margin-bottom: 14px;
+          }
+
+          .infoArea p {
+            max-width: 280px;
+
+            font-size: 13px;
+            line-height: 1.45;
+          }
+        }
+
+        /* =====================
+           JUDA KICHIK TELEFON
+        ===================== */
+
+        @media (
+          max-width: 360px
+        ) {
+          .loginPage {
+            padding: 7px;
+          }
+
+          .innerFrame {
+            padding:
+              17px
+              13px
+              15px;
+          }
+
+          .namePlate {
+            min-height: 68px;
+
+            font-size: 19px;
+          }
+
+          .loginForm {
+            margin-top: 22px;
+          }
+
+          .loginTitle {
+            font-size: 18px;
+          }
+
+          .inputBox,
+          .loginButton {
+            height: 48px;
+          }
+
+          .loginButton {
+            font-size: 19px;
+          }
+
+          .infoArea {
+            margin-top: 21px;
+          }
+
+          .infoArea p {
+            font-size: 12px;
           }
         }
       `}</style>
