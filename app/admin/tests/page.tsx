@@ -444,7 +444,7 @@ export default function AdminTestsPage() {
 
     // A4/Word ichida shakllar juda katta bo‘lib ketmasligi uchun
     // butun kompozitsiyani bir xil nisbatda kichraytiramiz.
-    const scale = Math.min(1, 620 / sourceWidth, 360 / sourceHeight);
+    const scale = Math.min(1, 560 / sourceWidth, 300 / sourceHeight);
 
     return {
       minX,
@@ -528,18 +528,24 @@ export default function AdminTestsPage() {
 
     const wrap = document.createElement("div");
     wrap.style.width = "100%";
-    wrap.style.margin = "10px 0 12px";
+    wrap.style.margin = "12px 0 14px";
+    wrap.style.padding = "12px";
     wrap.style.display = "flex";
     wrap.style.justifyContent = "center";
+    wrap.style.alignItems = "center";
     wrap.style.overflow = "hidden";
-    wrap.style.background = "#ffffff";
+    wrap.style.background = "linear-gradient(180deg,#f7fbfe 0%,#e8f2f8 100%)";
+    wrap.style.border = "2px solid #31586f";
+    wrap.style.borderRadius = "14px";
+    wrap.style.boxShadow = "inset 0 4px 4px rgba(255,255,255,.95), 0 4px 0 #355361, 0 8px 16px rgba(15,42,57,.18)";
 
     const stage = document.createElement("div");
     stage.style.position = "relative";
     stage.style.width = `${layout.width}px`;
     stage.style.height = `${layout.height}px`;
     stage.style.flex = "0 0 auto";
-    stage.style.background = "#ffffff";
+    stage.style.background = "transparent";
+    stage.style.margin = "0 auto";
     wrap.appendChild(stage);
 
     for (const shape of shapes) {
@@ -564,10 +570,10 @@ export default function AdminTestsPage() {
         const src = await imageToDataUrl(shape.imageSrc);
         if (!src) continue;
         item.style.overflow = "hidden";
-        item.style.background = "#ffffff";
-        item.style.border = `${borderWidth}px solid ${borderColor}`;
+        item.style.background = "transparent";
+        item.style.border = borderWidth > 0 ? `${borderWidth}px solid ${borderColor}` : "none";
         item.style.borderRadius = `${borderRadius}px`;
-        item.style.boxShadow = "0 3px 8px rgba(0,0,0,.16)";
+        item.style.boxShadow = borderWidth > 0 ? "0 3px 8px rgba(0,0,0,.14)" : "none";
 
         const img = document.createElement("img");
         img.src = src;
@@ -858,7 +864,7 @@ export default function AdminTestsPage() {
       renderRoot.style.position = "fixed";
       renderRoot.style.left = "-100000px";
       renderRoot.style.top = "0";
-      renderRoot.style.width = "760px";
+      renderRoot.style.width = "720px";
       renderRoot.style.padding = "0";
       renderRoot.style.margin = "0";
       renderRoot.style.background = "#ffffff";
@@ -907,30 +913,44 @@ export default function AdminTestsPage() {
         const question = questions[index];
         const card = document.createElement("section");
         addBaseStyles(card);
-        card.style.padding = "12px";
-        card.style.marginBottom = "12px";
-        card.style.border = "1px solid #8c9aa3";
-        card.style.borderRadius = "8px";
-        card.style.background = "#ffffff";
+        card.style.padding = "14px";
+        card.style.marginBottom = "16px";
+        card.style.border = "2px solid #2d5268";
+        card.style.borderRadius = "15px";
+        card.style.background = "linear-gradient(180deg,#ffffff 0%,#f2f6f8 100%)";
+        card.style.boxShadow = "inset 0 4px 4px rgba(255,255,255,.95), 0 5px 0 #3a5664, 0 10px 18px rgba(0,0,0,.18)";
 
         const title = document.createElement("div");
         title.textContent = `${index + 1}-savol`;
-        title.style.marginBottom = "8px";
+        title.style.width = "fit-content";
+        title.style.minWidth = "120px";
+        title.style.margin = "0 0 11px";
+        title.style.padding = "7px 15px";
         title.style.color = "#073b68";
         title.style.fontSize = "18px";
-        title.style.fontWeight = "800";
+        title.style.fontWeight = "900";
+        title.style.textAlign = "center";
+        title.style.border = "2px solid #174461";
+        title.style.borderRadius = "10px";
+        title.style.background = "linear-gradient(180deg,#c6f0ff 0%,#69b7df 100%)";
+        title.style.boxShadow = "inset 0 3px 3px rgba(255,255,255,.85), 0 3px 0 #17415c";
         card.appendChild(title);
 
         const questionText = document.createElement("div");
         questionText.textContent =
           stripHtml(question.questionHtml) || "Savol matni mavjud emas";
-        questionText.style.marginBottom = "9px";
+        questionText.style.marginBottom = "12px";
+        questionText.style.padding = "12px 14px";
         questionText.style.fontSize = "16px";
         questionText.style.lineHeight = "1.42";
-        questionText.style.fontWeight = "700";
+        questionText.style.fontWeight = "800";
         questionText.style.whiteSpace = "pre-wrap";
         questionText.style.overflowWrap = "anywhere";
-        questionText.style.color = "#111111";
+        questionText.style.color = "#12202a";
+        questionText.style.border = "1px solid #9aaab3";
+        questionText.style.borderRadius = "10px";
+        questionText.style.background = "linear-gradient(180deg,#ffffff 0%,#eef2f4 100%)";
+        questionText.style.boxShadow = "inset 0 3px 3px rgba(255,255,255,.95), 0 3px 0 #b5bec3";
         card.appendChild(questionText);
 
         await appendQuestionShapesForPdf(card, question);
@@ -945,15 +965,21 @@ export default function AdminTestsPage() {
           optionBox.style.display = "flex";
           optionBox.style.alignItems = "flex-start";
           optionBox.style.gap = "7px";
-          optionBox.style.margin = "5px 0";
-          optionBox.style.padding = "7px 9px";
+          optionBox.style.margin = "7px 0";
+          optionBox.style.padding = "8px 11px";
           optionBox.style.border = correct
             ? "2px solid #2f8450"
-            : "1px solid #c2c9cd";
-          optionBox.style.borderRadius = "6px";
-          optionBox.style.background = correct ? "#eaf8ef" : "#ffffff";
+            : "1px solid #8fa0aa";
+          optionBox.style.borderRadius = "8px";
+          optionBox.style.background = correct
+            ? "linear-gradient(180deg,#f1fff5 0%,#ccefd7 100%)"
+            : "linear-gradient(180deg,#ffffff 0%,#e9eef1 100%)";
+          optionBox.style.boxShadow = correct
+            ? "inset 0 3px 3px rgba(255,255,255,.9), 0 3px 0 #2f8450"
+            : "inset 0 3px 3px rgba(255,255,255,.95), 0 3px 0 #8e9aa1";
           optionBox.style.color = "#111111";
           optionBox.style.fontSize = "14px";
+          optionBox.style.fontWeight = "700";
           optionBox.style.lineHeight = "1.35";
 
           const letter = document.createElement("strong");
@@ -1039,7 +1065,7 @@ export default function AdminTestsPage() {
           imageTimeout: 4000,
           scrollX: 0,
           scrollY: 0,
-          windowWidth: 760,
+          windowWidth: 720,
         });
 
         const renderWidthMm = usableWidth;
