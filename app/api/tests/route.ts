@@ -1,194 +1,229 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs/promises";
+import { get, put } from "@vercel/blob";
+import fs from "fs";
 import path from "path";
-import crypto from "crypto";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =========================================================
-   TEST MA'LUMOTLARI UCHUN TIPLAR
+   BLOB
 ========================================================= */
 
-export type TestOption = {
-  id: string;
-  text: string;
-  isCorrect: boolean;
-};
-
-export type TestShape = {
-  id: string;
-
-  type:
-    | "rectangle"
-    | "roundedRectangle"
-    | "circle"
-    | "ellipse"
-    | "venn"
-    | "text";
-
-  x: number;
-  y: number;
-
-  width: number;
-  height: number;
-
-  text: string;
-
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
-
-  fontSize: number;
-  fontFamily: string;
-
-  fontWeight: "normal" | "bold";
-  fontStyle: "normal" | "italic";
-
-  textAlign:
-    | "left"
-    | "center"
-    | "right";
-};
-
-export type TestQuestion = {
-  id: string;
-
-  questionHtml: string;
-
-  options: TestOption[];
-
-  shapes: TestShape[];
-
-  points: number;
-};
-
-export type TestData = {
-  id: string;
-
-  title: string;
-  subject: string;
-
-  duration: number;
-
-  description: string;
-
-  questions: TestQuestion[];
-
-  status:
-    | "draft"
-    | "published";
-
-  createdAt: string;
-  updatedAt: string;
-};
-
+const BLOB_PATH = "huquqiy-sayt/tests.json";
 
 /* =========================================================
-   TESTLAR SAQLANADIGAN FAYL
+   ESKI LOCAL STORAGE
+   Faqat birinchi migratsiya uchun ishlatiladi.
 ========================================================= */
 
-const DATA_DIRECTORY = path.join(
+const LOCAL_TESTS_FILE = path.join(
   process.cwd(),
-  "data-storage"
-);
-
-const TESTS_FILE = path.join(
-  DATA_DIRECTORY,
+  "data-storage",
   "tests.json"
 );
 
-
 /* =========================================================
-   PAPKA VA FAYL BORLIGINI TEKSHIRISH
+   TYPES
 ========================================================= */
 
-async function ensureStorage() {
+type TestStatus = "draft" | "published";
 
-  await fs.mkdir(
-    DATA_DIRECTORY,
-    {
-      recursive: true,
-    }
-  );
+type TestData = {
+  id: string;
+  title?: string;
+  subject?: string;
+  duration?: number;
+  description?: string;
+  status?: TestStatus;
+  questions?: unknown[];
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
+};
 
-  try {
+/* =========================================================
+   JSON PARSE
+========================================================= */
 
-    await fs.access(TESTS_FILE);
-
-  } catch {
-
-    await fs.writeFile(
-      TESTS_FILE,
-      "[]",
-      "utf8"
-    );
-
-  }
-
+function normalizeTests(value: unknown): TestData[] {
+  return Array.isArray(value)
+    ? (value as TestData[])
+    : [];
 }
 
-
 /* =========================================================
-   TESTLARNI O'QISH
+   LOCAL TESTLARNI O‘QISH
+   Blob bo‘sh bo‘lsa bir marta ishlaydi.
 ========================================================= */
 
-async function readTests(): Promise<TestData[]> {
-
-  await ensureStorage();
-
+function readLegacyTests(): TestData[] {
   try {
+    if (!fs.existsSync(LOCAL_TESTS_FILE)) {
+      return [];
+    }
 
-    const file = await fs.readFile(
-      TESTS_FILE,
-      "utf8"
+    const content = fs.readFileSync(
+      LOCAL_TESTS_FILE,
+      "utf-8"
     );
 
-    if (!file.trim()) {
+    if (!content.trim()) {
       return [];
     }
 
-    const parsed = JSON.parse(file);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed;
-
+    return normalizeTests(
+      JSON.parse(content)
+    );
   } catch (error) {
-
     console.error(
-      "Testlarni o'qishda xato:",
+      "ESKI tests.json O‘QISH XATOSI:",
       error
     );
 
     return [];
-
   }
-
 }
 
-
 /* =========================================================
-   TESTLARNI SAQLASH
+   BLOBGA YOZISH
 ========================================================= */
 
 async function writeTests(
   tests: TestData[]
 ) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
+  }
 
-  await ensureStorage();
-
-  await fs.writeFile(
-    TESTS_FILE,
+  await put(
+    BLOB_PATH,
     JSON.stringify(
       tests,
       null,
       2
     ),
-    "utf8"
-  );
+    {
+      access: "private",
+      contentType:
+        "application/json; charset=utf-8",
 
+      /*
+        Path doim bir xil qoladi.
+      */
+      addRandomSuffix: false,
+
+      /*
+        tests.json yangilanayotganligi uchun
+        eski Blob ustidan yozishga ruxsat.
+      */
+      allowOverwrite: true,
+
+      /*
+        Tez yangilanishi uchun.
+        Vercel Blob minimum 60 soniya.
+      */
+      cacheControlMaxAge: 60,
+    }
+  );
 }
 
+/* =========================================================
+   BLOB'DAN O‘QISH
+========================================================= */
+
+async function readTests(): Promise<TestData[]> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
+  }
+
+  try {
+    const result = await get(
+      BLOB_PATH,
+      {
+        access: "private",
+      }
+    );
+
+    /*
+      Blob hali yaratilmagan.
+      Eski tests.json ni migratsiya qilamiz.
+    */
+    if (
+      !result ||
+      result.statusCode !== 200 ||
+      !result.stream
+    ) {
+      const legacyTests =
+        readLegacyTests();
+
+      await writeTests(
+        legacyTests
+      );
+
+      return legacyTests;
+    }
+
+    const text =
+      await new Response(
+        result.stream
+      ).text();
+
+    if (!text.trim()) {
+      return [];
+    }
+
+    return normalizeTests(
+      JSON.parse(text)
+    );
+  } catch (error) {
+    /*
+      Blob birinchi marta yo‘q bo‘lsa
+      yoki get() BlobNotFound qaytarsa,
+      eski fayldan boshlaymiz.
+    */
+
+    console.error(
+      "BLOB O‘QISH:",
+      error
+    );
+
+    const legacyTests =
+      readLegacyTests();
+
+    /*
+      Blobga yozishga urinamiz.
+      Agar boshqa jiddiy xato bo‘lsa,
+      yuqoriga chiqaramiz.
+    */
+    try {
+      await writeTests(
+        legacyTests
+      );
+
+      return legacyTests;
+    } catch (writeError) {
+      console.error(
+        "BLOB MIGRATSIYA XATOSI:",
+        writeError
+      );
+
+      throw writeError;
+    }
+  }
+}
+
+/* =========================================================
+   ID
+========================================================= */
+
+function makeId() {
+  return crypto.randomUUID();
+}
 
 /* =========================================================
    GET
@@ -196,69 +231,68 @@ async function writeTests(
 ========================================================= */
 
 export async function GET() {
-
   try {
-
-    const tests = await readTests();
+    const tests =
+      await readTests();
 
     /*
-      Eng oxirgi o'zgartirilgan test
-      tepada chiqadi.
+      Eng oxirgi o‘zgargan testlar tepada.
     */
+    const sortedTests = [
+      ...tests,
+    ].sort((a, b) => {
+      const aTime =
+        new Date(
+          String(
+            a.updatedAt ||
+              a.createdAt ||
+              ""
+          )
+        ).getTime() || 0;
 
-    const sortedTests = [...tests].sort(
-      (a, b) => {
+      const bTime =
+        new Date(
+          String(
+            b.updatedAt ||
+              b.createdAt ||
+              ""
+          )
+        ).getTime() || 0;
 
-        return (
-          new Date(
-            b.updatedAt
-          ).getTime() -
-          new Date(
-            a.updatedAt
-          ).getTime()
-        );
-
-      }
-    );
+      return bTime - aTime;
+    });
 
     return NextResponse.json(
       {
         success: true,
-
-        count:
-          sortedTests.length,
-
-        tests:
-          sortedTests,
+        tests: sortedTests,
       },
       {
         status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
       }
     );
-
   } catch (error) {
-
     console.error(
-      "GET /api/tests xatosi:",
+      "GET /api/tests ERROR:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-
         message:
-          "Testlarni yuklab bo'lmadi.",
+          "Testlarni yuklashda server xatosi yuz berdi.",
       },
       {
         status: 500,
       }
     );
-
   }
-
 }
-
 
 /* =========================================================
    POST
@@ -268,198 +302,131 @@ export async function GET() {
 export async function POST(
   request: NextRequest
 ) {
-
   try {
-
     const body =
       await request.json();
 
-    /* -----------------------------
-       TEST NOMI
-    ----------------------------- */
-
     const title =
-      typeof body.title === "string"
-        ? body.title.trim()
-        : "";
+      String(
+        body?.title || ""
+      ).trim();
+
+    const subject =
+      String(
+        body?.subject || ""
+      ).trim();
 
     if (!title) {
-
       return NextResponse.json(
         {
           success: false,
-
           message:
-            "Test nomini kiriting.",
+            "Test nomi kiritilmagan.",
         },
         {
           status: 400,
         }
       );
-
     }
 
-
-    /* -----------------------------
-       FAN
-    ----------------------------- */
-
-    const subject =
-      typeof body.subject === "string"
-        ? body.subject.trim()
-        : "";
-
-
-    /* -----------------------------
-       VAQT
-    ----------------------------- */
-
-    const rawDuration =
-      Number(body.duration);
-
-    const duration =
-      Number.isFinite(rawDuration) &&
-      rawDuration > 0
-        ? Math.round(rawDuration)
-        : 30;
-
-
-    /* -----------------------------
-       IZOH
-    ----------------------------- */
-
-    const description =
-      typeof body.description ===
-      "string"
-        ? body.description
-        : "";
-
-
-    /* -----------------------------
-       SAVOLLAR
-    ----------------------------- */
-
     const questions =
-      Array.isArray(body.questions)
+      Array.isArray(
+        body?.questions
+      )
         ? body.questions
         : [];
 
-
-    /* -----------------------------
-       STATUS
-    ----------------------------- */
-
-    const status:
-      | "draft"
-      | "published" =
-      body.status === "published"
-        ? "published"
-        : "draft";
-
-
-    /* -----------------------------
-       VAQT
-    ----------------------------- */
+    if (
+      questions.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kamida bitta savol bo‘lishi kerak.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const now =
       new Date().toISOString();
 
-
-    /* -----------------------------
-       ID
-    ----------------------------- */
-
-    const id =
-      crypto.randomUUID();
-
-
-    /* -----------------------------
-       YANGI TEST
-    ----------------------------- */
-
     const newTest: TestData = {
+      ...body,
 
-      id,
+      /*
+        Client bergan IDga ishonmaymiz.
+      */
+      id: makeId(),
 
       title,
-
       subject,
 
-      duration,
+      duration:
+        Math.max(
+          1,
+          Number(
+            body?.duration
+          ) || 30
+        ),
 
-      description,
+      description:
+        String(
+          body?.description || ""
+        ),
 
       questions,
 
-      status,
+      status:
+        body?.status ===
+        "published"
+          ? "published"
+          : "draft",
 
       createdAt: now,
-
       updatedAt: now,
-
     };
-
-
-    /* -----------------------------
-       OLDINGI TESTLAR
-    ----------------------------- */
 
     const tests =
       await readTests();
 
+    tests.push(
+      newTest
+    );
 
-    /* -----------------------------
-       YANGI TESTNI QO'SHAMIZ
-    ----------------------------- */
-
-    tests.push(newTest);
-
-
-    /* -----------------------------
-       FAYLGA SAQLAYMIZ
-    ----------------------------- */
-
-    await writeTests(tests);
-
-
-    /* -----------------------------
-       JAVOB
-    ----------------------------- */
+    await writeTests(
+      tests
+    );
 
     return NextResponse.json(
       {
         success: true,
-
         message:
           "Test muvaffaqiyatli yaratildi.",
-
-        test:
-          newTest,
+        test: newTest,
       },
       {
         status: 201,
       }
     );
-
   } catch (error) {
-
     console.error(
-      "POST /api/tests xatosi:",
+      "POST /api/tests ERROR:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-
         message:
-          "Testni saqlashda xatolik yuz berdi.",
+          "Testni yaratishda server xatosi yuz berdi.",
       },
       {
         status: 500,
       }
     );
-
   }
-
 }
