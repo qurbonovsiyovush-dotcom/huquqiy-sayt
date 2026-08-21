@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 type TestStatus = "draft" | "published";
 
@@ -593,70 +594,212 @@ export default function AdminTestsPage() {
     setExporting(true);
     setWorkingId(test.id);
 
-    let iframe: HTMLIFrameElement | null = null;
+    let renderRoot: HTMLDivElement | null = null;
 
     try {
       const fullTest = await getFullTest(test.id);
       if (!fullTest) return;
 
-      const html = await buildTestDocument(fullTest, includeAnswers);
+      const questions = Array.isArray(fullTest.questions)
+        ? fullTest.questions
+        : [];
 
-      // PDF uchun yashirin hujjat yaratamiz. Print oynasi ochilmaydi.
-      iframe = document.createElement("iframe");
-      iframe.setAttribute("aria-hidden", "true");
-      iframe.style.position = "fixed";
-      iframe.style.left = "-100000px";
-      iframe.style.top = "0";
-      iframe.style.width = "794px";
-      iframe.style.height = "1123px";
-      iframe.style.opacity = "0";
-      iframe.style.pointerEvents = "none";
-      iframe.style.border = "0";
-      document.body.appendChild(iframe);
+      /*
+        Muhim:
+        jsPDF.html() ishlatmaymiz. U brauzer CSS'ini ayrim holatlarda
+        noto'g'ri hisoblab, qora fon yoki juda katta shrift chiqarishi mumkin.
+        Har bir blokni html2canvas bilan oq fonda rasmga aylantirib,
+        PDF sahifalariga o'zimiz joylaymiz.
+      */
+      renderRoot = document.createElement("div");
+      renderRoot.style.position = "fixed";
+      renderRoot.style.left = "-100000px";
+      renderRoot.style.top = "0";
+      renderRoot.style.width = "760px";
+      renderRoot.style.padding = "0";
+      renderRoot.style.margin = "0";
+      renderRoot.style.background = "#ffffff";
+      renderRoot.style.color = "#111111";
+      renderRoot.style.fontFamily = 'Arial, "Times New Roman", serif';
+      renderRoot.style.fontSize = "16px";
+      renderRoot.style.lineHeight = "1.42";
+      renderRoot.style.zIndex = "-1";
+      document.body.appendChild(renderRoot);
 
-      const pdfDocument = iframe.contentDocument;
-      if (!pdfDocument) {
-        throw new Error("PDF hujjatini tayyorlab bo‘lmadi.");
+      function addBaseStyles(element: HTMLElement) {
+        element.style.boxSizing = "border-box";
+        element.style.width = "100%";
+        element.style.background = "#ffffff";
+        element.style.color = "#111111";
       }
 
-      pdfDocument.open();
-      pdfDocument.write(html);
-      pdfDocument.close();
+      const header = document.createElement("section");
+      addBaseStyles(header);
+      header.style.padding = "18px";
+      header.style.marginBottom = "14px";
+      header.style.border = "2px solid #174461";
+      header.style.borderRadius = "12px";
+      header.style.background = "#eef8ff";
+      header.style.textAlign = "center";
+      header.innerHTML = `
+        <h1 style="margin:0 0 7px;color:#073b68;font-size:30px;line-height:1.15;">
+          ${escapeHtml(fullTest.title || "Nomsiz test")}
+        </h1>
+        <div style="font-size:17px;margin:4px 0;"><strong>Fan:</strong> ${escapeHtml(fullTest.subject || "—")}</div>
+        ${fullTest.description ? `<div style="font-size:14px;margin:6px 0;">${escapeHtml(stripHtml(fullTest.description))}</div>` : ""}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px;">
+          <div style="padding:8px;border:1px solid #9aa8b0;background:#fff;"><strong>Savollar:</strong> ${questions.length}</div>
+          <div style="padding:8px;border:1px solid #9aa8b0;background:#fff;"><strong>Vaqt:</strong> ${Number(fullTest.duration) || 0} daqiqa</div>
+          <div style="padding:8px;border:1px solid #9aa8b0;background:#fff;"><strong>Javoblar:</strong> ${includeAnswers ? "bilan" : "javobsiz"}</div>
+        </div>
+        <div style="margin-top:12px;padding-top:9px;border-top:1px solid #7d9bad;text-align:left;font-size:16px;">
+          <strong>F.I.Sh.:</strong> ______________________________________________
+        </div>
+      `;
+      renderRoot.appendChild(header);
 
-      await new Promise<void>((resolve) => {
-        if (pdfDocument.readyState === "complete") {
-          resolve();
-          return;
+      const questionElements: HTMLElement[] = [];
+
+      for (let index = 0; index < questions.length; index++) {
+        const question = questions[index];
+        const card = document.createElement("section");
+        addBaseStyles(card);
+        card.style.padding = "12px";
+        card.style.marginBottom = "12px";
+        card.style.border = "1px solid #8c9aa3";
+        card.style.borderRadius = "8px";
+        card.style.background = "#ffffff";
+
+        const title = document.createElement("div");
+        title.textContent = `${index + 1}-savol`;
+        title.style.marginBottom = "8px";
+        title.style.color = "#073b68";
+        title.style.fontSize = "18px";
+        title.style.fontWeight = "800";
+        card.appendChild(title);
+
+        const questionText = document.createElement("div");
+        questionText.textContent =
+          stripHtml(question.questionHtml) || "Savol matni mavjud emas";
+        questionText.style.marginBottom = "9px";
+        questionText.style.fontSize = "16px";
+        questionText.style.lineHeight = "1.42";
+        questionText.style.fontWeight = "700";
+        questionText.style.whiteSpace = "pre-wrap";
+        questionText.style.overflowWrap = "anywhere";
+        questionText.style.color = "#111111";
+        card.appendChild(questionText);
+
+        const imageShapes = Array.isArray(question.shapes)
+          ? question.shapes.filter(
+              (shape) =>
+                typeof shape.imageSrc === "string" &&
+                shape.imageSrc.trim().length > 0
+            )
+          : [];
+
+        for (const shape of imageShapes) {
+          const src = await imageToDataUrl(shape.imageSrc);
+          if (!src) continue;
+
+          const imageWrap = document.createElement("div");
+          imageWrap.style.width = "100%";
+          imageWrap.style.margin = "8px 0 10px";
+          imageWrap.style.textAlign = "center";
+          imageWrap.style.background = "#ffffff";
+
+          const img = document.createElement("img");
+          img.src = src;
+          img.alt = "Savol rasmi";
+          img.style.display = "inline-block";
+          img.style.maxWidth = "330px";
+          img.style.maxHeight = "220px";
+          img.style.width = "auto";
+          img.style.height = "auto";
+          img.style.objectFit = "contain";
+          img.style.background = "#ffffff";
+          imageWrap.appendChild(img);
+          card.appendChild(imageWrap);
         }
 
-        iframe!.onload = () => resolve();
-        window.setTimeout(resolve, 500);
-      });
+        const options = Array.isArray(question.options)
+          ? question.options
+          : [];
 
-      // Hamma rasmlar yuklanishini kutamiz.
-      const images = Array.from(pdfDocument.images);
+        options.forEach((option, optionIndex) => {
+          const optionBox = document.createElement("div");
+          const correct = includeAnswers && option.isCorrect === true;
+          optionBox.style.display = "flex";
+          optionBox.style.alignItems = "flex-start";
+          optionBox.style.gap = "7px";
+          optionBox.style.margin = "5px 0";
+          optionBox.style.padding = "7px 9px";
+          optionBox.style.border = correct
+            ? "2px solid #2f8450"
+            : "1px solid #c2c9cd";
+          optionBox.style.borderRadius = "6px";
+          optionBox.style.background = correct ? "#eaf8ef" : "#ffffff";
+          optionBox.style.color = "#111111";
+          optionBox.style.fontSize = "14px";
+          optionBox.style.lineHeight = "1.35";
+
+          const letter = document.createElement("strong");
+          letter.textContent = `${String.fromCharCode(65 + optionIndex)}.`;
+          letter.style.flex = "0 0 auto";
+          optionBox.appendChild(letter);
+
+          const text = document.createElement("span");
+          text.textContent = stripHtml(option.text) || "Variant matni mavjud emas";
+          text.style.flex = "1";
+          text.style.overflowWrap = "anywhere";
+          optionBox.appendChild(text);
+
+          if (correct) {
+            const badge = document.createElement("strong");
+            badge.textContent = "TO‘G‘RI JAVOB";
+            badge.style.flex = "0 0 auto";
+            badge.style.color = "#176b39";
+            badge.style.fontSize = "11px";
+            badge.style.whiteSpace = "nowrap";
+            optionBox.appendChild(badge);
+          }
+
+          card.appendChild(optionBox);
+        });
+
+        renderRoot.appendChild(card);
+        questionElements.push(card);
+      }
+
+      const footer = document.createElement("div");
+      addBaseStyles(footer);
+      footer.textContent = "qurbonovv.uz — Huquqiy ta’lim platformasi";
+      footer.style.padding = "8px 0";
+      footer.style.color = "#4b5961";
+      footer.style.textAlign = "center";
+      footer.style.fontSize = "12px";
+      renderRoot.appendChild(footer);
+
+      // Rasm va fontlar to'liq yuklanishini kutamiz.
+      const allImages = Array.from(renderRoot.querySelectorAll("img"));
       await Promise.all(
-        images.map(
+        allImages.map(
           (image) =>
             new Promise<void>((resolve) => {
               if (image.complete) {
                 resolve();
                 return;
               }
-
               image.onload = () => resolve();
               image.onerror = () => resolve();
-              window.setTimeout(resolve, 4000);
+              window.setTimeout(resolve, 3500);
             })
         )
       );
 
-      // Font va layout to‘liq hisoblanishini kutamiz.
-      if (pdfDocument.fonts?.ready) {
-        await pdfDocument.fonts.ready;
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
       }
-
-      await new Promise((resolve) => window.setTimeout(resolve, 150));
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -665,23 +808,124 @@ export default function AdminTestsPage() {
         compress: true,
       });
 
-      await pdf.html(pdfDocument.body, {
-        margin: [8, 8, 8, 8],
-        autoPaging: "text",
-        width: 194,
-        windowWidth: 794,
-        html2canvas: {
-          scale: 0.9,
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 10;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+      let currentY = margin;
+      let pageHasContent = false;
+
+      async function addElementToPdf(element: HTMLElement, gapAfter = 3) {
+        const canvas = await html2canvas(element, {
+          scale: 1.7,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
           logging: false,
-        },
-      });
+          imageTimeout: 4000,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 760,
+        });
 
-      // Brauzer yuklab olishni boshlaydi. Chrome sozlamasida
-      // "Ask where to save each file before downloading" yoqilgan bo‘lsa,
-      // qayerga saqlashni so‘raydi.
+        const renderWidthMm = usableWidth;
+        const renderHeightMm = (canvas.height * renderWidthMm) / canvas.width;
+
+        // Blok bitta sahifaga sig'masa, yangi sahifadan boshlaymiz.
+        if (
+          pageHasContent &&
+          currentY + renderHeightMm > pageHeight - margin
+        ) {
+          pdf.addPage();
+          currentY = margin;
+          pageHasContent = false;
+        }
+
+        // Juda uzun blok (masalan, juda uzun savol) bo'lsa, vertikal bo'lib kesamiz.
+        if (renderHeightMm > usableHeight) {
+          const pxPerMm = canvas.width / renderWidthMm;
+          const sliceHeightPx = Math.floor(usableHeight * pxPerMm);
+          let sourceY = 0;
+
+          while (sourceY < canvas.height) {
+            if (pageHasContent) {
+              pdf.addPage();
+              currentY = margin;
+              pageHasContent = false;
+            }
+
+            const currentSliceHeight = Math.min(
+              sliceHeightPx,
+              canvas.height - sourceY
+            );
+
+            const slice = document.createElement("canvas");
+            slice.width = canvas.width;
+            slice.height = currentSliceHeight;
+            const ctx = slice.getContext("2d");
+            if (!ctx) throw new Error("PDF canvas yaratilmadi.");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, slice.width, slice.height);
+            ctx.drawImage(
+              canvas,
+              0,
+              sourceY,
+              canvas.width,
+              currentSliceHeight,
+              0,
+              0,
+              canvas.width,
+              currentSliceHeight
+            );
+
+            const sliceHeightMm =
+              (currentSliceHeight * renderWidthMm) / canvas.width;
+            pdf.addImage(
+              slice.toDataURL("image/jpeg", 0.92),
+              "JPEG",
+              margin,
+              currentY,
+              renderWidthMm,
+              sliceHeightMm,
+              undefined,
+              "FAST"
+            );
+
+            sourceY += currentSliceHeight;
+            pageHasContent = true;
+
+            if (sourceY < canvas.height) {
+              pdf.addPage();
+              currentY = margin;
+              pageHasContent = false;
+            } else {
+              currentY += sliceHeightMm + gapAfter;
+            }
+          }
+          return;
+        }
+
+        pdf.addImage(
+          canvas.toDataURL("image/jpeg", 0.94),
+          "JPEG",
+          margin,
+          currentY,
+          renderWidthMm,
+          renderHeightMm,
+          undefined,
+          "FAST"
+        );
+        currentY += renderHeightMm + gapAfter;
+        pageHasContent = true;
+      }
+
+      await addElementToPdf(header, 4);
+      for (const card of questionElements) {
+        await addElementToPdf(card, 4);
+      }
+      await addElementToPdf(footer, 0);
+
       pdf.save(
         `${cleanFileName(fullTest.title)}_${
           includeAnswers ? "javoblari_bilan" : "javobsiz"
@@ -691,13 +935,13 @@ export default function AdminTestsPage() {
       setExportTest(null);
       setExportFormat(null);
     } catch (error) {
-      console.error(error);
+      console.error("PDF EXPORT ERROR:", error);
       window.alert(
         "PDF faylini yaratishda xatolik yuz berdi. Sahifani yangilab qayta urinib ko‘ring."
       );
     } finally {
-      if (iframe?.parentNode) {
-        iframe.parentNode.removeChild(iframe);
+      if (renderRoot?.parentNode) {
+        renderRoot.parentNode.removeChild(renderRoot);
       }
 
       setExporting(false);
