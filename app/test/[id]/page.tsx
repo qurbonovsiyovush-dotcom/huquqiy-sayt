@@ -310,7 +310,7 @@ export default function TestSolvePage() {
         `✓ Javob berilgan: ${answered} ta\n` +
         `— Javobsiz: ${unanswered} ta\n` +
         `⚑ Belgilangan: ${flaggedCount} ta\n\n` +
-        `Testni yakunlaysizmi?`;
+        `Testni yakunlaysizmi ?`;
 
       if (!window.confirm(message)) {
         return;
