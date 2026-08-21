@@ -34,7 +34,6 @@ type AccessRequest = {
   code: string;
 
   createdAt?: string;
-
   requestedAt?: string | null;
 
   approved?: boolean;
@@ -196,7 +195,7 @@ export default function AdminRequestsPage() {
     }, []);
 
   /* =======================================================
-     TARIX
+     TARIXNI YUKLASH
   ======================================================= */
 
   const loadHistory =
@@ -271,7 +270,7 @@ export default function AdminRequestsPage() {
   }, [refreshAll]);
 
   /* =======================================================
-     KOD YARATISH
+     YANGI KOD
   ======================================================= */
 
   async function createCode() {
@@ -677,22 +676,47 @@ export default function AdminRequestsPage() {
   }
 
   /* =======================================================
+     SCROLL
+  ======================================================= */
+
+  function goToSection(
+    id: string
+  ) {
+    document
+      .getElementById(id)
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+  }
+
+  /* =======================================================
      JSX
   ======================================================= */
 
   return (
     <main className="page">
 
-      {/* HEADER */}
+      {/* ===================================================
+          HEADER
+      =================================================== */}
 
       <header className="topPanel">
 
         <div className="namePlate">
-          Qurbonov Siyovush
-          Jamaliddinzoda
+          Qurbonov Siyovush Jamaliddinzoda
         </div>
 
         <div className="topButtons">
+
+          <button
+            className="topButton"
+            onClick={() =>
+              router.push("/admin")
+            }
+          >
+            Admin panel
+          </button>
 
           <button
             className="topButton"
@@ -714,27 +738,203 @@ export default function AdminRequestsPage() {
 
       </header>
 
-
-      {/* ADMIN PANEL */}
+      {/* ===================================================
+          TITLE
+      =================================================== */}
 
       <section className="adminHero">
 
         <div className="sectionTitle">
-          Admin paneli
+          Foydalanuvchilar
         </div>
 
         <h1>
-          Foydalanuvchilar va
-          kirish ruxsatlarini
-          boshqarish
+          Foydalanuvchilar va kirish
+          ruxsatlarini boshqarish
         </h1>
 
       </section>
 
+      {/* ===================================================
+          6 TA 3D BLOK
+      =================================================== */}
 
-      {/* QIDIRUV */}
+      <section className="dashboardBox">
 
-      <section className="sectionBox">
+        <div className="dashboardTitle">
+          Boshqaruv bo‘limlari
+        </div>
+
+        <div className="dashboardGrid">
+
+          {/* 1 */}
+
+          <div className="dashboardCard">
+
+            <h2>
+              Qidiruv
+            </h2>
+
+            <p>
+              Foydalanuvchini ism yoki
+              maxsus kod orqali topish.
+            </p>
+
+            <button
+              className="blueButton dashboardButton"
+              onClick={() =>
+                goToSection(
+                  "search-section"
+                )
+              }
+            >
+              Ochish
+            </button>
+
+          </div>
+
+          {/* 2 */}
+
+          <div className="dashboardCard">
+
+            <h2>
+              Yangi kirish kodi
+            </h2>
+
+            <p>
+              Yangi foydalanuvchi uchun
+              maxsus kirish kodi yaratish.
+            </p>
+
+            <button
+              className="blueButton dashboardButton"
+              onClick={() =>
+                goToSection(
+                  "new-code-section"
+                )
+              }
+            >
+              Ochish
+            </button>
+
+          </div>
+
+          {/* 3 */}
+
+          <div className="dashboardCard">
+
+            <h2>
+              Yaratilgan kodlar
+            </h2>
+
+            <p>
+              Oldin yaratilgan barcha
+              kirish kodlarini ko‘rish.
+            </p>
+
+            <button
+              className="blueButton dashboardButton"
+              onClick={() =>
+                goToSection(
+                  "codes-section"
+                )
+              }
+            >
+              Ochish
+            </button>
+
+          </div>
+
+          {/* 4 */}
+
+          <div className="dashboardCard">
+
+            <h2>
+              Kirish so‘rovlari
+            </h2>
+
+            <p>
+              Foydalanuvchilarning
+              kutilayotgan so‘rovlarini boshqarish.
+            </p>
+
+            <button
+              className="blueButton dashboardButton"
+              onClick={() =>
+                goToSection(
+                  "requests-section"
+                )
+              }
+            >
+              Ochish
+            </button>
+
+          </div>
+
+          {/* 5 */}
+
+          <div className="dashboardCard">
+
+            <h2>
+              Ruxsat berilganlar
+            </h2>
+
+            <p>
+              Saytga kirish ruxsati
+              berilgan foydalanuvchilar.
+            </p>
+
+            <button
+              className="blueButton dashboardButton"
+              onClick={() =>
+                goToSection(
+                  "approved-section"
+                )
+              }
+            >
+              Ochish
+            </button>
+
+          </div>
+
+          {/* 6 */}
+
+          <div className="dashboardCard">
+
+            <h2>
+              Rad etilganlar
+            </h2>
+
+            <p>
+              Kirish so‘rovi rad
+              etilgan foydalanuvchilar.
+            </p>
+
+            <button
+              className="blueButton dashboardButton"
+              onClick={() =>
+                goToSection(
+                  "rejected-section"
+                )
+              }
+            >
+              Ochish
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* ===================================================
+          QIDIRUV
+      =================================================== */}
+
+      <section
+        className="sectionBox"
+        id="search-section"
+      >
 
         <div className="sectionTitle">
           Qidiruv
@@ -773,7 +973,6 @@ export default function AdminRequestsPage() {
 
           </div>
 
-
           {search.trim() && (
 
             <div className="searchResults">
@@ -786,8 +985,7 @@ export default function AdminRequestsPage() {
 
               </div>
 
-              {filteredCodes.length >
-                0 && (
+              {filteredCodes.length > 0 && (
 
                 <div className="searchResultGrid">
 
@@ -796,9 +994,7 @@ export default function AdminRequestsPage() {
 
                       <article
                         className="searchResultCard"
-                        key={
-                          item.id
-                        }
+                        key={item.id}
                       >
 
                         <button
@@ -863,10 +1059,14 @@ export default function AdminRequestsPage() {
 
       </section>
 
+      {/* ===================================================
+          YANGI KOD
+      =================================================== */}
 
-      {/* YANGI KOD */}
-
-      <section className="sectionBox">
+      <section
+        className="sectionBox"
+        id="new-code-section"
+      >
 
         <div className="sectionTitle">
           Yangi kirish kodi
@@ -910,10 +1110,14 @@ export default function AdminRequestsPage() {
 
       </section>
 
+      {/* ===================================================
+          YARATILGAN KODLAR
+      =================================================== */}
 
-      {/* YARATILGAN KODLAR */}
-
-      <section className="sectionBox">
+      <section
+        className="sectionBox"
+        id="codes-section"
+      >
 
         <div className="sectionTitle">
           Yaratilgan kodlar
@@ -927,8 +1131,7 @@ export default function AdminRequestsPage() {
               Yuklanmoqda...
             </div>
 
-          ) : codes.length ===
-            0 ? (
+          ) : codes.length === 0 ? (
 
             <div className="empty">
               Yaratilgan kod yo‘q.
@@ -999,16 +1202,21 @@ export default function AdminRequestsPage() {
               </div>
 
             </div>
+
           )}
 
         </div>
 
       </section>
 
+      {/* ===================================================
+          KIRISH SO‘ROVLARI
+      =================================================== */}
 
-      {/* KIRISH SO‘ROVLARI */}
-
-      <section className="sectionBox">
+      <section
+        className="sectionBox"
+        id="requests-section"
+      >
 
         <div className="sectionTitle">
           Kirish so‘rovlari
@@ -1030,12 +1238,11 @@ export default function AdminRequestsPage() {
 
           </div>
 
-          {pendingRequests.length ===
-          0 ? (
+          {pendingRequests.length === 0 ? (
 
             <div className="empty">
-              Hozircha yangi
-              kirish so‘rovi yo‘q.
+              Hozircha yangi kirish
+              so‘rovi yo‘q.
             </div>
 
           ) : (
@@ -1079,6 +1286,10 @@ export default function AdminRequestsPage() {
                             "approve"
                           )
                         }
+                        disabled={
+                          workingId ===
+                          item.id
+                        }
                       >
                         Qabul qilish
                       </button>
@@ -1090,6 +1301,10 @@ export default function AdminRequestsPage() {
                             item.id,
                             "reject"
                           )
+                        }
+                        disabled={
+                          workingId ===
+                          item.id
                         }
                       >
                         Rad etish
@@ -1103,16 +1318,21 @@ export default function AdminRequestsPage() {
               )}
 
             </div>
+
           )}
 
         </div>
 
       </section>
 
+      {/* ===================================================
+          RUXSAT BERILGANLAR
+      =================================================== */}
 
-      {/* RUXSAT BERILGANLAR */}
-
-      <section className="sectionBox">
+      <section
+        className="sectionBox"
+        id="approved-section"
+      >
 
         <div className="sectionTitle">
           Ruxsat berilganlar
@@ -1120,8 +1340,7 @@ export default function AdminRequestsPage() {
 
         <div className="metalInner">
 
-          {approvedCodes.length ===
-          0 ? (
+          {approvedCodes.length === 0 ? (
 
             <div className="empty">
               Ruxsat berilgan
@@ -1143,6 +1362,10 @@ export default function AdminRequestsPage() {
                     <button
                       className="deleteX"
                       title="Butunlay o‘chirish"
+                      disabled={
+                        workingId ===
+                        item.id
+                      }
                       onClick={() =>
                         deleteUser(
                           item.id
@@ -1177,6 +1400,10 @@ export default function AdminRequestsPage() {
 
                     <button
                       className="revokeButton"
+                      disabled={
+                        workingId ===
+                        item.id
+                      }
                       onClick={() =>
                         revokeAccess(
                           item.id
@@ -1192,16 +1419,21 @@ export default function AdminRequestsPage() {
               )}
 
             </div>
+
           )}
 
         </div>
 
       </section>
 
+      {/* ===================================================
+          RAD ETILGANLAR
+      =================================================== */}
 
-      {/* RAD ETILGANLAR */}
-
-      <section className="sectionBox">
+      <section
+        className="sectionBox"
+        id="rejected-section"
+      >
 
         <div className="sectionTitle">
           Rad etilganlar
@@ -1209,8 +1441,7 @@ export default function AdminRequestsPage() {
 
         <div className="metalInner">
 
-          {rejectedCodes.length ===
-          0 ? (
+          {rejectedCodes.length === 0 ? (
 
             <div className="empty">
               Rad etilgan foydalanuvchi yo‘q.
@@ -1230,6 +1461,10 @@ export default function AdminRequestsPage() {
 
                     <button
                       className="deleteX"
+                      disabled={
+                        workingId ===
+                        item.id
+                      }
                       onClick={() =>
                         deleteUser(
                           item.id
@@ -1257,14 +1492,16 @@ export default function AdminRequestsPage() {
               )}
 
             </div>
+
           )}
 
         </div>
 
       </section>
 
-
-      {/* TARIX */}
+      {/* ===================================================
+          TARIX
+      =================================================== */}
 
       <section className="sectionBox">
 
@@ -1274,12 +1511,10 @@ export default function AdminRequestsPage() {
 
         <div className="metalInner">
 
-          {history.length ===
-          0 ? (
+          {history.length === 0 ? (
 
             <div className="empty">
-              Hozircha tarix
-              mavjud emas.
+              Hozircha tarix mavjud emas.
             </div>
 
           ) : (
@@ -1331,28 +1566,36 @@ export default function AdminRequestsPage() {
               )}
 
             </div>
+
           )}
 
         </div>
 
       </section>
 
+      {/* ===================================================
+          CSS
+      =================================================== */}
 
       <style jsx>{`
 
         * {
-          box-sizing:
-            border-box;
+          box-sizing: border-box;
+        }
+
+        html {
+          scroll-behavior: smooth;
         }
 
         .page {
           min-height: 100vh;
+
           padding:
             16px 16px 80px;
 
           background:
             linear-gradient(
-              #fff,
+              #ffffff,
               #f2f5f7
             );
 
@@ -1360,12 +1603,18 @@ export default function AdminRequestsPage() {
             "Bell MT",
             "Times New Roman",
             serif;
+
+          color: #111;
         }
 
         button,
         input {
           font-family: inherit;
         }
+
+        /* =================================================
+           TOP
+        ================================================= */
 
         .topPanel {
           min-height: 110px;
@@ -1376,6 +1625,8 @@ export default function AdminRequestsPage() {
           justify-content:
             space-between;
           align-items: center;
+
+          gap: 20px;
 
           border:
             3px solid #173e58;
@@ -1404,8 +1655,20 @@ export default function AdminRequestsPage() {
           background:
             linear-gradient(
               #fafafa,
-              #aaa
+              #aaaaaa
             );
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .7
+              ),
+
+            0 5px 0
+              #555d61;
 
           font-size: 24px;
           font-weight: 700;
@@ -1431,27 +1694,41 @@ export default function AdminRequestsPage() {
         .topButton {
           background:
             linear-gradient(
-              #fff,
-              #bbb
+              #ffffff,
+              #bbbbbb
             );
         }
 
         .exitButton {
           color: white;
 
+          border:
+            2px solid #174461;
+
           background:
             linear-gradient(
-              #ff6262,
-              #a90909
+              #6bc2ec,
+              #3288b6
             );
+
+          box-shadow:
+            0 4px 0 #174461;
         }
 
+        /* =================================================
+           HERO / SECTION
+        ================================================= */
+
         .adminHero,
-        .sectionBox {
+        .sectionBox,
+        .dashboardBox {
           position: relative;
 
           width:
-            min(1200px, 94%);
+            min(
+              1200px,
+              94%
+            );
 
           margin:
             85px auto 65px;
@@ -1471,7 +1748,12 @@ export default function AdminRequestsPage() {
           box-shadow:
             0 7px 0 #272b2e,
             0 15px 24px
-              rgba(0,0,0,.25);
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
         }
 
         .adminHero {
@@ -1489,12 +1771,28 @@ export default function AdminRequestsPage() {
           text-align: center;
         }
 
+        .adminHero h1 {
+          max-width: 850px;
+
+          margin: 0;
+
+          font-size:
+            clamp(
+              28px,
+              3vw,
+              38px
+            );
+        }
+
         .sectionBox {
           padding:
             70px 38px 38px;
+
+          scroll-margin-top: 120px;
         }
 
-        .sectionTitle {
+        .sectionTitle,
+        .dashboardTitle {
           position: absolute;
 
           top: -32px;
@@ -1527,13 +1825,139 @@ export default function AdminRequestsPage() {
             );
 
           box-shadow:
-            0 5px 0 #17415c;
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .55
+              ),
+
+            0 5px 0
+              #17415c;
 
           font-size: 27px;
           font-weight: 700;
 
           z-index: 10;
         }
+
+        /* =================================================
+           6 TA OCH KULRANG 3D BLOK
+        ================================================= */
+
+        .dashboardBox {
+          padding:
+            78px 36px 42px;
+        }
+
+        .dashboardGrid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              3,
+              minmax(
+                0,
+                1fr
+              )
+            );
+
+          gap: 28px;
+        }
+
+        .dashboardCard {
+          min-height: 245px;
+
+          padding:
+            30px 24px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          text-align: center;
+
+          border:
+            3px solid #565e62;
+
+          border-radius: 19px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #f5f5f5 0%,
+              #dddddd 42%,
+              #bdbdbd 100%
+            );
+
+          box-shadow:
+            inset 0 7px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            inset 0 -5px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .10
+              ),
+
+            0 7px 0
+              #555d61,
+
+            0 12px 17px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+
+          transition:
+            transform .15s ease;
+        }
+
+        .dashboardCard:hover {
+          transform:
+            translateY(-5px);
+        }
+
+        .dashboardCard h2 {
+          margin:
+            0 0 15px;
+
+          color: #111;
+
+          font-size: 27px;
+        }
+
+        .dashboardCard p {
+          min-height: 54px;
+
+          margin:
+            0 0 25px;
+
+          color: #4a4a4a;
+
+          font-size: 16px;
+
+          line-height: 1.45;
+        }
+
+        .dashboardButton {
+          min-width: 145px;
+        }
+
+        /* =================================================
+           METAL INNER
+        ================================================= */
 
         .metalInner {
           padding: 28px;
@@ -1546,17 +1970,24 @@ export default function AdminRequestsPage() {
           background:
             linear-gradient(
               #ededed,
-              #aaa
+              #aaaaaa
             );
 
           box-shadow:
             inset 6px 6px 9px
-              rgba(255,255,255,.9),
+              rgba(
+                255,
+                255,
+                255,
+                .9
+              ),
 
             0 6px 0 #4a5054;
         }
 
-        /* QIDIRUV */
+        /* =================================================
+           SEARCH
+        ================================================= */
 
         .searchWrapper {
           height: 72px;
@@ -1639,7 +2070,10 @@ export default function AdminRequestsPage() {
           display: grid;
 
           grid-template-columns:
-            repeat(3, 1fr);
+            repeat(
+              3,
+              1fr
+            );
 
           gap: 20px;
         }
@@ -1660,7 +2094,7 @@ export default function AdminRequestsPage() {
           background:
             linear-gradient(
               #f5f5f5,
-              #bbb
+              #bbbbbb
             );
 
           box-shadow:
@@ -1674,7 +2108,9 @@ export default function AdminRequestsPage() {
           font-weight: 700;
         }
 
-        /* CREATE */
+        /* =================================================
+           CREATE
+        ================================================= */
 
         .createRow {
           display: grid;
@@ -1707,6 +2143,8 @@ export default function AdminRequestsPage() {
             2px solid #646b70;
 
           border-radius: 10px;
+
+          font-size: 18px;
         }
 
         .blueButton {
@@ -1717,18 +2155,34 @@ export default function AdminRequestsPage() {
 
           border-radius: 12px;
 
+          color: #073b68;
+
           background:
             linear-gradient(
               #9bd9ff,
               #5ba9d8
             );
 
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .6
+              ),
+
+            0 4px 0 #17415c;
+
           cursor: pointer;
 
+          font-size: 16px;
           font-weight: 700;
         }
 
-        /* 2 QATOR */
+        /* =================================================
+           CARDS
+        ================================================= */
 
         .twoRowScroll {
           max-height: 435px;
@@ -1742,7 +2196,10 @@ export default function AdminRequestsPage() {
           display: grid;
 
           grid-template-columns:
-            repeat(3, 1fr);
+            repeat(
+              3,
+              1fr
+            );
 
           gap: 22px;
         }
@@ -1822,6 +2279,10 @@ export default function AdminRequestsPage() {
           font-size: 25px;
           font-weight: 700;
         }
+
+        /* =================================================
+           REQUESTS
+        ================================================= */
 
         .subHeader {
           margin-bottom: 22px;
@@ -1925,6 +2386,10 @@ export default function AdminRequestsPage() {
           font-weight: 700;
         }
 
+        /* =================================================
+           HISTORY
+        ================================================= */
+
         .historyScroll {
           max-height: 390px;
 
@@ -1942,6 +2407,8 @@ export default function AdminRequestsPage() {
 
           justify-content:
             space-between;
+
+          gap: 25px;
 
           border:
             1px solid #777;
@@ -1975,20 +2442,36 @@ export default function AdminRequestsPage() {
           text-align: center;
         }
 
+        /* =================================================
+           RESPONSIVE
+        ================================================= */
+
         @media (
-          max-width: 950px
+          max-width: 1000px
         ) {
+
+          .dashboardGrid {
+            grid-template-columns:
+              repeat(
+                2,
+                1fr
+              );
+          }
 
           .cardsGrid,
           .searchResultGrid {
             grid-template-columns:
-              repeat(2, 1fr);
+              repeat(
+                2,
+                1fr
+              );
           }
 
           .createRow {
             grid-template-columns:
               1fr;
           }
+
         }
 
         @media (
@@ -2000,6 +2483,19 @@ export default function AdminRequestsPage() {
               column;
           }
 
+          .topButtons {
+            width: 100%;
+
+            flex-direction:
+              column;
+          }
+
+          .topButton,
+          .exitButton {
+            width: 100%;
+          }
+
+          .dashboardGrid,
           .cardsGrid,
           .searchResultGrid {
             grid-template-columns:
