@@ -1,5 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { get, put } from "@vercel/blob";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
+import {
+  get,
+  put,
+} from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +51,10 @@ type VocabularyPostBody = {
 ========================================================= */
 
 function checkBlobToken() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (
+    !process.env
+      .BLOB_READ_WRITE_TOKEN
+  ) {
     throw new Error(
       "BLOB_READ_WRITE_TOKEN topilmadi."
     );
@@ -52,10 +62,12 @@ function checkBlobToken() {
 }
 
 /* =========================================================
-   BOOK TEKSHIRISH
+   BOOK VALIDATION
 ========================================================= */
 
-function isValidBook(book: number) {
+function isValidBook(
+  book: number
+) {
   return (
     Number.isInteger(book) &&
     book >= 1 &&
@@ -64,15 +76,153 @@ function isValidBook(book: number) {
 }
 
 /* =========================================================
-   UNIT TEKSHIRISH
+   UNIT VALIDATION
 ========================================================= */
 
-function isValidUnit(unit: number) {
+function isValidUnit(
+  unit: number
+) {
   return (
     Number.isInteger(unit) &&
     unit >= 1 &&
     unit <= 30
   );
+}
+
+/* =========================================================
+   WORD NORMALIZE
+========================================================= */
+
+function normalizeWord(
+  item: RawVocabularyWord
+): VocabularyWord | null {
+  const word =
+    String(
+      item.word ?? ""
+    ).trim();
+
+  const translation =
+    String(
+      item.translation ?? ""
+    ).trim();
+
+  const example =
+    String(
+      item.example ?? ""
+    ).trim();
+
+  const exampleTranslation =
+    String(
+      item.exampleTranslation ??
+        ""
+    ).trim();
+
+  if (
+    !word ||
+    !translation
+  ) {
+    return null;
+  }
+
+  return {
+    word,
+    translation,
+
+    ...(example
+      ? {
+          example,
+        }
+      : {}),
+
+    ...(exampleTranslation
+      ? {
+          exampleTranslation,
+        }
+      : {}),
+  };
+}
+
+/* =========================================================
+   VOCABULARY NORMALIZE
+========================================================= */
+
+function normalizeVocabulary(
+  value: unknown
+): VocabularyUnit[] {
+  if (
+    !Array.isArray(value)
+  ) {
+    return [];
+  }
+
+  const result: VocabularyUnit[] =
+    [];
+
+  for (
+    const item of value
+  ) {
+    if (
+      !item ||
+      typeof item !==
+        "object"
+    ) {
+      continue;
+    }
+
+    const raw =
+      item as Record<
+        string,
+        unknown
+      >;
+
+    const book =
+      Number(raw.book);
+
+    const unit =
+      Number(raw.unit);
+
+    if (
+      !isValidBook(book) ||
+      !isValidUnit(unit)
+    ) {
+      continue;
+    }
+
+    const rawWords =
+      Array.isArray(
+        raw.words
+      )
+        ? raw.words
+        : [];
+
+    const words =
+      rawWords
+        .map((word) =>
+          normalizeWord(
+            (word ?? {}) as RawVocabularyWord
+          )
+        )
+        .filter(
+          (
+            word
+          ): word is VocabularyWord =>
+            word !== null
+        );
+
+    result.push({
+      book,
+      unit,
+      words,
+
+      updatedAt:
+        typeof raw.updatedAt ===
+        "string"
+          ? raw.updatedAt
+          : "",
+    });
+  }
+
+  return result;
 }
 
 /* =========================================================
@@ -85,16 +235,19 @@ async function readVocabulary(): Promise<
   checkBlobToken();
 
   try {
-    const result = await get(
-      VOCABULARY_BLOB_PATH,
-      {
-        access: "private",
-      }
-    );
+    const result =
+      await get(
+        VOCABULARY_BLOB_PATH,
+        {
+          access:
+            "private",
+        }
+      );
 
     if (
       !result ||
-      result.statusCode !== 200 ||
+      result.statusCode !==
+        200 ||
       !result.stream
     ) {
       return [];
@@ -105,18 +258,18 @@ async function readVocabulary(): Promise<
         result.stream
       ).text();
 
-    if (!text.trim()) {
+    if (
+      !text.trim()
+    ) {
       return [];
     }
 
     const parsed: unknown =
       JSON.parse(text);
 
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed as VocabularyUnit[];
+    return normalizeVocabulary(
+      parsed
+    );
   } catch (error) {
     console.error(
       "readVocabulary ERROR:",
@@ -138,25 +291,34 @@ async function writeVocabulary(
 
   await put(
     VOCABULARY_BLOB_PATH,
+
     JSON.stringify(
       data,
       null,
       2
     ),
+
     {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
+      access:
+        "private",
+
+      addRandomSuffix:
+        false,
+
+      allowOverwrite:
+        true,
+
       contentType:
         "application/json; charset=utf-8",
-      cacheControlMaxAge: 60,
+
+      cacheControlMaxAge:
+        60,
     }
   );
 }
 
 /* =========================================================
    GET
-
    /api/vocabulary?book=1&unit=1
 ========================================================= */
 
@@ -164,39 +326,59 @@ export async function GET(
   request: NextRequest
 ) {
   try {
-    const { searchParams } =
-      new URL(request.url);
+    const {
+      searchParams,
+    } =
+      new URL(
+        request.url
+      );
 
-    const book = Number(
-      searchParams.get("book")
-    );
+    const book =
+      Number(
+        searchParams.get(
+          "book"
+        )
+      );
 
-    const unit = Number(
-      searchParams.get("unit")
-    );
+    const unit =
+      Number(
+        searchParams.get(
+          "unit"
+        )
+      );
 
-    if (!isValidBook(book)) {
+    if (
+      !isValidBook(book)
+    ) {
       return NextResponse.json(
         {
-          success: false,
+          success:
+            false,
+
           message:
             "Book 1 dan 6 gacha bo‘lishi kerak.",
         },
         {
-          status: 400,
+          status:
+            400,
         }
       );
     }
 
-    if (!isValidUnit(unit)) {
+    if (
+      !isValidUnit(unit)
+    ) {
       return NextResponse.json(
         {
-          success: false,
+          success:
+            false,
+
           message:
             "Unit 1 dan 30 gacha bo‘lishi kerak.",
         },
         {
-          status: 400,
+          status:
+            400,
         }
       );
     }
@@ -207,22 +389,34 @@ export async function GET(
     const found =
       vocabulary.find(
         (
-          item: VocabularyUnit
+          item:
+            VocabularyUnit
         ) =>
-          item.book === book &&
-          item.unit === unit
+          item.book ===
+            book &&
+          item.unit ===
+            unit
       );
 
     return NextResponse.json(
       {
-        success: true,
+        success:
+          true,
+
         book,
         unit,
+
+        count:
+          found?.words.length ??
+          0,
+
         words:
-          found?.words ?? [],
+          found?.words ??
+          [],
       },
       {
-        status: 200,
+        status:
+          200,
 
         headers: {
           "Cache-Control":
@@ -238,7 +432,8 @@ export async function GET(
 
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
 
         message:
           error instanceof Error
@@ -246,7 +441,8 @@ export async function GET(
             : "Vocabulary yuklashda server xatosi.",
       },
       {
-        status: 500,
+        status:
+          500,
       }
     );
   }
@@ -254,8 +450,7 @@ export async function GET(
 
 /* =========================================================
    POST
-
-   BOOK + UNIT UCHUN SO‘ZLARNI SAQLASH
+   BOOK + UNIT SO‘ZLARINI SAQLASH
 ========================================================= */
 
 export async function POST(
@@ -265,138 +460,142 @@ export async function POST(
     const body =
       (await request.json()) as VocabularyPostBody;
 
-    const book = Number(
-      body.book
-    );
+    const book =
+      Number(
+        body.book
+      );
 
-    const unit = Number(
-      body.unit
-    );
+    const unit =
+      Number(
+        body.unit
+      );
 
-    if (!isValidBook(book)) {
+    if (
+      !isValidBook(book)
+    ) {
       return NextResponse.json(
         {
-          success: false,
+          success:
+            false,
 
           message:
             "Book 1 dan 6 gacha bo‘lishi kerak.",
         },
         {
-          status: 400,
+          status:
+            400,
         }
       );
     }
 
-    if (!isValidUnit(unit)) {
+    if (
+      !isValidUnit(unit)
+    ) {
       return NextResponse.json(
         {
-          success: false,
+          success:
+            false,
 
           message:
             "Unit 1 dan 30 gacha bo‘lishi kerak.",
         },
         {
-          status: 400,
+          status:
+            400,
         }
       );
     }
 
-    const incomingWords: RawVocabularyWord[] =
-      Array.isArray(body.words)
-        ? (
-            body.words as RawVocabularyWord[]
-          )
+    const incomingWords =
+      Array.isArray(
+        body.words
+      )
+        ? body.words
         : [];
 
     const words: VocabularyWord[] =
       incomingWords
-        .map(
-          (
-            item: RawVocabularyWord
-          ): VocabularyWord => {
-            const word = String(
-              item.word ?? ""
-            ).trim();
-
-            const translation =
-              String(
-                item.translation ?? ""
-              ).trim();
-
-            const example =
-              String(
-                item.example ?? ""
-              ).trim();
-
-            const exampleTranslation =
-              String(
-                item.exampleTranslation ?? ""
-              ).trim();
-
-            return {
-              word,
-              translation,
-
-              ...(example
-                ? {
-                    example,
-                  }
-                : {}),
-
-              ...(exampleTranslation
-                ? {
-                    exampleTranslation,
-                  }
-                : {}),
-            };
-          }
+        .map((item) =>
+          normalizeWord(
+            (item ?? {}) as RawVocabularyWord
+          )
         )
+
         .filter(
           (
-            item: VocabularyWord
-          ) =>
-            item.word.length > 0 &&
-            item.translation.length > 0
+            item
+          ): item is VocabularyWord =>
+            item !== null
         );
 
-    if (words.length === 0) {
+    if (
+      words.length ===
+      0
+    ) {
       return NextResponse.json(
         {
-          success: false,
+          success:
+            false,
 
           message:
             "Kamida bitta so‘z kiritilishi kerak.",
         },
         {
-          status: 400,
+          status:
+            400,
         }
       );
     }
+
+    /*
+      Mavjud vocabulary ni
+      avval o‘qiymiz.
+
+      Shu sababli boshqa
+      Book va Unitlar
+      o‘chib ketmaydi.
+    */
 
     const vocabulary =
       await readVocabulary();
 
     const now =
-      new Date().toISOString();
+      new Date()
+        .toISOString();
 
     const existingIndex =
       vocabulary.findIndex(
         (
-          item: VocabularyUnit
+          item:
+            VocabularyUnit
         ) =>
-          item.book === book &&
-          item.unit === unit
+          item.book ===
+            book &&
+          item.unit ===
+            unit
       );
 
-    const unitData: VocabularyUnit = {
-      book,
-      unit,
-      words,
-      updatedAt: now,
-    };
+    const unitData: VocabularyUnit =
+      {
+        book,
+        unit,
+        words,
+        updatedAt:
+          now,
+      };
+
+    /*
+      Unit mavjud bo‘lsa
+      faqat shu Unit
+      yangilanadi.
+
+      Boshqa Unitlar
+      o‘z joyida qoladi.
+    */
 
     if (
-      existingIndex >= 0
+      existingIndex >=
+      0
     ) {
       vocabulary[
         existingIndex
@@ -407,25 +606,58 @@ export async function POST(
       );
     }
 
+    /*
+      Tartibli saqlaymiz:
+      Book → Unit
+    */
+
+    vocabulary.sort(
+      (
+        a:
+          VocabularyUnit,
+        b:
+          VocabularyUnit
+      ) => {
+        if (
+          a.book !==
+          b.book
+        ) {
+          return (
+            a.book -
+            b.book
+          );
+        }
+
+        return (
+          a.unit -
+          b.unit
+        );
+      }
+    );
+
     await writeVocabulary(
       vocabulary
     );
 
     return NextResponse.json(
       {
-        success: true,
+        success:
+          true,
 
         message:
-          `Book ${book}, Unit ${unit} uchun ` +
-          `${words.length} ta so‘z saqlandi.`,
+          `Book ${book}, Unit ${unit} uchun ${words.length} ta so‘z saqlandi.`,
 
         book,
         unit,
-        count: words.length,
+
+        count:
+          words.length,
+
         words,
       },
       {
-        status: 200,
+        status:
+          200,
       }
     );
   } catch (error) {
@@ -436,7 +668,8 @@ export async function POST(
 
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
 
         message:
           error instanceof Error
@@ -444,7 +677,8 @@ export async function POST(
             : "Vocabulary saqlashda server xatosi.",
       },
       {
-        status: 500,
+        status:
+          500,
       }
     );
   }
