@@ -5,268 +5,56 @@ import crypto from "crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RESULTS_BLOB_PATH =
-  "huquqiy-sayt/test-results.json";
+const TESTS_BLOB_PATH = "huquqiy-sayt/tests.json";
 
-const TESTS_BLOB_PATH =
-  "huquqiy-sayt/tests.json";
-
-/* =========================================================
-   TYPES
-========================================================= */
+type TestStatus = "draft" | "published";
 
 type TestData = {
   id: string;
   title?: string;
   subject?: string;
+  duration?: number;
+  description?: string;
+  status?: TestStatus;
+  questions?: unknown[];
 
-  /*
-    null = cheksiz
-    1, 2, 3... = urinishlar soni
-  */
+  // null = cheksiz
+  // 1,2,3... = urinishlar soni
   attemptLimit?: number | null;
+
+  createdAt?: string;
+  updatedAt?: string;
 
   [key: string]: unknown;
 };
 
-type TestResult = {
-  id: string;
-  userName: string;
-  testId: string;
-  testTitle: string;
-  subject: string;
-
-  total: number;
-  correct: number;
-  incorrect: number;
-  unanswered: number;
-
-  percentage: number;
-
-  earnedPoints: number;
-  totalPoints: number;
-
-  spentSeconds: number;
-
-  answers?: Record<string, unknown>;
-
-  finishedAt: string;
-};
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function safeNumber(
-  value: unknown,
-  fallback = 0
-) {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed)
-    ? parsed
-    : fallback;
-}
-
-function getUserName(
-  request: NextRequest
-) {
-  const encodedName =
-    request.cookies.get(
-      "qurbonov_name"
-    )?.value ||
-    "Foydalanuvchi";
-
-  try {
-    return decodeURIComponent(
-      encodedName
-    );
-  } catch {
-    return encodedName;
-  }
-}
-
-/* =========================================================
-   BLOB TEKSHIRISH
-========================================================= */
-
 function checkBlobToken() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error("BLOB_READ_WRITE_TOKEN topilmadi.");
+  }
+}
+
+function normalizeTests(value: unknown): TestData[] {
+  if (!Array.isArray(value)) {
+    throw new Error("tests.json formati noto‘g‘ri.");
+  }
+
+  return value as TestData[];
+}
+
+function normalizeAttemptLimit(value: unknown): number | null {
   if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-}
-
-/* =========================================================
-   TESTLARNI O‘QISH
-========================================================= */
-
-async function readTests(): Promise<TestData[]> {
-  checkBlobToken();
-
-  try {
-    const result =
-      await get(
-        TESTS_BLOB_PATH,
-        {
-          access: "private",
-        }
-      );
-
-    if (
-      !result ||
-      result.statusCode !== 200 ||
-      !result.stream
-    ) {
-      return [];
-    }
-
-    const text =
-      await new Response(
-        result.stream
-      ).text();
-
-    if (!text.trim()) {
-      return [];
-    }
-
-    const parsed =
-      JSON.parse(text);
-
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
-  } catch (error) {
-    console.error(
-      "TESTS BLOB READ ERROR:",
-      error
-    );
-
-    return [];
-  }
-}
-
-/* =========================================================
-   NATIJALARNI O‘QISH
-========================================================= */
-
-async function readResults(): Promise<TestResult[]> {
-  checkBlobToken();
-
-  try {
-    const result =
-      await get(
-        RESULTS_BLOB_PATH,
-        {
-          access: "private",
-        }
-      );
-
-    if (
-      !result ||
-      result.statusCode !== 200 ||
-      !result.stream
-    ) {
-      return [];
-    }
-
-    const text =
-      await new Response(
-        result.stream
-      ).text();
-
-    if (!text.trim()) {
-      return [];
-    }
-
-    const parsed =
-      JSON.parse(text);
-
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
-  } catch (error) {
-    /*
-      Hali birorta natija
-      mavjud bo‘lmasa [].
-    */
-
-    console.log(
-      "Natijalar Blob hali mavjud emas:",
-      error
-    );
-
-    return [];
-  }
-}
-
-/* =========================================================
-   NATIJALARNI YOZISH
-========================================================= */
-
-async function writeResults(
-  results: TestResult[]
-) {
-  checkBlobToken();
-
-  await put(
-    RESULTS_BLOB_PATH,
-    JSON.stringify(
-      results,
-      null,
-      2
-    ),
-    {
-      access: "private",
-
-      addRandomSuffix: false,
-
-      allowOverwrite: true,
-
-      contentType:
-        "application/json; charset=utf-8",
-
-      cacheControlMaxAge: 60,
-    }
-  );
-}
-
-/* =========================================================
-   TEST LIMITINI OLISH
-========================================================= */
-
-function getAttemptLimit(
-  test: TestData
-): number | null {
-  /*
-    null yoki undefined:
-    CHEKSIZ.
-
-    Bu eski testlar buzilmasligi
-    uchun ham kerak.
-  */
-
-  if (
-    test.attemptLimit === null ||
-    test.attemptLimit ===
-      undefined
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === "unlimited"
   ) {
     return null;
   }
 
-  const parsed =
-    Number(
-      test.attemptLimit
-    );
+  const parsed = Number(value);
 
-  if (
-    !Number.isFinite(parsed) ||
-    parsed < 1
-  ) {
+  if (!Number.isFinite(parsed) || parsed < 1) {
     return null;
   }
 
@@ -274,389 +62,103 @@ function getAttemptLimit(
 }
 
 /* =========================================================
-   FOYDALANUVCHINING SHU TESTDAGI URINISHLARI
+   TESTLARNI BLOB'DAN O‘QISH
 ========================================================= */
 
-function getUserAttempts(
-  results: TestResult[],
-  testId: string,
-  userName: string
-) {
-  return results.filter(
-    (item) =>
-      String(item.testId) ===
-        String(testId) &&
-      String(item.userName)
-        .trim()
-        .toLocaleLowerCase() ===
-        String(userName)
-          .trim()
-          .toLocaleLowerCase()
+async function readTests(): Promise<TestData[]> {
+  checkBlobToken();
+
+  const result = await get(TESTS_BLOB_PATH, {
+    access: "private",
+  });
+
+  if (
+    !result ||
+    result.statusCode !== 200 ||
+    !result.stream
+  ) {
+    throw new Error(
+      `tests.json o‘qilmadi. Status: ${result?.statusCode ?? "noma'lum"}`
+    );
+  }
+
+  const text = await new Response(result.stream).text();
+
+  if (!text.trim()) {
+    throw new Error("tests.json bo‘sh.");
+  }
+
+  const parsed = JSON.parse(text);
+
+  return normalizeTests(parsed);
+}
+
+/* =========================================================
+   TESTLARNI BLOB'GA YOZISH
+========================================================= */
+
+async function writeTests(tests: TestData[]) {
+  checkBlobToken();
+
+  await put(
+    TESTS_BLOB_PATH,
+    JSON.stringify(tests, null, 2),
+    {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json; charset=utf-8",
+      cacheControlMaxAge: 60,
+    }
   );
 }
 
 /* =========================================================
-   POST
-   NATIJANI SAQLASH
+   GET
+   BARCHA TESTLARNI OLISH
 ========================================================= */
 
-export async function POST(
-  request: NextRequest
-) {
+export async function GET() {
   try {
-    /* =====================================================
-       LOGIN
-    ===================================================== */
+    const tests = await readTests();
 
-    const session =
-      request.cookies.get(
-        "qurbonov_session"
-      )?.value;
+    const sortedTests = [...tests].sort((a, b) => {
+      const aTime =
+        new Date(
+          String(a.updatedAt || a.createdAt || "")
+        ).getTime() || 0;
 
-    if (!session) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Avval tizimga kiring.",
-        },
-        {
-          status: 401,
-        }
-      );
-    }
+      const bTime =
+        new Date(
+          String(b.updatedAt || b.createdAt || "")
+        ).getTime() || 0;
 
-    const userName =
-      getUserName(request);
-
-    /* =====================================================
-       BODY
-    ===================================================== */
-
-    const body =
-      await request.json();
-
-    const testId =
-      String(
-        body?.testId || ""
-      ).trim();
-
-    if (!testId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID topilmadi.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    /* =====================================================
-       TESTNI SERVERDAN TOPAMIZ
-    ===================================================== */
-
-    const tests =
-      await readTests();
-
-    const test =
-      tests.find(
-        (item) =>
-          String(item.id) ===
-          String(testId)
-      );
-
-    if (!test) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    /*
-      MUHIM:
-      test nomi va fanini ham
-      clientdan emas,
-      serverdagi testdan olamiz.
-    */
-
-    const testTitle =
-      String(
-        test.title ||
-          body?.testTitle ||
-          ""
-      ).trim();
-
-    const subject =
-      String(
-        test.subject ||
-          body?.subject ||
-          ""
-      ).trim();
-
-    /* =====================================================
-       NATIJALARNI O‘QIYMIZ
-    ===================================================== */
-
-    const results =
-      await readResults();
-
-    /* =====================================================
-       URINISH LIMITINI TEKSHIRAMIZ
-    ===================================================== */
-
-    const attemptLimit =
-      getAttemptLimit(test);
-
-    const previousAttempts =
-      getUserAttempts(
-        results,
-        testId,
-        userName
-      );
-
-    const attemptsUsed =
-      previousAttempts.length;
-
-    /*
-      Limit mavjud bo‘lsa va
-      ishlatilgan urinishlar
-      limitga yetgan bo‘lsa,
-      natijani qabul qilmaymiz.
-    */
-
-    if (
-      attemptLimit !== null &&
-      attemptsUsed >=
-        attemptLimit
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-
-          code:
-            "ATTEMPT_LIMIT_REACHED",
-
-          message:
-            `Siz ushbu test uchun berilgan ${attemptLimit} ta urinishdan foydalanib bo‘lgansiz.`,
-
-          attemptLimit,
-
-          attemptsUsed,
-
-          attemptsRemaining: 0,
-
-          previousResults:
-            previousAttempts,
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-    /* =====================================================
-       NATIJA HISOBLARI
-    ===================================================== */
-
-    const total =
-      Math.max(
-        0,
-        safeNumber(
-          body?.total
-        )
-      );
-
-    const correct =
-      Math.max(
-        0,
-        safeNumber(
-          body?.correct
-        )
-      );
-
-    const incorrect =
-      Math.max(
-        0,
-        safeNumber(
-          body?.incorrect
-        )
-      );
-
-    const unanswered =
-      Math.max(
-        0,
-        safeNumber(
-          body?.unanswered
-        )
-      );
-
-    const percentage =
-      Math.min(
-        100,
-        Math.max(
-          0,
-          safeNumber(
-            body?.percentage
-          )
-        )
-      );
-
-    const earnedPoints =
-      Math.max(
-        0,
-        safeNumber(
-          body?.earnedPoints
-        )
-      );
-
-    const totalPoints =
-      Math.max(
-        0,
-        safeNumber(
-          body?.totalPoints
-        )
-      );
-
-    const spentSeconds =
-      Math.max(
-        0,
-        Math.floor(
-          safeNumber(
-            body?.spentSeconds
-          )
-        )
-      );
-
-    /* =====================================================
-       JAVOBLAR
-    ===================================================== */
-
-    let answers:
-      | Record<string, unknown>
-      | undefined;
-
-    if (
-      body?.answers &&
-      typeof body.answers ===
-        "object" &&
-      !Array.isArray(
-        body.answers
-      )
-    ) {
-      answers =
-        body.answers;
-    }
-
-    /* =====================================================
-       YANGI NATIJA
-    ===================================================== */
-
-    const result: TestResult = {
-      id:
-        crypto.randomUUID(),
-
-      userName,
-
-      testId,
-
-      testTitle,
-
-      subject,
-
-      total,
-
-      correct,
-
-      incorrect,
-
-      unanswered,
-
-      percentage,
-
-      earnedPoints,
-
-      totalPoints,
-
-      spentSeconds,
-
-      answers,
-
-      finishedAt:
-        new Date().toISOString(),
-    };
-
-    /* =====================================================
-       SAQLASH
-    ===================================================== */
-
-    results.unshift(
-      result
-    );
-
-    await writeResults(
-      results
-    );
-
-    /* =====================================================
-       QOLGAN URINISHLAR
-    ===================================================== */
-
-    const newAttemptsUsed =
-      attemptsUsed + 1;
-
-    const attemptsRemaining =
-      attemptLimit === null
-        ? null
-        : Math.max(
-            0,
-            attemptLimit -
-              newAttemptsUsed
-          );
+      return bTime - aTime;
+    });
 
     return NextResponse.json(
       {
         success: true,
-
-        message:
-          "Natija muvaffaqiyatli saqlandi.",
-
-        result,
-
-        attemptLimit,
-
-        attemptsUsed:
-          newAttemptsUsed,
-
-        attemptsRemaining,
-
-        unlimited:
-          attemptLimit === null,
+        tests: sortedTests,
       },
       {
-        status: 201,
+        status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
       }
     );
   } catch (error) {
-    console.error(
-      "RESULT POST ERROR:",
-      error
-    );
+    console.error("GET /api/tests ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-
         message:
-          "Natijani saqlashda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Testlarni yuklashda server xatosi.",
       },
       {
         status: 500,
@@ -666,192 +168,113 @@ export async function POST(
 }
 
 /* =========================================================
-   GET
-   FOYDALANUVCHI NATIJALARI + URINISH HOLATI
+   POST
+   YANGI TEST YARATISH
 ========================================================= */
 
-export async function GET(
-  request: NextRequest
-) {
+export async function POST(request: NextRequest) {
   try {
-    /* =====================================================
-       LOGIN
-    ===================================================== */
+    const body = await request.json();
 
-    const session =
-      request.cookies.get(
-        "qurbonov_session"
-      )?.value;
+    const title = String(body?.title || "").trim();
+    const subject = String(body?.subject || "").trim();
 
-    if (!session) {
+    if (!title) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Avval tizimga kiring.",
+          message: "Test nomi kiritilmagan.",
         },
         {
-          status: 401,
+          status: 400,
         }
       );
     }
 
-    const userName =
-      getUserName(request);
+    const questions = Array.isArray(body?.questions)
+      ? body.questions
+      : [];
 
-    const url =
-      new URL(
-        request.url
-      );
-
-    const testId =
-      String(
-        url.searchParams.get(
-          "testId"
-        ) || ""
-      ).trim();
-
-    const results =
-      await readResults();
-
-    /* =====================================================
-       TEST ID BERILMAGAN
-    ===================================================== */
-
-    if (!testId) {
-      const userResults =
-        results.filter(
-          (item) =>
-            String(
-              item.userName
-            )
-              .trim()
-              .toLocaleLowerCase() ===
-            String(userName)
-              .trim()
-              .toLocaleLowerCase()
-        );
-
-      return NextResponse.json(
-        {
-          success: true,
-
-          count:
-            userResults.length,
-
-          results:
-            userResults,
-        },
-        {
-          status: 200,
-
-          headers: {
-            "Cache-Control":
-              "no-store, no-cache, must-revalidate",
-          },
-        }
-      );
-    }
-
-    /* =====================================================
-       TESTNI TOPAMIZ
-    ===================================================== */
-
-    const tests =
-      await readTests();
-
-    const test =
-      tests.find(
-        (item) =>
-          String(item.id) ===
-          String(testId)
-      );
-
-    if (!test) {
+    if (questions.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Test topilmadi.",
+          message: "Kamida bitta savol bo‘lishi kerak.",
         },
         {
-          status: 404,
+          status: 400,
         }
       );
     }
 
-    const attemptLimit =
-      getAttemptLimit(test);
+    /*
+      MUHIM:
+      avval mavjud testlarni Blob'dan o‘qiymiz.
+      Agar o‘qish xato bersa, yozmaymiz.
+      Shuning uchun eski testlar tasodifan o‘chmaydi.
+    */
+    const tests = await readTests();
 
-    const attempts =
-      getUserAttempts(
-        results,
-        testId,
-        userName
-      );
+    const now = new Date().toISOString();
 
-    const attemptsUsed =
-      attempts.length;
+    const newTest: TestData = {
+      ...body,
 
-    const attemptsRemaining =
-      attemptLimit === null
-        ? null
-        : Math.max(
-            0,
-            attemptLimit -
-              attemptsUsed
-          );
+      id: crypto.randomUUID(),
 
-    const canAttempt =
-      attemptLimit === null ||
-      attemptsUsed <
-        attemptLimit;
+      title,
+      subject,
 
-    /* =====================================================
-       RESPONSE
-    ===================================================== */
+      duration: Math.max(
+        1,
+        Number(body?.duration) || 30
+      ),
+
+      description: String(
+        body?.description || ""
+      ),
+
+      questions,
+
+      status:
+        body?.status === "published"
+          ? "published"
+          : "draft",
+
+      attemptLimit:
+        normalizeAttemptLimit(
+          body?.attemptLimit
+        ),
+
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    tests.push(newTest);
+
+    await writeTests(tests);
 
     return NextResponse.json(
       {
         success: true,
-
-        testId,
-
-        attemptLimit,
-
-        attemptsUsed,
-
-        attemptsRemaining,
-
-        unlimited:
-          attemptLimit === null,
-
-        canAttempt,
-
-        results:
-          attempts,
+        message:
+          "Test muvaffaqiyatli yaratildi.",
+        test: newTest,
       },
       {
-        status: 200,
-
-        headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
-        },
+        status: 201,
       }
     );
   } catch (error) {
-    console.error(
-      "RESULT GET ERROR:",
-      error
-    );
+    console.error("POST /api/tests ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-
         message:
-          "Urinish ma’lumotlarini yuklashda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Testni yaratishda server xatosi.",
       },
       {
         status: 500,
