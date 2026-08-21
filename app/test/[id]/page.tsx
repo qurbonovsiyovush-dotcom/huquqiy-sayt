@@ -68,6 +68,7 @@ type TestData = {
   description?: string;
   status: TestStatus;
   questions: TestQuestion[];
+  attemptLimit?: number | null;
 };
 
 type Answers = Record<string, string>;
@@ -101,6 +102,13 @@ export default function TestSolvePage() {
   const [zoomQuestionId, setZoomQuestionId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
   const [isOnline, setIsOnline] = useState(true);
+
+  const [attemptLoading, setAttemptLoading] = useState(true);
+  const [attemptLimit, setAttemptLimit] = useState<number | null>(null);
+  const [attemptsUsed, setAttemptsUsed] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+  const [canAttempt, setCanAttempt] = useState(true);
+
   const restoredRef = useRef(false);
 
   const finishLock = useRef(false);
@@ -205,6 +213,12 @@ export default function TestSolvePage() {
 
         status: receivedTest.status,
 
+        attemptLimit:
+          receivedTest.attemptLimit === null ||
+          receivedTest.attemptLimit === undefined
+            ? null
+            : Math.max(1, Math.floor(Number(receivedTest.attemptLimit) || 1)),
+
         questions: Array.isArray(receivedTest.questions)
           ? receivedTest.questions
           : [],
@@ -217,6 +231,41 @@ export default function TestSolvePage() {
       }
 
       setTest(normalizedTest);
+
+      // Serverdan foydalanuvchining ushbu test bo‘yicha urinish holatini olamiz.
+      setAttemptLoading(true);
+      try {
+        const attemptResponse = await fetch(
+          `/api/results?testId=${encodeURIComponent(normalizedTest.id)}`,
+          { method: "GET", cache: "no-store" }
+        );
+        const attemptData = await readJson(attemptResponse);
+
+        if (attemptResponse.ok) {
+          setAttemptLimit(
+            attemptData?.attemptLimit === null || attemptData?.unlimited === true
+              ? null
+              : Math.max(1, Number(attemptData?.attemptLimit) || 1)
+          );
+          setAttemptsUsed(Math.max(0, Number(attemptData?.attemptsUsed) || 0));
+          setAttemptsRemaining(
+            attemptData?.attemptsRemaining === null
+              ? null
+              : Math.max(0, Number(attemptData?.attemptsRemaining) || 0)
+          );
+          setCanAttempt(attemptData?.canAttempt !== false);
+        } else {
+          // Tekshiruv muvaffaqiyatsiz bo‘lsa testni boshlatmaymiz.
+          setCanAttempt(false);
+          setError(attemptData?.message || "Urinish holatini tekshirib bo‘lmadi.");
+        }
+      } catch (attemptError) {
+        console.error("ATTEMPT CHECK ERROR:", attemptError);
+        setCanAttempt(false);
+        setError("Urinish holatini tekshirib bo‘lmadi.");
+      } finally {
+        setAttemptLoading(false);
+      }
 
       setRemainingSeconds(
         normalizedTest.duration * 60
@@ -298,7 +347,16 @@ export default function TestSolvePage() {
   ===================================================== */
 
   function startTest() {
-    if (!test) {
+    if (!test || attemptLoading) {
+      return;
+    }
+
+    if (!canAttempt) {
+      window.alert(
+        attemptLimit === null
+          ? "Hozir testni boshlash mumkin emas."
+          : `Siz ushbu test uchun berilgan ${attemptLimit} ta urinishdan foydalanib bo‘lgansiz.`
+      );
       return;
     }
 
@@ -654,10 +712,31 @@ async function saveResult() {
           }),
         });
 
+        const data = await readJson(response);
+
         if (!response.ok) {
           resultSavedRef.current = false;
-          console.error("RESULT SAVE ERROR");
+          if (data?.code === "ATTEMPT_LIMIT_REACHED") {
+            setCanAttempt(false);
+            setAttemptLimit(data?.attemptLimit ?? attemptLimit);
+            setAttemptsUsed(Number(data?.attemptsUsed) || attemptsUsed);
+            setAttemptsRemaining(0);
+          }
+          console.error("RESULT SAVE ERROR:", data?.message || response.status);
+          return;
         }
+
+        setAttemptLimit(data?.attemptLimit ?? null);
+        setAttemptsUsed(Math.max(0, Number(data?.attemptsUsed) || 0));
+        setAttemptsRemaining(
+          data?.attemptsRemaining === null
+            ? null
+            : Math.max(0, Number(data?.attemptsRemaining) || 0)
+        );
+        setCanAttempt(
+          data?.attemptLimit === null ||
+          (Number(data?.attemptsRemaining) || 0) > 0
+        );
       } catch (error) {
         resultSavedRef.current = false;
         console.error("RESULT SAVE ERROR:", error);
@@ -665,7 +744,7 @@ async function saveResult() {
     }
 
     saveResult();
-  }, [finished, test, result, remainingSeconds]);
+  }, [finished, test, result, remainingSeconds, attemptLimit, attemptsUsed]);
 
   /* =====================================================
      VAQT FORMAT
@@ -980,6 +1059,17 @@ async function saveResult() {
                   Tayyor
                 </strong>
               </div>
+
+              <div className="info">
+                <span>Urinish</span>
+                <strong className={canAttempt ? "green" : ""}>
+                  {attemptLoading
+                    ? "Tekshirilmoqda..."
+                    : attemptLimit === null
+                    ? "Cheksiz"
+                    : `${attemptsRemaining ?? 0} ta qoldi`}
+                </strong>
+              </div>
             </div>
 
             <div className="instruction">
@@ -997,8 +1087,13 @@ async function saveResult() {
               type="button"
               className="startButton"
               onClick={startTest}
+              disabled={attemptLoading || !canAttempt}
             >
-              TESTNI BOSHLASH
+              {attemptLoading
+                ? "URINISHLAR TEKSHIRILMOQDA..."
+                : canAttempt
+                ? "TESTNI BOSHLASH"
+                : "URINISHLAR TUGAGAN"}
             </button>
           </div>
         </section>
@@ -1140,8 +1235,13 @@ async function saveResult() {
                 type="button"
                 className="againButton"
                 onClick={startTest}
+                disabled={attemptLoading || !canAttempt}
               >
-                Qayta ishlash
+                {canAttempt
+                  ? attemptLimit === null
+                    ? "Qayta ishlash"
+                    : `Qayta ishlash (${attemptsRemaining ?? 0} ta qoldi)`
+                  : "Urinishlar tugagan"}
               </button>
 
               <button
