@@ -5,56 +5,46 @@ import { useRouter } from "next/navigation";
 export default function AdminPage() {
   const router = useRouter();
 
-  const sections = [
+  const cards = [
     {
       title: "Foydalanuvchilar va ruxsatlar",
-      subtitle:
-        "Kirish kodlari, foydalanuvchilar va saytga kirish so‘rovlarini boshqarish.",
-      href: "/admin/requests",
-      symbol: "👥",
+      description:
+        "Foydalanuvchilar, kirish kodlari va saytga kirish so‘rovlarini boshqarish.",
+      path: "/admin/requests",
     },
     {
       title: "Lug‘at boshqaruvi",
-      subtitle:
-        "4000 Essential English Words bo‘yicha Book, Unit, so‘z va misol gaplarni boshqarish.",
-      href: "/admin/dictionary",
-      symbol: "📚",
+      description:
+        "4000 Essential English Words bo‘yicha kitob, unit, so‘z va misol gaplarni boshqarish.",
+      path: "/admin/dictionary",
     },
     {
       title: "Testlar",
-      subtitle:
-        "Saytdagi testlarni yaratish, tahrirlash va boshqarish.",
-      href: "/admin/tests",
-      symbol: "📝",
+      description:
+        "Saytdagi testlarni boshqarish va test tizimini nazorat qilish.",
+      path: "/admin/tests",
     },
     {
       title: "Natijalar",
-      subtitle:
+      description:
         "Foydalanuvchilarning test natijalari va ko‘rsatkichlarini ko‘rish.",
-      href: "/admin/results",
-      symbol: "📊",
+      path: "/admin/results",
     },
   ];
 
   return (
-    <main className="page">
-      {/* =====================================================
-          TOP PANEL
-      ===================================================== */}
+    <main className="adminPage">
+      {/* ================= HEADER ================= */}
 
-      <header className="topPanel">
-        <button
-          type="button"
-          className="namePlate"
-          onClick={() => router.push("/")}
-        >
+      <header className="topHeader">
+        <div className="brandBox">
           Qurbonov Siyovush Jamaliddinzoda
-        </button>
+        </div>
 
-        <div className="topButtons">
+        <div className="headerButtons">
           <button
             type="button"
-            className="topButton"
+            className="headerButton"
             onClick={() => router.push("/")}
           >
             Asosiy sahifa
@@ -62,7 +52,7 @@ export default function AdminPage() {
 
           <button
             type="button"
-            className="exitButton"
+            className="logoutButton"
             onClick={() => router.push("/logout")}
           >
             Chiqish
@@ -70,246 +60,260 @@ export default function AdminPage() {
         </div>
       </header>
 
-      {/* =====================================================
-          ADMIN HERO
-      ===================================================== */}
+      {/* ================= ADMIN TITLE ================= */}
 
-      <section className="adminHero">
-        <div className="sectionTitle">
-          Admin panel
+      <section className="adminContainer">
+        <div className="smallTitle">Admin panel</div>
+
+        <div className="heroPanel">
+          <h1>Sayt boshqaruv markazi</h1>
+
+          <p>
+            Kerakli bo‘limni tanlang va sayt ma’lumotlarini boshqaring.
+          </p>
         </div>
 
-        <h1>
-          Sayt boshqaruv markazi
-        </h1>
+        {/* ================= CARDS ================= */}
 
-        <p>
-          Kerakli bo‘limni tanlang va sayt ma’lumotlarini boshqaring.
-        </p>
-      </section>
-
-      {/* =====================================================
-          ADMIN CARDS
-      ===================================================== */}
-
-      <section className="cardsSection">
         <div className="cardsGrid">
-          {sections.map((section) => (
-            <button
-              type="button"
-              key={section.href}
-              className="adminCard"
-              onClick={() =>
-                router.push(section.href)
-              }
-            >
-              <div className="cardTop">
-                <div className="cardIcon">
-                  {section.symbol}
-                </div>
-
-                <div className="cardTitle">
-                  {section.title}
-                </div>
+          {cards.map((card) => (
+            <article className="adminCard" key={card.title}>
+              <div className="cardHeader">
+                <h2>{card.title}</h2>
               </div>
 
               <div className="cardBody">
-                <p>
-                  {section.subtitle}
-                </p>
+                <p>{card.description}</p>
 
-                <div className="manageButton">
+                <button
+                  type="button"
+                  className="manageButton"
+                  onClick={() => router.push(card.path)}
+                >
                   Boshqarish →
-                </div>
+                </button>
               </div>
-            </button>
+            </article>
           ))}
         </div>
       </section>
-
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
-
-      <footer className="footer">
-        Admin boshqaruv paneli
-      </footer>
-
-      {/* =====================================================
-          CSS
-      ===================================================== */}
 
       <style jsx>{`
         * {
           box-sizing: border-box;
         }
 
-        .page {
+        .adminPage {
           min-height: 100vh;
-          padding: 18px 18px 80px;
-
+          width: 100%;
+          margin: 0;
+          padding: 28px 35px 70px;
           background:
+            radial-gradient(
+              circle at top,
+              rgba(75, 165, 215, 0.12),
+              transparent 38%
+            ),
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #f4f7f9 55%,
-              #e9eef2 100%
+              #f2f5f7 55%,
+              #e7ecef 100%
             );
-
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            serif;
-
-          color: #0a3553;
+          font-family: "Bell MT", "Times New Roman", serif;
+          color: #102f45;
         }
 
         /* =====================================================
-           TOP PANEL
+           HEADER
         ===================================================== */
 
-        .topPanel {
-          width: min(1580px, 98%);
-          min-height: 118px;
-
+        .topHeader {
+          width: min(1450px, 96%);
+          min-height: 105px;
           margin: 0 auto;
-
-          padding: 22px 30px;
+          padding: 20px 25px;
 
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 25px;
 
-          gap: 20px;
+          border: 3px solid #164d6b;
+          border-radius: 24px;
 
-          border: 3px solid #173e58;
-          border-radius: 26px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #92dcff 0%,
-              #67bee9 45%,
-              #4599cc 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #7cc8ef 0%,
+            #54addb 47%,
+            #348fc0 100%
+          );
 
           box-shadow:
-            inset 0 6px 6px
-              rgba(255,255,255,.72),
-
-            inset 0 -5px 6px
-              rgba(0,0,0,.10),
-
-            0 8px 0 #173c55,
-
-            0 15px 25px
-              rgba(0,0,0,.18);
+            0 8px 0 #164d6b,
+            0 15px 24px rgba(0, 0, 0, 0.2),
+            inset 0 2px 2px rgba(255, 255, 255, 0.8);
         }
 
-        .namePlate {
-          min-height: 64px;
+        .brandBox {
+          min-height: 58px;
+          padding: 0 30px;
 
-          padding: 15px 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
 
-          border: 3px solid #545b60;
-          border-radius: 14px;
+          border: 2px solid #6a7479;
+          border-radius: 13px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #c6c6c6
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #e9e9e9 48%,
+            #c7c7c7 100%
+          );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.9),
-
-            0 5px 0 #6a7074;
+            0 5px 0 #667176,
+            0 8px 12px rgba(0, 0, 0, 0.2),
+            inset 0 2px 2px rgba(255, 255, 255, 0.95);
 
           color: #111;
-
-          font-family: inherit;
-          font-size: 24px;
+          font-size: 21px;
           font-weight: 700;
-
-          cursor: pointer;
+          white-space: nowrap;
         }
 
-        .topButtons {
+        .headerButtons {
           display: flex;
-          gap: 16px;
-          flex-wrap: wrap;
+          align-items: center;
+          gap: 18px;
         }
 
-        .topButton,
-        .exitButton {
-          min-width: 150px;
-          height: 58px;
+        .headerButton,
+        .logoutButton {
+          min-width: 135px;
+          height: 55px;
+          padding: 0 24px;
 
-          padding: 0 22px;
-
-          border-radius: 13px;
+          border-radius: 12px;
 
           font-family: inherit;
           font-size: 16px;
           font-weight: 700;
 
           cursor: pointer;
+
+          transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease;
         }
 
-        .topButton {
-          border: 2px solid #666;
+        .headerButton {
+          border: 2px solid #6c7478;
+
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #e9e9e9 52%,
+            #c8c8c8 100%
+          );
 
           color: #111;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #c7c7c7
-            );
-
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.9),
-
-            0 4px 0 #666;
+            0 4px 0 #606a6e,
+            0 7px 10px rgba(0, 0, 0, 0.15);
         }
 
-        .exitButton {
-          border: 2px solid #a80d0d;
+        .logoutButton {
+          border: 2px solid #164d6b;
 
-          color: white;
+          background: linear-gradient(
+            180deg,
+            #69bee9 0%,
+            #3d9aca 50%,
+            #287aa5 100%
+          );
 
-          background:
-            linear-gradient(
-              180deg,
-              #ff5e5e,
-              #cf1111
-            );
+          color: #ffffff;
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.25),
+            0 4px 0 #164d6b,
+            0 7px 10px rgba(0, 0, 0, 0.18);
+        }
 
-            0 4px 0 #8d0b0b;
+        .headerButton:hover,
+        .logoutButton:hover {
+          transform: translateY(-2px);
+        }
+
+        .headerButton:active,
+        .logoutButton:active {
+          transform: translateY(3px);
+          box-shadow: none;
+        }
+
+        /* =====================================================
+           MAIN CONTAINER
+        ===================================================== */
+
+        .adminContainer {
+          position: relative;
+
+          width: min(1250px, 92%);
+          margin: 75px auto 0;
+        }
+
+        /* =====================================================
+           ADMIN PANEL SMALL TITLE
+        ===================================================== */
+
+        .smallTitle {
+          position: absolute;
+          z-index: 10;
+
+          top: -42px;
+          left: 50%;
+          transform: translateX(-50%);
+
+          min-width: 270px;
+          height: 72px;
+          padding: 0 35px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border: 3px solid #175272;
+          border-radius: 16px;
+
+          background: linear-gradient(
+            180deg,
+            #86cff3 0%,
+            #5eb5df 48%,
+            #368fbd 100%
+          );
+
+          box-shadow:
+            0 7px 0 #175272,
+            0 12px 17px rgba(0, 0, 0, 0.2),
+            inset 0 2px 2px rgba(255, 255, 255, 0.8);
+
+          color: #123f5d;
+
+          font-size: 29px;
+          font-weight: 700;
         }
 
         /* =====================================================
            HERO
         ===================================================== */
 
-        .adminHero {
-          position: relative;
+        .heroPanel {
+          min-height: 235px;
 
-          width: min(1200px, 94%);
-
-          min-height: 260px;
-
-          margin: 95px auto 75px;
-
-          padding: 90px 45px 55px;
+          padding: 75px 40px 45px;
 
           display: flex;
           flex-direction: column;
@@ -318,314 +322,255 @@ export default function AdminPage() {
 
           text-align: center;
 
-          border: 3px solid #303538;
-          border-radius: 28px;
+          border: 3px solid #343b3f;
+          border-radius: 25px;
 
-          background:
-            linear-gradient(
-              145deg,
-              #686c6f,
-              #363a3d
-            );
-
-          box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.08),
-
-            0 8px 0 #272b2e,
-
-            0 17px 28px
-              rgba(0,0,0,.24);
-        }
-
-        .sectionTitle {
-          position: absolute;
-
-          top: -37px;
-          left: 50%;
-
-          transform: translateX(-50%);
-
-          min-width: 320px;
-          min-height: 72px;
-
-          padding: 12px 30px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border: 3px solid #174461;
-          border-radius: 16px;
-
-          color: #073b68;
-
-          background:
-            linear-gradient(
-              180deg,
-              #a0ddff,
-              #55a8d8
-            );
+          background: linear-gradient(
+            145deg,
+            #6e7478 0%,
+            #555b5f 45%,
+            #3e4448 100%
+          );
 
           box-shadow:
-            inset 0 5px 4px
-              rgba(255,255,255,.55),
+            0 9px 0 #292f32,
+            0 18px 28px rgba(0, 0, 0, 0.2),
+            inset 0 2px 2px rgba(255, 255, 255, 0.2);
 
-            0 6px 0 #17415c;
-
-          font-size: 30px;
-          font-weight: 700;
-
-          z-index: 2;
+          color: #ffffff;
         }
 
-        .adminHero h1 {
+        .heroPanel h1 {
           margin: 0;
 
-          color: white;
+          font-size: clamp(32px, 3vw, 46px);
+          line-height: 1.2;
+          font-weight: 700;
 
-          font-size:
-            clamp(
-              34px,
-              4.2vw,
-              52px
-            );
-
-          line-height: 1.15;
-
-          text-shadow:
-            0 3px 3px
-              rgba(0,0,0,.35);
+          text-shadow: 0 2px 2px rgba(0, 0, 0, 0.5);
         }
 
-        .adminHero p {
-          max-width: 760px;
-
+        .heroPanel p {
           margin: 20px 0 0;
 
-          color: #f1f5f7;
+          font-size: 19px;
+          line-height: 1.6;
+          font-weight: 600;
 
-          font-size: 21px;
-          line-height: 1.55;
+          color: #eef4f7;
+        }
+
+        /* =====================================================
+           GRID
+        ===================================================== */
+
+        .cardsGrid {
+          width: 100%;
+
+          margin-top: 65px;
+
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+
+          gap: 45px;
         }
 
         /* =====================================================
            CARDS
         ===================================================== */
 
-        .cardsSection {
-          width: min(1200px, 94%);
-
-          margin: 0 auto;
-        }
-
-        .cardsGrid {
-          display: grid;
-
-          grid-template-columns:
-            repeat(2, minmax(0, 1fr));
-
-          gap: 46px;
-        }
-
         .adminCard {
-          min-height: 320px;
-
-          padding: 0;
+          min-height: 315px;
 
           overflow: hidden;
 
-          border: 3px solid #303538;
-          border-radius: 24px;
+          display: flex;
+          flex-direction: column;
 
-          background:
-            linear-gradient(
-              145deg,
-              #666b6e,
-              #3b4043
-            );
+          border: 3px solid #343b3f;
+          border-radius: 22px;
+
+          background: #484e52;
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.06),
-
-            0 8px 0 #272d30,
-
-            0 16px 26px
-              rgba(0,0,0,.22);
-
-          font-family: inherit;
-
-          text-align: left;
-
-          cursor: pointer;
+            0 9px 0 #2b3033,
+            0 16px 25px rgba(0, 0, 0, 0.2);
 
           transition:
-            transform .15s ease,
-            filter .15s ease;
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
         }
 
         .adminCard:hover {
-          transform:
-            translateY(-6px);
-
-          filter:
-            brightness(1.03);
-        }
-
-        .adminCard:active {
-          transform:
-            translateY(2px);
-        }
-
-        .cardTop {
-          min-height: 105px;
-
-          padding: 22px 28px;
-
-          display: flex;
-          align-items: center;
-
-          gap: 20px;
-
-          border-bottom: 6px solid #174461;
-
-          background:
-            linear-gradient(
-              180deg,
-              #9adfff,
-              #56addc
-            );
+          transform: translateY(-5px);
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.55);
+            0 12px 0 #2b3033,
+            0 22px 32px rgba(0, 0, 0, 0.24);
         }
 
-        .cardIcon {
-          width: 64px;
-          height: 64px;
+        .cardHeader {
+          min-height: 92px;
 
-          flex-shrink: 0;
+          padding: 20px 30px;
 
           display: flex;
           align-items: center;
           justify-content: center;
 
-          border: 2px solid
-            rgba(23,68,97,.55);
+          text-align: center;
 
-          border-radius: 15px;
+          border-bottom: 4px solid #175272;
 
-          background:
-            rgba(255,255,255,.35);
+          background: linear-gradient(
+            180deg,
+            #7dc9ef 0%,
+            #59b1dc 48%,
+            #368fbd 100%
+          );
 
-          font-size: 36px;
+          box-shadow:
+            inset 0 2px 2px rgba(255, 255, 255, 0.7),
+            0 4px 8px rgba(0, 0, 0, 0.22);
         }
 
-        .cardTitle {
-          color: #073b68;
+        .cardHeader h2 {
+          margin: 0;
 
-          font-size:
-            clamp(
-              25px,
-              2.4vw,
-              34px
-            );
+          color: #123f5d;
 
+          font-size: clamp(23px, 2vw, 30px);
+          line-height: 1.2;
           font-weight: 700;
-
-          line-height: 1.15;
         }
 
         .cardBody {
-          min-height: 205px;
+          flex: 1;
 
-          padding: 32px 30px 30px;
+          padding: 32px 35px 30px;
 
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          align-items: flex-start;
 
-          color: white;
+          background: linear-gradient(
+            145deg,
+            #5c6266 0%,
+            #484e52 50%,
+            #3c4246 100%
+          );
         }
 
         .cardBody p {
-          max-width: 470px;
+          flex: 1;
 
-          margin: 0;
+          margin: 0 0 30px;
 
-          font-size: 20px;
-          line-height: 1.55;
+          color: #ffffff;
 
-          text-shadow:
-            0 1px 1px
-              rgba(0,0,0,.35);
-        }
-
-        .manageButton {
-          width: fit-content;
-
-          margin-top: 28px;
-
-          padding: 13px 25px;
-
-          border: 2px solid #686e72;
-          border-radius: 11px;
-
-          color: #0b3550;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #cfcfcf
-            );
-
-          box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.9),
-
-            0 4px 0 #676d71;
-
-          font-size: 17px;
-          font-weight: 700;
+          font-size: 18px;
+          line-height: 1.7;
+          font-weight: 600;
         }
 
         /* =====================================================
-           FOOTER
+           MANAGE BUTTON
         ===================================================== */
 
-        .footer {
-          width: min(1200px, 94%);
+        .manageButton {
+          min-width: 155px;
+          height: 52px;
 
-          margin: 70px auto 0;
+          padding: 0 25px;
 
-          text-align: center;
+          border: 2px solid #697378;
+          border-radius: 11px;
 
-          color: #60717b;
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #e8e8e8 48%,
+            #c6c6c6 100%
+          );
 
+          box-shadow:
+            0 5px 0 #626c70,
+            0 8px 12px rgba(0, 0, 0, 0.22),
+            inset 0 2px 2px rgba(255, 255, 255, 0.95);
+
+          color: #173d55;
+
+          font-family: inherit;
           font-size: 16px;
+          font-weight: 700;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease,
+            background 0.15s ease;
+        }
+
+        .manageButton:hover {
+          transform: translateY(-2px);
+
+          background: linear-gradient(
+            180deg,
+            #e7f6fd 0%,
+            #c7e9f8 50%,
+            #a8d5ea 100%
+          );
+        }
+
+        .manageButton:active {
+          transform: translateY(4px);
+          box-shadow: none;
         }
 
         /* =====================================================
            TABLET
         ===================================================== */
 
-        @media (
-          max-width: 900px
-        ) {
-          .topPanel {
+        @media (max-width: 900px) {
+          .adminPage {
+            padding: 20px 18px 60px;
+          }
+
+          .topHeader {
+            width: 100%;
+
             flex-direction: column;
+
+            padding: 20px;
+          }
+
+          .brandBox {
+            width: 100%;
+            white-space: normal;
+            text-align: center;
+          }
+
+          .headerButtons {
+            width: 100%;
+          }
+
+          .headerButton,
+          .logoutButton {
+            flex: 1;
+          }
+
+          .adminContainer {
+            width: 100%;
           }
 
           .cardsGrid {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
+            gap: 38px;
           }
 
-          .adminHero {
-            margin-top: 90px;
+          .adminCard {
+            min-height: 290px;
           }
         }
 
@@ -633,86 +578,78 @@ export default function AdminPage() {
            MOBILE
         ===================================================== */
 
-        @media (
-          max-width: 600px
-        ) {
-          .page {
-            padding:
-              12px 10px 50px;
+        @media (max-width: 520px) {
+          .adminPage {
+            padding: 15px 10px 50px;
           }
 
-          .topPanel {
+          .topHeader {
+            border-radius: 17px;
+          }
+
+          .brandBox {
+            padding: 15px;
+
+            font-size: 17px;
+          }
+
+          .headerButtons {
+            flex-direction: column;
+          }
+
+          .headerButton,
+          .logoutButton {
             width: 100%;
-
-            padding:
-              18px 15px;
           }
 
-          .namePlate {
-            width: 100%;
-
-            font-size: 19px;
-
-            text-align: center;
+          .adminContainer {
+            margin-top: 65px;
           }
 
-          .topButtons {
-            width: 100%;
+          .smallTitle {
+            min-width: 210px;
+            height: 62px;
 
-            justify-content: center;
+            font-size: 23px;
           }
 
-          .topButton,
-          .exitButton {
-            min-width: 130px;
+          .heroPanel {
+            min-height: 220px;
+
+            padding: 65px 20px 35px;
           }
 
-          .adminHero {
-            width: 100%;
-
-            min-height: 240px;
-
-            padding:
-              85px 22px 45px;
+          .heroPanel h1 {
+            font-size: 29px;
           }
 
-          .sectionTitle {
-            min-width: 230px;
-
-            font-size: 25px;
-          }
-
-          .cardsSection {
-            width: 100%;
+          .heroPanel p {
+            font-size: 16px;
           }
 
           .cardsGrid {
-            gap: 30px;
+            margin-top: 45px;
           }
 
-          .adminCard {
-            min-height: 290px;
+          .cardHeader {
+            min-height: 78px;
+            padding: 15px;
           }
 
-          .cardTop {
-            padding:
-              20px 18px;
-          }
-
-          .cardIcon {
-            width: 54px;
-            height: 54px;
-
-            font-size: 30px;
+          .cardHeader h2 {
+            font-size: 22px;
           }
 
           .cardBody {
-            padding:
-              26px 22px;
+            padding: 25px 22px;
           }
 
           .cardBody p {
-            font-size: 18px;
+            font-size: 16px;
+          }
+
+          .manageButton {
+            width: 100%;
           }
         }
       `}</style>
