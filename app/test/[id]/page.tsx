@@ -96,6 +96,7 @@ export default function TestSolvePage() {
     useState(0);
 
   const [showReview, setShowReview] = useState(false);
+  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
 
   const finishLock = useRef(false);
   const resultSavedRef = useRef(false);
@@ -276,6 +277,7 @@ export default function TestSolvePage() {
     setCurrentIndex(0);
     setFinished(false);
     setShowReview(false);
+    setFlagged({});
 
     setRemainingSeconds(
       Math.max(1, Number(test.duration)) * 60
@@ -298,10 +300,17 @@ export default function TestSolvePage() {
         (question) => !answers[question.id]
       ).length;
 
+      const flaggedCount = test.questions.filter(
+        (question) => flagged[question.id]
+      ).length;
+      const answered = test.questions.length - unanswered;
+
       const message =
-        unanswered > 0
-          ? `Siz ${unanswered} ta savolga javob bermadingiz.\n\nTestni yakunlaysizmi?`
-          : "Testni yakunlaysizmi?";
+        `Testni yakunlashdan oldin tekshiring:\n\n` +
+        `✓ Javob berilgan: ${answered} ta\n` +
+        `— Javobsiz: ${unanswered} ta\n` +
+        `⚑ Belgilangan: ${flaggedCount} ta\n\n` +
+        `Testni yakunlaysizmi?`;
 
       if (!window.confirm(message)) {
         return;
@@ -366,6 +375,13 @@ export default function TestSolvePage() {
     setAnswers((current) => ({
       ...current,
       [questionId]: optionId,
+    }));
+  }
+
+  function toggleFlag(questionId: string) {
+    setFlagged((current) => ({
+      ...current,
+      [questionId]: !current[questionId],
     }));
   }
 
@@ -1171,6 +1187,10 @@ async function saveResult() {
                       answered
                         ? "answeredNumber"
                         : "",
+
+                      flagged[question.id]
+                        ? "flaggedNumber"
+                        : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -1194,6 +1214,11 @@ async function saveResult() {
             <div>
               <span className="legendAnswered" />
               Javob berilgan
+            </div>
+
+            <div>
+              <span className="legendFlagged" />
+              Belgilangan
             </div>
 
             <div>
@@ -1229,10 +1254,25 @@ async function saveResult() {
                   </strong>
                 </div>
 
-                <p>
-                  {currentIndex + 1} /{" "}
-                  {test.questions.length}
-                </p>
+                <div className="questionTopActions">
+                  <button
+                    type="button"
+                    className={
+                      flagged[currentQuestion.id]
+                        ? "flagButton flagButtonActive"
+                        : "flagButton"
+                    }
+                    onClick={() => toggleFlag(currentQuestion.id)}
+                    title="Bu savolga keyin qaytish uchun belgilang"
+                  >
+                    ⚑ {flagged[currentQuestion.id] ? "BELGILANGAN" : "BELGILASH"}
+                  </button>
+
+                  <p>
+                    {currentIndex + 1} /{" "}
+                    {test.questions.length}
+                  </p>
+                </div>
               </div>
 
               <div className="questionContent">
@@ -1910,6 +1950,15 @@ const pageStyles = `
     outline-offset: 2px;
   }
 
+  .flaggedNumber {
+    border-color: #a66a00;
+    background: linear-gradient(#fff0b8, #e9b84f);
+  }
+
+  .currentNumber.flaggedNumber {
+    outline-color: #43b7ee;
+  }
+
   .legend {
     margin-top: 25px;
     padding: 15px;
@@ -1943,6 +1992,10 @@ const pageStyles = `
 
   .legendAnswered {
     background: #70ca8e;
+  }
+
+  .legendFlagged {
+    background: #e9b84f;
   }
 
   .legendEmpty {
@@ -2032,7 +2085,29 @@ const pageStyles = `
     font-size: 22px;
   }
 
+  .questionTopActions {
+    display: flex !important;
+    align-items: center;
+    gap: 12px !important;
+  }
+
+  .flagButton {
+    min-height: 38px;
+    padding: 0 14px;
+    border: 2px solid #805600;
+    border-radius: 9px;
+    background: linear-gradient(#fff8d8, #e8c56a);
+    box-shadow: 0 3px 0 #805600;
+    color: #624200;
+    font-weight: 800;
+  }
+
+  .flagButtonActive {
+    background: linear-gradient(#ffe68a, #e4a92f);
+  }
+
   .questionTop p {
+    margin: 0;
     font-weight: 700;
   }
 
@@ -2837,15 +2912,36 @@ const pageStyles = `
   }
 
   .questionActions {
-    padding: 0 9px 16px;
-    flex-direction: column;
-    gap: 10px;
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    padding: 10px 9px 14px;
+    flex-direction: row;
+    gap: 8px;
+    background: rgba(55, 61, 65, .96);
+    border-top: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(10px);
   }
 
   .questionActions button {
-    width: 100%;
+    flex: 1;
+    width: auto;
     min-width: 0;
     min-height: 48px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .questionTopActions {
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .flagButton {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 11px;
   }
 
   /* NATIJA SAHIFASI */
