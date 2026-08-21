@@ -409,6 +409,251 @@ export default function AdminTestsPage() {
     }
   }
 
+
+  function shapeNumber(shape: TestShape, key: string, fallback = 0) {
+    const value = shape[key];
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function shapeString(shape: TestShape, key: string, fallback = "") {
+    const value = shape[key];
+    return typeof value === "string" ? value : fallback;
+  }
+
+  function getShapeLayout(shapes: TestShape[]) {
+    if (!shapes.length) return null;
+
+    const minX = Math.min(...shapes.map((shape) => Number(shape.x) || 0));
+    const minY = Math.min(...shapes.map((shape) => Number(shape.y) || 0));
+    const maxX = Math.max(
+      ...shapes.map(
+        (shape) =>
+          (Number(shape.x) || 0) + Math.max(1, Number(shape.width) || 1)
+      )
+    );
+    const maxY = Math.max(
+      ...shapes.map(
+        (shape) =>
+          (Number(shape.y) || 0) + Math.max(1, Number(shape.height) || 1)
+      )
+    );
+
+    const sourceWidth = Math.max(1, maxX - minX);
+    const sourceHeight = Math.max(1, maxY - minY);
+
+    // A4/Word ichida shakllar juda katta bo‘lib ketmasligi uchun
+    // butun kompozitsiyani bir xil nisbatda kichraytiramiz.
+    const scale = Math.min(1, 620 / sourceWidth, 360 / sourceHeight);
+
+    return {
+      minX,
+      minY,
+      sourceWidth,
+      sourceHeight,
+      scale,
+      width: Math.max(1, Math.round(sourceWidth * scale)),
+      height: Math.max(1, Math.round(sourceHeight * scale)),
+    };
+  }
+
+  async function buildQuestionShapesHtml(question: TestQuestion) {
+    const shapes = Array.isArray(question.shapes) ? question.shapes : [];
+    const layout = getShapeLayout(shapes);
+    if (!layout) return "";
+
+    const items = await Promise.all(
+      shapes.map(async (shape) => {
+        const type = String(shape.type || "rectangle");
+        const left = ((Number(shape.x) || 0) - layout.minX) * layout.scale;
+        const top = ((Number(shape.y) || 0) - layout.minY) * layout.scale;
+        const width = Math.max(1, Number(shape.width) || 1) * layout.scale;
+        const height = Math.max(1, Number(shape.height) || 1) * layout.scale;
+        const opacity = shapeNumber(shape, "opacity", 1);
+        const zIndex = Math.round(shapeNumber(shape, "zIndex", 1));
+        const borderWidth = shapeNumber(shape, "borderWidth", 2) * layout.scale;
+        const borderRadius = shapeNumber(shape, "borderRadius", 6) * layout.scale;
+        const backgroundColor = shapeString(shape, "backgroundColor", "#8fc9ef");
+        const borderColor = shapeString(shape, "borderColor", "#2f5975");
+        const textColor = shapeString(shape, "textColor", "#111111");
+        const fontSize = Math.max(8, shapeNumber(shape, "fontSize", 20) * layout.scale);
+        const fontFamily = shapeString(shape, "fontFamily", "Times New Roman");
+        const fontWeight = shapeString(shape, "fontWeight", "normal");
+        const fontStyle = shapeString(shape, "fontStyle", "normal");
+        const textAlign = shapeString(shape, "textAlign", "center");
+        const textDecoration = shapeString(shape, "textDecoration", "none");
+        const textTransform = shapeString(shape, "textTransform", "none");
+        const text = escapeHtml(shapeString(shape, "text", ""));
+
+        const base = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;z-index:${zIndex};opacity:${opacity};box-sizing:border-box;`;
+
+        if (type === "image") {
+          const src = await imageToDataUrl(shape.imageSrc);
+          if (!src) return "";
+          const objectFit = shapeString(shape, "objectFit", "contain");
+          return `<div style="${base}overflow:hidden;border:${Math.max(0, borderWidth)}px solid ${escapeHtml(borderColor)};border-radius:${Math.max(0, borderRadius)}px;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.16);"><img src="${escapeHtml(src)}" alt="Savol rasmi" style="display:block;width:100%;height:100%;object-fit:${escapeHtml(objectFit)};" /></div>`;
+        }
+
+        if (type === "venn") {
+          return `<div style="${base}">
+            <div style="position:absolute;left:2%;top:8%;width:64%;height:84%;border:${Math.max(1, borderWidth)}px solid ${escapeHtml(borderColor)};border-radius:50%;background:${escapeHtml(backgroundColor)};opacity:.72;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:inset 0 3px 4px rgba(255,255,255,.6),0 3px 7px rgba(0,0,0,.18);">A</div>
+            <div style="position:absolute;right:2%;top:8%;width:64%;height:84%;border:${Math.max(1, borderWidth)}px solid ${escapeHtml(borderColor)};border-radius:50%;background:${escapeHtml(backgroundColor)};opacity:.72;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:inset 0 3px 4px rgba(255,255,255,.6),0 3px 7px rgba(0,0,0,.18);">B</div>
+          </div>`;
+        }
+
+        const radius =
+          type === "circle" || type === "ellipse"
+            ? "50%"
+            : type === "roundedRectangle"
+            ? `${Math.max(10, borderRadius)}px`
+            : `${Math.max(0, borderRadius)}px`;
+        const border = type === "text" ? "none" : `${Math.max(1, borderWidth)}px solid ${escapeHtml(borderColor)}`;
+        const background = type === "text" ? "transparent" : escapeHtml(backgroundColor);
+        const shadow = type === "text" ? "none" : "inset 0 3px 4px rgba(255,255,255,.72),0 3px 0 rgba(40,55,65,.35),0 7px 12px rgba(0,0,0,.17)";
+
+        return `<div style="${base}display:flex;align-items:center;justify-content:${textAlign === "left" ? "flex-start" : textAlign === "right" ? "flex-end" : "center"};padding:${Math.max(2, 6 * layout.scale)}px;overflow:hidden;background:${background};border:${border};border-radius:${radius};box-shadow:${shadow};color:${escapeHtml(textColor)};font-family:${escapeHtml(fontFamily)};font-size:${fontSize}px;font-weight:${escapeHtml(fontWeight)};font-style:${escapeHtml(fontStyle)};text-align:${escapeHtml(textAlign)};text-decoration:${escapeHtml(textDecoration)};text-transform:${escapeHtml(textTransform)};line-height:1.15;">${text}</div>`;
+      })
+    );
+
+    return `<div class="shapeStageWrap"><div class="shapeStage" style="position:relative;width:${layout.width}px;height:${layout.height}px;">${items.join("")}</div></div>`;
+  }
+
+  async function appendQuestionShapesForPdf(
+    parent: HTMLElement,
+    question: TestQuestion
+  ) {
+    const shapes = Array.isArray(question.shapes) ? question.shapes : [];
+    const layout = getShapeLayout(shapes);
+    if (!layout) return;
+
+    const wrap = document.createElement("div");
+    wrap.style.width = "100%";
+    wrap.style.margin = "10px 0 12px";
+    wrap.style.display = "flex";
+    wrap.style.justifyContent = "center";
+    wrap.style.overflow = "hidden";
+    wrap.style.background = "#ffffff";
+
+    const stage = document.createElement("div");
+    stage.style.position = "relative";
+    stage.style.width = `${layout.width}px`;
+    stage.style.height = `${layout.height}px`;
+    stage.style.flex = "0 0 auto";
+    stage.style.background = "#ffffff";
+    wrap.appendChild(stage);
+
+    for (const shape of shapes) {
+      const type = String(shape.type || "rectangle");
+      const item = document.createElement("div");
+      item.style.position = "absolute";
+      item.style.left = `${((Number(shape.x) || 0) - layout.minX) * layout.scale}px`;
+      item.style.top = `${((Number(shape.y) || 0) - layout.minY) * layout.scale}px`;
+      item.style.width = `${Math.max(1, Number(shape.width) || 1) * layout.scale}px`;
+      item.style.height = `${Math.max(1, Number(shape.height) || 1) * layout.scale}px`;
+      item.style.zIndex = String(Math.round(shapeNumber(shape, "zIndex", 1)));
+      item.style.opacity = String(shapeNumber(shape, "opacity", 1));
+      item.style.boxSizing = "border-box";
+
+      const borderWidth = Math.max(0, shapeNumber(shape, "borderWidth", 2) * layout.scale);
+      const borderRadius = Math.max(0, shapeNumber(shape, "borderRadius", 6) * layout.scale);
+      const backgroundColor = shapeString(shape, "backgroundColor", "#8fc9ef");
+      const borderColor = shapeString(shape, "borderColor", "#2f5975");
+      const textColor = shapeString(shape, "textColor", "#111111");
+
+      if (type === "image") {
+        const src = await imageToDataUrl(shape.imageSrc);
+        if (!src) continue;
+        item.style.overflow = "hidden";
+        item.style.background = "#ffffff";
+        item.style.border = `${borderWidth}px solid ${borderColor}`;
+        item.style.borderRadius = `${borderRadius}px`;
+        item.style.boxShadow = "0 3px 8px rgba(0,0,0,.16)";
+
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "Savol rasmi";
+        img.style.display = "block";
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = shapeString(shape, "objectFit", "contain") as
+          | "contain"
+          | "cover"
+          | "fill";
+        item.appendChild(img);
+        stage.appendChild(item);
+        continue;
+      }
+
+      if (type === "venn") {
+        const makeCircle = (side: "left" | "right", label: string) => {
+          const circle = document.createElement("div");
+          circle.style.position = "absolute";
+          circle.style.top = "8%";
+          circle.style.width = "64%";
+          circle.style.height = "84%";
+          circle.style[side] = "2%";
+          circle.style.border = `${Math.max(1, borderWidth)}px solid ${borderColor}`;
+          circle.style.borderRadius = "50%";
+          circle.style.background = backgroundColor;
+          circle.style.opacity = ".72";
+          circle.style.display = "flex";
+          circle.style.alignItems = "center";
+          circle.style.justifyContent = "center";
+          circle.style.fontWeight = "700";
+          circle.style.boxShadow = "inset 0 3px 4px rgba(255,255,255,.6),0 3px 7px rgba(0,0,0,.18)";
+          circle.textContent = label;
+          return circle;
+        };
+        item.appendChild(makeCircle("left", "A"));
+        item.appendChild(makeCircle("right", "B"));
+        stage.appendChild(item);
+        continue;
+      }
+
+      item.style.display = "flex";
+      item.style.alignItems = "center";
+      const align = shapeString(shape, "textAlign", "center");
+      item.style.justifyContent =
+        align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
+      item.style.padding = `${Math.max(2, 6 * layout.scale)}px`;
+      item.style.overflow = "hidden";
+      item.style.color = textColor;
+      item.style.fontFamily = shapeString(shape, "fontFamily", "Times New Roman");
+      item.style.fontSize = `${Math.max(8, shapeNumber(shape, "fontSize", 20) * layout.scale)}px`;
+      item.style.fontWeight = shapeString(shape, "fontWeight", "normal");
+      item.style.fontStyle = shapeString(shape, "fontStyle", "normal");
+      item.style.textAlign = align as "left" | "center" | "right";
+      item.style.textDecoration = shapeString(shape, "textDecoration", "none");
+      item.style.textTransform = shapeString(shape, "textTransform", "none") as
+        | "none"
+        | "uppercase"
+        | "lowercase";
+      item.style.lineHeight = "1.15";
+      item.textContent = shapeString(shape, "text", "");
+
+      if (type === "text") {
+        item.style.background = "transparent";
+        item.style.border = "none";
+        item.style.boxShadow = "none";
+      } else {
+        item.style.background = backgroundColor;
+        item.style.border = `${Math.max(1, borderWidth)}px solid ${borderColor}`;
+        item.style.borderRadius =
+          type === "circle" || type === "ellipse"
+            ? "50%"
+            : type === "roundedRectangle"
+            ? `${Math.max(10, borderRadius)}px`
+            : `${borderRadius}px`;
+        item.style.boxShadow =
+          "inset 0 3px 4px rgba(255,255,255,.72),0 3px 0 rgba(40,55,65,.35),0 7px 12px rgba(0,0,0,.17)";
+      }
+
+      stage.appendChild(item);
+    }
+
+    parent.appendChild(wrap);
+  }
+
   async function buildTestDocument(
     fullTest: TestData,
     includeAnswers: boolean
@@ -423,22 +668,7 @@ export default function AdminTestsPage() {
           ? question.options
           : [];
 
-        const imageShapes = Array.isArray(question.shapes)
-          ? question.shapes.filter(
-              (shape) =>
-                typeof shape.imageSrc === "string" &&
-                shape.imageSrc.trim().length > 0
-            )
-          : [];
-
-        const shapeImages = await Promise.all(
-          imageShapes.map(async (shape) => {
-            const src = await imageToDataUrl(shape.imageSrc);
-            return src
-              ? `<div class="questionImage"><img src="${escapeHtml(src)}" alt="Savol rasmi" /></div>`
-              : "";
-          })
-        );
+        const shapesHtml = await buildQuestionShapesHtml(question);
 
         const optionsHtml = options
           .map((option, optionIndex) => {
@@ -467,7 +697,7 @@ export default function AdminTestsPage() {
             <div class="questionText">${escapeHtml(
               stripHtml(question.questionHtml) || "Savol matni mavjud emas"
             )}</div>
-            ${shapeImages.join("")}
+            ${shapesHtml}
             <div class="options">${optionsHtml}</div>
           </section>
         `;
@@ -523,6 +753,19 @@ export default function AdminTestsPage() {
       max-width: 260px;
       max-height: 185px;
       object-fit: contain;
+    }
+    .shapeStageWrap {
+      width: 100%;
+      margin: 8px 0 10px;
+      text-align: center;
+      overflow: hidden;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .shapeStage {
+      display: inline-block;
+      vertical-align: top;
+      background: #fff;
     }
     .option {
       position: relative;
@@ -690,37 +933,7 @@ export default function AdminTestsPage() {
         questionText.style.color = "#111111";
         card.appendChild(questionText);
 
-        const imageShapes = Array.isArray(question.shapes)
-          ? question.shapes.filter(
-              (shape) =>
-                typeof shape.imageSrc === "string" &&
-                shape.imageSrc.trim().length > 0
-            )
-          : [];
-
-        for (const shape of imageShapes) {
-          const src = await imageToDataUrl(shape.imageSrc);
-          if (!src) continue;
-
-          const imageWrap = document.createElement("div");
-          imageWrap.style.width = "100%";
-          imageWrap.style.margin = "8px 0 10px";
-          imageWrap.style.textAlign = "center";
-          imageWrap.style.background = "#ffffff";
-
-          const img = document.createElement("img");
-          img.src = src;
-          img.alt = "Savol rasmi";
-          img.style.display = "inline-block";
-          img.style.maxWidth = "330px";
-          img.style.maxHeight = "220px";
-          img.style.width = "auto";
-          img.style.height = "auto";
-          img.style.objectFit = "contain";
-          img.style.background = "#ffffff";
-          imageWrap.appendChild(img);
-          card.appendChild(imageWrap);
-        }
+        await appendQuestionShapesForPdf(card, question);
 
         const options = Array.isArray(question.options)
           ? question.options
@@ -780,7 +993,7 @@ export default function AdminTestsPage() {
       footer.style.fontSize = "12px";
       renderRoot.appendChild(footer);
 
-      // Rasm va fontlar to'liq yuklanishini kutamiz.
+      // Rasm, shakl va fontlar to‘liq tayyor bo‘lishini kutamiz.
       const allImages = Array.from(renderRoot.querySelectorAll("img"));
       await Promise.all(
         allImages.map(
