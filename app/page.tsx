@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useEffect,
@@ -56,6 +56,7 @@ export default function Home() {
           window.location.replace(
             "/login"
           );
+
           return;
         }
 
@@ -134,12 +135,6 @@ export default function Home() {
 
   /* =========================================
      TESTLARNI OCHISH
-
-     ADMIN -> /admin/tests
-     USER  -> /test
-
-     /test-entry serverning o‘zi
-     rolni tekshiradi.
   ========================================= */
 
   function openTests() {
@@ -582,6 +577,31 @@ export default function Home() {
             <button
               type="button"
               className="openButton"
+            >
+              Ochish
+            </button>
+
+          </article>
+
+          {/* ================= ENGLISH VOCABULARY ================= */}
+
+          <article className="card">
+
+            <h2>
+              English Vocabulary
+            </h2>
+
+            <div className="vocabularySubtitle">
+              4000 Essential English Words
+            </div>
+
+            <button
+              type="button"
+              className="openButton testButton"
+              onClick={() => {
+                window.location.href =
+                  "/qollanmalar/english-vocabulary";
+              }}
             >
               Ochish
             </button>
@@ -1230,6 +1250,17 @@ export default function Home() {
           border-radius: 8px;
 
           background: #d8f1df;
+        }
+
+        /* ================= VOCABULARY ================= */
+
+        .vocabularySubtitle {
+          margin: -18px 0 22px;
+
+          color: #173e58;
+
+          font-size: 16px;
+          font-weight: 700;
         }
 
         /* ================= OCHISH ================= */
