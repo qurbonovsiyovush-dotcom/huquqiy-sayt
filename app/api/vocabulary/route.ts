@@ -14,6 +14,9 @@ const VOCABULARY_BLOB_PATH =
 type VocabularyWord = {
   word: string;
   translation: string;
+
+  example?: string;
+  exampleTranslation?: string;
 };
 
 type VocabularyUnit = {
@@ -26,6 +29,8 @@ type VocabularyUnit = {
 type RawVocabularyWord = {
   word?: unknown;
   translation?: unknown;
+  example?: unknown;
+  exampleTranslation?: unknown;
 };
 
 type VocabularyPostBody = {
@@ -35,14 +40,11 @@ type VocabularyPostBody = {
 };
 
 /* =========================================================
-   BLOB TOKEN TEKSHIRISH
+   BLOB TOKEN
 ========================================================= */
 
 function checkBlobToken() {
-  if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error(
       "BLOB_READ_WRITE_TOKEN topilmadi."
     );
@@ -50,7 +52,31 @@ function checkBlobToken() {
 }
 
 /* =========================================================
-   VOCABULARY'NI BLOB'DAN O‘QISH
+   BOOK TEKSHIRISH
+========================================================= */
+
+function isValidBook(book: number) {
+  return (
+    Number.isInteger(book) &&
+    book >= 1 &&
+    book <= 6
+  );
+}
+
+/* =========================================================
+   UNIT TEKSHIRISH
+========================================================= */
+
+function isValidUnit(unit: number) {
+  return (
+    Number.isInteger(unit) &&
+    unit >= 1 &&
+    unit <= 30
+  );
+}
+
+/* =========================================================
+   VOCABULARY O‘QISH
 ========================================================= */
 
 async function readVocabulary(): Promise<
@@ -97,18 +123,12 @@ async function readVocabulary(): Promise<
       error
     );
 
-    /*
-      vocabulary.json hali
-      mavjud bo‘lmasa bo‘sh
-      massiv qaytadi.
-    */
-
     return [];
   }
 }
 
 /* =========================================================
-   VOCABULARY'NI BLOB'GA YOZISH
+   VOCABULARY YOZISH
 ========================================================= */
 
 async function writeVocabulary(
@@ -135,37 +155,8 @@ async function writeVocabulary(
 }
 
 /* =========================================================
-   BOOK TEKSHIRISH
-========================================================= */
-
-function isValidBook(
-  book: number
-) {
-  return (
-    Number.isInteger(book) &&
-    book >= 1 &&
-    book <= 6
-  );
-}
-
-/* =========================================================
-   UNIT TEKSHIRISH
-========================================================= */
-
-function isValidUnit(
-  unit: number
-) {
-  return (
-    Number.isInteger(unit) &&
-    unit >= 1 &&
-    unit <= 30
-  );
-}
-
-/* =========================================================
    GET
 
-   MISOL:
    /api/vocabulary?book=1&unit=1
 ========================================================= */
 
@@ -184,10 +175,6 @@ export async function GET(
       searchParams.get("unit")
     );
 
-    /* =====================================================
-       BOOK TEKSHIRISH
-    ===================================================== */
-
     if (!isValidBook(book)) {
       return NextResponse.json(
         {
@@ -200,10 +187,6 @@ export async function GET(
         }
       );
     }
-
-    /* =====================================================
-       UNIT TEKSHIRISH
-    ===================================================== */
 
     if (!isValidUnit(unit)) {
       return NextResponse.json(
@@ -218,10 +201,6 @@ export async function GET(
       );
     }
 
-    /* =====================================================
-       VOCABULARY O‘QISH
-    ===================================================== */
-
     const vocabulary =
       await readVocabulary();
 
@@ -233,10 +212,6 @@ export async function GET(
           item.book === book &&
           item.unit === unit
       );
-
-    /* =====================================================
-       JAVOB
-    ===================================================== */
 
     return NextResponse.json(
       {
@@ -280,7 +255,7 @@ export async function GET(
 /* =========================================================
    POST
 
-   ADMIN BOOK + UNIT UCHUN SO‘ZLARNI SAQLAYDI
+   BOOK + UNIT UCHUN SO‘ZLARNI SAQLASH
 ========================================================= */
 
 export async function POST(
@@ -298,10 +273,6 @@ export async function POST(
       body.unit
     );
 
-    /* =====================================================
-       BOOK TEKSHIRISH
-    ===================================================== */
-
     if (!isValidBook(book)) {
       return NextResponse.json(
         {
@@ -315,10 +286,6 @@ export async function POST(
         }
       );
     }
-
-    /* =====================================================
-       UNIT TEKSHIRISH
-    ===================================================== */
 
     if (!isValidUnit(unit)) {
       return NextResponse.json(
@@ -334,10 +301,6 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       KELGAN SO‘ZLARNI OLISH
-    ===================================================== */
-
     const incomingWords: RawVocabularyWord[] =
       Array.isArray(body.words)
         ? (
@@ -345,37 +308,56 @@ export async function POST(
           )
         : [];
 
-    /* =====================================================
-       SO‘ZLARNI TOZALASH
-    ===================================================== */
-
     const words: VocabularyWord[] =
       incomingWords
         .map(
           (
             item: RawVocabularyWord
-          ): VocabularyWord => ({
-            word: String(
+          ): VocabularyWord => {
+            const word = String(
               item.word ?? ""
-            ).trim(),
+            ).trim();
 
-            translation: String(
-              item.translation ?? ""
-            ).trim(),
-          })
+            const translation =
+              String(
+                item.translation ?? ""
+              ).trim();
+
+            const example =
+              String(
+                item.example ?? ""
+              ).trim();
+
+            const exampleTranslation =
+              String(
+                item.exampleTranslation ?? ""
+              ).trim();
+
+            return {
+              word,
+              translation,
+
+              ...(example
+                ? {
+                    example,
+                  }
+                : {}),
+
+              ...(exampleTranslation
+                ? {
+                    exampleTranslation,
+                  }
+                : {}),
+            };
+          }
         )
         .filter(
           (
             item: VocabularyWord
           ) =>
             item.word.length > 0 &&
-            item.translation.length >
-              0
+            item.translation.length > 0
         );
-
-    /* =====================================================
-       SO‘Z BORMI?
-    ===================================================== */
 
     if (words.length === 0) {
       return NextResponse.json(
@@ -391,19 +373,11 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       MAVJUD VOCABULARY'NI O‘QISH
-    ===================================================== */
-
     const vocabulary =
       await readVocabulary();
 
     const now =
       new Date().toISOString();
-
-    /* =====================================================
-       BOOK + UNIT MAVJUDMI?
-    ===================================================== */
 
     const existingIndex =
       vocabulary.findIndex(
@@ -414,22 +388,12 @@ export async function POST(
           item.unit === unit
       );
 
-    /* =====================================================
-       YANGI UNIT MA'LUMOTI
-    ===================================================== */
-
-    const unitData: VocabularyUnit =
-      {
-        book,
-        unit,
-        words,
-        updatedAt: now,
-      };
-
-    /* =====================================================
-       MAVJUD BO‘LSA YANGILAYMIZ
-       YO‘Q BO‘LSA QO‘SHAMIZ
-    ===================================================== */
+    const unitData: VocabularyUnit = {
+      book,
+      unit,
+      words,
+      updatedAt: now,
+    };
 
     if (
       existingIndex >= 0
@@ -443,17 +407,9 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       BLOB'GA SAQLASH
-    ===================================================== */
-
     await writeVocabulary(
       vocabulary
     );
-
-    /* =====================================================
-       NATIJA
-    ===================================================== */
 
     return NextResponse.json(
       {
