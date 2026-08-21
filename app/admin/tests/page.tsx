@@ -56,6 +56,7 @@ export default function AdminTestsPage() {
   >("all");
   const [exportTest, setExportTest] = useState<TestData | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"pdf" | "word" | null>(null);
 
   /* =========================================================
      JSON O'QISH
@@ -386,28 +387,73 @@ export default function AdminTestsPage() {
       .replace(/'/g, "&#039;");
   }
 
-  function buildTestDocument(fullTest: TestData) {
+  async function imageToDataUrl(src?: string) {
+    if (!src) return "";
+    if (src.startsWith("data:")) return src;
+
+    try {
+      const response = await fetch(src, { cache: "no-store" });
+      if (!response.ok) return src;
+      const blob = await response.blob();
+
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || src));
+        reader.onerror = () => resolve(src);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return src;
+    }
+  }
+
+  async function buildTestDocument(
+    fullTest: TestData,
+    includeAnswers: boolean
+  ) {
     const questions = Array.isArray(fullTest.questions)
       ? fullTest.questions
       : [];
 
-    const questionHtml = questions
-      .map((question, index) => {
+    const questionParts = await Promise.all(
+      questions.map(async (question, index) => {
         const options = Array.isArray(question.options)
           ? question.options
           : [];
+
+        const imageShapes = Array.isArray(question.shapes)
+          ? question.shapes.filter(
+              (shape) =>
+                typeof shape.imageSrc === "string" &&
+                shape.imageSrc.trim().length > 0
+            )
+          : [];
+
+        const shapeImages = await Promise.all(
+          imageShapes.map(async (shape) => {
+            const src = await imageToDataUrl(shape.imageSrc);
+            return src
+              ? `<div class="questionImage"><img src="${escapeHtml(src)}" alt="Savol rasmi" /></div>`
+              : "";
+          })
+        );
 
         const optionsHtml = options
           .map((option, optionIndex) => {
             const letter = String.fromCharCode(65 + optionIndex);
             const correct = option.isCorrect === true;
             const optionText = stripHtml(option.text);
+            const correctClass = includeAnswers && correct ? " correct" : "";
+            const answerLabel =
+              includeAnswers && correct
+                ? '<span class="answer">TO‘G‘RI JAVOB</span>'
+                : "";
 
             return `
-              <div class="option ${correct ? "correct" : ""}">
+              <div class="option${correctClass}">
                 <strong>${letter}.</strong>
                 ${escapeHtml(optionText || "Variant matni mavjud emas")}
-                ${correct ? '<span class="answer">To‘g‘ri javob</span>' : ""}
+                ${answerLabel}
               </div>
             `;
           })
@@ -419,11 +465,12 @@ export default function AdminTestsPage() {
             <div class="questionText">${escapeHtml(
               stripHtml(question.questionHtml) || "Savol matni mavjud emas"
             )}</div>
+            ${shapeImages.join("")}
             <div class="options">${optionsHtml}</div>
           </section>
         `;
       })
-      .join("");
+    );
 
     return `<!doctype html>
 <html lang="uz">
@@ -435,11 +482,13 @@ export default function AdminTestsPage() {
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      color: #111;
+      color: #101820;
       font-family: Arial, "Times New Roman", serif;
       font-size: 12pt;
-      line-height: 1.45;
+      line-height: 1.5;
       background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .header {
       margin-bottom: 22px;
@@ -451,32 +500,25 @@ export default function AdminTestsPage() {
     }
     .header h1 { margin: 0 0 6px; color: #073b68; font-size: 22pt; }
     .header p { margin: 4px 0; }
-    .meta {
-      display: table;
-      width: 100%;
-      margin-top: 14px;
-      border-collapse: collapse;
-    }
-    .meta div { display: table-cell; padding: 9px; border: 1px solid #aaa; }
+    .nameLine { margin-top: 14px; padding-top: 10px; border-top: 1px solid #7d9bad; text-align: left; }
+    .meta { display: table; width: 100%; margin-top: 14px; border-collapse: collapse; }
+    .meta div { display: table-cell; padding: 9px; border: 1px solid #9aa8b0; }
     .question {
       margin: 0 0 18px;
       padding: 15px;
       break-inside: avoid;
-      border: 1px solid #999;
+      page-break-inside: avoid;
+      border: 1px solid #8c9aa3;
       border-radius: 9px;
     }
     .question h3 { margin: 0 0 10px; color: #073b68; }
-    .questionText { margin-bottom: 12px; font-weight: 700; }
-    .option {
-      position: relative;
-      margin: 7px 0;
-      padding: 9px 12px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-    .option.correct { border-color: #2f8450; background: #eaf8ef; }
-    .answer { float: right; color: #17723b; font-size: 9pt; font-weight: 700; }
-    .footer { margin-top: 24px; color: #666; text-align: center; font-size: 9pt; }
+    .questionText { margin-bottom: 12px; font-weight: 700; white-space: pre-wrap; }
+    .questionImage { margin: 12px 0; text-align: center; }
+    .questionImage img { display: inline-block; max-width: 100%; max-height: 420px; object-fit: contain; }
+    .option { position: relative; margin: 7px 0; padding: 9px 12px; border: 1px solid #c2c9cd; border-radius: 6px; }
+    .option.correct { border: 2px solid #2f8450; background: #eaf8ef; }
+    .answer { float: right; margin-left: 10px; color: #176b39; font-size: 9pt; font-weight: 800; }
+    .footer { margin-top: 24px; color: #4b5961; text-align: center; font-size: 9pt; }
   </style>
 </head>
 <body>
@@ -487,16 +529,17 @@ export default function AdminTestsPage() {
     <div class="meta">
       <div><strong>Savollar:</strong> ${questions.length}</div>
       <div><strong>Vaqt:</strong> ${Number(fullTest.duration) || 0} daqiqa</div>
-      <div><strong>Holati:</strong> ${fullTest.status === "published" ? "E’lon qilingan" : "Qoralama"}</div>
+      <div><strong>Javoblar:</strong> ${includeAnswers ? "bilan" : "javobsiz"}</div>
     </div>
+    <div class="nameLine"><strong>F.I.Sh.:</strong> ____________________________________________</div>
   </div>
-  ${questionHtml}
+  ${questionParts.join("")}
   <div class="footer">qurbonovv.uz — Huquqiy ta’lim platformasi</div>
 </body>
 </html>`;
   }
 
-  async function exportAsWord(test: TestData) {
+  async function exportAsWord(test: TestData, includeAnswers: boolean) {
     setExporting(true);
     setWorkingId(test.id);
 
@@ -504,7 +547,7 @@ export default function AdminTestsPage() {
       const fullTest = await getFullTest(test.id);
       if (!fullTest) return;
 
-      const html = buildTestDocument(fullTest);
+      const html = await buildTestDocument(fullTest, includeAnswers);
       const blob = new Blob(["\ufeff", html], {
         type: "application/msword;charset=utf-8",
       });
@@ -512,12 +555,15 @@ export default function AdminTestsPage() {
       const link = document.createElement("a");
 
       link.href = url;
-      link.download = `${cleanFileName(fullTest.title)}.doc`;
+      link.download = `${cleanFileName(fullTest.title)}_${
+        includeAnswers ? "javoblari_bilan" : "javobsiz"
+      }.doc`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       setExportTest(null);
+      setExportFormat(null);
     } catch (error) {
       console.error(error);
       window.alert("Word faylini yaratishda xatolik yuz berdi.");
@@ -527,7 +573,7 @@ export default function AdminTestsPage() {
     }
   }
 
-  async function exportAsPdf(test: TestData) {
+  async function exportAsPdf(test: TestData, includeAnswers: boolean) {
     setExporting(true);
     setWorkingId(test.id);
 
@@ -541,16 +587,27 @@ export default function AdminTestsPage() {
         return;
       }
 
+      const html = await buildTestDocument(fullTest, includeAnswers);
       printWindow.document.open();
-      printWindow.document.write(buildTestDocument(fullTest));
+      printWindow.document.write(html);
       printWindow.document.close();
+
+      const images = Array.from(printWindow.document.images);
+      await Promise.all(
+        images.map(
+          (image) =>
+            new Promise<void>((resolve) => {
+              if (image.complete) return resolve();
+              image.onload = () => resolve();
+              image.onerror = () => resolve();
+            })
+        )
+      );
+
       printWindow.focus();
-
-      window.setTimeout(() => {
-        printWindow.print();
-      }, 350);
-
+      window.setTimeout(() => printWindow.print(), 250);
       setExportTest(null);
+      setExportFormat(null);
     } catch (error) {
       console.error(error);
       window.alert("PDF tayyorlashda xatolik yuz berdi.");
@@ -962,7 +1019,12 @@ export default function AdminTestsPage() {
       {exportTest && (
         <div
           className="exportOverlay"
-          onClick={() => !exporting && setExportTest(null)}
+          onClick={() => {
+            if (!exporting) {
+              setExportTest(null);
+              setExportFormat(null);
+            }
+          }}
         >
           <div
             className="exportModal"
@@ -973,37 +1035,87 @@ export default function AdminTestsPage() {
               <strong>{exportTest.title || "Test"}</strong>
             </div>
 
-            <p>Kerakli formatni tanlang.</p>
+            {!exportFormat ? (
+              <>
+                <p>Avval fayl formatini tanlang.</p>
+                <div className="exportChoices">
+                  <button
+                    type="button"
+                    className="pdfChoice"
+                    disabled={exporting}
+                    onClick={() => setExportFormat("pdf")}
+                  >
+                    <span className="choiceMain">PDF</span>
+                    <span className="choiceSub">Chop etish yoki PDF sifatida saqlash</span>
+                  </button>
 
-            <div className="exportChoices">
-              <button
-                type="button"
-                className="pdfChoice"
-                disabled={exporting}
-                onClick={() => exportAsPdf(exportTest)}
-              >
-                <span className="choiceMain">PDF</span>
-                <span className="choiceSub">Chop etish yoki PDF sifatida saqlash</span>
-              </button>
+                  <button
+                    type="button"
+                    className="wordChoice"
+                    disabled={exporting}
+                    onClick={() => setExportFormat("word")}
+                  >
+                    <span className="choiceMain">Word</span>
+                    <span className="choiceSub">Tahrirlash mumkin bo‘lgan .doc fayl</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>
+                  <strong>{exportFormat === "pdf" ? "PDF" : "Word"}</strong> qanday saqlansin?
+                </p>
+                <div className="answerChoices">
+                  <button
+                    type="button"
+                    className="withAnswersChoice"
+                    disabled={exporting}
+                    onClick={() =>
+                      exportFormat === "pdf"
+                        ? exportAsPdf(exportTest, true)
+                        : exportAsWord(exportTest, true)
+                    }
+                  >
+                    <span className="choiceMain">Javoblari bilan</span>
+                    <span className="choiceSub">To‘g‘ri javoblar yashil rangda belgilanadi</span>
+                  </button>
 
-              <button
-                type="button"
-                className="wordChoice"
-                disabled={exporting}
-                onClick={() => exportAsWord(exportTest)}
-              >
-                <span className="choiceMain">Word</span>
-                <span className="choiceSub">Tahrirlash mumkin bo‘lgan .doc fayl</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    className="withoutAnswersChoice"
+                    disabled={exporting}
+                    onClick={() =>
+                      exportFormat === "pdf"
+                        ? exportAsPdf(exportTest, false)
+                        : exportAsWord(exportTest, false)
+                    }
+                  >
+                    <span className="choiceMain">Javoblarsiz</span>
+                    <span className="choiceSub">Talabalarga tarqatish uchun toza test</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="backExport"
+                  disabled={exporting}
+                  onClick={() => setExportFormat(null)}
+                >
+                  ← Formatni qayta tanlash
+                </button>
+              </>
+            )}
 
             <button
               type="button"
               className="cancelExport"
               disabled={exporting}
-              onClick={() => setExportTest(null)}
+              onClick={() => {
+                setExportTest(null);
+                setExportFormat(null);
+              }}
             >
-              Bekor qilish
+              {exporting ? "Tayyorlanmoqda..." : "Bekor qilish"}
             </button>
           </div>
         </div>
@@ -2134,6 +2246,84 @@ export default function AdminTestsPage() {
           font-weight: 800;
         }
 
+        .answerChoices {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .answerChoices button {
+          min-height: 92px;
+          padding: 12px;
+          border-radius: 13px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 5px 0 rgba(0,0,0,.28);
+          font-weight: 800;
+        }
+
+        .withAnswersChoice {
+          border: 2px solid #267446;
+          background: linear-gradient(#d8f8e2, #74cf92);
+          color: #104d2b;
+        }
+
+        .withoutAnswersChoice {
+          border: 2px solid #174461;
+          background: linear-gradient(#d8f3ff, #73bce2);
+          color: #073b68;
+        }
+
+        .backExport {
+          width: 100%;
+          min-height: 44px;
+          margin-top: 14px;
+          border: 2px solid #6a6a6a;
+          border-radius: 10px;
+          background: linear-gradient(#fff, #d3d3d3);
+          box-shadow: 0 3px 0 #666;
+          color: #202020;
+          font-weight: 800;
+        }
+
+        /* Matnlarni xira ko‘rinishdan chiqarish */
+        .page,
+        .page button,
+        .page input {
+          -webkit-font-smoothing: antialiased;
+          text-rendering: optimizeLegibility;
+        }
+
+        .testTitleArea h2,
+        .testTitleArea p,
+        .description,
+        .infoItem span,
+        .infoItem strong,
+        .actionMain,
+        .actionSub,
+        .buttonMain,
+        .buttonSub,
+        .statCard span,
+        .exportModal {
+          text-shadow: none;
+          opacity: 1;
+        }
+
+        .description,
+        .infoItem span,
+        .actionSub,
+        .buttonSub {
+          color: #26343c;
+        }
+
+        .actionSub,
+        .buttonSub {
+          font-weight: 700;
+          opacity: .92;
+        }
+
         /* ================================================
            RESPONSIVE
         ================================================ */
@@ -2382,7 +2572,8 @@ export default function AdminTestsPage() {
             border-radius: 17px;
           }
 
-          .exportChoices {
+          .exportChoices,
+          .answerChoices {
             grid-template-columns: 1fr;
             gap: 10px;
           }
