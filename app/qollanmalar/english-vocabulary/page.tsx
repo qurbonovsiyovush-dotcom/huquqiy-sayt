@@ -202,7 +202,7 @@ export default function EnglishVocabularyPage() {
                   type="button"
                   onClick={() => {
                     window.location.href =
-                      `/qollanmalar/english-vocabulary/test?book=${selectedBook}&unit=${unit}`;
+                      `/qollanmalar/english-vocabulary/learn?book=${selectedBook}&unit=${unit}`;
                   }}
                   style={{
                     minHeight: "65px",
