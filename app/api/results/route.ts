@@ -5,7 +5,8 @@ import crypto from "crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RESULTS_BLOB_PATH = "huquqiy-sayt/test-results.json";
+const RESULTS_BLOB_PATH =
+  "huquqiy-sayt/test-results.json";
 
 type TestResult = {
   id: string;
@@ -21,24 +22,39 @@ type TestResult = {
   earnedPoints: number;
   totalPoints: number;
   spentSeconds: number;
-  answers?: Record<string, string>;
+  answers?: Record<string, unknown>;
   finishedAt: string;
 };
 
-function number(value: unknown, fallback = 0) {
+function safeNumber(
+  value: unknown,
+  fallback = 0
+) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : fallback;
 }
+
+/* =========================================================
+   BLOB'DAN NATIJALARNI O‘QISH
+========================================================= */
 
 async function readResults(): Promise<TestResult[]> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("BLOB_READ_WRITE_TOKEN topilmadi.");
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
   }
 
   try {
-    const result = await get(RESULTS_BLOB_PATH, {
-      access: "private",
-    });
+    const result = await get(
+      RESULTS_BLOB_PATH,
+      {
+        access: "private",
+      }
+    );
 
     if (
       !result ||
@@ -48,37 +64,61 @@ async function readResults(): Promise<TestResult[]> {
       return [];
     }
 
-    const text = await new Response(result.stream).text();
+    const text =
+      await new Response(
+        result.stream
+      ).text();
 
     if (!text.trim()) {
       return [];
     }
 
-    const parsed = JSON.parse(text);
+    const parsed =
+      JSON.parse(text);
 
     return Array.isArray(parsed)
       ? parsed
       : [];
   } catch (error) {
-    console.error("RESULT BLOB READ ERROR:", error);
+    /*
+      Blob hali yaratilmagan bo‘lsa
+      birinchi natijadan boshlaymiz.
+    */
+    console.log(
+      "Natijalar Blob hali mavjud emas:",
+      error
+    );
 
     return [];
   }
 }
 
-async function writeResults(results: TestResult[]) {
+/* =========================================================
+   NATIJALARNI BLOB'GA YOZISH
+========================================================= */
+
+async function writeResults(
+  results: TestResult[]
+) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("BLOB_READ_WRITE_TOKEN topilmadi.");
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
   }
 
   await put(
     RESULTS_BLOB_PATH,
-    JSON.stringify(results, null, 2),
+    JSON.stringify(
+      results,
+      null,
+      2
+    ),
     {
       access: "private",
       addRandomSuffix: false,
       allowOverwrite: true,
-      contentType: "application/json; charset=utf-8",
+      contentType:
+        "application/json; charset=utf-8",
       cacheControlMaxAge: 60,
     }
   );
@@ -89,16 +129,21 @@ async function writeResults(results: TestResult[]) {
    TEST NATIJASINI SAQLASH
 ========================================================= */
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest
+) {
   try {
     const session =
-      request.cookies.get("qurbonov_session")?.value;
+      request.cookies.get(
+        "qurbonov_session"
+      )?.value;
 
     if (!session) {
       return NextResponse.json(
         {
           success: false,
-          message: "Avval tizimga kiring.",
+          message:
+            "Avval tizimga kiring.",
         },
         {
           status: 401,
@@ -106,34 +151,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    /* =====================================================
+       FOYDALANUVCHI ISMI
+    ===================================================== */
+
     const encodedName =
-      request.cookies.get("qurbonov_name")?.value ||
+      request.cookies.get(
+        "qurbonov_name"
+      )?.value ||
       "Foydalanuvchi";
 
-    let userName = "Foydalanuvchi";
+    let userName =
+      "Foydalanuvchi";
 
     try {
-      userName = decodeURIComponent(encodedName);
+      userName =
+        decodeURIComponent(
+          encodedName
+        );
     } catch {
-      userName = encodedName;
+      userName =
+        encodedName;
     }
 
-    const body = await request.json();
+    /* =====================================================
+       BODY
+    ===================================================== */
+
+    const body =
+      await request.json();
 
     const testId =
-      String(body?.testId || "").trim();
+      String(
+        body?.testId || ""
+      ).trim();
 
     const testTitle =
-      String(body?.testTitle || "").trim();
+      String(
+        body?.testTitle || ""
+      ).trim();
 
     const subject =
-      String(body?.subject || "").trim();
+      String(
+        body?.subject || ""
+      ).trim();
 
-    if (!testId || !testTitle) {
+    if (
+      !testId ||
+      !testTitle
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Test ma’lumotlari yetarli emas.",
+          message:
+            "Test ma’lumotlari yetarli emas.",
         },
         {
           status: 400,
@@ -141,83 +212,180 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    /* =====================================================
+       NATIJA
+    ===================================================== */
+
     const total =
-      Math.max(0, number(body?.total));
+      Math.max(
+        0,
+        safeNumber(
+          body?.total
+        )
+      );
 
     const correct =
-      Math.max(0, number(body?.correct));
+      Math.max(
+        0,
+        safeNumber(
+          body?.correct
+        )
+      );
 
     const incorrect =
-      Math.max(0, number(body?.incorrect));
+      Math.max(
+        0,
+        safeNumber(
+          body?.incorrect
+        )
+      );
 
     const unanswered =
-      Math.max(0, number(body?.unanswered));
+      Math.max(
+        0,
+        safeNumber(
+          body?.unanswered
+        )
+      );
 
     const percentage =
       Math.min(
         100,
         Math.max(
           0,
-          number(body?.percentage)
+          safeNumber(
+            body?.percentage
+          )
         )
       );
 
     const earnedPoints =
       Math.max(
         0,
-        number(body?.earnedPoints)
+        safeNumber(
+          body?.earnedPoints
+        )
       );
 
     const totalPoints =
       Math.max(
         0,
-        number(body?.totalPoints)
+        safeNumber(
+          body?.totalPoints
+        )
       );
 
     const spentSeconds =
       Math.max(
         0,
         Math.floor(
-          number(body?.spentSeconds)
+          safeNumber(
+            body?.spentSeconds
+          )
         )
       );
 
-    const answers =
+    /* =====================================================
+       JAVOBLAR
+    ===================================================== */
+
+    let answers:
+      | Record<string, unknown>
+      | undefined;
+
+    if (
       body?.answers &&
-      typeof body.answers === "object" &&
-      !Array.isArray(body.answers)
-        ? body.answers
-        : undefined;
+      typeof body.answers ===
+        "object" &&
+      !Array.isArray(
+        body.answers
+      )
+    ) {
+      answers =
+        body.answers;
+    }
+
+    /* =====================================================
+       YANGI NATIJA
+    ===================================================== */
 
     const result: TestResult = {
-      id: crypto.randomUUID(),
+      id:
+        crypto.randomUUID(),
+
       userName,
+
       testId,
+
       testTitle,
+
       subject,
+
       total,
+
       correct,
+
       incorrect,
+
       unanswered,
+
       percentage,
+
       earnedPoints,
+
       totalPoints,
+
       spentSeconds,
+
       answers,
+
       finishedAt:
         new Date().toISOString(),
     };
 
+    /* =====================================================
+       ESKI NATIJALARNI OLAMIZ
+    ===================================================== */
+
     const results =
       await readResults();
 
-    results.unshift(result);
+    /*
+      Yangi natija tepada turadi.
+    */
 
-    await writeResults(results);
+    results.unshift(
+      result
+    );
+
+    /* =====================================================
+       BLOB'GA SAQLAYMIZ
+    ===================================================== */
+
+    await writeResults(
+      results
+    );
+
+    console.log(
+      "NATIJA BLOB'GA SAQLANDI:",
+      {
+        id: result.id,
+        userName:
+          result.userName,
+        testTitle:
+          result.testTitle,
+        percentage:
+          result.percentage,
+      }
+    );
 
     return NextResponse.json(
       {
         success: true,
+
+        message:
+          "Natija muvaffaqiyatli saqlandi.",
+
         result,
       },
       {
@@ -233,6 +401,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Natijani saqlashda server xatosi.",
       },
@@ -245,7 +414,7 @@ export async function POST(request: NextRequest) {
 
 /* =========================================================
    GET
-   NATIJALARNI KO‘RISH
+   HOZIRCHA TEKSHIRISH UCHUN
 ========================================================= */
 
 export async function GET(
@@ -253,13 +422,16 @@ export async function GET(
 ) {
   try {
     const session =
-      request.cookies.get("qurbonov_session")?.value;
+      request.cookies.get(
+        "qurbonov_session"
+      )?.value;
 
     if (!session) {
       return NextResponse.json(
         {
           success: false,
-          message: "Avval tizimga kiring.",
+          message:
+            "Avval tizimga kiring.",
         },
         {
           status: 401,
@@ -273,6 +445,8 @@ export async function GET(
     return NextResponse.json(
       {
         success: true,
+        count:
+          results.length,
         results,
       },
       {
