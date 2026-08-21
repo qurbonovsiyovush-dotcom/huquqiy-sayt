@@ -1063,9 +1063,9 @@ export default function Home() {
         /* ================= RESPONSIVE ================= */
 
         @media (max-width: 1350px) {
-
           .topPanel {
             flex-direction: column;
+            min-height: auto;
           }
 
           .namePlate {
@@ -1080,35 +1080,23 @@ export default function Home() {
         }
 
         @media (max-width: 950px) {
-
-          .cards {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 700px) {
-
           .page {
-            padding: 10px;
+            padding: 12px;
+          }
+
+          .topPanel {
+            padding: 18px;
+            gap: 16px;
           }
 
           .namePlate {
-            min-width: 0;
-            width: 100%;
-
             white-space: normal;
-
-            font-size: 21px;
           }
 
           .navButtons {
-            width: 100%;
-
             display: grid;
-
-            grid-template-columns:
-              1fr
-              1fr;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
           }
 
           .grayButton,
@@ -1116,60 +1104,185 @@ export default function Home() {
             width: 100%;
           }
 
-          .clockPanel {
-            width: 97%;
+          .clockSection {
+            padding: 45px 0 60px;
+          }
 
-            padding:
-              70px
-              15px
-              30px;
+          .clockPanel {
+            min-height: 360px;
+            padding: 60px 24px 28px;
+            gap: 22px;
+          }
+
+          .cards {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+          }
+
+          .mainSection {
+            min-height: auto;
+            margin-bottom: 70px;
+            padding: 58px 22px 28px;
+          }
+
+          .card {
+            min-height: 170px;
+            padding: 20px 14px;
+          }
+
+          .card h2 {
+            margin: 6px 0 18px;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .page {
+            padding: 8px 6px 28px;
+          }
+
+          .topPanel {
+            min-height: auto;
+            padding: 12px 10px;
+            gap: 12px;
+            border-radius: 18px;
+          }
+
+          .namePlate {
+            width: 100%;
+            min-width: 0;
+            padding: 12px 10px;
+            white-space: normal;
+            font-size: 18px;
+            line-height: 1.25;
+            border-radius: 12px;
+          }
+
+          .navButtons {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 7px;
+          }
+
+          .grayButton,
+          .logoutButton {
+            width: 100%;
+            height: 43px;
+            padding: 0 5px;
+            border-width: 2px;
+            border-radius: 9px;
+            font-size: 13px;
+          }
+
+          .clockSection {
+            padding: 32px 0 46px;
+          }
+
+          .clockPanel {
+            width: 98%;
+            min-height: 275px;
+            padding: 48px 10px 18px;
+            gap: 14px;
+            border-radius: 19px;
           }
 
           .clockTopLabel {
-            width: 90%;
-
-            font-size: 23px;
+            top: -25px;
+            width: 88%;
+            min-height: 48px;
+            padding: 6px 12px;
+            font-size: 18px;
+            border-radius: 11px;
           }
 
           .clockTime {
             width: 96%;
-
-            min-height: 130px;
-
-            font-size: 50px;
-
-            letter-spacing: 2px;
+            min-height: 86px;
+            padding: 12px 8px;
+            font-size: clamp(38px, 13vw, 54px);
+            letter-spacing: 1px;
+            border-width: 3px;
+            border-radius: 16px;
           }
 
           .calendarBox {
             width: 96%;
-
-            min-height: 110px;
+            min-height: 68px;
+            padding: 10px 8px;
+            border-radius: 13px;
           }
 
           .dateText {
-            font-size: 22px;
+            font-size: 17px;
+            line-height: 1.25;
           }
 
           .mainSection {
-            width: 97%;
-
-            padding:
-              60px
-              18px
-              35px;
+            width: 98%;
+            min-height: auto;
+            margin: 0 auto 54px;
+            padding: 48px 9px 17px;
+            border-radius: 19px;
           }
 
           .sectionTitle {
-            width: 88%;
+            top: -25px;
+            width: 76%;
+            height: 48px;
+            font-size: 19px;
+            border-radius: 11px;
+          }
 
-            font-size: 23px;
+          .cards {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+          }
+
+          .card {
+            min-height: 118px;
+            padding: 12px 7px;
+            border-radius: 13px;
+          }
+
+          .card h2 {
+            margin: 2px 0 10px;
+            font-size: 15px;
+            line-height: 1.15;
+          }
+
+          .openButton {
+            width: min(112px, 92%);
+            height: 38px;
+            font-size: 14px;
+            border-radius: 7px;
           }
 
           .footerBlue {
-            width: 97%;
+            width: 98%;
+            min-height: 68px;
+            margin-top: 0;
+            padding: 12px 10px;
+            font-size: 17px;
+            line-height: 1.25;
+            border-radius: 14px;
+          }
+        }
 
-            font-size: 22px;
+        @media (max-width: 420px) {
+          .navButtons {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .clockTime {
+            font-size: clamp(34px, 12vw, 46px);
+          }
+
+          .card h2 {
+            font-size: 14px;
+          }
+
+          .openButton {
+            width: min(105px, 94%);
           }
         }
 
