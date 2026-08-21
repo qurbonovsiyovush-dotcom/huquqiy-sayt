@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { jsPDF } from "jspdf";
 
 type TestStatus = "draft" | "published";
 
@@ -478,47 +479,62 @@ export default function AdminTestsPage() {
   <meta charset="utf-8" />
   <title>${escapeHtml(fullTest.title || "Test")}</title>
   <style>
-    @page { size: A4; margin: 16mm; }
+    @page { size: A4; margin: 10mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: #101820;
       font-family: Arial, "Times New Roman", serif;
-      font-size: 12pt;
-      line-height: 1.5;
+      font-size: 10.5pt;
+      line-height: 1.34;
       background: #fff;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     .header {
-      margin-bottom: 22px;
-      padding: 18px;
+      margin-bottom: 12px;
+      padding: 12px;
       border: 2px solid #174461;
       border-radius: 12px;
       background: #eaf7ff;
       text-align: center;
     }
-    .header h1 { margin: 0 0 6px; color: #073b68; font-size: 22pt; }
-    .header p { margin: 4px 0; }
-    .nameLine { margin-top: 14px; padding-top: 10px; border-top: 1px solid #7d9bad; text-align: left; }
-    .meta { display: table; width: 100%; margin-top: 14px; border-collapse: collapse; }
-    .meta div { display: table-cell; padding: 9px; border: 1px solid #9aa8b0; }
+    .header h1 { margin: 0 0 5px; color: #073b68; font-size: 18pt; }
+    .header p { margin: 3px 0; }
+    .nameLine { margin-top: 9px; padding-top: 7px; border-top: 1px solid #7d9bad; text-align: left; }
+    .meta { display: table; width: 100%; margin-top: 9px; border-collapse: collapse; }
+    .meta div { display: table-cell; padding: 6px; border: 1px solid #9aa8b0; }
     .question {
-      margin: 0 0 18px;
-      padding: 15px;
+      margin: 0 0 10px;
+      padding: 9px 10px;
+      break-inside: auto;
+      page-break-inside: auto;
+      border: 1px solid #8c9aa3;
+      border-radius: 7px;
+    }
+    .question h3 { margin: 0 0 6px; color: #073b68; font-size: 12pt; }
+    .questionText { margin-bottom: 7px; font-weight: 700; white-space: pre-wrap; }
+    .questionImage { margin: 7px 0; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+    .questionImage img {
+      display: inline-block;
+      width: auto;
+      height: auto;
+      max-width: 260px;
+      max-height: 185px;
+      object-fit: contain;
+    }
+    .option {
+      position: relative;
+      margin: 4px 0;
+      padding: 5px 8px;
+      border: 1px solid #c2c9cd;
+      border-radius: 5px;
       break-inside: avoid;
       page-break-inside: avoid;
-      border: 1px solid #8c9aa3;
-      border-radius: 9px;
     }
-    .question h3 { margin: 0 0 10px; color: #073b68; }
-    .questionText { margin-bottom: 12px; font-weight: 700; white-space: pre-wrap; }
-    .questionImage { margin: 12px 0; text-align: center; }
-    .questionImage img { display: inline-block; max-width: 100%; max-height: 420px; object-fit: contain; }
-    .option { position: relative; margin: 7px 0; padding: 9px 12px; border: 1px solid #c2c9cd; border-radius: 6px; }
     .option.correct { border: 2px solid #2f8450; background: #eaf8ef; }
-    .answer { float: right; margin-left: 10px; color: #176b39; font-size: 9pt; font-weight: 800; }
-    .footer { margin-top: 24px; color: #4b5961; text-align: center; font-size: 9pt; }
+    .answer { float: right; margin-left: 8px; color: #176b39; font-size: 8pt; font-weight: 800; }
+    .footer { margin-top: 12px; color: #4b5961; text-align: center; font-size: 8pt; }
   </style>
 </head>
 <body>
@@ -577,41 +593,113 @@ export default function AdminTestsPage() {
     setExporting(true);
     setWorkingId(test.id);
 
+    let iframe: HTMLIFrameElement | null = null;
+
     try {
       const fullTest = await getFullTest(test.id);
       if (!fullTest) return;
 
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        window.alert("PDF oynasi ochilmadi. Brauzer pop-up oynasiga ruxsat bering.");
-        return;
+      const html = await buildTestDocument(fullTest, includeAnswers);
+
+      // PDF uchun yashirin hujjat yaratamiz. Print oynasi ochilmaydi.
+      iframe = document.createElement("iframe");
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.style.position = "fixed";
+      iframe.style.left = "-100000px";
+      iframe.style.top = "0";
+      iframe.style.width = "794px";
+      iframe.style.height = "1123px";
+      iframe.style.opacity = "0";
+      iframe.style.pointerEvents = "none";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const pdfDocument = iframe.contentDocument;
+      if (!pdfDocument) {
+        throw new Error("PDF hujjatini tayyorlab bo‘lmadi.");
       }
 
-      const html = await buildTestDocument(fullTest, includeAnswers);
-      printWindow.document.open();
-      printWindow.document.write(html);
-      printWindow.document.close();
+      pdfDocument.open();
+      pdfDocument.write(html);
+      pdfDocument.close();
 
-      const images = Array.from(printWindow.document.images);
+      await new Promise<void>((resolve) => {
+        if (pdfDocument.readyState === "complete") {
+          resolve();
+          return;
+        }
+
+        iframe!.onload = () => resolve();
+        window.setTimeout(resolve, 500);
+      });
+
+      // Hamma rasmlar yuklanishini kutamiz.
+      const images = Array.from(pdfDocument.images);
       await Promise.all(
         images.map(
           (image) =>
             new Promise<void>((resolve) => {
-              if (image.complete) return resolve();
+              if (image.complete) {
+                resolve();
+                return;
+              }
+
               image.onload = () => resolve();
               image.onerror = () => resolve();
+              window.setTimeout(resolve, 4000);
             })
         )
       );
 
-      printWindow.focus();
-      window.setTimeout(() => printWindow.print(), 250);
+      // Font va layout to‘liq hisoblanishini kutamiz.
+      if (pdfDocument.fonts?.ready) {
+        await pdfDocument.fonts.ready;
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      await pdf.html(pdfDocument.body, {
+        margin: [8, 8, 8, 8],
+        autoPaging: "text",
+        width: 194,
+        windowWidth: 794,
+        html2canvas: {
+          scale: 0.9,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+        },
+      });
+
+      // Brauzer yuklab olishni boshlaydi. Chrome sozlamasida
+      // "Ask where to save each file before downloading" yoqilgan bo‘lsa,
+      // qayerga saqlashni so‘raydi.
+      pdf.save(
+        `${cleanFileName(fullTest.title)}_${
+          includeAnswers ? "javoblari_bilan" : "javobsiz"
+        }.pdf`
+      );
+
       setExportTest(null);
       setExportFormat(null);
     } catch (error) {
       console.error(error);
-      window.alert("PDF tayyorlashda xatolik yuz berdi.");
+      window.alert(
+        "PDF faylini yaratishda xatolik yuz berdi. Sahifani yangilab qayta urinib ko‘ring."
+      );
     } finally {
+      if (iframe?.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+
       setExporting(false);
       setWorkingId(null);
     }
@@ -1164,7 +1252,7 @@ export default function AdminTestsPage() {
           color: #111;
 
           font-family:
-            "Bell MT",
+            Georgia,
             "Times New Roman",
             serif;
         }
@@ -1816,7 +1904,9 @@ export default function AdminTestsPage() {
 
           color: #111;
 
-          font-size: 27px;
+          font-size: 30px;
+          font-weight: 800;
+          letter-spacing: .1px;
         }
 
         .testTitleArea p {
@@ -1824,15 +1914,18 @@ export default function AdminTestsPage() {
 
           color: #07517e;
 
-          font-size: 18px;
+          font-size: 20px;
 
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .description {
           margin-top: 20px;
 
-          padding: 15px;
+          padding: 16px;
+          color: #1c252b;
+          font-size: 16px;
+          font-weight: 600;
 
           border:
             1px solid #aaa;
@@ -1888,15 +1981,17 @@ export default function AdminTestsPage() {
         .infoItem span {
           margin-bottom: 7px;
 
-          color: #555;
+          color: #26343c;
 
-          font-size: 13px;
+          font-size: 15px;
+          font-weight: 700;
         }
 
         .infoItem strong {
           color: #07517e;
 
-          font-size: 21px;
+          font-size: 23px;
+          font-weight: 800;
         }
 
         .infoItem small {
@@ -1904,7 +1999,8 @@ export default function AdminTestsPage() {
         }
 
         .dateText {
-          font-size: 14px !important;
+          font-size: 15px !important;
+          line-height: 1.3;
         }
 
         /* ================================================
@@ -2068,9 +2164,9 @@ export default function AdminTestsPage() {
               rgba(255, 255, 255, 0.6),
             0 5px 0 #17415c;
 
-          font-size: 18px;
+          font-size: 20px;
 
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .bottomCreate span {
@@ -2090,15 +2186,16 @@ export default function AdminTestsPage() {
         }
 
         .buttonMain {
-          font-size: 15px;
-          font-weight: 800;
+          font-size: 16px;
+          font-weight: 900;
         }
 
         .buttonSub {
           margin-top: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          opacity: .72;
+          font-size: 12px;
+          font-weight: 700;
+          opacity: 1;
+          color: #26343c;
         }
 
         .actions button {
@@ -2126,16 +2223,54 @@ export default function AdminTestsPage() {
 
         .actionMain {
           display: block;
-          font-size: 15px;
-          font-weight: 800;
+          font-size: 16px;
+          font-weight: 900;
         }
 
         .actionSub {
           display: block;
           margin-top: 4px;
-          font-size: 10px;
-          font-weight: 600;
-          opacity: .72;
+          font-size: 12px;
+          font-weight: 700;
+          opacity: 1;
+          color: #26343c;
+        }
+
+        /* ===============================
+           Yozuvlarni tiniq va aniq ko‘rsatish
+        =============================== */
+        .page,
+        .page button,
+        .page input {
+          -webkit-font-smoothing: antialiased;
+          text-rendering: geometricPrecision;
+        }
+
+        .testCard,
+        .statCard,
+        .infoItem,
+        .actions button,
+        .headerActions button {
+          text-shadow: none;
+        }
+
+        .buttonMain,
+        .actionMain,
+        .testTitleArea h2,
+        .testTitleArea p,
+        .infoItem strong {
+          opacity: 1;
+          text-shadow: 0 1px 0 rgba(255,255,255,.35);
+        }
+
+        .buttonSub,
+        .actionSub,
+        .description,
+        .infoItem span,
+        .dateText {
+          opacity: 1;
+          color: #26343c;
+          text-shadow: none;
         }
 
         .exportOverlay {
@@ -2355,6 +2490,14 @@ export default function AdminTestsPage() {
         }
 
         @media (max-width: 700px) {
+          .testTitleArea h2 { font-size: 24px; line-height: 1.2; }
+          .testTitleArea p { font-size: 17px; line-height: 1.25; }
+          .description { font-size: 15px; line-height: 1.45; }
+          .infoItem span { font-size: 14px; }
+          .infoItem strong { font-size: 21px; }
+          .dateText { font-size: 14px !important; }
+          .buttonMain, .actionMain { font-size: 15px; }
+          .buttonSub, .actionSub { font-size: 11px; line-height: 1.25; }
           .page {
             padding: 9px 6px 60px;
           }
