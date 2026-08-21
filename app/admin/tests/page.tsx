@@ -491,7 +491,17 @@ export default function AdminTestsPage() {
           const src = await imageToDataUrl(shape.imageSrc);
           if (!src) return "";
           const objectFit = shapeString(shape, "objectFit", "contain");
-          return `<div style="${base}overflow:hidden;border:${Math.max(0, borderWidth)}px solid ${escapeHtml(borderColor)};border-radius:${Math.max(0, borderRadius)}px;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.16);"><img src="${escapeHtml(src)}" alt="Savol rasmi" style="display:block;width:100%;height:100%;object-fit:${escapeHtml(objectFit)};" /></div>`;
+
+          // PDF/Word eksportida rasm kompozitsiyani bosib ketmasin:
+          // original shape qutisi ichida markazga proporsional kichraytiramiz.
+          const imageScale = 0.52;
+          const imageWidth = Math.max(1, width * imageScale);
+          const imageHeight = Math.max(1, height * imageScale);
+          const imageLeft = left + (width - imageWidth) / 2;
+          const imageTop = top + (height - imageHeight) / 2;
+          const imageBase = `position:absolute;left:${imageLeft}px;top:${imageTop}px;width:${imageWidth}px;height:${imageHeight}px;z-index:${zIndex};opacity:${opacity};box-sizing:border-box;`;
+
+          return `<div style="${imageBase}overflow:hidden;border:${Math.max(0, borderWidth)}px solid ${escapeHtml(borderColor)};border-radius:${Math.max(0, borderRadius)}px;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.16);"><img src="${escapeHtml(src)}" alt="Savol rasmi" style="display:block;width:100%;height:100%;object-fit:${escapeHtml(objectFit)};" /></div>`;
         }
 
         if (type === "venn") {
@@ -569,6 +579,21 @@ export default function AdminTestsPage() {
       if (type === "image") {
         const src = await imageToDataUrl(shape.imageSrc);
         if (!src) continue;
+
+        // Rasmning original joylashuvini saqlagan holda qutisi ichida markazga
+        // kichraytiramiz. Shu sabab gerb/foto butun savolni egallab olmaydi.
+        const currentLeft = ((Number(shape.x) || 0) - layout.minX) * layout.scale;
+        const currentTop = ((Number(shape.y) || 0) - layout.minY) * layout.scale;
+        const currentWidth = Math.max(1, Number(shape.width) || 1) * layout.scale;
+        const currentHeight = Math.max(1, Number(shape.height) || 1) * layout.scale;
+        const imageScale = 0.52;
+        const imageWidth = Math.max(1, currentWidth * imageScale);
+        const imageHeight = Math.max(1, currentHeight * imageScale);
+
+        item.style.left = `${currentLeft + (currentWidth - imageWidth) / 2}px`;
+        item.style.top = `${currentTop + (currentHeight - imageHeight) / 2}px`;
+        item.style.width = `${imageWidth}px`;
+        item.style.height = `${imageHeight}px`;
         item.style.overflow = "hidden";
         item.style.background = "transparent";
         item.style.border = borderWidth > 0 ? `${borderWidth}px solid ${borderColor}` : "none";
@@ -1230,7 +1255,6 @@ margin: 10px auto 12px;
             onClick={() => router.push("/admin/requests")}
           >
             <span className="buttonMain">Admin panel</span>
-            <span className="buttonSub">Boshqaruv bo‘limi</span>
           </button>
 
           <button
@@ -1239,7 +1263,6 @@ margin: 10px auto 12px;
             onClick={() => router.push("/test")}
           >
             <span className="buttonMain">Testlarni ko‘rish</span>
-            <span className="buttonSub">Barcha testlar ro‘yxati</span>
           </button>
 
           <button
@@ -1248,7 +1271,6 @@ margin: 10px auto 12px;
             onClick={() => router.push("/admin/results")}
           >
             <span className="buttonMain">Test natijalari</span>
-            <span className="buttonSub">Natijalar va statistika</span>
           </button>
 
           <button
@@ -1257,7 +1279,6 @@ margin: 10px auto 12px;
             onClick={() => router.push("/test/editor")}
           >
             <span className="buttonMain">Yangi test yaratish</span>
-            <span className="buttonSub">Yangi test qo‘shish</span>
           </button>
         </div>
       </header>
@@ -1503,7 +1524,6 @@ margin: 10px auto 12px;
                         }
                       >
                         <span className="actionMain">Tahrirlash</span>
-                        <span className="actionSub">Test ma’lumotlarini o‘zgartirish</span>
                       </button>
 
                       {test.status === "draft" ? (
@@ -1537,7 +1557,6 @@ margin: 10px auto 12px;
                             }
                           >
                             <span className="actionMain">Testni ko‘rish</span>
-                            <span className="actionSub">Testni yechib ko‘rish</span>
                           </button>
 
                           <button
@@ -1552,7 +1571,6 @@ margin: 10px auto 12px;
                             }
                           >
                             <span className="actionMain">Qoralamaga qaytarish</span>
-                            <span className="actionSub">Testni qoralamaga o‘tkazish</span>
                           </button>
                         </>
                       )}
@@ -1564,7 +1582,6 @@ margin: 10px auto 12px;
                         onClick={() => setExportTest(test)}
                       >
                         <span className="actionMain">Kompyuterga saqlash</span>
-                        <span className="actionSub">PDF yoki Word formatida</span>
                       </button>
 
                       <button
@@ -1576,7 +1593,6 @@ margin: 10px auto 12px;
                         }
                       >
                         <span className="actionMain">O‘chirish</span>
-                        <span className="actionSub">Testni butunlay o‘chirish</span>
                       </button>
                     </div>
                   </article>
@@ -2684,8 +2700,8 @@ margin: 10px auto 12px;
         .actions button {
           position: relative;
           min-width: 170px;
-          min-height: 62px;
-          padding: 8px 16px;
+          min-height: 52px;
+          padding: 7px 16px;
           display: flex;
           flex-direction: column;
           align-items: center;
