@@ -54,6 +54,8 @@ export default function AdminTestsPage() {
   const [statusFilter, setStatusFilter] = useState<
     "all" | TestStatus
   >("all");
+  const [exportTest, setExportTest] = useState<TestData | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   /* =========================================================
      JSON O'QISH
@@ -351,53 +353,209 @@ export default function AdminTestsPage() {
   }
 
   /* =========================================================
-     KOMPYUTERGA SAQLASH
+     PDF / WORD EKSPORT
   ========================================================= */
 
-  async function downloadTest(test: TestData) {
+  function cleanFileName(value: string) {
+    return String(value || "test")
+      .trim()
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+      .replace(/\s+/g, "_") || "test";
+  }
+
+  function stripHtml(value?: string) {
+    if (!value) return "";
+
+    if (typeof document === "undefined") {
+      return String(value).replace(/<[^>]*>/g, " ");
+    }
+
+    const element = document.createElement("div");
+    element.innerHTML = value;
+    return (element.textContent || element.innerText || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function escapeHtml(value: string) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function buildTestDocument(fullTest: TestData) {
+    const questions = Array.isArray(fullTest.questions)
+      ? fullTest.questions
+      : [];
+
+    const questionHtml = questions
+      .map((question, index) => {
+        const options = Array.isArray(question.options)
+          ? question.options
+          : [];
+
+        const optionsHtml = options
+          .map((option, optionIndex) => {
+            const letter = String.fromCharCode(65 + optionIndex);
+            const correct = option.isCorrect === true;
+            const optionText = stripHtml(option.text);
+
+            return `
+              <div class="option ${correct ? "correct" : ""}">
+                <strong>${letter}.</strong>
+                ${escapeHtml(optionText || "Variant matni mavjud emas")}
+                ${correct ? '<span class="answer">To‘g‘ri javob</span>' : ""}
+              </div>
+            `;
+          })
+          .join("");
+
+        return `
+          <section class="question">
+            <h3>${index + 1}-savol</h3>
+            <div class="questionText">${escapeHtml(
+              stripHtml(question.questionHtml) || "Savol matni mavjud emas"
+            )}</div>
+            <div class="options">${optionsHtml}</div>
+          </section>
+        `;
+      })
+      .join("");
+
+    return `<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(fullTest.title || "Test")}</title>
+  <style>
+    @page { size: A4; margin: 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #111;
+      font-family: Arial, "Times New Roman", serif;
+      font-size: 12pt;
+      line-height: 1.45;
+      background: #fff;
+    }
+    .header {
+      margin-bottom: 22px;
+      padding: 18px;
+      border: 2px solid #174461;
+      border-radius: 12px;
+      background: #eaf7ff;
+      text-align: center;
+    }
+    .header h1 { margin: 0 0 6px; color: #073b68; font-size: 22pt; }
+    .header p { margin: 4px 0; }
+    .meta {
+      display: table;
+      width: 100%;
+      margin-top: 14px;
+      border-collapse: collapse;
+    }
+    .meta div { display: table-cell; padding: 9px; border: 1px solid #aaa; }
+    .question {
+      margin: 0 0 18px;
+      padding: 15px;
+      break-inside: avoid;
+      border: 1px solid #999;
+      border-radius: 9px;
+    }
+    .question h3 { margin: 0 0 10px; color: #073b68; }
+    .questionText { margin-bottom: 12px; font-weight: 700; }
+    .option {
+      position: relative;
+      margin: 7px 0;
+      padding: 9px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .option.correct { border-color: #2f8450; background: #eaf8ef; }
+    .answer { float: right; color: #17723b; font-size: 9pt; font-weight: 700; }
+    .footer { margin-top: 24px; color: #666; text-align: center; font-size: 9pt; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${escapeHtml(fullTest.title || "Nomsiz test")}</h1>
+    <p><strong>Fan:</strong> ${escapeHtml(fullTest.subject || "—")}</p>
+    ${fullTest.description ? `<p>${escapeHtml(stripHtml(fullTest.description))}</p>` : ""}
+    <div class="meta">
+      <div><strong>Savollar:</strong> ${questions.length}</div>
+      <div><strong>Vaqt:</strong> ${Number(fullTest.duration) || 0} daqiqa</div>
+      <div><strong>Holati:</strong> ${fullTest.status === "published" ? "E’lon qilingan" : "Qoralama"}</div>
+    </div>
+  </div>
+  ${questionHtml}
+  <div class="footer">qurbonovv.uz — Huquqiy ta’lim platformasi</div>
+</body>
+</html>`;
+  }
+
+  async function exportAsWord(test: TestData) {
+    setExporting(true);
     setWorkingId(test.id);
 
     try {
       const fullTest = await getFullTest(test.id);
+      if (!fullTest) return;
 
-      if (!fullTest) {
+      const html = buildTestDocument(fullTest);
+      const blob = new Blob(["\ufeff", html], {
+        type: "application/msword;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `${cleanFileName(fullTest.title)}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setExportTest(null);
+    } catch (error) {
+      console.error(error);
+      window.alert("Word faylini yaratishda xatolik yuz berdi.");
+    } finally {
+      setExporting(false);
+      setWorkingId(null);
+    }
+  }
+
+  async function exportAsPdf(test: TestData) {
+    setExporting(true);
+    setWorkingId(test.id);
+
+    try {
+      const fullTest = await getFullTest(test.id);
+      if (!fullTest) return;
+
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        window.alert("PDF oynasi ochilmadi. Brauzer pop-up oynasiga ruxsat bering.");
         return;
       }
 
-      const json = JSON.stringify(fullTest, null, 2);
+      printWindow.document.open();
+      printWindow.document.write(buildTestDocument(fullTest));
+      printWindow.document.close();
+      printWindow.focus();
 
-      const blob = new Blob([json], {
-        type: "application/json;charset=utf-8",
-      });
+      window.setTimeout(() => {
+        printWindow.print();
+      }, 350);
 
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-
-      const cleanName = String(
-        fullTest.title || "test"
-      )
-        .trim()
-        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-        .replace(/\s+/g, "_");
-
-      link.href = url;
-      link.download = `${cleanName || "test"}.json`;
-
-      document.body.appendChild(link);
-
-      link.click();
-
-      document.body.removeChild(link);
-
-      URL.revokeObjectURL(url);
+      setExportTest(null);
     } catch (error) {
       console.error(error);
-
-      window.alert(
-        "Testni kompyuterga saqlashda xatolik."
-      );
+      window.alert("PDF tayyorlashda xatolik yuz berdi.");
     } finally {
+      setExporting(false);
       setWorkingId(null);
     }
   }
@@ -443,7 +601,8 @@ export default function AdminTestsPage() {
             className="grayButton"
             onClick={() => router.push("/admin/requests")}
           >
-            Admin panel
+            <span className="buttonMain">Admin panel</span>
+            <span className="buttonSub">Boshqaruv bo‘limi</span>
           </button>
 
           <button
@@ -451,7 +610,8 @@ export default function AdminTestsPage() {
             className="grayButton"
             onClick={() => router.push("/test")}
           >
-            Testlarni ko‘rish
+            <span className="buttonMain">Testlarni ko‘rish</span>
+            <span className="buttonSub">Barcha testlar ro‘yxati</span>
           </button>
 
           <button
@@ -459,7 +619,8 @@ export default function AdminTestsPage() {
             className="resultsButton"
             onClick={() => router.push("/admin/results")}
           >
-            Test natijalari
+            <span className="buttonMain">Test natijalari</span>
+            <span className="buttonSub">Natijalar va statistika</span>
           </button>
 
           <button
@@ -467,7 +628,8 @@ export default function AdminTestsPage() {
             className="blueButton"
             onClick={() => router.push("/test/editor")}
           >
-            + Yangi test yaratish
+            <span className="buttonMain">Yangi test yaratish</span>
+            <span className="buttonSub">Yangi test qo‘shish</span>
           </button>
         </div>
       </header>
@@ -712,7 +874,8 @@ export default function AdminTestsPage() {
                           )
                         }
                       >
-                        ✎ Tahrirlash
+                        <span className="actionMain">Tahrirlash</span>
+                        <span className="actionSub">Test ma’lumotlarini o‘zgartirish</span>
                       </button>
 
                       {test.status === "draft" ? (
@@ -745,7 +908,8 @@ export default function AdminTestsPage() {
                               )
                             }
                           >
-                            ▶ Testni ko‘rish
+                            <span className="actionMain">Testni ko‘rish</span>
+                            <span className="actionSub">Testni yechib ko‘rish</span>
                           </button>
 
                           <button
@@ -759,7 +923,8 @@ export default function AdminTestsPage() {
                               )
                             }
                           >
-                            Qoralamaga qaytarish
+                            <span className="actionMain">Qoralamaga qaytarish</span>
+                            <span className="actionSub">Testni qoralamaga o‘tkazish</span>
                           </button>
                         </>
                       )}
@@ -768,11 +933,10 @@ export default function AdminTestsPage() {
                         type="button"
                         className="saveButton"
                         disabled={busy}
-                        onClick={() =>
-                          downloadTest(test)
-                        }
+                        onClick={() => setExportTest(test)}
                       >
-                        💾 Kompyuterga saqlash
+                        <span className="actionMain">Kompyuterga saqlash</span>
+                        <span className="actionSub">PDF yoki Word formatida</span>
                       </button>
 
                       <button
@@ -783,7 +947,8 @@ export default function AdminTestsPage() {
                           deleteTest(test)
                         }
                       >
-                        × O‘chirish
+                        <span className="actionMain">O‘chirish</span>
+                        <span className="actionSub">Testni butunlay o‘chirish</span>
                       </button>
                     </div>
                   </article>
@@ -793,6 +958,56 @@ export default function AdminTestsPage() {
           )}
         </div>
       </section>
+
+      {exportTest && (
+        <div
+          className="exportOverlay"
+          onClick={() => !exporting && setExportTest(null)}
+        >
+          <div
+            className="exportModal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="exportTitle">
+              <span>Kompyuterga saqlash</span>
+              <strong>{exportTest.title || "Test"}</strong>
+            </div>
+
+            <p>Kerakli formatni tanlang.</p>
+
+            <div className="exportChoices">
+              <button
+                type="button"
+                className="pdfChoice"
+                disabled={exporting}
+                onClick={() => exportAsPdf(exportTest)}
+              >
+                <span className="choiceMain">PDF</span>
+                <span className="choiceSub">Chop etish yoki PDF sifatida saqlash</span>
+              </button>
+
+              <button
+                type="button"
+                className="wordChoice"
+                disabled={exporting}
+                onClick={() => exportAsWord(exportTest)}
+              >
+                <span className="choiceMain">Word</span>
+                <span className="choiceSub">Tahrirlash mumkin bo‘lgan .doc fayl</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="cancelExport"
+              disabled={exporting}
+              onClick={() => setExportTest(null)}
+            >
+              Bekor qilish
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           YANGI TEST TUGMASI
@@ -1754,6 +1969,171 @@ export default function AdminTestsPage() {
           vertical-align: middle;
         }
 
+        .headerActions button {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          line-height: 1.12;
+        }
+
+        .buttonMain {
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .buttonSub {
+          margin-top: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          opacity: .72;
+        }
+
+        .actions button {
+          position: relative;
+          min-width: 170px;
+          min-height: 62px;
+          padding: 8px 16px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          line-height: 1.12;
+          transition: transform .12s ease, filter .12s ease, box-shadow .12s ease;
+        }
+
+        .actions button:hover {
+          filter: brightness(1.04);
+          transform: translateY(-1px);
+        }
+
+        .actions button:active {
+          transform: translateY(3px);
+          box-shadow: 0 1px 0 rgba(0,0,0,.45) !important;
+        }
+
+        .actionMain {
+          display: block;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .actionSub {
+          display: block;
+          margin-top: 4px;
+          font-size: 10px;
+          font-weight: 600;
+          opacity: .72;
+        }
+
+        .exportOverlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          padding: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(4, 20, 30, .62);
+          backdrop-filter: blur(6px);
+        }
+
+        .exportModal {
+          width: min(540px, 100%);
+          padding: 26px;
+          border: 3px solid #303538;
+          border-radius: 22px;
+          background: linear-gradient(145deg, #f8f8f8, #d2d2d2);
+          box-shadow:
+            inset 0 6px 5px rgba(255,255,255,.95),
+            0 7px 0 #555d61,
+            0 20px 45px rgba(0,0,0,.35);
+          text-align: center;
+        }
+
+        .exportTitle {
+          margin-bottom: 12px;
+          padding: 14px 16px;
+          border: 2px solid #174461;
+          border-radius: 13px;
+          background: linear-gradient(#b6ebff, #58a8d7);
+          box-shadow: inset 0 5px 5px rgba(255,255,255,.7), 0 4px 0 #17415c;
+          color: #073b68;
+        }
+
+        .exportTitle span,
+        .exportTitle strong {
+          display: block;
+        }
+
+        .exportTitle span {
+          font-size: 13px;
+          letter-spacing: .7px;
+          text-transform: uppercase;
+        }
+
+        .exportTitle strong {
+          margin-top: 4px;
+          font-size: 23px;
+        }
+
+        .exportModal p {
+          margin: 18px 0;
+          color: #444;
+        }
+
+        .exportChoices {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .exportChoices button {
+          min-height: 92px;
+          padding: 12px;
+          border-radius: 13px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 5px 0 rgba(0,0,0,.28);
+          font-weight: 700;
+        }
+
+        .pdfChoice {
+          border: 2px solid #8e1515;
+          background: linear-gradient(#ffd1d1, #ed7777);
+          color: #7b1111;
+        }
+
+        .wordChoice {
+          border: 2px solid #174461;
+          background: linear-gradient(#c9f1ff, #64b6e1);
+          color: #073b68;
+        }
+
+        .choiceMain {
+          font-size: 24px;
+          font-weight: 900;
+        }
+
+        .choiceSub {
+          margin-top: 5px;
+          font-size: 11px;
+          line-height: 1.3;
+        }
+
+        .cancelExport {
+          width: 100%;
+          min-height: 46px;
+          margin-top: 18px;
+          border: 2px solid #555;
+          border-radius: 10px;
+          background: linear-gradient(#fff, #bbb);
+          box-shadow: 0 4px 0 #555;
+          font-weight: 800;
+        }
+
         /* ================================================
            RESPONSIVE
         ================================================ */
@@ -1765,84 +2145,276 @@ export default function AdminTestsPage() {
 
           .headerTitle {
             width: 100%;
-
             min-width: 0;
           }
 
           .headerActions {
             width: 100%;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
 
-            justify-content: center;
+          .headerActions button {
+            width: 100%;
           }
 
           .testInformation {
-            grid-template-columns:
-              repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
 
         @media (max-width: 700px) {
           .page {
-            padding:
-              12px 7px 70px;
+            padding: 9px 6px 60px;
+          }
+
+          .header {
+            width: 99%;
+            min-height: auto;
+            padding: 13px 11px;
+            gap: 12px;
+            border-radius: 18px;
+          }
+
+          .headerTitle {
+            min-height: 78px;
+            padding: 10px 12px;
+            border-width: 2px;
+            border-radius: 13px;
+          }
+
+          .headerTitle span {
+            font-size: 11px;
+          }
+
+          .headerTitle strong {
+            font-size: 22px;
+          }
+
+          .headerActions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+          }
+
+          .headerActions button {
+            min-height: 55px;
+            padding: 6px 8px;
+            border-radius: 9px;
+          }
+
+          .buttonMain {
+            font-size: 13px;
+          }
+
+          .buttonSub {
+            font-size: 9px;
           }
 
           .mainBox {
             width: 99%;
-
-            padding:
-              75px 13px 25px;
+            margin-top: 66px;
+            padding: 54px 9px 16px;
+            border-radius: 19px;
           }
 
           .floatingTitle {
-            min-width: 230px;
-
-            font-size: 22px;
+            top: -27px;
+            min-width: 210px;
+            min-height: 51px;
+            padding: 7px 18px;
+            border-width: 2px;
+            border-radius: 12px;
+            font-size: 21px;
           }
 
           .statistics {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 7px;
+            margin-bottom: 15px;
+          }
+
+          .statCard {
+            min-height: 82px;
+            padding: 9px 5px;
+            border-width: 2px;
+            border-radius: 10px;
+            box-shadow: inset 0 4px 4px white, 0 3px 0 #555d61;
+          }
+
+          .statCard strong {
+            margin-bottom: 2px;
+            font-size: 25px;
+          }
+
+          .statCard span {
+            font-size: 12px;
+            line-height: 1.12;
           }
 
           .searchArea {
+            margin-bottom: 15px;
+            padding: 10px;
             flex-direction: column;
+            gap: 8px;
+            border-radius: 11px;
+          }
+
+          .searchInputBox input {
+            height: 46px;
+            padding-left: 12px;
+            font-size: 14px;
           }
 
           .refreshButton {
-            min-height: 50px;
+            min-height: 42px;
           }
 
           .contentBox {
-            padding: 13px;
+            min-height: 180px;
+            padding: 8px;
+            border-radius: 13px;
+          }
+
+          .testList {
+            gap: 14px;
           }
 
           .testCard {
-            padding:
-              65px 15px 20px;
+            padding: 52px 10px 14px;
+            border-radius: 13px;
+            box-shadow: inset 0 4px 4px white, 0 4px 0 #555d61, 0 8px 12px rgba(0,0,0,.15);
+          }
+
+          .statusBadge {
+            top: 10px;
+            right: 10px;
+            padding: 6px 9px;
+            font-size: 10px;
           }
 
           .testHeader {
             padding-right: 0;
           }
 
+          .testTitleArea h2 {
+            margin-bottom: 4px;
+            font-size: 23px;
+          }
+
+          .testTitleArea p {
+            font-size: 15px;
+          }
+
+          .description {
+            margin-top: 12px;
+            padding: 10px;
+            font-size: 13px;
+          }
+
           .testInformation {
-            grid-template-columns: 1fr;
+            margin: 14px 0;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px;
+          }
+
+          .infoItem {
+            min-height: 78px;
+            padding: 8px 5px;
+            border-radius: 9px;
+          }
+
+          .infoItem span {
+            margin-bottom: 4px;
+            font-size: 11px;
+          }
+
+          .infoItem strong {
+            font-size: 18px;
+            line-height: 1.15;
+          }
+
+          .dateText {
+            font-size: 12px !important;
           }
 
           .actions {
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
           }
 
           .actions button {
             width: 100%;
-
+            min-width: 0;
+            min-height: 58px;
             margin-left: 0;
+            padding: 7px 6px;
+            border-radius: 9px;
+          }
+
+          .actionMain {
+            font-size: 13px;
+          }
+
+          .actionSub {
+            font-size: 9px;
+            line-height: 1.16;
+          }
+
+          .deleteButton {
+            grid-column: 1 / -1;
+          }
+
+          .bottomCreate {
+            width: 99%;
           }
 
           .bottomCreate button {
             width: 100%;
-
             min-width: 0;
+            min-height: 53px;
+            font-size: 15px;
+          }
+
+          .exportModal {
+            padding: 18px 13px;
+            border-radius: 17px;
+          }
+
+          .exportChoices {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .exportChoices button {
+            min-height: 76px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .headerActions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .statistics {
+            gap: 5px;
+          }
+
+          .statCard strong {
+            font-size: 22px;
+          }
+
+          .statCard span {
+            font-size: 10px;
+          }
+
+          .actions {
+            grid-template-columns: 1fr;
+          }
+
+          .deleteButton {
+            grid-column: auto;
           }
         }
       `}</style>
