@@ -9,14 +9,24 @@ import {
 
 import { useSearchParams } from "next/navigation";
 
+/* =========================================================
+   TYPES
+========================================================= */
+
 type VocabularyWord = {
   word: string;
   translation: string;
+
+  example?: string;
+  exampleTranslation?: string;
 };
 
 type VocabularyResponse = {
   success: boolean;
   message?: string;
+  book?: number;
+  unit?: number;
+  count?: number;
   words?: VocabularyWord[];
 };
 
@@ -26,13 +36,19 @@ type ExampleData = {
 };
 
 /* =========================================================
-   HOZIRGI BOOK 1 → UNIT 1 UCHUN MISOL GAPLAR
+   UNIT 1 UCHUN ESKI MISOL GAPLAR
 
-   Keyinchalik bu gaplarni ham admin paneldan
-   kiritadigan qilamiz.
+   MUHIM:
+   Bu faqat fallback.
+
+   Yangi Unitlarda misol gap:
+   currentWord.example
+   currentWord.exampleTranslation
+
+   orqali API'dan keladi.
 ========================================================= */
 
-const EXAMPLES: Record<string, ExampleData> = {
+const FALLBACK_EXAMPLES: Record<string, ExampleData> = {
   afraid: {
     english: "I am afraid of dogs.",
     uzbek: "Men itlardan qo‘rqaman.",
@@ -135,17 +151,26 @@ const EXAMPLES: Record<string, ExampleData> = {
 };
 
 /* =========================================================
-   MASSIVNI ARALASHTIRISH
+   ARRAY ARALASHTIRISH
 ========================================================= */
 
 function shuffleArray<T>(items: T[]): T[] {
   const array = [...items];
 
-  for (let i = array.length - 1; i > 0; i--) {
+  for (
+    let i = array.length - 1;
+    i > 0;
+    i--
+  ) {
     const randomIndex =
-      Math.floor(Math.random() * (i + 1));
+      Math.floor(
+        Math.random() * (i + 1)
+      );
 
-    [array[i], array[randomIndex]] = [
+    [
+      array[i],
+      array[randomIndex],
+    ] = [
       array[randomIndex],
       array[i],
     ];
@@ -155,56 +180,137 @@ function shuffleArray<T>(items: T[]): T[] {
 }
 
 /* =========================================================
-   ASOSIY YODLASH COMPONENT
+   WORD KEY
+========================================================= */
+
+function getWordKey(
+  word: VocabularyWord
+) {
+  return word.word
+    .trim()
+    .toLowerCase();
+}
+
+/* =========================================================
+   MAIN
 ========================================================= */
 
 function LearnContent() {
-  const searchParams = useSearchParams();
+  const searchParams =
+    useSearchParams();
 
   const book =
-    Number(searchParams.get("book")) || 1;
+    Number(
+      searchParams.get("book")
+    ) || 1;
 
   const unit =
-    Number(searchParams.get("unit")) || 1;
+    Number(
+      searchParams.get("unit")
+    ) || 1;
 
-  const [words, setWords] =
+  /* =======================================================
+     DATA
+  ======================================================= */
+
+  const [
+    words,
+    setWords,
+  ] =
     useState<VocabularyWord[]>([]);
 
-  const [queue, setQueue] =
+  const [
+    queue,
+    setQueue,
+  ] =
     useState<VocabularyWord[]>([]);
 
-  const [currentIndex, setCurrentIndex] =
+  const [
+    currentIndex,
+    setCurrentIndex,
+  ] =
     useState(0);
 
-  const [options, setOptions] =
+  const [
+    options,
+    setOptions,
+  ] =
     useState<string[]>([]);
 
-  const [showExample, setShowExample] =
+  /* =======================================================
+     UI
+  ======================================================= */
+
+  const [
+    showExample,
+    setShowExample,
+  ] =
     useState(false);
 
-  const [selectedAnswer, setSelectedAnswer] =
+  const [
+    selectedAnswer,
+    setSelectedAnswer,
+  ] =
     useState<string | null>(null);
 
-  const [answerState, setAnswerState] =
-    useState<"correct" | "wrong" | null>(null);
+  const [
+    answerState,
+    setAnswerState,
+  ] =
+    useState<
+      "correct" |
+      "wrong" |
+      null
+    >(null);
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState("");
 
-  const [correctCount, setCorrectCount] =
-    useState(0);
-
-  const [wrongCount, setWrongCount] =
-    useState(0);
-
-  const [finished, setFinished] =
+  const [
+    finished,
+    setFinished,
+  ] =
     useState(false);
 
   /* =======================================================
-     SO‘ZLARNI API DAN OLISH
+     YODLASH
+  ======================================================= */
+
+  const [
+    correctCount,
+    setCorrectCount,
+  ] =
+    useState(0);
+
+  const [
+    wrongCount,
+    setWrongCount,
+  ] =
+    useState(0);
+
+  const [
+    difficultWords,
+    setDifficultWords,
+  ] =
+    useState<string[]>([]);
+
+  const [
+    isReviewMode,
+    setIsReviewMode,
+  ] =
+    useState(false);
+
+  /* =======================================================
+     API DAN SO‘ZLARNI OLISH
   ======================================================= */
 
   useEffect(() => {
@@ -213,18 +319,22 @@ function LearnContent() {
         setLoading(true);
         setError("");
 
-        const response = await fetch(
-          `/api/vocabulary?book=${book}&unit=${unit}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
-        );
+        const response =
+          await fetch(
+            `/api/vocabulary?book=${book}&unit=${unit}`,
+            {
+              method: "GET",
+              cache: "no-store",
+            }
+          );
 
         const data =
           (await response.json()) as VocabularyResponse;
 
-        if (!response.ok || !data.success) {
+        if (
+          !response.ok ||
+          !data.success
+        ) {
           throw new Error(
             data.message ||
               "So‘zlarni yuklab bo‘lmadi."
@@ -232,31 +342,41 @@ function LearnContent() {
         }
 
         const loadedWords =
-          Array.isArray(data.words)
+          Array.isArray(
+            data.words
+          )
             ? data.words
             : [];
 
-        if (loadedWords.length < 2) {
+        if (
+          loadedWords.length < 2
+        ) {
           throw new Error(
             "Bu Unitda yodlash uchun yetarli so‘z mavjud emas."
           );
         }
 
-        setWords(loadedWords);
-
-        /*
-          Birinchi aylanishda so‘zlarni
-          aralashtirib chiqamiz.
-        */
+        setWords(
+          loadedWords
+        );
 
         setQueue(
-          shuffleArray(loadedWords)
+          shuffleArray(
+            loadedWords
+          )
         );
 
         setCurrentIndex(0);
+
         setFinished(false);
+
         setCorrectCount(0);
+
         setWrongCount(0);
+
+        setDifficultWords([]);
+
+        setIsReviewMode(false);
       } catch (err) {
         console.error(
           "VOCABULARY LOAD ERROR:",
@@ -274,207 +394,547 @@ function LearnContent() {
     }
 
     loadWords();
-  }, [book, unit]);
+  }, [
+    book,
+    unit,
+  ]);
 
   /* =======================================================
-     HOZIRGI SO‘Z
+     CURRENT WORD
   ======================================================= */
 
   const currentWord =
-    queue[currentIndex];
+    queue[
+      currentIndex
+    ];
 
   /* =======================================================
-     HOZIRGI SO‘Z UCHUN 2 TA VARIANT
+     2 TA VARIANT
   ======================================================= */
 
   useEffect(() => {
-    if (!currentWord || words.length < 2) {
+    if (
+      !currentWord ||
+      words.length < 2
+    ) {
       return;
     }
 
     const wrongCandidates =
       words.filter(
-        (item) =>
+        (
+          item:
+            VocabularyWord
+        ) =>
           item.translation !==
           currentWord.translation
       );
 
-    if (wrongCandidates.length === 0) {
+    if (
+      wrongCandidates.length === 0
+    ) {
       return;
     }
 
-    const wrongAnswer =
+    const randomWrong =
       wrongCandidates[
         Math.floor(
           Math.random() *
             wrongCandidates.length
         )
-      ].translation;
+      ];
 
     setOptions(
       shuffleArray([
         currentWord.translation,
-        wrongAnswer,
+        randomWrong.translation,
       ])
     );
 
     setShowExample(false);
-    setSelectedAnswer(null);
-    setAnswerState(null);
-  }, [currentWord, words]);
+
+    setSelectedAnswer(
+      null
+    );
+
+    setAnswerState(
+      null
+    );
+  }, [
+    currentWord,
+    words,
+  ]);
 
   /* =======================================================
-     JAVOB TANLASH
+     MISOL GAP
+
+     1-o‘rinda: API / BLOB
+     2-o‘rinda: eski Unit 1 fallback
   ======================================================= */
 
-  function chooseAnswer(answer: string) {
+  const example =
+    useMemo<ExampleData | null>(() => {
+      if (
+        !currentWord
+      ) {
+        return null;
+      }
+
+      /*
+        YANGI TIZIM:
+        Admin paneldan saqlangan gap.
+      */
+
+      if (
+        currentWord.example &&
+        currentWord.exampleTranslation
+      ) {
+        return {
+          english:
+            currentWord.example,
+
+          uzbek:
+            currentWord.exampleTranslation,
+        };
+      }
+
+      /*
+        ESKI UNIT 1:
+        Hali qayta import qilinmagan
+        bo‘lsa fallback ishlaydi.
+      */
+
+      const key =
+        getWordKey(
+          currentWord
+        );
+
+      return (
+        FALLBACK_EXAMPLES[
+          key
+        ] ?? null
+      );
+    }, [
+      currentWord,
+    ]);
+
+  /* =======================================================
+     QIYIN SO‘Z
+  ======================================================= */
+
+  const currentIsDifficult =
+    currentWord
+      ? difficultWords.includes(
+          getWordKey(
+            currentWord
+          )
+        )
+      : false;
+
+  /* =======================================================
+     TALAFFUZ
+  ======================================================= */
+
+  function speakWord() {
     if (
-      !currentWord ||
-      selectedAnswer !== null
+      !currentWord
     ) {
       return;
     }
 
-    setSelectedAnswer(answer);
+    if (
+      typeof window ===
+      "undefined"
+    ) {
+      return;
+    }
+
+    if (
+      !(
+        "speechSynthesis" in
+        window
+      )
+    ) {
+      return;
+    }
+
+    window
+      .speechSynthesis
+      .cancel();
+
+    const utterance =
+      new SpeechSynthesisUtterance(
+        currentWord.word
+      );
+
+    utterance.lang =
+      "en-US";
+
+    utterance.rate =
+      0.78;
+
+    utterance.pitch =
+      1;
+
+    utterance.volume =
+      1;
+
+    window
+      .speechSynthesis
+      .speak(
+        utterance
+      );
+  }
+
+  /* =======================================================
+     QIYIN SO‘ZNI BELGILASH
+  ======================================================= */
+
+  function toggleDifficultWord() {
+    if (
+      !currentWord
+    ) {
+      return;
+    }
+
+    const key =
+      getWordKey(
+        currentWord
+      );
+
+    setDifficultWords(
+      (
+        oldWords
+      ) => {
+        if (
+          oldWords.includes(
+            key
+          )
+        ) {
+          return oldWords.filter(
+            (
+              item:
+                string
+            ) =>
+              item !==
+              key
+          );
+        }
+
+        return [
+          ...oldWords,
+          key,
+        ];
+      }
+    );
+  }
+
+  /* =======================================================
+     KEYINROQ YANA KO‘RSAT
+  ======================================================= */
+
+  function showLater() {
+    if (
+      !currentWord ||
+      selectedAnswer !==
+        null
+    ) {
+      return;
+    }
+
+    const key =
+      getWordKey(
+        currentWord
+      );
+
+    setDifficultWords(
+      (
+        oldWords
+      ) =>
+        oldWords.includes(
+          key
+        )
+          ? oldWords
+          : [
+              ...oldWords,
+              key,
+            ]
+    );
+
+    setQueue(
+      (
+        oldQueue
+      ) => [
+        ...oldQueue,
+        currentWord,
+      ]
+    );
+
+    setCurrentIndex(
+      (
+        oldIndex
+      ) =>
+        oldIndex + 1
+    );
+  }
+
+  /* =======================================================
+     JAVOB
+  ======================================================= */
+
+  function chooseAnswer(
+    answer: string
+  ) {
+    if (
+      !currentWord ||
+      selectedAnswer !==
+        null
+    ) {
+      return;
+    }
+
+    setSelectedAnswer(
+      answer
+    );
 
     const isCorrect =
       answer ===
       currentWord.translation;
 
-    if (isCorrect) {
-      setAnswerState("correct");
+    if (
+      isCorrect
+    ) {
+      setAnswerState(
+        "correct"
+      );
 
       setCorrectCount(
-        (value) => value + 1
+        (
+          value
+        ) =>
+          value + 1
       );
     } else {
-      setAnswerState("wrong");
+      setAnswerState(
+        "wrong"
+      );
 
       setWrongCount(
-        (value) => value + 1
+        (
+          value
+        ) =>
+          value + 1
+      );
+
+      const key =
+        getWordKey(
+          currentWord
+        );
+
+      setDifficultWords(
+        (
+          oldWords
+        ) =>
+          oldWords.includes(
+            key
+          )
+            ? oldWords
+            : [
+                ...oldWords,
+                key,
+              ]
       );
 
       /*
-        XATO QILINGAN SO‘ZNI
-        KEYINROQ YANA QAYTARAMIZ.
-
-        Darhol emas — navbat oxiriga
-        qo‘shiladi.
+        Xato so‘z
+        keyin yana chiqadi.
       */
 
-      setQueue((oldQueue) => [
-        ...oldQueue,
-        currentWord,
-      ]);
+      setQueue(
+        (
+          oldQueue
+        ) => [
+          ...oldQueue,
+          currentWord,
+        ]
+      );
     }
 
-    /*
-      Javob rangini ozgina ko‘rsatib,
-      keyingi so‘zga avtomatik o‘tamiz.
-    */
-
-    window.setTimeout(() => {
-      setCurrentIndex(
-        (oldIndex) => {
-          const nextIndex =
-            oldIndex + 1;
-
-          /*
-            queue uzunligi keyinroq
-            yangilanishi mumkinligi uchun
-            yakunlashni alohida tekshiramiz.
-          */
-
-          return nextIndex;
-        }
-      );
-    }, 850);
+    window.setTimeout(
+      () => {
+        setCurrentIndex(
+          (
+            oldIndex
+          ) =>
+            oldIndex + 1
+        );
+      },
+      950
+    );
   }
 
   /* =======================================================
-     YAKUNLANGANINI TEKSHIRISH
+     TUGADI
   ======================================================= */
 
   useEffect(() => {
     if (
       queue.length > 0 &&
-      currentIndex >= queue.length
+      currentIndex >=
+        queue.length
     ) {
-      setFinished(true);
+      setFinished(
+        true
+      );
     }
-  }, [currentIndex, queue.length]);
+  }, [
+    currentIndex,
+    queue.length,
+  ]);
 
   /* =======================================================
-     MISOL GAP
+     BOSHIDAN
   ======================================================= */
 
-  const example = useMemo(() => {
-    if (!currentWord) {
-      return null;
-    }
-
-    return (
-      EXAMPLES[
-        currentWord.word
-          .trim()
-          .toLowerCase()
-      ] ?? null
-    );
-  }, [currentWord]);
-
-  /* =======================================================
-     QAYTA BOSHLASH
-  ======================================================= */
-
-  function restart() {
+  function restartAll() {
     setQueue(
-      shuffleArray(words)
+      shuffleArray(
+        words
+      )
     );
 
     setCurrentIndex(0);
+
     setCorrectCount(0);
+
     setWrongCount(0);
+
     setFinished(false);
+
     setShowExample(false);
-    setSelectedAnswer(null);
-    setAnswerState(null);
+
+    setSelectedAnswer(
+      null
+    );
+
+    setAnswerState(
+      null
+    );
+
+    setDifficultWords([]);
+
+    setIsReviewMode(
+      false
+    );
+  }
+
+  /* =======================================================
+     FAQAT QIYIN SO‘ZLAR
+  ======================================================= */
+
+  function startDifficultReview() {
+    const difficult =
+      words.filter(
+        (
+          word:
+            VocabularyWord
+        ) =>
+          difficultWords.includes(
+            getWordKey(
+              word
+            )
+          )
+      );
+
+    if (
+      difficult.length ===
+      0
+    ) {
+      return;
+    }
+
+    setQueue(
+      shuffleArray(
+        difficult
+      )
+    );
+
+    setCurrentIndex(0);
+
+    setCorrectCount(0);
+
+    setWrongCount(0);
+
+    setFinished(false);
+
+    setShowExample(false);
+
+    setSelectedAnswer(
+      null
+    );
+
+    setAnswerState(
+      null
+    );
+
+    setIsReviewMode(
+      true
+    );
   }
 
   /* =======================================================
      LOADING
   ======================================================= */
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
-      <main className="page center">
-        <div className="loadingBox">
+      <main
+        className="simplePage"
+      >
+        <div
+          className="loadingBox"
+        >
           So‘zlar yuklanmoqda...
         </div>
 
         <style jsx>{`
-          .page {
-            min-height: 100vh;
+          .simplePage {
+            min-height:
+              100vh;
+
+            display:
+              flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
             background:
               linear-gradient(
                 180deg,
                 #ffffff,
                 #eef1f3
               );
+
             font-family:
               "Bell MT",
               "Times New Roman",
               serif;
           }
 
-          .center {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
           .loadingBox {
-            font-size: 28px;
-            font-weight: 700;
+            color:
+              #073b68;
+
+            font-size:
+              28px;
+
+            font-weight:
+              700;
           }
         `}</style>
       </main>
@@ -485,11 +945,19 @@ function LearnContent() {
      ERROR
   ======================================================= */
 
-  if (error) {
+  if (
+    error
+  ) {
     return (
-      <main className="page center">
-        <div className="errorCard">
-          <div className="errorTitle">
+      <main
+        className="simplePage"
+      >
+        <div
+          className="errorCard"
+        >
+          <div
+            className="errorTitle"
+          >
             Xatolik
           </div>
 
@@ -504,46 +972,80 @@ function LearnContent() {
                 "/qollanmalar/english-vocabulary";
             }}
           >
-            Orqaga
+            Unitlarga qaytish
           </button>
         </div>
 
         <style jsx>{`
-          .page {
-            min-height: 100vh;
-            background: #f5f7f8;
+          .simplePage {
+            min-height:
+              100vh;
+
+            display:
+              flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            background:
+              #f5f7f8;
+
             font-family:
               "Bell MT",
               "Times New Roman",
               serif;
           }
 
-          .center {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
           .errorCard {
-            width: min(520px, 90%);
-            padding: 35px;
-            text-align: center;
-            border: 2px solid #aaa;
-            border-radius: 20px;
-            background: white;
+            width:
+              min(
+                520px,
+                90%
+              );
+
+            padding:
+              35px;
+
+            text-align:
+              center;
+
+            border:
+              2px solid
+              #aaa;
+
+            border-radius:
+              20px;
+
+            background:
+              white;
           }
 
           .errorTitle {
-            margin-bottom: 15px;
-            color: #b42318;
-            font-size: 28px;
-            font-weight: 700;
+            margin-bottom:
+              15px;
+
+            color:
+              #b42318;
+
+            font-size:
+              28px;
+
+            font-weight:
+              700;
           }
 
           button {
-            margin-top: 25px;
-            padding: 12px 25px;
-            cursor: pointer;
+            margin-top:
+              25px;
+
+            padding:
+              12px 25px;
+
+            cursor:
+              pointer;
           }
         `}</style>
       </main>
@@ -551,33 +1053,52 @@ function LearnContent() {
   }
 
   /* =======================================================
-     YAKUN
+     FINISHED
   ======================================================= */
 
-  if (finished) {
+  if (
+    finished
+  ) {
     return (
-      <main className="page finishedPage">
+      <main
+        className="finishedPage"
+      >
+        <div
+          className="finishedCard"
+        >
+          <div
+            className="finishedTop"
+          >
+            Book {book}
+            {" • "}
+            Unit {unit}
 
-        <div className="finishedCard">
-
-          <div className="finishedSmall">
-            Book {book} — Unit {unit}
+            {isReviewMode &&
+              " • ⭐ Takrorlash"}
           </div>
 
           <h1>
-            Yodlash yakunlandi!
+            {isReviewMode
+              ? "Takrorlash yakunlandi!"
+              : "Yodlash yakunlandi!"}
           </h1>
 
           <p>
-            Unitdagi barcha so‘zlarni
-            ko‘rib chiqdingiz.
+            {isReviewMode
+              ? "Qiyin so‘zlarni yana bir marta ko‘rib chiqdingiz."
+              : "Unitdagi so‘zlarni ko‘rib chiqdingiz."}
           </p>
 
-          <div className="resultRow">
-
-            <div className="resultBox">
+          <div
+            className="resultRow"
+          >
+            <div
+              className="resultBox"
+            >
               <strong>
-                {correctCount}
+                {
+                  correctCount
+                }
               </strong>
 
               <span>
@@ -585,9 +1106,13 @@ function LearnContent() {
               </span>
             </div>
 
-            <div className="resultBox">
+            <div
+              className="resultBox"
+            >
               <strong>
-                {wrongCount}
+                {
+                  wrongCount
+                }
               </strong>
 
               <span>
@@ -595,16 +1120,90 @@ function LearnContent() {
               </span>
             </div>
 
+            <div
+              className="resultBox yellowBox"
+            >
+              <strong>
+                {
+                  difficultWords.length
+                }
+              </strong>
+
+              <span>
+                ⭐ Qiyin so‘z
+              </span>
+            </div>
           </div>
 
-          <div className="finishButtons">
+          {difficultWords.length >
+            0 && (
+            <div
+              className="difficultList"
+            >
+              <div
+                className="difficultTitle"
+              >
+                ⭐ Qiyin so‘zlar
+              </div>
+
+              <div
+                className="chips"
+              >
+                {words
+                  .filter(
+                    (
+                      word
+                    ) =>
+                      difficultWords.includes(
+                        getWordKey(
+                          word
+                        )
+                      )
+                  )
+                  .map(
+                    (
+                      word
+                    ) => (
+                      <span
+                        key={
+                          word.word
+                        }
+                        className="chip"
+                      >
+                        {
+                          word.word
+                        }
+                      </span>
+                    )
+                  )}
+              </div>
+            </div>
+          )}
+
+          <div
+            className="finishButtons"
+          >
+            {difficultWords.length >
+              0 && (
+              <button
+                type="button"
+                className="reviewButton"
+                onClick={
+                  startDifficultReview
+                }
+              >
+                ⭐ Qiyin so‘zlarni yana yodlash
+              </button>
+            )}
 
             <button
               type="button"
               className="againButton"
-              onClick={restart}
+              onClick={
+                restartAll
+              }
             >
-              Yana yodlash
+              🔄 Boshidan yodlash
             </button>
 
             <button
@@ -615,44 +1214,65 @@ function LearnContent() {
                   "/qollanmalar/english-vocabulary";
               }}
             >
-              Unitlarga qaytish
+              ← Unitlarga qaytish
             </button>
-
           </div>
-
         </div>
 
         <style jsx>{`
-          .page {
-            min-height: 100vh;
+          * {
+            box-sizing:
+              border-box;
+          }
+
+          .finishedPage {
+            min-height:
+              100vh;
+
+            padding:
+              35px 20px;
+
+            display:
+              flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
             background:
               linear-gradient(
                 180deg,
                 #ffffff,
-                #eceff1
+                #eef1f3
               );
+
             font-family:
               "Bell MT",
               "Times New Roman",
               serif;
           }
 
-          .finishedPage {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 30px;
-          }
-
           .finishedCard {
-            width: min(750px, 96%);
-            padding: 50px 35px;
-            text-align: center;
+            width:
+              min(
+                900px,
+                96%
+              );
+
+            padding:
+              45px 35px;
+
+            text-align:
+              center;
 
             border:
-              3px solid #303538;
+              3px solid
+              #303538;
 
-            border-radius: 28px;
+            border-radius:
+              28px;
 
             background:
               linear-gradient(
@@ -663,82 +1283,269 @@ function LearnContent() {
 
             box-shadow:
               inset 0 7px 6px
-                rgba(255,255,255,.85),
-              0 8px 0 #51585c,
+                rgba(
+                  255,
+                  255,
+                  255,
+                  .85
+                ),
+
+              0 8px 0
+                #51585c,
+
               0 16px 25px
-                rgba(0,0,0,.25);
+                rgba(
+                  0,
+                  0,
+                  0,
+                  .25
+                );
           }
 
-          .finishedSmall {
-            color: #174461;
-            font-size: 19px;
-            font-weight: 700;
+          .finishedTop {
+            color:
+              #174461;
+
+            font-size:
+              20px;
+
+            font-weight:
+              700;
           }
 
           h1 {
-            margin: 15px 0;
-            color: #073b68;
-            font-size: 42px;
+            margin:
+              14px 0 8px;
+
+            color:
+              #073b68;
+
+            font-size:
+              clamp(
+                34px,
+                5vw,
+                48px
+              );
           }
 
           p {
-            font-size: 21px;
+            font-size:
+              21px;
           }
 
           .resultRow {
-            display: flex;
-            justify-content: center;
-            gap: 25px;
-            margin: 35px 0;
+            margin:
+              35px 0;
+
+            display:
+              grid;
+
+            grid-template-columns:
+              repeat(
+                3,
+                1fr
+              );
+
+            gap:
+              20px;
           }
 
           .resultBox {
-            min-width: 180px;
-            padding: 25px;
+            min-height:
+              125px;
+
+            padding:
+              20px;
+
+            display:
+              flex;
+
+            flex-direction:
+              column;
+
+            justify-content:
+              center;
+
+            align-items:
+              center;
 
             border:
-              2px solid #555;
+              2px solid
+              #555;
 
-            border-radius: 16px;
+            border-radius:
+              16px;
 
-            background: white;
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff,
+                #dddddd
+              );
+
+            box-shadow:
+              inset 0 4px 4px
+                white,
+
+              0 4px 0
+                #555d61;
           }
 
           .resultBox strong {
-            display: block;
-            font-size: 38px;
-            color: #073b68;
+            color:
+              #073b68;
+
+            font-size:
+              40px;
           }
 
           .resultBox span {
-            font-size: 18px;
+            font-size:
+              18px;
+
+            font-weight:
+              700;
+          }
+
+          .yellowBox {
+            border-color:
+              #9a6b00;
+
+            background:
+              linear-gradient(
+                180deg,
+                #fff8cf,
+                #ecd86e
+              );
+          }
+
+          .difficultList {
+            margin:
+              10px 0 30px;
+
+            padding:
+              22px;
+
+            border:
+              2px solid
+              #b68b20;
+
+            border-radius:
+              16px;
+
+            background:
+              #fff8cf;
+          }
+
+          .difficultTitle {
+            margin-bottom:
+              15px;
+
+            color:
+              #754c00;
+
+            font-size:
+              23px;
+
+            font-weight:
+              700;
+          }
+
+          .chips {
+            display:
+              flex;
+
+            justify-content:
+              center;
+
+            flex-wrap:
+              wrap;
+
+            gap:
+              10px;
+          }
+
+          .chip {
+            padding:
+              7px 14px;
+
+            border:
+              1px solid
+              #ad8528;
+
+            border-radius:
+              18px;
+
+            background:
+              white;
+
+            font-size:
+              17px;
+
+            font-weight:
+              700;
           }
 
           .finishButtons {
-            display: flex;
-            justify-content: center;
-            gap: 18px;
-            flex-wrap: wrap;
+            display:
+              flex;
+
+            justify-content:
+              center;
+
+            flex-wrap:
+              wrap;
+
+            gap:
+              16px;
           }
 
-          button {
-            min-width: 190px;
-            padding: 14px 22px;
+          .finishButtons button {
+            min-width:
+              210px;
 
-            border-radius: 11px;
+            min-height:
+              50px;
 
-            font-family: inherit;
-            font-size: 17px;
-            font-weight: 700;
+            padding:
+              12px 20px;
 
-            cursor: pointer;
+            border-radius:
+              11px;
+
+            font-family:
+              inherit;
+
+            font-size:
+              17px;
+
+            font-weight:
+              700;
+
+            cursor:
+              pointer;
+          }
+
+          .reviewButton {
+            border:
+              2px solid
+              #9a6b00;
+
+            background:
+              linear-gradient(
+                180deg,
+                #fff4b8,
+                #e5c451
+              );
           }
 
           .againButton {
-            color: #073b68;
+            color:
+              #073b68;
 
             border:
-              2px solid #174461;
+              2px solid
+              #174461;
 
             background:
               linear-gradient(
@@ -750,7 +1557,8 @@ function LearnContent() {
 
           .backButton {
             border:
-              2px solid #555;
+              2px solid
+              #555;
 
             background:
               linear-gradient(
@@ -759,27 +1567,40 @@ function LearnContent() {
                 #bdbdbd
               );
           }
-        `}</style>
 
+          @media (
+            max-width:
+              700px
+          ) {
+            .resultRow {
+              grid-template-columns:
+                1fr;
+            }
+          }
+        `}</style>
       </main>
     );
   }
 
-  if (!currentWord) {
+  if (
+    !currentWord
+  ) {
     return null;
   }
 
   /* =======================================================
-     ASOSIY YODLASH OYNASI
+     LEARN PAGE
   ======================================================= */
 
   return (
-    <main className="page">
+    <main
+      className="page"
+    >
+      {/* ================= TOP ================= */}
 
-      {/* YUQORI PANEL */}
-
-      <header className="topBar">
-
+      <header
+        className="topBar"
+      >
         <button
           type="button"
           className="backMini"
@@ -791,39 +1612,91 @@ function LearnContent() {
           ← Unitlar
         </button>
 
-        <div className="unitInfo">
-          Book {book} • Unit {unit}
+        <div
+          className="unitInfo"
+        >
+          Book {book}
+          {" • "}
+          Unit {unit}
+
+          {isReviewMode &&
+            " • ⭐ Takrorlash"}
         </div>
 
-        <div className="progress">
+        <div
+          className="progress"
+        >
           {Math.min(
             currentIndex + 1,
             queue.length
           )}
-          {" / "}
-          {queue.length}
-        </div>
 
+          {" / "}
+
+          {
+            queue.length
+          }
+        </div>
       </header>
 
-      {/* SO‘Z */}
+      {/* ================= MAIN ================= */}
 
-      <section className="learnArea">
+      <section
+        className="learnArea"
+      >
+        {/* WORD */}
 
-        <div className="wordBox">
+        <div
+          className="wordBox"
+        >
           {currentWord.word.toUpperCase()}
+        </div>
+
+        {/* TOOLS */}
+
+        <div
+          className="wordTools"
+        >
+          <button
+            type="button"
+            className="toolButton"
+            onClick={
+              speakWord
+            }
+          >
+            🔊 Talaffuz
+          </button>
+
+          <button
+            type="button"
+            className={
+              currentIsDifficult
+                ? "toolButton difficultActive"
+                : "toolButton"
+            }
+            onClick={
+              toggleDifficultWord
+            }
+          >
+            {currentIsDifficult
+              ? "⭐ Qiyin so‘z"
+              : "☆ Qiyin so‘z"}
+          </button>
         </div>
 
         {/* MISOL GAP */}
 
-        <div className="exampleArea">
-
+        <div
+          className="exampleArea"
+        >
           {!showExample && (
             <button
               type="button"
               className="exampleButton"
               onClick={() =>
-                setShowExample(true)
+                setShowExample(
+                  true
+                )
               }
             >
               💡 Misol gap
@@ -831,51 +1704,74 @@ function LearnContent() {
           )}
 
           {showExample && (
-            <div className="exampleText">
-
+            <div
+              className="exampleText"
+            >
               {example ? (
                 <>
-                  <div className="englishExample">
-                    {example.english}
+                  <div
+                    className="englishExample"
+                  >
+                    {
+                      example.english
+                    }
                   </div>
 
-                  <div className="uzbekExample">
-                    ({example.uzbek})
+                  <div
+                    className="uzbekExample"
+                  >
+                    (
+                    {
+                      example.uzbek
+                    }
+                    )
                   </div>
                 </>
               ) : (
-                <div className="noExample">
-                  Bu so‘z uchun misol gap
-                  hali kiritilmagan.
+                <div
+                  className="noExample"
+                >
+                  Bu so‘z uchun
+                  misol gap hali
+                  kiritilmagan.
                 </div>
               )}
-
             </div>
           )}
-
         </div>
 
-        {/* 2 TA VARIANT */}
+        {/* OPTIONS */}
 
-        <div className="answers">
-
+        <div
+          className="answers"
+        >
           {options.map(
-            (answer) => {
+            (
+              answer:
+                string
+            ) => {
               const isCorrect =
                 answer ===
                 currentWord.translation;
 
               const isSelected =
-                selectedAnswer === answer;
+                selectedAnswer ===
+                answer;
 
               let className =
                 "answerButton";
 
-              if (selectedAnswer) {
-                if (isCorrect) {
+              if (
+                selectedAnswer
+              ) {
+                if (
+                  isCorrect
+                ) {
                   className +=
                     " correctAnswer";
-                } else if (isSelected) {
+                } else if (
+                  isSelected
+                ) {
                   className +=
                     " wrongAnswer";
                 }
@@ -883,54 +1779,84 @@ function LearnContent() {
 
               return (
                 <button
-                  key={answer}
+                  key={
+                    answer
+                  }
                   type="button"
-                  className={className}
+                  className={
+                    className
+                  }
                   onClick={() =>
-                    chooseAnswer(answer)
+                    chooseAnswer(
+                      answer
+                    )
                   }
                   disabled={
-                    selectedAnswer !== null
+                    selectedAnswer !==
+                    null
                   }
                 >
-                  {answer}
+                  {
+                    answer
+                  }
                 </button>
               );
             }
           )}
-
         </div>
 
-        {/* JAVOB HOLATI */}
+        {/* LATER */}
 
-        <div className="feedbackArea">
+        <button
+          type="button"
+          className="laterButton"
+          onClick={
+            showLater
+          }
+          disabled={
+            selectedAnswer !==
+            null
+          }
+        >
+          ↩ Keyinroq yana ko‘rsat
+        </button>
 
+        {/* FEEDBACK */}
+
+        <div
+          className="feedbackArea"
+        >
           {answerState ===
             "correct" && (
-            <div className="correctText">
+            <div
+              className="correctText"
+            >
               To‘g‘ri ✓
             </div>
           )}
 
           {answerState ===
             "wrong" && (
-            <div className="wrongText">
-              Yana bir marta eslab qolamiz
+            <div
+              className="wrongText"
+            >
+              Bu so‘zni keyinroq yana ko‘ramiz
             </div>
           )}
-
         </div>
-
       </section>
 
-      <style jsx>{`
+      {/* ================= CSS ================= */}
 
+      <style jsx>{`
         * {
-          box-sizing: border-box;
+          box-sizing:
+            border-box;
         }
 
         .page {
-          min-height: 100vh;
+          min-height:
+            100vh;
 
           padding:
             22px 30px 50px;
@@ -948,35 +1874,97 @@ function LearnContent() {
             "Times New Roman",
             serif;
 
-          color: #111;
+          color:
+            #111;
         }
 
         /* ================= TOP ================= */
 
         .topBar {
-          width: min(1200px, 96%);
+          width:
+            min(
+              1200px,
+              96%
+            );
 
-          margin: 0 auto;
+          min-height:
+            115px;
 
-          display: grid;
+          margin:
+            0 auto;
+
+          padding:
+            20px 28px;
+
+          display:
+            grid;
 
           grid-template-columns:
             1fr auto 1fr;
 
-          align-items: center;
+          align-items:
+            center;
 
-          gap: 20px;
+          gap:
+            20px;
+
+          border:
+            3px solid
+            #174461;
+
+          border-radius:
+            25px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #8bd3ff 0%,
+              #68b7e8 45%,
+              #4999ce 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .72
+              ),
+
+            inset 0 -7px 7px
+              rgba(
+                0,
+                0,
+                0,
+                .16
+              ),
+
+            0 7px 0
+              #17415c,
+
+            0 13px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
         }
 
         .backMini {
-          justify-self: start;
+          justify-self:
+            start;
 
-          padding: 10px 18px;
+          padding:
+            10px 18px;
 
           border:
-            2px solid #51585c;
+            2px solid
+            #51585c;
 
-          border-radius: 9px;
+          border-radius:
+            9px;
 
           background:
             linear-gradient(
@@ -986,67 +1974,107 @@ function LearnContent() {
             );
 
           box-shadow:
-            inset 0 3px 3px white,
-            0 3px 0 #555d61;
+            inset 0 3px 3px
+              white,
 
-          font-family: inherit;
+            0 3px 0
+              #555d61;
 
-          font-size: 16px;
-          font-weight: 700;
+          font-family:
+            inherit;
 
-          cursor: pointer;
+          font-size:
+            16px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
         }
 
         .unitInfo {
-          color: #073b68;
+          color:
+            #073b68;
 
-          font-size: 21px;
-          font-weight: 700;
+          text-align:
+            center;
+
+          font-size:
+            21px;
+
+          font-weight:
+            700;
         }
 
         .progress {
-          justify-self: end;
+          justify-self:
+            end;
 
-          color: #555;
+          color:
+            #304f65;
 
-          font-size: 18px;
-          font-weight: 700;
+          font-size:
+            18px;
+
+          font-weight:
+            700;
         }
 
         /* ================= MAIN ================= */
 
         .learnArea {
-          width: min(1250px, 98%);
+          width:
+            min(
+              1250px,
+              98%
+            );
 
-          min-height: 700px;
+          min-height:
+            700px;
 
-          margin: 45px auto 0;
+          margin:
+            42px auto 0;
 
-          display: flex;
+          display:
+            flex;
 
-          flex-direction: column;
+          flex-direction:
+            column;
 
-          align-items: center;
+          align-items:
+            center;
         }
 
         /* ================= WORD ================= */
 
         .wordBox {
-          width: min(470px, 85%);
+          width:
+            min(
+              470px,
+              85%
+            );
 
-          min-height: 105px;
+          min-height:
+            105px;
 
-          padding: 20px;
+          padding:
+            20px;
 
-          display: flex;
+          display:
+            flex;
 
-          align-items: center;
+          align-items:
+            center;
 
-          justify-content: center;
+          justify-content:
+            center;
 
-          text-align: center;
+          text-align:
+            center;
 
-          color: #050505;
+          color:
+            #050505;
 
           font-size:
             clamp(
@@ -1055,12 +2083,15 @@ function LearnContent() {
               40px
             );
 
-          font-weight: 700;
+          font-weight:
+            700;
 
           border:
-            3px solid #174461;
+            3px solid
+            #174461;
 
-          border-radius: 18px;
+          border-radius:
+            18px;
 
           background:
             linear-gradient(
@@ -1072,73 +2103,181 @@ function LearnContent() {
 
           box-shadow:
             inset 0 7px 6px
-              rgba(255,255,255,.65),
+              rgba(
+                255,
+                255,
+                255,
+                .65
+              ),
 
             inset 0 -7px 7px
-              rgba(0,0,0,.16),
+              rgba(
+                0,
+                0,
+                0,
+                .16
+              ),
 
-            0 6px 0 #17415c,
+            0 6px 0
+              #17415c,
 
             0 10px 15px
-              rgba(0,0,0,.24);
+              rgba(
+                0,
+                0,
+                0,
+                .24
+              );
+        }
+
+        /* ================= TOOLS ================= */
+
+        .wordTools {
+          margin-top:
+            24px;
+
+          display:
+            flex;
+
+          justify-content:
+            center;
+
+          gap:
+            16px;
+
+          flex-wrap:
+            wrap;
+        }
+
+        .toolButton {
+          min-width:
+            145px;
+
+          min-height:
+            44px;
+
+          padding:
+            9px 17px;
+
+          border:
+            2px solid
+            #51585c;
+
+          border-radius:
+            11px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #dedede
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              white,
+
+            0 4px 0
+              #555d61;
+
+          color:
+            #222;
+
+          font-family:
+            inherit;
+
+          font-size:
+            16px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+        }
+
+        .difficultActive {
+          color:
+            #754c00;
+
+          border-color:
+            #9a6b00;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff4b8,
+              #eac858
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              white,
+
+            0 4px 0
+              #9a6b00;
         }
 
         /* ================= EXAMPLE ================= */
 
         .exampleArea {
-          width: 100%;
+          width:
+            100%;
 
-          min-height: 155px;
+          min-height:
+            145px;
 
-          margin-top: 28px;
+          margin-top:
+            18px;
 
-          display: flex;
+          display:
+            flex;
 
-          align-items: center;
+          align-items:
+            center;
 
-          justify-content: center;
+          justify-content:
+            center;
         }
 
         .exampleButton {
-          padding: 10px 21px;
+          padding:
+            10px 21px;
 
           border:
-            1px solid #777;
+            1px solid
+            #777;
 
-          border-radius: 20px;
+          border-radius:
+            20px;
 
-          background: #ffffff;
+          background:
+            #ffffff;
 
-          color: #333;
+          color:
+            #333;
 
-          font-family: inherit;
+          font-family:
+            inherit;
 
-          font-size: 17px;
+          font-size:
+            17px;
 
-          font-weight: 700;
+          font-weight:
+            700;
 
-          cursor: pointer;
-
-          transition:
-            transform .15s ease,
-            box-shadow .15s ease;
-        }
-
-        .exampleButton:hover {
-          transform:
-            translateY(-2px);
-
-          box-shadow:
-            0 5px 10px
-              rgba(0,0,0,.12);
+          cursor:
+            pointer;
         }
 
         .exampleText {
-          text-align: center;
+          text-align:
+            center;
         }
 
         .englishExample {
-          color: #111;
+          color:
+            #111;
 
           font-family:
             "Times New Roman",
@@ -1151,15 +2290,19 @@ function LearnContent() {
               38px
             );
 
-          font-weight: 700;
+          font-weight:
+            700;
 
-          font-style: italic;
+          font-style:
+            italic;
         }
 
         .uzbekExample {
-          margin-top: 3px;
+          margin-top:
+            3px;
 
-          color: #e11d1d;
+          color:
+            #e11d1d;
 
           font-family:
             "Times New Roman",
@@ -1172,43 +2315,65 @@ function LearnContent() {
               33px
             );
 
-          font-style: italic;
+          font-style:
+            italic;
         }
 
         .noExample {
-          color: #777;
+          color:
+            #777;
 
-          font-size: 19px;
+          font-size:
+            19px;
 
-          font-style: italic;
+          font-style:
+            italic;
         }
 
         /* ================= ANSWERS ================= */
 
         .answers {
-          width: min(1050px, 95%);
+          width:
+            min(
+              1050px,
+              95%
+            );
 
-          margin-top: 25px;
+          margin-top:
+            15px;
 
-          display: grid;
+          display:
+            grid;
 
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+            repeat(
+              2,
+              minmax(
+                0,
+                1fr
+              )
+            );
 
-          gap: 85px;
+          gap:
+            80px;
         }
 
         .answerButton {
-          min-height: 105px;
+          min-height:
+            105px;
 
-          padding: 20px 25px;
+          padding:
+            20px 25px;
 
           border:
-            3px solid #4d555a;
+            3px solid
+            #4d555a;
 
-          border-radius: 17px;
+          border-radius:
+            17px;
 
-          color: #070707;
+          color:
+            #070707;
 
           background:
             linear-gradient(
@@ -1220,17 +2385,34 @@ function LearnContent() {
 
           box-shadow:
             inset 0 7px 6px
-              rgba(255,255,255,.92),
+              rgba(
+                255,
+                255,
+                255,
+                .92
+              ),
 
             inset 0 -6px 6px
-              rgba(0,0,0,.15),
+              rgba(
+                0,
+                0,
+                0,
+                .15
+              ),
 
-            0 6px 0 #555d61,
+            0 6px 0
+              #555d61,
 
             0 10px 14px
-              rgba(0,0,0,.20);
+              rgba(
+                0,
+                0,
+                0,
+                .20
+              );
 
-          font-family: inherit;
+          font-family:
+            inherit;
 
           font-size:
             clamp(
@@ -1239,9 +2421,11 @@ function LearnContent() {
               34px
             );
 
-          font-weight: 700;
+          font-weight:
+            700;
 
-          cursor: pointer;
+          cursor:
+            pointer;
 
           transition:
             transform .12s ease,
@@ -1262,13 +2446,16 @@ function LearnContent() {
         }
 
         .answerButton:disabled {
-          cursor: default;
+          cursor:
+            default;
         }
 
         .correctAnswer {
-          color: #0b4f2b;
+          color:
+            #0b4f2b;
 
-          border-color: #237a45;
+          border-color:
+            #237a45;
 
           background:
             linear-gradient(
@@ -1279,15 +2466,18 @@ function LearnContent() {
 
           box-shadow:
             inset 0 6px 5px
-              rgba(255,255,255,.75),
+              white,
 
-            0 6px 0 #237a45;
+            0 6px 0
+              #237a45;
         }
 
         .wrongAnswer {
-          color: #7a1515;
+          color:
+            #7a1515;
 
-          border-color: #a52b2b;
+          border-color:
+            #a52b2b;
 
           background:
             linear-gradient(
@@ -1298,41 +2488,96 @@ function LearnContent() {
 
           box-shadow:
             inset 0 6px 5px
-              rgba(255,255,255,.75),
+              white,
 
-            0 6px 0 #8c2727;
+            0 6px 0
+              #8c2727;
+        }
+
+        /* ================= LATER ================= */
+
+        .laterButton {
+          margin-top:
+            30px;
+
+          padding:
+            10px 22px;
+
+          border:
+            1px solid
+            #858585;
+
+          border-radius:
+            18px;
+
+          background:
+            #ffffff;
+
+          color:
+            #555;
+
+          font-family:
+            inherit;
+
+          font-size:
+            16px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+        }
+
+        .laterButton:disabled {
+          opacity:
+            .5;
+
+          cursor:
+            default;
         }
 
         /* ================= FEEDBACK ================= */
 
         .feedbackArea {
-          min-height: 60px;
+          min-height:
+            55px;
 
-          margin-top: 35px;
+          margin-top:
+            24px;
 
-          text-align: center;
+          text-align:
+            center;
         }
 
         .correctText {
-          color: #14713a;
+          color:
+            #14713a;
 
-          font-size: 25px;
+          font-size:
+            25px;
 
-          font-weight: 700;
+          font-weight:
+            700;
         }
 
         .wrongText {
-          color: #b42318;
+          color:
+            #b42318;
 
-          font-size: 22px;
+          font-size:
+            22px;
 
-          font-weight: 700;
+          font-weight:
+            700;
         }
 
         /* ================= MOBILE ================= */
 
-        @media (max-width: 760px) {
-
+        @media (
+          max-width:
+            760px
+        ) {
           .page {
             padding:
               15px 12px 35px;
@@ -1341,61 +2586,55 @@ function LearnContent() {
           .topBar {
             grid-template-columns:
               1fr 1fr;
+
+            padding:
+              18px 15px;
           }
 
           .unitInfo {
             grid-column:
               1 / -1;
 
-            grid-row: 1;
-
-            text-align: center;
+            grid-row:
+              1;
           }
 
           .backMini {
-            grid-column: 1;
+            grid-column:
+              1;
 
-            grid-row: 2;
+            grid-row:
+              2;
           }
 
           .progress {
-            grid-column: 2;
+            grid-column:
+              2;
 
-            grid-row: 2;
-          }
-
-          .learnArea {
-            margin-top: 30px;
-          }
-
-          .exampleArea {
-            min-height: 140px;
+            grid-row:
+              2;
           }
 
           .answers {
             grid-template-columns:
               1fr;
 
-            gap: 25px;
-
-            margin-top: 15px;
+            gap:
+              25px;
           }
 
           .answerButton {
-            min-height: 88px;
+            min-height:
+              88px;
           }
         }
-
       `}</style>
-
     </main>
   );
 }
 
 /* =========================================================
    PAGE
-
-   useSearchParams uchun Suspense ishlatyapmiz.
 ========================================================= */
 
 export default function LearnPage() {
@@ -1404,14 +2643,26 @@ export default function LearnPage() {
       fallback={
         <div
           style={{
-            minHeight: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            minHeight:
+              "100vh",
+
+            display:
+              "flex",
+
+            alignItems:
+              "center",
+
+            justifyContent:
+              "center",
+
             fontFamily:
               '"Bell MT", "Times New Roman", serif',
-            fontSize: "26px",
-            fontWeight: 700,
+
+            fontSize:
+              "26px",
+
+            fontWeight:
+              700,
           }}
         >
           Yuklanmoqda...
