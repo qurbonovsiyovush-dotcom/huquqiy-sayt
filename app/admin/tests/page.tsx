@@ -756,13 +756,13 @@ export default function AdminTestsPage() {
       display: inline-block;
       width: auto;
       height: auto;
-      max-width: 260px;
-      max-height: 185px;
-      object-fit: contain;
-    }
-    .shapeStageWrap {
-      width: 100%;
-      margin: 8px 0 10px;
+     max-width: 48%;
+max-height: 135px;
+width: auto;
+height: auto;
+object-fit: contain;
+display: block;
+margin: 10px auto 12px;
       text-align: center;
       overflow: hidden;
       break-inside: avoid;
