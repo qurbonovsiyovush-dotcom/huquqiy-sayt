@@ -6,25 +6,13 @@ import path from "path";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   BLOB
-========================================================= */
-
 const BLOB_PATH = "huquqiy-sayt/tests.json";
 
-/*
-  Eski tests.json faqat birinchi migratsiya uchun o‘qiladi.
-  Endi unga HECH QACHON yozilmaydi.
-*/
 const LEGACY_TESTS_FILE = path.join(
   process.cwd(),
   "data-storage",
   "tests.json"
 );
-
-/* =========================================================
-   TYPES
-========================================================= */
 
 type TestStatus = "draft" | "published";
 
@@ -40,15 +28,6 @@ type TestData = {
   updatedAt?: string;
   [key: string]: unknown;
 };
-
-type StoreData = {
-  tests: TestData[];
-  etag?: string;
-};
-
-/* =========================================================
-   HELPERS
-========================================================= */
 
 function normalizeTests(value: unknown): TestData[] {
   return Array.isArray(value)
@@ -71,9 +50,7 @@ function readLegacyTests(): TestData[] {
       return [];
     }
 
-    return normalizeTests(
-      JSON.parse(content)
-    );
+    return normalizeTests(JSON.parse(content));
   } catch (error) {
     console.error(
       "LEGACY tests.json O‘QISH XATOSI:",
@@ -84,13 +61,8 @@ function readLegacyTests(): TestData[] {
   }
 }
 
-/* =========================================================
-   BLOBGA YOZISH
-========================================================= */
-
 async function writeTests(
-  tests: TestData[],
-  etag?: string
+  tests: TestData[]
 ) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error(
@@ -112,86 +84,81 @@ async function writeTests(
       contentType:
         "application/json; charset=utf-8",
       cacheControlMaxAge: 60,
-
-      /*
-        Agar biz o‘qiganimizdan keyin boshqa request
-        faylni o‘zgartirgan bo‘lsa, tasodifan ustidan
-        yozib yubormaslik uchun.
-      */
-      ...(etag
-        ? {
-            ifMatch: etag,
-          }
-        : {}),
     }
   );
 }
 
-/* =========================================================
-   BLOB'DAN O‘QISH
-========================================================= */
-
-async function readTests(): Promise<StoreData> {
+async function readTests(): Promise<TestData[]> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error(
       "BLOB_READ_WRITE_TOKEN topilmadi."
     );
   }
 
-  const result = await get(
-    BLOB_PATH,
-    {
-      access: "private",
-    }
-  );
+  try {
+    const result = await get(
+      BLOB_PATH,
+      {
+        access: "private",
+      }
+    );
 
-  /*
-    Blob hali mavjud bo‘lmasa:
-    GitHub/Verceldagi eski tests.json ni bir marta
-    Blob'ga ko‘chiramiz.
-  */
-  if (!result) {
+    if (
+      !result ||
+      result.statusCode !== 200 ||
+      !result.stream
+    ) {
+      const legacyTests =
+        readLegacyTests();
+
+      await writeTests(
+        legacyTests
+      );
+
+      return legacyTests;
+    }
+
+    const text =
+      await new Response(
+        result.stream
+      ).text();
+
+    if (!text.trim()) {
+      return [];
+    }
+
+    return normalizeTests(
+      JSON.parse(text)
+    );
+  } catch (error) {
+    console.error(
+      "BLOB O‘QISH XATOSI:",
+      error
+    );
+
+    /*
+      Blob hali yaratilmagan bo‘lishi mumkin.
+      Shunda eski tests.json'dan bir marta olib o'tamiz.
+    */
     const legacyTests =
       readLegacyTests();
 
-    await writeTests(
-      legacyTests
-    );
+    try {
+      await writeTests(
+        legacyTests
+      );
 
-    return {
-      tests: legacyTests,
-    };
+      return legacyTests;
+    } catch (writeError) {
+      console.error(
+        "BLOB MIGRATSIYA XATOSI:",
+        writeError
+      );
+
+      throw writeError;
+    }
   }
-
-  if (
-    result.statusCode !== 200 ||
-    !result.stream
-  ) {
-    throw new Error(
-      `Blob o‘qilmadi. Status: ${result.statusCode}`
-    );
-  }
-
-  const text =
-    await new Response(
-      result.stream
-    ).text();
-
-  const tests = text.trim()
-    ? normalizeTests(
-        JSON.parse(text)
-      )
-    : [];
-
-  return {
-    tests,
-    etag: result.blob.etag,
-  };
 }
-
-/* =========================================================
-   PARAMS ID
-========================================================= */
 
 async function getId(
   context: {
@@ -212,7 +179,6 @@ async function getId(
 
 /* =========================================================
    GET
-   BITTA TESTNI OLISH
 ========================================================= */
 
 export async function GET(
@@ -240,7 +206,7 @@ export async function GET(
       );
     }
 
-    const { tests } =
+    const tests =
       await readTests();
 
     const test =
@@ -297,7 +263,6 @@ export async function GET(
 
 /* =========================================================
    PUT
-   TESTNI TO‘LIQ TAHRIRLASH
 ========================================================= */
 
 export async function PUT(
@@ -328,10 +293,8 @@ export async function PUT(
     const body =
       await request.json();
 
-    const {
-      tests,
-      etag,
-    } = await readTests();
+    const tests =
+      await readTests();
 
     const index =
       tests.findIndex(
@@ -406,9 +369,6 @@ export async function PUT(
       ...oldTest,
       ...body,
 
-      /*
-        ID o‘zgarmaydi.
-      */
       id: oldTest.id,
 
       title,
@@ -437,14 +397,11 @@ export async function PUT(
       questions,
 
       status:
-        body?.status ===
-        "published"
+        body?.status === "published"
           ? "published"
-          : body?.status ===
-            "draft"
+          : body?.status === "draft"
           ? "draft"
-          : oldTest.status ||
-            "draft",
+          : oldTest.status || "draft",
 
       createdAt:
         oldTest.createdAt ||
@@ -458,8 +415,7 @@ export async function PUT(
       updatedTest;
 
     await writeTests(
-      tests,
-      etag
+      tests
     );
 
     return NextResponse.json(
@@ -494,7 +450,6 @@ export async function PUT(
 
 /* =========================================================
    PATCH
-   FAQAT KERAKLI MAYDONLARNI O‘ZGARTIRISH
 ========================================================= */
 
 export async function PATCH(
@@ -525,10 +480,8 @@ export async function PATCH(
     const body =
       await request.json();
 
-    const {
-      tests,
-      etag,
-    } = await readTests();
+    const tests =
+      await readTests();
 
     const index =
       tests.findIndex(
@@ -570,8 +523,7 @@ export async function PATCH(
       updatedTest;
 
     await writeTests(
-      tests,
-      etag
+      tests
     );
 
     return NextResponse.json(
@@ -606,7 +558,6 @@ export async function PATCH(
 
 /* =========================================================
    DELETE
-   TESTNI BUTUNLAY O‘CHIRISH
 ========================================================= */
 
 export async function DELETE(
@@ -634,10 +585,8 @@ export async function DELETE(
       );
     }
 
-    const {
-      tests,
-      etag,
-    } = await readTests();
+    const tests =
+      await readTests();
 
     const exists =
       tests.some(
@@ -667,8 +616,7 @@ export async function DELETE(
       );
 
     await writeTests(
-      remainingTests,
-      etag
+      remainingTests
     );
 
     return NextResponse.json(
