@@ -1,447 +1,3128 @@
-Bular tepada qotib turishadimi ?
-
-mana shu joyini ham olib tashla. 
-Hozir qarada, men adminni bossam, shu panel chiqyabti. 
-to'liq kod ber ! Yuqoridagi sahifani ham tartibga keltie
-qara admin so'zini bosganimdan keyin. shu sahifalar chiqsin. Agar men foydalanuvcgilarini bsoganimdan keyin narigi sahifaga o'tsin. Hozir adminni bosgandan u sahifaga to'gridan-to'g'ri o'tyabti
-Вставленный текст(20260822-062115).txt
-Документ
-to'liq yangi kod ber 
-nimaga bu xato deybati
-Вставленный текст(20260822-063048).txt
-Документ
-o'chirishni bossam, shu yozuv chiqyabti nimaga ?
-Вставленный текст(20260822-063931).txt
-Документ
-Вставленный текст(20260822-064608).txt
-Документ
-Вставленный текст(20260822-064656).txt
-Документ
-so'z chiqmayabtiku
-Вставленный текст(20260822-070520).txt
-Документ
-Вставленный текст(20260822-070644).txt
-Документ
-Вставленный текст(20260822-070815).txt
-Документ
-Вставленный текст(20260822-070934).txt
-Документ
-Вставленный текст(20260822-071113).txt
-Документ
-Вставленный текст(20260822-071303).txt
-Документ
-Вставленный текст(20260822-071651).txt
-Документ
-Вставленный текст(20260822-072034).txt
-Документ
-barbir chiqmadi
-Вставленный текст(20260822-073809).txt
-Документ
-SHUNI O'CHIRISH KKMI ?
-qandaydir manash saytda lug'atlar bittada saqlanmayabti
-Вставленный текст(20260822-102139).txt
-Документ
-Вставленный текст(20260822-102300).txt
-Документ
-O'zi shu saytni o'zini ham 3d format qilib tartibga keltiraylik. Och kulrang ko'k ramglar bilar. 3d FORMATDA
-Редактировать
-BLEE NIMA BU EE ? o'ZIMIZNI SAYT QNADAY EDI SHUNGA MOS QIL ! 
-ADmin tugmasi ishlamayabti. 
-Mana shu dizynga mos qil ! Yiban ! 
-Hozir mana shunday ko'rinishda saqlangan. 
-Вставленный текст(20260822-122013).txt
-Документ
-Mana shu tepadagi 3ta tugmani yana qaerga qo'yish mumkin. Uyerda sal ga'ati turibti
-Mana shu tugmalarni ham bosganda ko'k bo'ladigan qilish kerakda. qaysi unitni ishlaganligini bilishi uchun
-ee dalbayob buzib qo'yding. Men shunchai ishlayotgan uniti kok bo'lsin dedim. Belgi qo'y demadimku.
-Вставленный текст(20260822-125229).txt
-Документ
-Kirmayabtiku bu testga ?
-qara bir qanday xunik qilib qo'yding bleeee
-qani yana shu ahvolku
-Bizni saytni qara, u bo'lim ham shunga mos bo'lsin
-Анализ приостановлен
-
-Ha, endi rasm bo‘yicha aniq qildim. Bu versiya siz yuborgan ko‘rinishga mos: tepada Asosiy sahifa, markazda English Vocabulary, pastda to‘q kulrang 3D Book tanlash paneli, undan keyin Book N + Unit 1–30 bloki.
-
-To‘liq kodni yuklab ol
-
-Buni:
-
-app/qollanmalar/english-vocabulary/page.tsx
-
-ga qo‘y.
-
-Muhimi, learn/page.tsxga tegmaysan. Unit bosilganda shu mavjud testga o‘tadi. 
-
-english-vocabulary-exact-reference.tsx
-Код
-eee dalbayob tushun sen. English Vocabulary ochganda. chiqadigan oinani ushbu saytga moslat ! Keyin test kitoblari chiqsin. masalan 1-kitobni bossam, 30 unit chiqsin. 1-unitni tansam oldingidek. shakillar bo'lsin
-
-Endi aynan tushundim: English Vocabulary ochilganda alohida chiroyli 3D sahifa chiqadi, u asosiy saytdagi Qo‘llanmalar blokining dizayniga mos bo‘ladi.
-
-Keyin Book 1–6 chiqadi. Masalan, Book 1ni bossang, faqat Book 1 uchun 30 ta Unit chiqadi. Unit 1ni bossang esa oldingi test sahifangga:
-
-/qollanmalar/english-vocabulary/learn?book=1&unit=1
-
-o‘tadi. learn/page.tsxga umuman tegilmaydi.
-
-To‘liq moslashtirilgan page.tsx kodini yuklab ol
-
-Buni aynan:
-
-app/qollanmalar/english-vocabulary/page.tsx
-
-ga qo‘y. 
-
-english-vocabulary-final-site-matched.tsx
-Код
-
-Библиотека
-/
-english-vocabulary-final-site-matched.tsx
 "use client";
 
-import { useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-const BOOKS = [1, 2, 3, 4, 5, 6];
-const UNITS = Array.from({ length: 30 }, (_, i) => i + 1);
+import { useSearchParams } from "next/navigation";
 
-export default function EnglishVocabularyPage() {
-  const [selectedBook, setSelectedBook] = useState<number | null>(null);
+/* =========================================================
+   TYPES
+========================================================= */
 
-  function goBack() {
-    window.location.href = "/qollanmalar";
+type VocabularyWord = {
+  word: string;
+  translation: string;
+  example?: string;
+  exampleTranslation?: string;
+};
+
+type VocabularyResponse = {
+  success: boolean;
+  message?: string;
+  words?: VocabularyWord[];
+};
+
+type LearnMode = "en-uz" | "uz-en" | "mixed";
+
+type ExampleData = {
+  english: string;
+  uzbek: string;
+};
+
+/* =========================================================
+   BOOK 1 → UNIT 1 MISOL GAPLARI
+
+   Keyinchalik bularni ham admin panel orqali
+   kiritadigan qilamiz.
+========================================================= */
+
+const EXAMPLES: Record<string, ExampleData> = {
+  afraid: {
+    english: "I am afraid of dogs.",
+    uzbek: "Men itlardan qo‘rqaman.",
+  },
+
+  agree: {
+    english: "I agree with you.",
+    uzbek: "Men sizga qo‘shilaman.",
+  },
+
+  angry: {
+    english: "He is angry with me.",
+    uzbek: "U mendan jahli chiqdi.",
+  },
+
+  arrive: {
+    english: "We arrived at school early.",
+    uzbek: "Biz maktabga erta yetib keldik.",
+  },
+
+  attack: {
+    english: "The dog tried to attack him.",
+    uzbek: "It unga hujum qilishga urindi.",
+  },
+
+  bottom: {
+    english: "The key is at the bottom of the bag.",
+    uzbek: "Kalit sumkaning pastki qismida.",
+  },
+
+  clever: {
+    english: "She is a clever student.",
+    uzbek: "U aqlli o‘quvchi.",
+  },
+
+  cruel: {
+    english: "The cruel man hurt the animal.",
+    uzbek: "Shafqatsiz odam hayvonga ozor berdi.",
+  },
+
+  finally: {
+    english: "Finally, we arrived home.",
+    uzbek: "Nihoyat, biz uyga yetib keldik.",
+  },
+
+  hide: {
+    english: "The boy hid behind the door.",
+    uzbek: "Bola eshik orqasiga yashirindi.",
+  },
+
+  hunt: {
+    english: "The lion hunts at night.",
+    uzbek: "Sher tunda ov qiladi.",
+  },
+
+  lot: {
+    english: "I have a lot of books.",
+    uzbek: "Menda juda ko‘p kitob bor.",
+  },
+
+  middle: {
+    english: "He is standing in the middle of the room.",
+    uzbek: "U xonaning o‘rtasida turibdi.",
+  },
+
+  moment: {
+    english: "Please wait a moment.",
+    uzbek: "Iltimos, bir lahza kuting.",
+  },
+
+  pleased: {
+    english: "I am pleased to meet you.",
+    uzbek: "Siz bilan tanishganimdan mamnunman.",
+  },
+
+  promise: {
+    english: "I promise to help you.",
+    uzbek: "Men sizga yordam berishga va’da beraman.",
+  },
+
+  reply: {
+    english: "She did not reply to my message.",
+    uzbek: "U mening xabarimga javob bermadi.",
+  },
+
+  safe: {
+    english: "The children are safe now.",
+    uzbek: "Bolalar hozir xavfsiz.",
+  },
+
+  trick: {
+    english: "He played a trick on his friend.",
+    uzbek: "U do‘stiga hiyla ishlatdi.",
+  },
+
+  well: {
+    english: "She speaks English well.",
+    uzbek: "U ingliz tilida yaxshi gapiradi.",
+  },
+};
+
+/* =========================================================
+   ARRAY ARALASHTIRISH
+========================================================= */
+
+function shuffleArray<T>(
+  items: T[]
+): T[] {
+  const array = [...items];
+
+  for (
+    let i = array.length - 1;
+    i > 0;
+    i--
+  ) {
+    const randomIndex =
+      Math.floor(
+        Math.random() *
+          (i + 1)
+      );
+
+    [
+      array[i],
+      array[randomIndex],
+    ] = [
+      array[randomIndex],
+      array[i],
+    ];
   }
 
-  function openUnit(unit: number) {
-    if (!selectedBook) return;
+  return array;
+}
 
-    window.location.href =
-      `/qollanmalar/english-vocabulary/learn?book=${selectedBook}&unit=${unit}`;
+/* =========================================================
+   WORD KEY
+========================================================= */
+
+function getWordKey(
+  word: VocabularyWord
+) {
+  return word.word
+    .trim()
+    .toLowerCase();
+}
+
+/* =========================================================
+   ASOSIY COMPONENT
+========================================================= */
+
+function LearnContent() {
+  const searchParams =
+    useSearchParams();
+
+  const book =
+    Number(
+      searchParams.get("book")
+    ) || 1;
+
+  const unit =
+    Number(
+      searchParams.get("unit")
+    ) || 1;
+
+  /* =======================================================
+     DATA
+  ======================================================= */
+
+  const [
+    words,
+    setWords,
+  ] =
+    useState<
+      VocabularyWord[]
+    >([]);
+
+  const [
+    queue,
+    setQueue,
+  ] =
+    useState<
+      VocabularyWord[]
+    >([]);
+
+  const [
+    currentIndex,
+    setCurrentIndex,
+  ] =
+    useState(0);
+
+  const [
+    options,
+    setOptions,
+  ] =
+    useState<string[]>([]);
+
+  /* =======================================================
+     UI STATE
+  ======================================================= */
+
+  const [
+    showExample,
+    setShowExample,
+  ] =
+    useState(false);
+
+  const [
+    selectedAnswer,
+    setSelectedAnswer,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
+    answerState,
+    setAnswerState,
+  ] =
+    useState<
+      "correct" |
+      "wrong" |
+      null
+    >(null);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    error,
+    setError,
+  ] =
+    useState("");
+
+  const [
+    finished,
+    setFinished,
+  ] =
+    useState(false);
+
+  /* =======================================================
+     YODLASH STATISTIKASI
+  ======================================================= */
+
+  const [
+    correctCount,
+    setCorrectCount,
+  ] =
+    useState(0);
+
+  const [
+    wrongCount,
+    setWrongCount,
+  ] =
+    useState(0);
+
+  const [
+    difficultWords,
+    setDifficultWords,
+  ] =
+    useState<string[]>([]);
+
+  const [
+    isReviewMode,
+    setIsReviewMode,
+  ] =
+    useState(false);
+
+  const [learnMode, setLearnMode] =
+    useState<LearnMode>("en-uz");
+
+  const [
+    currentDirection,
+    setCurrentDirection,
+  ] =
+    useState<"en-uz" | "uz-en">("en-uz");
+
+  /* =======================================================
+     API DAN SO‘ZLARNI OLISH
+  ======================================================= */
+
+  useEffect(() => {
+    async function loadWords() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response =
+          await fetch(
+            `/api/vocabulary?book=${book}&unit=${unit}`,
+            {
+              method: "GET",
+              cache:
+                "no-store",
+            }
+          );
+
+        const data =
+          (await response.json()) as VocabularyResponse;
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.message ||
+              "So‘zlarni yuklab bo‘lmadi."
+          );
+        }
+
+        const loadedWords =
+          Array.isArray(
+            data.words
+          )
+            ? data.words
+            : [];
+
+        if (
+          loadedWords.length <
+          2
+        ) {
+          throw new Error(
+            "Bu Unitda yodlash uchun yetarli so‘z mavjud emas."
+          );
+        }
+
+        setWords(
+          loadedWords
+        );
+
+        setQueue(
+          shuffleArray(
+            loadedWords
+          )
+        );
+
+        setCurrentIndex(0);
+
+        setFinished(false);
+
+        setCorrectCount(0);
+
+        setWrongCount(0);
+
+        setDifficultWords([]);
+
+        setIsReviewMode(false);
+      } catch (err) {
+        console.error(
+          "VOCABULARY LOAD ERROR:",
+          err
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Xatolik yuz berdi."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadWords();
+  }, [
+    book,
+    unit,
+  ]);
+
+  /* =======================================================
+     CURRENT WORD
+  ======================================================= */
+
+  const currentWord =
+    queue[
+      currentIndex
+    ];
+
+  /* =======================================================
+     YO‘NALISH + 2 TA VARIANT TAYYORLASH
+  ======================================================= */
+
+  useEffect(() => {
+    if (!currentWord || words.length < 2) return;
+
+    const direction: "en-uz" | "uz-en" =
+      learnMode === "mixed"
+        ? Math.random() < 0.5
+          ? "en-uz"
+          : "uz-en"
+        : learnMode;
+
+    setCurrentDirection(direction);
+
+    const correctAnswer =
+      direction === "en-uz"
+        ? currentWord.translation
+        : currentWord.word;
+
+    const wrongCandidates = words.filter((item) => {
+      const candidateAnswer =
+        direction === "en-uz"
+          ? item.translation
+          : item.word;
+
+      return candidateAnswer !== correctAnswer;
+    });
+
+    if (wrongCandidates.length === 0) return;
+
+    const randomWrong =
+      wrongCandidates[
+        Math.floor(Math.random() * wrongCandidates.length)
+      ];
+
+    const wrongAnswer =
+      direction === "en-uz"
+        ? randomWrong.translation
+        : randomWrong.word;
+
+    setOptions(
+      shuffleArray([
+        correctAnswer,
+        wrongAnswer,
+      ])
+    );
+
+    setShowExample(false);
+    setSelectedAnswer(null);
+    setAnswerState(null);
+  }, [currentWord, words, learnMode]);
+
+  const promptText =
+    !currentWord
+      ? ""
+      : currentDirection === "en-uz"
+      ? currentWord.word.toUpperCase()
+      : currentWord.translation.toUpperCase();
+
+  const correctCurrentAnswer =
+    !currentWord
+      ? ""
+      : currentDirection === "en-uz"
+      ? currentWord.translation
+      : currentWord.word;
+
+  /* =======================================================
+     MISOL GAP
+
+     1-o‘rinda: API / BLOB orqali kelgan misol gap
+     2-o‘rinda: eski Unit 1 uchun EXAMPLES fallback
+  ======================================================= */
+
+  const example =
+    useMemo<ExampleData | null>(() => {
+      if (
+        !currentWord
+      ) {
+        return null;
+      }
+
+      const english =
+        currentWord.example?.trim();
+
+      const uzbek =
+        currentWord.exampleTranslation?.trim();
+
+      if (
+        english
+      ) {
+        return {
+          english,
+          uzbek:
+            uzbek || "",
+        };
+      }
+
+      const key =
+        getWordKey(
+          currentWord
+        );
+
+      return (
+        EXAMPLES[key] ??
+        null
+      );
+    }, [
+      currentWord,
+    ]);
+
+  /* =======================================================
+     CURRENT WORD QIYINMI?
+  ======================================================= */
+
+  const currentIsDifficult =
+    currentWord
+      ? difficultWords.includes(
+          getWordKey(
+            currentWord
+          )
+        )
+      : false;
+
+  /* =======================================================
+     TALAFFUZ
+  ======================================================= */
+
+  function speakWord() {
+    if (
+      !currentWord
+    ) {
+      return;
+    }
+
+    if (
+      typeof window ===
+      "undefined"
+    ) {
+      return;
+    }
+
+    if (
+      !(
+        "speechSynthesis" in
+        window
+      )
+    ) {
+      return;
+    }
+
+    window
+      .speechSynthesis
+      .cancel();
+
+    const utterance =
+      new SpeechSynthesisUtterance(
+        currentWord.word
+      );
+
+    utterance.lang =
+      "en-US";
+
+    /*
+      Ozgina sekinroq:
+      yodlash uchun
+      tushunarliroq bo‘ladi.
+    */
+
+    utterance.rate =
+      0.78;
+
+    utterance.pitch =
+      1;
+
+    utterance.volume =
+      1;
+
+    window
+      .speechSynthesis
+      .speak(
+        utterance
+      );
   }
+
+  /* =======================================================
+     QIYIN SO‘Z BELGILASH
+  ======================================================= */
+
+  function toggleDifficultWord() {
+    if (
+      !currentWord
+    ) {
+      return;
+    }
+
+    const key =
+      getWordKey(
+        currentWord
+      );
+
+    setDifficultWords(
+      (
+        oldWords
+      ) => {
+        if (
+          oldWords.includes(
+            key
+          )
+        ) {
+          return oldWords.filter(
+            (
+              item:
+                string
+            ) =>
+              item !== key
+          );
+        }
+
+        return [
+          ...oldWords,
+          key,
+        ];
+      }
+    );
+  }
+
+  /* =======================================================
+     KEYINROQ YANA KO‘RSAT
+  ======================================================= */
+
+  function showLater() {
+    if (
+      !currentWord ||
+      selectedAnswer !==
+        null
+    ) {
+      return;
+    }
+
+    const key =
+      getWordKey(
+        currentWord
+      );
+
+    /*
+      Keyinroq bosilgan so‘zni
+      avtomatik qiyin so‘z
+      qilib qo‘yamiz.
+    */
+
+    setDifficultWords(
+      (
+        oldWords
+      ) =>
+        oldWords.includes(
+          key
+        )
+          ? oldWords
+          : [
+              ...oldWords,
+              key,
+            ]
+    );
+
+    /*
+      Navbat oxiriga
+      qayta qo‘shamiz.
+    */
+
+    setQueue(
+      (
+        oldQueue
+      ) => [
+        ...oldQueue,
+        currentWord,
+      ]
+    );
+
+    setCurrentIndex(
+      (
+        oldIndex
+      ) =>
+        oldIndex + 1
+    );
+  }
+
+  /* =======================================================
+     JAVOB TANLASH
+  ======================================================= */
+
+  function chooseAnswer(
+    answer: string
+  ) {
+    if (
+      !currentWord ||
+      selectedAnswer !==
+        null
+    ) {
+      return;
+    }
+
+    setSelectedAnswer(
+      answer
+    );
+
+    const isCorrect =
+      answer ===
+      correctCurrentAnswer;
+
+    if (
+      isCorrect
+    ) {
+      setAnswerState(
+        "correct"
+      );
+
+      setCorrectCount(
+        (
+          value
+        ) =>
+          value + 1
+      );
+    } else {
+      setAnswerState(
+        "wrong"
+      );
+
+      setWrongCount(
+        (
+          value
+        ) =>
+          value + 1
+      );
+
+      const key =
+        getWordKey(
+          currentWord
+        );
+
+      /*
+        Xato qilingan so‘z
+        qiyin so‘zlarga tushadi.
+      */
+
+      setDifficultWords(
+        (
+          oldWords
+        ) =>
+          oldWords.includes(
+            key
+          )
+            ? oldWords
+            : [
+                ...oldWords,
+                key,
+              ]
+      );
+
+      /*
+        Xato qilingan so‘z
+        navbat oxiriga qaytadi.
+      */
+
+      setQueue(
+        (
+          oldQueue
+        ) => [
+          ...oldQueue,
+          currentWord,
+        ]
+      );
+    }
+
+    /*
+      Rangni ko‘rsatib turish uchun
+      ozgina kutamiz.
+    */
+
+    window.setTimeout(
+      () => {
+        setCurrentIndex(
+          (
+            oldIndex
+          ) =>
+            oldIndex + 1
+        );
+      },
+      950
+    );
+  }
+
+  /* =======================================================
+     TUGAGANINI TEKSHIRISH
+  ======================================================= */
+
+  useEffect(() => {
+    if (
+      queue.length > 0 &&
+      currentIndex >=
+        queue.length
+    ) {
+      setFinished(
+        true
+      );
+    }
+  }, [
+    currentIndex,
+    queue.length,
+  ]);
+
+  /* =======================================================
+     BARCHASINI QAYTA BOSHLASH
+  ======================================================= */
+
+  function restartAll() {
+    setQueue(
+      shuffleArray(
+        words
+      )
+    );
+
+    setCurrentIndex(0);
+
+    setCorrectCount(0);
+
+    setWrongCount(0);
+
+    setFinished(false);
+
+    setShowExample(false);
+
+    setSelectedAnswer(
+      null
+    );
+
+    setAnswerState(
+      null
+    );
+
+    setDifficultWords([]);
+
+    setIsReviewMode(
+      false
+    );
+  }
+
+  /* =======================================================
+     FAQAT QIYIN SO‘ZLARNI YODLASH
+  ======================================================= */
+
+  function startDifficultReview() {
+    const difficult =
+      words.filter(
+        (
+          word:
+            VocabularyWord
+        ) =>
+          difficultWords.includes(
+            getWordKey(
+              word
+            )
+          )
+      );
+
+    if (
+      difficult.length <
+      1
+    ) {
+      return;
+    }
+
+    setQueue(
+      shuffleArray(
+        difficult
+      )
+    );
+
+    setCurrentIndex(0);
+
+    setCorrectCount(0);
+
+    setWrongCount(0);
+
+    setFinished(false);
+
+    setShowExample(false);
+
+    setSelectedAnswer(
+      null
+    );
+
+    setAnswerState(
+      null
+    );
+
+    setIsReviewMode(
+      true
+    );
+  }
+
+  function changeLearnMode(mode: LearnMode) {
+    setLearnMode(mode);
+
+    const baseWords = isReviewMode
+      ? words.filter((word) =>
+          difficultWords.includes(getWordKey(word))
+        )
+      : words;
+
+    setQueue(shuffleArray(baseWords));
+    setCurrentIndex(0);
+    setCorrectCount(0);
+    setWrongCount(0);
+    setFinished(false);
+    setShowExample(false);
+    setSelectedAnswer(null);
+    setAnswerState(null);
+  }
+
+  /* =======================================================
+     LOADING
+  ======================================================= */
+
+  if (
+    loading
+  ) {
+    return (
+      <main
+        className="simplePage"
+      >
+        <div
+          className="loadingBox"
+        >
+          So‘zlar yuklanmoqda...
+        </div>
+
+        <style jsx>{`
+          .simplePage {
+            min-height: 100vh;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff,
+                #eef1f3
+              );
+
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
+          }
+
+          .loadingBox {
+            font-size: 28px;
+
+            font-weight: 700;
+
+            color: #073b68;
+          }
+        `}</style>
+      </main>
+    );
+  }
+
+  /* =======================================================
+     ERROR
+  ======================================================= */
+
+  if (
+    error
+  ) {
+    return (
+      <main
+        className="simplePage"
+      >
+        <div
+          className="errorCard"
+        >
+          <div
+            className="errorTitle"
+          >
+            Xatolik
+          </div>
+
+          <div>
+            {error}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href =
+                "/qollanmalar/english-vocabulary";
+            }}
+          >
+            Unitlarga qaytish
+          </button>
+        </div>
+
+        <style jsx>{`
+          .simplePage {
+            min-height: 100vh;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            background:
+              #f5f7f8;
+
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
+          }
+
+          .errorCard {
+            width:
+              min(
+                520px,
+                90%
+              );
+
+            padding: 35px;
+
+            text-align:
+              center;
+
+            border:
+              2px solid
+              #aaa;
+
+            border-radius:
+              20px;
+
+            background:
+              white;
+          }
+
+          .errorTitle {
+            margin-bottom:
+              15px;
+
+            color:
+              #b42318;
+
+            font-size:
+              28px;
+
+            font-weight:
+              700;
+          }
+
+          button {
+            margin-top:
+              25px;
+
+            padding:
+              12px 25px;
+
+            cursor:
+              pointer;
+          }
+        `}</style>
+      </main>
+    );
+  }
+
+  /* =======================================================
+     YAKUNIY SAHIFA
+  ======================================================= */
+
+  if (
+    finished
+  ) {
+    return (
+      <main
+        className="finishedPage"
+      >
+        <div
+          className="finishedCard"
+        >
+          <div
+            className="finishedTop"
+          >
+            Book {book}
+            {" • "}
+            Unit {unit}
+
+            {isReviewMode &&
+              " • Qiyin so‘zlar"}
+
+            {" • "}
+
+            {learnMode === "en-uz"
+              ? "English → Uzbek"
+              : learnMode === "uz-en"
+              ? "Uzbek → English"
+              : "Aralash"}
+          </div>
+
+          <h1>
+            {isReviewMode
+              ? "Takrorlash yakunlandi!"
+              : "Yodlash yakunlandi!"}
+          </h1>
+
+          <p
+            className="finishText"
+          >
+            {isReviewMode
+              ? "Qiyin so‘zlarni yana bir marta ko‘rib chiqdingiz."
+              : "Unitdagi so‘zlarni ko‘rib chiqdingiz."}
+          </p>
+
+          <div
+            className="resultRow"
+          >
+            <div
+              className="resultBox"
+            >
+              <strong>
+                {
+                  correctCount
+                }
+              </strong>
+
+              <span>
+                Esladingiz
+              </span>
+            </div>
+
+            <div
+              className="resultBox"
+            >
+              <strong>
+                {
+                  wrongCount
+                }
+              </strong>
+
+              <span>
+                Qayta ko‘rildi
+              </span>
+            </div>
+
+            <div
+              className="resultBox difficultResult"
+            >
+              <strong>
+                {
+                  difficultWords.length
+                }
+              </strong>
+
+              <span>
+                ⭐ Qiyin so‘z
+              </span>
+            </div>
+          </div>
+
+          {difficultWords.length >
+            0 && (
+            <div
+              className="difficultList"
+            >
+              <div
+                className="difficultTitle"
+              >
+                ⭐ Qiyin so‘zlar
+              </div>
+
+              <div
+                className="wordChips"
+              >
+                {words
+                  .filter(
+                    (
+                      word:
+                        VocabularyWord
+                    ) =>
+                      difficultWords.includes(
+                        getWordKey(
+                          word
+                        )
+                      )
+                  )
+                  .map(
+                    (
+                      word:
+                        VocabularyWord
+                    ) => (
+                      <span
+                        key={
+                          word.word
+                        }
+                        className="wordChip"
+                      >
+                        {
+                          word.word
+                        }
+                      </span>
+                    )
+                  )}
+              </div>
+            </div>
+          )}
+
+          <div
+            className="finishButtons"
+          >
+            {difficultWords.length >
+              0 && (
+              <button
+                type="button"
+                className="reviewButton"
+                onClick={
+                  startDifficultReview
+                }
+              >
+                ⭐ Qiyin so‘zlarni yana yodlash
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="againButton"
+              onClick={
+                restartAll
+              }
+            >
+              🔄 Boshidan yodlash
+            </button>
+
+            <button
+              type="button"
+              className="backButton"
+              onClick={() => {
+                window.location.href =
+                  "/qollanmalar/english-vocabulary";
+              }}
+            >
+              ← Unitlarga qaytish
+            </button>
+          </div>
+        </div>
+
+        <style jsx>{`
+          * {
+            box-sizing:
+              border-box;
+          }
+
+          .finishedPage {
+            min-height:
+              100vh;
+
+            display:
+              flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            padding:
+              35px 20px;
+
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff 0%,
+                #eef1f3 100%
+              );
+
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
+          }
+
+          .finishedCard {
+            width:
+              min(
+                900px,
+                96%
+              );
+
+            padding:
+              45px 35px;
+
+            text-align:
+              center;
+
+            border:
+              3px solid
+              #303538;
+
+            border-radius:
+              28px;
+
+            background:
+              linear-gradient(
+                145deg,
+                #eeeeee,
+                #c8c8c8
+              );
+
+            box-shadow:
+              inset 0 7px 6px
+                rgba(
+                  255,
+                  255,
+                  255,
+                  .85
+                ),
+
+              inset 0 -7px 7px
+                rgba(
+                  0,
+                  0,
+                  0,
+                  .12
+                ),
+
+              0 8px 0
+                #51585c,
+
+              0 16px 25px
+                rgba(
+                  0,
+                  0,
+                  0,
+                  .25
+                );
+          }
+
+          .finishedTop {
+            color:
+              #174461;
+
+            font-size:
+              20px;
+
+            font-weight:
+              700;
+          }
+
+          h1 {
+            margin:
+              14px 0 8px;
+
+            color:
+              #073b68;
+
+            font-size:
+              clamp(
+                34px,
+                5vw,
+                48px
+              );
+          }
+
+          .finishText {
+            margin:
+              0;
+
+            font-size:
+              21px;
+          }
+
+          .resultRow {
+            display:
+              grid;
+
+            grid-template-columns:
+              repeat(
+                3,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+
+            gap:
+              20px;
+
+            margin:
+              35px 0;
+          }
+
+          .resultBox {
+            min-height:
+              125px;
+
+            display:
+              flex;
+
+            flex-direction:
+              column;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            padding:
+              20px;
+
+            border:
+              2px solid
+              #555;
+
+            border-radius:
+              16px;
+
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff,
+                #dddddd
+              );
+
+            box-shadow:
+              inset 0 4px 4px
+                white,
+
+              0 4px 0
+                #555d61;
+          }
+
+          .resultBox strong {
+            display:
+              block;
+
+            margin-bottom:
+              5px;
+
+            color:
+              #073b68;
+
+            font-size:
+              40px;
+          }
+
+          .resultBox span {
+            font-size:
+              18px;
+
+            font-weight:
+              700;
+          }
+
+          .difficultResult {
+            border-color:
+              #9a6b00;
+
+            background:
+              linear-gradient(
+                180deg,
+                #fff8cf,
+                #ecd86e
+              );
+          }
+
+          .difficultList {
+            margin:
+              15px 0 30px;
+
+            padding:
+              22px;
+
+            border:
+              2px solid
+              #b68b20;
+
+            border-radius:
+              16px;
+
+            background:
+              rgba(
+                255,
+                248,
+                207,
+                .8
+              );
+          }
+
+          .difficultTitle {
+            margin-bottom:
+              15px;
+
+            color:
+              #754c00;
+
+            font-size:
+              23px;
+
+            font-weight:
+              700;
+          }
+
+          .wordChips {
+            display:
+              flex;
+
+            justify-content:
+              center;
+
+            gap:
+              10px;
+
+            flex-wrap:
+              wrap;
+          }
+
+          .wordChip {
+            padding:
+              7px 14px;
+
+            border:
+              1px solid
+              #ad8528;
+
+            border-radius:
+              18px;
+
+            background:
+              white;
+
+            color:
+              #55400c;
+
+            font-size:
+              17px;
+
+            font-weight:
+              700;
+          }
+
+          .finishButtons {
+            display:
+              flex;
+
+            justify-content:
+              center;
+
+            gap:
+              16px;
+
+            flex-wrap:
+              wrap;
+          }
+
+          .finishButtons button {
+            min-width:
+              210px;
+
+            min-height:
+              50px;
+
+            padding:
+              12px 20px;
+
+            border-radius:
+              11px;
+
+            font-family:
+              inherit;
+
+            font-size:
+              17px;
+
+            font-weight:
+              700;
+
+            cursor:
+              pointer;
+          }
+
+          .reviewButton {
+            color:
+              #634500;
+
+            border:
+              2px solid
+              #9a6b00;
+
+            background:
+              linear-gradient(
+                180deg,
+                #fff4b8,
+                #e5c451
+              );
+
+            box-shadow:
+              inset 0 4px 4px
+                rgba(
+                  255,
+                  255,
+                  255,
+                  .8
+                ),
+
+              0 4px 0
+                #9a6b00;
+          }
+
+          .againButton {
+            color:
+              #073b68;
+
+            border:
+              2px solid
+              #174461;
+
+            background:
+              linear-gradient(
+                180deg,
+                #b8ecff,
+                #58a8d7
+              );
+
+            box-shadow:
+              inset 0 4px 4px
+                rgba(
+                  255,
+                  255,
+                  255,
+                  .8
+                ),
+
+              0 4px 0
+                #17415c;
+          }
+
+          .backButton {
+            border:
+              2px solid
+              #555;
+
+            background:
+              linear-gradient(
+                180deg,
+                #fafafa,
+                #bdbdbd
+              );
+
+            box-shadow:
+              inset 0 4px 4px
+                white,
+
+              0 4px 0
+                #555d61;
+          }
+
+          @media (
+            max-width:
+              700px
+          ) {
+            .resultRow {
+              grid-template-columns:
+                1fr;
+            }
+          }
+        `}</style>
+      </main>
+    );
+  }
+
+  if (
+    !currentWord
+  ) {
+    return null;
+  }
+
+  /* =======================================================
+     ASOSIY YODLASH SAHIFASI
+  ======================================================= */
 
   return (
-    <main className="page">
-      <div className="shell">
+    <main
+      className="page"
+    >
+      {/* ===================================================
+          YUQORI PANEL
+      =================================================== */}
+
+      <header
+        className="topBar"
+      >
         <button
           type="button"
-          className="backButton"
-          onClick={goBack}
+          className="backMini"
+          onClick={() => {
+            window.location.href =
+              "/qollanmalar/english-vocabulary";
+          }}
         >
-          ← Qo‘llanmalar
+          ← Unitlar
         </button>
 
-        <section className="mainPanel">
-          <div className="floatingTitle">
-            English Vocabulary
+        <div className="topCenter">
+          <div
+            className="unitInfo"
+          >
+            Book {book}
+            {" • "}
+            Unit {unit}
+
+            {isReviewMode &&
+              " • ⭐ Takrorlash"}
           </div>
 
-          <div className="intro">
-            <h1>4000 Essential English Words</h1>
-            <p>Kitobni tanlang</p>
+          <div className="modeSwitch topModeSwitch">
+            <button
+              type="button"
+              className={learnMode === "en-uz" ? "modeButton modeActive" : "modeButton"}
+              onClick={() => changeLearnMode("en-uz")}
+            >
+              English → Uzbek
+            </button>
+
+            <button
+              type="button"
+              className={learnMode === "uz-en" ? "modeButton modeActive" : "modeButton"}
+              onClick={() => changeLearnMode("uz-en")}
+            >
+              Uzbek → English
+            </button>
+
+            <button
+              type="button"
+              className={learnMode === "mixed" ? "modeButton modeActive" : "modeButton"}
+              onClick={() => changeLearnMode("mixed")}
+            >
+              Aralash
+            </button>
           </div>
+        </div>
 
-          <div className="bookGrid">
-            {BOOKS.map((book) => (
-              <button
-                key={book}
-                type="button"
-                className={
-                  selectedBook === book
-                    ? "bookCard bookCardActive"
-                    : "bookCard"
-                }
-                onClick={() => setSelectedBook(book)}
-              >
-                <span className="bookName">Book {book}</span>
-                <span className="bookSub">30 ta Unit</span>
-              </button>
-            ))}
-          </div>
-        </section>
+        <div
+          className="progress"
+        >
+          {Math.min(
+            currentIndex +
+              1,
+            queue.length
+          )}
 
-        {selectedBook && (
-          <section className="unitPanel">
-            <div className="floatingTitle unitFloatingTitle">
-              Book {selectedBook}
-            </div>
+          {" / "}
 
-            <div className="unitIntro">
-              <h2>Unitni tanlang</h2>
-              <p>
-                Book {selectedBook} bo‘yicha 30 ta Unit
-              </p>
-            </div>
+          {
+            queue.length
+          }
+        </div>
+      </header>
 
-            <div className="unitGrid">
-              {UNITS.map((unit) => (
-                <button
-                  key={unit}
-                  type="button"
-                  className="unitButton"
-                  onClick={() => openUnit(unit)}
+      {/* ===================================================
+          MAIN
+      =================================================== */}
+
+      <section
+        className="learnArea"
+      >
+        {/* =================================================
+            SO‘Z
+        ================================================= */}
+
+        <div className="wordBox">
+          {promptText}
+        </div>
+
+        {/* =================================================
+            WORD TOOLS
+        ================================================= */}
+
+        <div
+          className="wordTools"
+        >
+          <button
+            type="button"
+            className="toolButton"
+            onClick={speakWord}
+            disabled={currentDirection === "uz-en"}
+            title={
+              currentDirection === "uz-en"
+                ? "Javobni oldindan aytib qo‘ymaslik uchun talaffuz o‘chirilgan."
+                : "So‘zni tinglash"
+            }
+          >
+            🔊 Talaffuz
+          </button>
+
+          <button
+            type="button"
+            className={
+              currentIsDifficult
+                ? "toolButton difficultActive"
+                : "toolButton"
+            }
+            onClick={
+              toggleDifficultWord
+            }
+          >
+            {currentIsDifficult
+              ? "⭐ Qiyin so‘z"
+              : "☆ Qiyin so‘z"}
+          </button>
+        </div>
+
+        {/* =================================================
+            MISOL GAP
+        ================================================= */}
+
+        <div
+          className="exampleArea"
+        >
+          {!showExample && (
+            <button
+              type="button"
+              className="exampleButton"
+              onClick={() =>
+                setShowExample(
+                  true
+                )
+              }
+            >
+              💡 Misol gap
+            </button>
+          )}
+
+          {showExample && (
+            <div
+              className="exampleText"
+            >
+              {example ? (
+                <>
+                  <div
+                    className="englishExample"
+                  >
+                    {
+                      example.english
+                    }
+                  </div>
+
+                  <div
+                    className="uzbekExample"
+                  >
+                    (
+                    {
+                      example.uzbek
+                    }
+                    )
+                  </div>
+                </>
+              ) : (
+                <div
+                  className="noExample"
                 >
-                  Unit {unit}
-                </button>
-              ))}
+                  Bu so‘z uchun
+                  misol gap hali
+                  kiritilmagan.
+                </div>
+              )}
             </div>
-          </section>
-        )}
-      </div>
+          )}
+        </div>
+
+        {/* =================================================
+            JAVOBLAR
+        ================================================= */}
+
+        <div
+          className="answers"
+        >
+          {options.map(
+            (
+              answer:
+                string
+            ) => {
+              const isCorrect =
+                answer ===
+                correctCurrentAnswer;
+
+              const isSelected =
+                selectedAnswer ===
+                answer;
+
+              let className =
+                "answerButton";
+
+              if (
+                selectedAnswer
+              ) {
+                if (
+                  isCorrect
+                ) {
+                  className +=
+                    " correctAnswer";
+                } else if (
+                  isSelected
+                ) {
+                  className +=
+                    " wrongAnswer";
+                }
+              }
+
+              return (
+                <button
+                  key={
+                    answer
+                  }
+                  type="button"
+                  className={
+                    className
+                  }
+                  onClick={() =>
+                    chooseAnswer(
+                      answer
+                    )
+                  }
+                  disabled={
+                    selectedAnswer !==
+                    null
+                  }
+                >
+                  {
+                    answer
+                  }
+                </button>
+              );
+            }
+          )}
+        </div>
+
+        {/* =================================================
+            KEYINROQ
+        ================================================= */}
+
+        <button
+          type="button"
+          className="laterButton"
+          onClick={
+            showLater
+          }
+          disabled={
+            selectedAnswer !==
+            null
+          }
+        >
+          ↩ Keyinroq yana ko‘rsat
+        </button>
+
+        {/* =================================================
+            FEEDBACK
+        ================================================= */}
+
+        <div
+          className="feedbackArea"
+        >
+          {answerState ===
+            "correct" && (
+            <div
+              className="correctText"
+            >
+              To‘g‘ri ✓
+            </div>
+          )}
+
+          {answerState ===
+            "wrong" && (
+            <div
+              className="wrongText"
+            >
+              Bu so‘zni keyinroq yana ko‘ramiz
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ===================================================
+          CSS
+      =================================================== */}
 
       <style jsx>{`
         * {
-          box-sizing: border-box;
+          box-sizing:
+            border-box;
         }
 
         .page {
-          min-height: 100vh;
-          padding: 24px 18px 70px;
+          min-height:
+            100vh;
+
+          padding:
+            22px 30px
+            50px;
+
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #f5f7f8 60%,
-              #e9edef 100%
+              #f5f6f7 60%,
+              #eceff1 100%
             );
+
           font-family:
             "Bell MT",
             "Times New Roman",
             serif;
-          color: #111;
+
+          color:
+            #111;
         }
 
-        .shell {
-          width: min(1200px, 96%);
-          margin: 0 auto;
-        }
+        /* ================= TOP ================= */
 
-        .backButton {
-          min-width: 150px;
-          min-height: 44px;
-          padding: 8px 16px;
+        .topBar {
+          width:
+            min(
+              1200px,
+              96%
+            );
 
-          border: 2px solid #174461;
-          border-radius: 9px;
+          min-height:
+            145px;
+
+          margin:
+            0 auto;
+
+          padding:
+            20px 28px;
+
+          display:
+            grid;
+
+          grid-template-columns:
+            1fr auto 1fr;
+
+          align-items:
+            center;
+
+          gap:
+            20px;
+
+          border:
+            3px solid
+            #174461;
+
+          border-radius:
+            25px;
 
           background:
             linear-gradient(
               180deg,
-              #a8e7ff 0%,
-              #72c3eb 55%,
-              #4b9dcd 100%
+              #8bd3ff 0%,
+              #68b7e8 45%,
+              #4999ce 100%
             );
 
           box-shadow:
-            inset 0 4px 4px rgba(255,255,255,.8),
-            inset 0 -3px 3px rgba(0,0,0,.12),
-            0 4px 0 #17415c,
-            0 8px 10px rgba(0,0,0,.18);
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .72
+              ),
 
-          color: #073b68;
+            inset 0 -7px 7px
+              rgba(
+                0,
+                0,
+                0,
+                .16
+              ),
+
+            0 7px 0
+              #17415c,
+
+            0 13px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
+        }
+
+        .backMini {
+          justify-self:
+            start;
+
+          padding:
+            10px 18px;
+
+          border:
+            2px solid
+            #51585c;
+
+          border-radius:
+            9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #c7c7c7
+            );
+
+          box-shadow:
+            inset 0 3px 3px
+              white,
+
+            0 3px 0
+              #555d61;
+
+          font-family:
+            inherit;
+
+          font-size:
+            16px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+        }
+
+        .unitInfo {
+          color:
+            #073b68;
+
+          font-size:
+            21px;
+
+          font-weight:
+            700;
+
+          text-align:
+            center;
+        }
+
+        .topCenter {
+          display:
+            flex;
+
+          flex-direction:
+            column;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          gap:
+            13px;
+        }
+
+        .topModeSwitch {
+          margin-bottom:
+            0;
+        }
+
+        .topModeSwitch .modeButton {
+          min-width:
+            145px;
+
+          min-height:
+            38px;
+
+          padding:
+            8px 13px;
+
+          font-size:
+            14px;
+
+          border-width:
+            1.5px;
+
+          border-radius:
+            9px;
+
+          box-shadow:
+            inset 0 3px 3px
+              rgba(
+                255,
+                255,
+                255,
+                .9
+              ),
+
+            0 3px 0
+              #555d61;
+        }
+
+        .topModeSwitch .modeActive {
+          box-shadow:
+            inset 0 3px 3px
+              rgba(
+                255,
+                255,
+                255,
+                .82
+              ),
+
+            0 3px 0
+              #17415c;
+        }
+
+        .progress {
+          justify-self:
+            end;
+
+          color:
+            #304f65;
+
+          font-size:
+            18px;
+
+          font-weight:
+            700;
+        }
+
+        /* ================= MAIN ================= */
+
+        .learnArea {
+          width:
+            min(
+              1250px,
+              98%
+            );
+
+          min-height:
+            700px;
+
+          margin:
+            32px auto
+            0;
+
+          display:
+            flex;
+
+          flex-direction:
+            column;
+
+          align-items:
+            center;
+        }
+
+        /* ================= MODE SWITCH ================= */
+
+        .modeSwitch {
+          display: flex;
+          justify-content: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          margin-bottom: 18px;
+        }
+
+        .modeButton {
+          min-width: 180px;
+          min-height: 46px;
+          padding: 10px 18px;
+          border: 2px solid #51585c;
+          border-radius: 11px;
+          background: linear-gradient(180deg, #ffffff, #d7d7d7);
+          box-shadow: inset 0 4px 4px rgba(255,255,255,.95), 0 4px 0 #555d61;
+          color: #222;
           font-family: inherit;
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 700;
           cursor: pointer;
         }
 
-        .backButton:hover {
+        .modeButton:hover {
           transform: translateY(-2px);
         }
 
-        .backButton:active {
-          transform: translateY(3px);
-          box-shadow:
-            inset 0 4px 5px rgba(0,0,0,.10),
-            0 1px 0 #17415c;
-        }
-
-        .mainPanel,
-        .unitPanel {
-          position: relative;
-          margin-top: 76px;
-          padding: 70px 30px 34px;
-
-          border: 3px solid #333a3e;
-          border-radius: 23px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #62686b 0%,
-              #505659 46%,
-              #3d4346 100%
-            );
-
-          box-shadow:
-            inset 0 5px 5px rgba(255,255,255,.10),
-            inset 0 -7px 7px rgba(0,0,0,.22),
-            0 6px 0 #30373b,
-            0 11px 0 #242a2d,
-            0 17px 24px rgba(0,0,0,.22);
-        }
-
-        .unitPanel {
-          margin-top: 82px;
-          padding-top: 64px;
-        }
-
-        .floatingTitle {
-          position: absolute;
-          left: 50%;
-          top: -31px;
-          transform: translateX(-50%);
-
-          min-width: 340px;
-          min-height: 58px;
-          padding: 10px 28px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border: 3px solid #174461;
-          border-radius: 12px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #a9e7ff 0%,
-              #75c5ed 47%,
-              #4a9dce 100%
-            );
-
-          box-shadow:
-            inset 0 6px 5px rgba(255,255,255,.70),
-            inset 0 -5px 5px rgba(0,0,0,.13),
-            0 6px 0 #17415c,
-            0 10px 13px rgba(20,65,92,.24);
-
-          color: #073b68;
-          font-size: 30px;
-          font-weight: 700;
-          text-align: center;
-          white-space: nowrap;
-        }
-
-        .unitFloatingTitle {
-          min-width: 250px;
-          font-size: 27px;
-        }
-
-        .intro,
-        .unitIntro {
-          text-align: center;
-          margin-bottom: 30px;
-        }
-
-        .intro h1,
-        .unitIntro h2 {
-          margin: 0;
-          color: #ffffff;
-          font-size: 28px;
-          font-weight: 700;
-          text-shadow:
-            0 2px 0 rgba(0,0,0,.35);
-        }
-
-        .intro p,
-        .unitIntro p {
-          margin: 7px 0 0;
-          color: #e7eaec;
-          font-size: 16px;
-          font-weight: 700;
-        }
-
-        .bookGrid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 26px;
-        }
-
-        .bookCard {
-          min-height: 160px;
-          padding: 18px 20px;
-
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-
-          border: 2px solid #596166;
-          border-radius: 15px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #ededed 42%,
-              #c8c8c8 100%
-            );
-
-          box-shadow:
-            inset 0 7px 6px rgba(255,255,255,.95),
-            inset 0 -5px 5px rgba(0,0,0,.10),
-            0 6px 0 #596166,
-            0 11px 12px rgba(0,0,0,.18);
-
-          color: #111;
-          font-family: inherit;
-          cursor: pointer;
-
-          transition:
-            transform .10s ease,
-            filter .10s ease,
-            box-shadow .10s ease;
-        }
-
-        .bookCard:hover {
-          transform: translateY(-3px);
-          filter: brightness(1.035);
-        }
-
-        .bookCard:active {
-          transform: translateY(4px);
-        }
-
-        .bookCardActive {
+        .modeActive {
           color: #073b68;
           border-color: #174461;
+          background: linear-gradient(180deg, #b8ecff, #58a8d7);
+          box-shadow: inset 0 4px 4px rgba(255,255,255,.82), 0 4px 0 #17415c;
+        }
+
+        /* ================= WORD ================= */
+
+        .wordBox {
+          width:
+            min(
+              470px,
+              85%
+            );
+
+          min-height:
+            105px;
+
+          padding:
+            20px;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          text-align:
+            center;
+
+          color:
+            #050505;
+
+          font-size:
+            clamp(
+              28px,
+              3vw,
+              40px
+            );
+
+          font-weight:
+            700;
+
+          border:
+            3px solid
+            #174461;
+
+          border-radius:
+            18px;
 
           background:
             linear-gradient(
               180deg,
-              #b7eaff 0%,
-              #7ecdf2 43%,
-              #4ba1d2 100%
+              #84c9f5 0%,
+              #63a9da 45%,
+              #5298ca 100%
             );
 
           box-shadow:
-            inset 0 7px 6px rgba(255,255,255,.72),
-            inset 0 -5px 5px rgba(0,0,0,.13),
-            0 6px 0 #17415c,
-            0 11px 14px rgba(20,65,92,.25);
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .65
+              ),
+
+            inset 0 -7px 7px
+              rgba(
+                0,
+                0,
+                0,
+                .16
+              ),
+
+            0 6px 0
+              #17415c,
+
+            0 10px 15px
+              rgba(
+                0,
+                0,
+                0,
+                .24
+              );
         }
 
-        .bookName {
-          font-size: 28px;
-          font-weight: 700;
+        /* ================= WORD TOOLS ================= */
+
+        .wordTools {
+          margin-top:
+            24px;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          gap:
+            16px;
+
+          flex-wrap:
+            wrap;
         }
 
-        .bookSub {
-          font-size: 14px;
-          font-weight: 700;
-          opacity: .75;
+        .toolButton {
+          min-width:
+            145px;
+
+          min-height:
+            44px;
+
+          padding:
+            9px 17px;
+
+          border:
+            2px solid
+            #51585c;
+
+          border-radius:
+            11px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #dedede
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 4px 0
+              #555d61;
+
+          color:
+            #222;
+
+          font-family:
+            inherit;
+
+          font-size:
+            16px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+
+          transition:
+            transform
+              .12s ease,
+            filter
+              .12s ease;
         }
 
-        .unitGrid {
-          display: grid;
-          grid-template-columns: repeat(8, minmax(0, 1fr));
-          gap: 18px 14px;
+        .toolButton:hover {
+          transform:
+            translateY(
+              -2px
+            );
+
+          filter:
+            brightness(
+              1.05
+            );
         }
 
-        .unitButton {
-          min-height: 68px;
-          padding: 12px 12px;
+        .toolButton:active {
+          transform:
+            translateY(
+              2px
+            );
+        }
+
+        .toolButton:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+          transform: none;
+          filter: none;
+        }
+
+        .difficultActive {
+          color:
+            #754c00;
+
+          border-color:
+            #9a6b00;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff4b8,
+              #eac858
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .8
+              ),
+
+            0 4px 0
+              #9a6b00;
+        }
+
+        /* ================= EXAMPLE ================= */
+
+        .exampleArea {
+          width:
+            100%;
+
+          min-height:
+            145px;
+
+          margin-top:
+            18px;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+        }
+
+        .exampleButton {
+          padding:
+            10px 21px;
+
+          border:
+            1px solid
+            #777;
+
+          border-radius:
+            20px;
+
+          background:
+            #ffffff;
+
+          color:
+            #333;
+
+          font-family:
+            inherit;
+
+          font-size:
+            17px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+
+          transition:
+            transform
+              .15s ease,
+            box-shadow
+              .15s ease;
+        }
+
+        .exampleButton:hover {
+          transform:
+            translateY(
+              -2px
+            );
+
+          box-shadow:
+            0 5px 10px
+              rgba(
+                0,
+                0,
+                0,
+                .12
+              );
+        }
+
+        .exampleText {
+          text-align:
+            center;
+
+          animation:
+            exampleAppear
+            .22s ease;
+        }
+
+        @keyframes exampleAppear {
+          from {
+            opacity:
+              0;
+
+            transform:
+              translateY(
+                5px
+              );
+          }
+
+          to {
+            opacity:
+              1;
+
+            transform:
+              translateY(
+                0
+              );
+          }
+        }
+
+        .englishExample {
+          color:
+            #111;
+
+          font-family:
+            "Times New Roman",
+            serif;
+
+          font-size:
+            clamp(
+              27px,
+              3vw,
+              38px
+            );
+
+          font-weight:
+            700;
+
+          font-style:
+            italic;
+        }
+
+        .uzbekExample {
+          margin-top:
+            3px;
+
+          color:
+            #e11d1d;
+
+          font-family:
+            "Times New Roman",
+            serif;
+
+          font-size:
+            clamp(
+              24px,
+              2.6vw,
+              33px
+            );
+
+          font-style:
+            italic;
+        }
+
+        .noExample {
+          color:
+            #777;
+
+          font-size:
+            19px;
+
+          font-style:
+            italic;
+        }
+
+        /* ================= ANSWERS ================= */
+
+        .answers {
+          width:
+            min(
+              1050px,
+              95%
+            );
+
+          margin-top:
+            15px;
+
+          display:
+            grid;
+
+          grid-template-columns:
+            repeat(
+              2,
+              minmax(
+                0,
+                1fr
+              )
+            );
+
+          gap:
+            80px;
+        }
+
+        .answerButton {
+          min-height:
+            105px;
+
+          padding:
+            20px 25px;
+
+          border:
+            3px solid
+            #4d555a;
+
+          border-radius:
+            17px;
+
+          color:
+            #070707;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f2f2f2 0%,
+              #d7d7d7 35%,
+              #bbbbbb 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .92
+              ),
+
+            inset 0 -6px 6px
+              rgba(
+                0,
+                0,
+                0,
+                .15
+              ),
+
+            0 6px 0
+              #555d61,
+
+            0 10px 14px
+              rgba(
+                0,
+                0,
+                0,
+                .20
+              );
+
+          font-family:
+            inherit;
+
+          font-size:
+            clamp(
+              24px,
+              2.5vw,
+              34px
+            );
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+
+          transition:
+            transform
+              .12s ease,
+            filter
+              .12s ease;
+        }
+
+        .answerButton:hover:not(:disabled) {
+          transform:
+            translateY(
+              -3px
+            );
+
+          filter:
+            brightness(
+              1.04
+            );
+        }
+
+        .answerButton:active:not(:disabled) {
+          transform:
+            translateY(
+              3px
+            );
+        }
+
+        .answerButton:disabled {
+          cursor:
+            default;
+        }
+
+        .correctAnswer {
+          color:
+            #0b4f2b;
+
+          border-color:
+            #237a45;
+
+          background:
+            linear-gradient(
+              180deg,
+              #baf4cb,
+              #74cf91
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .75
+              ),
+
+            0 6px 0
+              #237a45;
+        }
+
+        .wrongAnswer {
+          color:
+            #7a1515;
+
+          border-color:
+            #a52b2b;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffc4c4,
+              #e77b7b
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .75
+              ),
+
+            0 6px 0
+              #8c2727;
+        }
+
+        /* ================= LATER ================= */
+
+        .laterButton {
+          margin-top:
+            30px;
+
+          padding:
+            10px 22px;
+
+          border:
+            1px solid
+            #858585;
+
+          border-radius:
+            18px;
+
+          background:
+            #ffffff;
+
+          color:
+            #555;
+
+          font-family:
+            inherit;
+
+          font-size:
+            16px;
+
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
+
+          transition:
+            transform
+              .12s ease,
+            box-shadow
+              .12s ease;
+        }
+
+        .laterButton:hover:not(:disabled) {
+          transform:
+            translateY(
+              -2px
+            );
+
+          box-shadow:
+            0 4px 9px
+              rgba(
+                0,
+                0,
+                0,
+                .13
+              );
+        }
+
+        .laterButton:disabled {
+          opacity:
+            .5;
+
+          cursor:
+            default;
+        }
+
+        /* ================= FEEDBACK ================= */
+
+        .feedbackArea {
+          min-height:
+            55px;
+
+          margin-top:
+            24px;
+
+          text-align:
+            center;
+        }
+
+        .correctText {
+          color:
+            #14713a;
+
+          font-size:
+            25px;
+
+          font-weight:
+            700;
+        }
+
+        .wrongText {
+          color:
+            #b42318;
+
+          font-size:
+            22px;
+
+          font-weight:
+            700;
+        }
+
+        /* ================= MOBILE ================= */
+
+        @media (
+          max-width:
+            760px
+        ) {
+          .page {
+            padding:
+              15px 12px
+              35px;
+          }
+
+          .topBar {
+            grid-template-columns:
+              1fr 1fr;
+
+            padding:
+              18px 15px;
+          }
+
+          .topCenter {
+            grid-column:
+              1 / -1;
+
+            grid-row:
+              1;
+          }
+
+          .unitInfo {
+            grid-column:
+              auto;
+
+            grid-row:
+              auto;
+          }
+
+          .topModeSwitch {
+            width:
+              100%;
+
+            gap:
+              8px;
+          }
+
+          .topModeSwitch .modeButton {
+            min-width:
+              0;
+
+            flex:
+              1 1
+              120px;
+
+            font-size:
+              13px;
+          }
+
+          .backMini {
+            grid-column:
+              1;
+
+            grid-row:
+              2;
+          }
+
+          .progress {
+            grid-column:
+              2;
+
+            grid-row:
+              2;
+          }
+
+          .learnArea {
+            margin-top:
+              30px;
+          }
+
+          .answers {
+            grid-template-columns:
+              1fr;
+
+            gap:
+              25px;
+
+            margin-top:
+              10px;
+          }
+
+          .answerButton {
+            min-height:
+              88px;
+          }
+
+          .exampleArea {
+            min-height:
+              130px;
+          }
+        }
+      `}</style>
+    </main>
+  );
+}
+
+/* =========================================================
+   PAGE
+
+   useSearchParams uchun Suspense kerak.
+========================================================= */
+
+export default function LearnPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight:
+              "100vh",
+
+            display:
+              "flex",
+
+            alignItems:
+              "center",
+
+            justifyContent:
+              "center",
+
+            fontFamily:
+              '"Bell MT", "Times New Roman", serif',
+
+            fontSize:
+              "26px",
+
+            fontWeight:
+              700,
+          }}
+        >
+          Yuklanmoqda...
+        </div>
+      }
+    >
+      <LearnContent />
+    </Suspense>
+  );
+}
