@@ -22,13 +22,15 @@ export default function EnglishVocabularyPage() {
   return (
     <main className="page">
       <div className="shell">
-        <button
-          type="button"
-          className="backButton"
-          onClick={goBack}
-        >
-          ← Qo‘llanmalar
-        </button>
+        <div className="guideBar">
+          <button
+            type="button"
+            className="backButton"
+            onClick={goBack}
+          >
+            ← Qo‘llanmalar
+          </button>
+        </div>
 
         <section className="mainPanel">
           <div className="floatingTitle">
@@ -115,10 +117,39 @@ export default function EnglishVocabularyPage() {
           margin: 0 auto;
         }
 
+        .guideBar {
+          width: 100%;
+          min-height: 112px;
+
+          display: flex;
+          align-items: center;
+
+          padding: 20px 32px;
+
+          border: 3px solid #174461;
+          border-radius: 28px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #8bd4fa 0%,
+              #68bae8 48%,
+              #4da2d3 100%
+            );
+
+          box-shadow:
+            inset 0 5px 4px rgba(255,255,255,.72),
+            inset 0 -6px 6px rgba(0,0,0,.10),
+            0 8px 0 #174d6d,
+            0 14px 18px rgba(0,0,0,.20);
+
+          margin-bottom: 34px;
+        }
+
         .backButton {
-          min-width: 150px;
-          min-height: 44px;
-          padding: 8px 16px;
+          min-width: 168px;
+          min-height: 52px;
+          padding: 10px 24px;
 
           border: 2px solid #174461;
           border-radius: 9px;
@@ -411,6 +442,19 @@ export default function EnglishVocabularyPage() {
         }
 
         @media (max-width: 760px) {
+          .guideBar {
+            min-height: 92px;
+            padding: 16px 18px;
+            border-radius: 22px;
+          }
+
+          .backButton {
+            min-width: 150px;
+            min-height: 48px;
+            padding: 9px 18px;
+            font-size: 14px;
+          }
+
           .bookGrid {
             grid-template-columns: 1fr;
           }
@@ -433,6 +477,24 @@ export default function EnglishVocabularyPage() {
         }
 
         @media (max-width: 500px) {
+          .page {
+            padding-left: 8px;
+            padding-right: 8px;
+          }
+
+          .guideBar {
+            min-height: 82px;
+            padding: 13px 12px;
+            border-radius: 19px;
+          }
+
+          .backButton {
+            width: 100%;
+            min-width: 0;
+            min-height: 46px;
+            font-size: 14px;
+          }
+
           .unitGrid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
           }
