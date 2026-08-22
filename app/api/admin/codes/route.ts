@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import fs from "fs/promises";
-import path from "path";
+import { get, put } from "@vercel/blob";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type AccessCode = {
   id: string;
@@ -33,24 +37,31 @@ type HistoryItem = {
   createdAt: string;
 };
 
-const DATA_DIR = path.join(
-  process.cwd(),
-  "data-storage"
-);
+/* =========================================================
+   BLOB PATH
+========================================================= */
 
-const DATA_FILE = path.join(
-  DATA_DIR,
-  "access-codes.json"
-);
+const CODES_BLOB_PATH =
+  "huquqiy-sayt/access-codes.json";
 
-const HISTORY_FILE = path.join(
-  DATA_DIR,
-  "history.json"
-);
+const HISTORY_BLOB_PATH =
+  "huquqiy-sayt/history.json";
 
-/* =========================================
+/* =========================================================
+   BLOB TOKEN
+========================================================= */
+
+function checkBlobToken() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
+  }
+}
+
+/* =========================================================
    ADMIN
-========================================= */
+========================================================= */
 
 async function isAdmin() {
   const cookieStore = await cookies();
@@ -61,61 +72,198 @@ async function isAdmin() {
   );
 }
 
-/* =========================================
-   FAYLLARNI TAYYORLASH
-========================================= */
+/* =========================================================
+   KODLARNI NORMALIZE QILISH
+========================================================= */
 
-async function ensureFiles() {
-  await fs.mkdir(DATA_DIR, {
-    recursive: true,
-  });
-
-  try {
-    await fs.access(DATA_FILE);
-  } catch {
-    await fs.writeFile(
-      DATA_FILE,
-      "[]",
-      "utf8"
-    );
+function normalizeCodes(
+  value: unknown
+): AccessCode[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
 
-  try {
-    await fs.access(HISTORY_FILE);
-  } catch {
-    await fs.writeFile(
-      HISTORY_FILE,
-      "[]",
-      "utf8"
-    );
-  }
+  return value.filter(
+    (item): item is AccessCode => {
+      if (
+        !item ||
+        typeof item !== "object"
+      ) {
+        return false;
+      }
+
+      const raw = item as Record<
+        string,
+        unknown
+      >;
+
+      return (
+        typeof raw.id === "string" &&
+        typeof raw.code === "string" &&
+        typeof raw.name === "string"
+      );
+    }
+  );
 }
 
-/* =========================================
-   KODLARNI O‘QISH
-========================================= */
+/* =========================================================
+   TARIXNI NORMALIZE QILISH
+========================================================= */
 
-async function readCodes(): Promise<AccessCode[]> {
-  await ensureFiles();
+function normalizeHistory(
+  value: unknown
+): HistoryItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (item): item is HistoryItem => {
+      if (
+        !item ||
+        typeof item !== "object"
+      ) {
+        return false;
+      }
+
+      const raw = item as Record<
+        string,
+        unknown
+      >;
+
+      return (
+        typeof raw.id === "string" &&
+        typeof raw.name === "string" &&
+        typeof raw.code === "string"
+      );
+    }
+  );
+}
+
+/* =========================================================
+   KODLARNI O‘QISH
+========================================================= */
+
+async function readCodes(): Promise<
+  AccessCode[]
+> {
+  checkBlobToken();
 
   try {
-    const text = await fs.readFile(
-      DATA_FILE,
-      "utf8"
+    const result = await get(
+      CODES_BLOB_PATH,
+      {
+        access: "private",
+      }
     );
+
+    if (
+      !result ||
+      result.statusCode !== 200 ||
+      !result.stream
+    ) {
+      return [];
+    }
+
+    const text = await new Response(
+      result.stream
+    ).text();
 
     if (!text.trim()) {
       return [];
     }
 
-    const data = JSON.parse(text);
+    const parsed: unknown =
+      JSON.parse(text);
 
-    return Array.isArray(data)
-      ? data
-      : [];
+    return normalizeCodes(parsed);
   } catch (error) {
     console.error(
       "READ CODES ERROR:",
+      error
+    );
+
+    /*
+      Blob hali mavjud bo‘lmasa
+      bo‘sh ro‘yxat qaytadi.
+    */
+    return [];
+  }
+}
+
+/* =========================================================
+   KODLARNI SAQLASH
+========================================================= */
+
+async function writeCodes(
+  codes: AccessCode[]
+) {
+  checkBlobToken();
+
+  await put(
+    CODES_BLOB_PATH,
+
+    JSON.stringify(
+      codes,
+      null,
+      2
+    ),
+
+    {
+      access: "private",
+
+      addRandomSuffix: false,
+
+      allowOverwrite: true,
+
+      contentType:
+        "application/json; charset=utf-8",
+
+      cacheControlMaxAge: 60,
+    }
+  );
+}
+
+/* =========================================================
+   TARIXNI O‘QISH
+========================================================= */
+
+async function readHistory(): Promise<
+  HistoryItem[]
+> {
+  checkBlobToken();
+
+  try {
+    const result = await get(
+      HISTORY_BLOB_PATH,
+      {
+        access: "private",
+      }
+    );
+
+    if (
+      !result ||
+      result.statusCode !== 200 ||
+      !result.stream
+    ) {
+      return [];
+    }
+
+    const text = await new Response(
+      result.stream
+    ).text();
+
+    if (!text.trim()) {
+      return [];
+    }
+
+    const parsed: unknown =
+      JSON.parse(text);
+
+    return normalizeHistory(parsed);
+  } catch (error) {
+    console.error(
+      "READ HISTORY ERROR:",
       error
     );
 
@@ -123,60 +271,52 @@ async function readCodes(): Promise<AccessCode[]> {
   }
 }
 
-/* =========================================
-   KODLARNI SAQLASH
-========================================= */
+/* =========================================================
+   TARIXNI SAQLASH
+========================================================= */
 
-async function writeCodes(
-  codes: AccessCode[]
+async function writeHistory(
+  history: HistoryItem[]
 ) {
-  await ensureFiles();
+  checkBlobToken();
 
-  await fs.writeFile(
-    DATA_FILE,
+  await put(
+    HISTORY_BLOB_PATH,
+
     JSON.stringify(
-      codes,
+      history,
       null,
       2
     ),
-    "utf8"
+
+    {
+      access: "private",
+
+      addRandomSuffix: false,
+
+      allowOverwrite: true,
+
+      contentType:
+        "application/json; charset=utf-8",
+
+      cacheControlMaxAge: 60,
+    }
   );
 }
 
-/* =========================================
+/* =========================================================
    TARIXGA YOZISH
-========================================= */
+========================================================= */
 
-async function addHistory(
-  data: {
-    type: HistoryItem["type"];
-    name: string;
-    code: string;
-    message: string;
-  }
-) {
+async function addHistory(data: {
+  type: HistoryItem["type"];
+  name: string;
+  code: string;
+  message: string;
+}) {
   try {
-    await ensureFiles();
-
-    let history: HistoryItem[] = [];
-
-    try {
-      const text =
-        await fs.readFile(
-          HISTORY_FILE,
-          "utf8"
-        );
-
-      const parsed =
-        JSON.parse(text);
-
-      history =
-        Array.isArray(parsed)
-          ? parsed
-          : [];
-    } catch {
-      history = [];
-    }
+    const history =
+      await readHistory();
 
     history.unshift({
       id: crypto.randomUUID(),
@@ -193,14 +333,17 @@ async function addHistory(
         new Date().toISOString(),
     });
 
-    await fs.writeFile(
-      HISTORY_FILE,
-      JSON.stringify(
-        history,
-        null,
-        2
-      ),
-      "utf8"
+    /*
+      Tarix haddan tashqari
+      kattalashib ketmasligi uchun
+      oxirgi 500 ta yozuvni saqlaymiz.
+    */
+
+    const limitedHistory =
+      history.slice(0, 500);
+
+    await writeHistory(
+      limitedHistory
     );
   } catch (error) {
     console.error(
@@ -210,9 +353,9 @@ async function addHistory(
   }
 }
 
-/* =========================================
-   MAXSUS KOD
-========================================= */
+/* =========================================================
+   MAXSUS KOD YARATISH
+========================================================= */
 
 function generateCode() {
   const a = crypto
@@ -228,15 +371,16 @@ function generateCode() {
   return `QUR-${a}-${b}`;
 }
 
-/* =========================================
+/* =========================================================
    GET
-========================================= */
+========================================================= */
 
 export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Faqat administrator kirishi mumkin.",
       },
@@ -250,10 +394,20 @@ export async function GET() {
     const codes =
       await readCodes();
 
-    return NextResponse.json({
-      success: true,
-      codes,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        codes,
+      },
+      {
+        status: 200,
+
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "GET CODES ERROR:",
@@ -263,8 +417,11 @@ export async function GET() {
     return NextResponse.json(
       {
         success: false,
+
         message:
-          "Kodlarni yuklashda xatolik.",
+          error instanceof Error
+            ? error.message
+            : "Kodlarni yuklashda xatolik.",
       },
       {
         status: 500,
@@ -273,10 +430,10 @@ export async function GET() {
   }
 }
 
-/* =========================================
+/* =========================================================
    POST
    YANGI KOD YARATISH
-========================================= */
+========================================================= */
 
 export async function POST(
   request: Request
@@ -285,6 +442,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Faqat administrator kod yaratishi mumkin.",
       },
@@ -295,18 +453,20 @@ export async function POST(
   }
 
   try {
+    checkBlobToken();
+
     const body =
       await request.json();
 
-    const name =
-      String(
-        body?.name ?? ""
-      ).trim();
+    const name = String(
+      body?.name ?? ""
+    ).trim();
 
     if (!name) {
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Foydalanuvchi ismini kiriting.",
         },
@@ -357,18 +517,24 @@ export async function POST(
       newUser
     );
 
+    /*
+      VERCEL BLOB'GA SAQLAYMIZ
+    */
+
     await writeCodes(
       codes
     );
 
+    /*
+      TARIXGA HAM YOZAMIZ
+    */
+
     await addHistory({
       type: "created",
 
-      name:
-        newUser.name,
+      name: newUser.name,
 
-      code:
-        newUser.code,
+      code: newUser.code,
 
       message:
         `${newUser.name} uchun yangi maxsus kirish kodi yaratildi.`,
@@ -378,8 +544,10 @@ export async function POST(
       {
         success: true,
 
-        user:
-          newUser,
+        message:
+          "Maxsus kirish kodi yaratildi.",
+
+        user: newUser,
       },
       {
         status: 201,
@@ -394,8 +562,11 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+
         message:
-          "Kod yaratishda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Kod yaratishda server xatosi.",
       },
       {
         status: 500,
@@ -404,10 +575,13 @@ export async function POST(
   }
 }
 
-/* =========================================
+/* =========================================================
    DELETE
    FOYDALANUVCHI + KODNI BUTUNLAY O‘CHIRISH
-========================================= */
+
+   MISOL:
+   /api/admin/codes?id=123
+========================================================= */
 
 export async function DELETE(
   request: Request
@@ -416,6 +590,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Faqat administrator o‘chira oladi.",
       },
@@ -426,18 +601,21 @@ export async function DELETE(
   }
 
   try {
+    checkBlobToken();
+
     const url =
       new URL(request.url);
 
-    const id =
-      String(
-        url.searchParams.get("id") ?? ""
-      ).trim();
+    const id = String(
+      url.searchParams.get("id") ??
+        ""
+    ).trim();
 
     if (!id) {
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Foydalanuvchi ID berilmagan.",
         },
@@ -460,6 +638,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Foydalanuvchi topilmadi.",
         },
@@ -469,19 +648,24 @@ export async function DELETE(
       );
     }
 
-    /* MUHIM */
-
     const newCodes =
       codes.filter(
         (item) =>
           item.id !== id
       );
 
+    /*
+      BLOB'DAGI RO‘YXATNI
+      YANGILAYMIZ
+    */
+
     await writeCodes(
       newCodes
     );
 
-    /* HAQIQATAN O‘CHGANINI TEKSHIRAMIZ */
+    /*
+      QAYTA O‘QIB TEKSHIRAMIZ
+    */
 
     const checkCodes =
       await readCodes();
@@ -503,7 +687,7 @@ export async function DELETE(
           success: false,
 
           message:
-            "Foydalanuvchini fayldan o‘chirib bo‘lmadi.",
+            "Foydalanuvchini o‘chirib bo‘lmadi.",
         },
         {
           status: 500,
@@ -511,16 +695,16 @@ export async function DELETE(
       );
     }
 
-    /* TARIXDA QOLADI */
+    /*
+      TARIXDA QOLDIRAMIZ
+    */
 
     await addHistory({
       type: "deleted",
 
-      name:
-        user.name,
+      name: user.name,
 
-      code:
-        user.code,
+      code: user.code,
 
       message:
         `${user.name} va ${user.code} kodi butunlay o‘chirildi.`,
@@ -533,16 +717,23 @@ export async function DELETE(
       user.id
     );
 
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json(
+      {
+        success: true,
 
-      deletedId:
-        user.id,
+        message:
+          "Foydalanuvchi butunlay o‘chirildi.",
 
-      deletedCode:
-        user.code,
-    });
+        deletedId:
+          user.id,
 
+        deletedCode:
+          user.code,
+      },
+      {
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error(
       "DELETE USER ERROR:",
@@ -554,7 +745,9 @@ export async function DELETE(
         success: false,
 
         message:
-          "Foydalanuvchini o‘chirishda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Foydalanuvchini o‘chirishda server xatosi.",
       },
       {
         status: 500,
