@@ -24,6 +24,7 @@ export default function DictionaryAdminPage() {
   const [text, setText] = useState("");
 
   const [savedWords, setSavedWords] = useState<VocabularyWord[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -33,10 +34,6 @@ export default function DictionaryAdminPage() {
   const books = Array.from({ length: 6 }, (_, i) => i + 1);
   const units = Array.from({ length: 30 }, (_, i) => i + 1);
 
-  /* =========================================================
-     SO‘ZLARNI PARSE QILISH
-  ========================================================= */
-
   const parsedWords = useMemo(() => {
     return text
       .split("\n")
@@ -45,18 +42,14 @@ export default function DictionaryAdminPage() {
       .map((line): VocabularyWord | null => {
         const parts = line.split("|").map((part) => part.trim());
 
-        if (parts.length < 2) {
-          return null;
-        }
+        if (parts.length < 2) return null;
 
         const word = parts[0] || "";
         const translation = parts[1] || "";
         const example = parts[2] || "";
         const exampleTranslation = parts[3] || "";
 
-        if (!word || !translation) {
-          return null;
-        }
+        if (!word || !translation) return null;
 
         return {
           word,
@@ -79,13 +72,9 @@ export default function DictionaryAdminPage() {
 
   const exampleCount = useMemo(() => {
     return parsedWords.filter(
-      (item) => Boolean(item.example && item.exampleTranslation)
+      (item) => item.example && item.exampleTranslation
     ).length;
   }, [parsedWords]);
-
-  /* =========================================================
-     SO‘ZLARNI YUKLASH
-  ========================================================= */
 
   async function loadWords() {
     try {
@@ -111,8 +100,6 @@ export default function DictionaryAdminPage() {
 
       setSavedWords(Array.isArray(data.words) ? data.words : []);
     } catch (err) {
-      console.error("Vocabulary load error:", err);
-
       setSavedWords([]);
 
       setError(
@@ -130,10 +117,6 @@ export default function DictionaryAdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, unit]);
 
-  /* =========================================================
-     IMPORT
-  ========================================================= */
-
   async function handleImport() {
     try {
       setError("");
@@ -150,31 +133,24 @@ export default function DictionaryAdminPage() {
       }
 
       if (parsedWords.length === 0) {
-        setError(
-          "Import qilish uchun kamida bitta to‘g‘ri so‘z bo‘lishi kerak."
-        );
+        setError("Kamida bitta to‘g‘ri so‘z kiriting.");
         return;
       }
 
       const confirmed = window.confirm(
         `Book ${book}, Unit ${unit} uchun ${parsedWords.length} ta so‘zni saqlaysizmi?\n\n` +
-          `Misol gap bilan: ${exampleCount} ta\n\n` +
-          `Agar bu Unit oldin mavjud bo‘lsa, eski so‘zlar yangilari bilan almashtiriladi.`
+          `Misol gap bilan: ${exampleCount} ta`
       );
 
-      if (!confirmed) {
-        return;
-      }
+      if (!confirmed) return;
 
       setSaving(true);
 
       const response = await fetch("/api/vocabulary", {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
           book: Number(book),
           unit: Number(unit),
@@ -203,8 +179,6 @@ export default function DictionaryAdminPage() {
 
       setText("");
     } catch (err) {
-      console.error("Vocabulary import error:", err);
-
       setError(
         err instanceof Error
           ? err.message
@@ -215,10 +189,6 @@ export default function DictionaryAdminPage() {
     }
   }
 
-  /* =========================================================
-     TAHRIRLASH
-  ========================================================= */
-
   function loadSavedIntoEditor() {
     if (savedWords.length === 0) {
       setError("Bu Unitda hali saqlangan so‘zlar yo‘q.");
@@ -226,19 +196,18 @@ export default function DictionaryAdminPage() {
     }
 
     const prepared = savedWords
-      .map((item) => {
-        return [
+      .map((item) =>
+        [
           item.word,
           item.translation,
           item.example || "",
           item.exampleTranslation || "",
-        ].join(" | ");
-      })
+        ].join(" | ")
+      )
       .join("\n");
 
     setText(prepared);
-
-    setMessage("Saqlangan so‘zlar tahrirlash maydoniga yuklandi.");
+    setMessage("Saqlangan so‘zlar tahrirlash uchun yuklandi.");
     setError("");
 
     window.scrollTo({
@@ -247,80 +216,75 @@ export default function DictionaryAdminPage() {
     });
   }
 
+  function goHome() {
+    window.location.href = "/";
+  }
+
+  function goAdmin() {
+    window.location.href = "/admin";
+  }
+
+  function logout() {
+    window.location.href = "/logout";
+  }
+
   return (
     <main className="page">
-      <div className="pageGlow pageGlowOne" />
-      <div className="pageGlow pageGlowTwo" />
-
-      <div className="container">
+      <div className="wrapper">
         {/* =====================================================
-            HEADER
+            TOP PANEL
         ===================================================== */}
 
-        <div className="topPanel">
-          <div className="topLeft">
-            <div className="logoMark">
-              <span>QS</span>
-            </div>
+        <div className="topBar">
+          <button
+            type="button"
+            className="brandButton"
+            onClick={goAdmin}
+          >
+            Qurbonov Siyovush Jamaliddinzoda
+          </button>
 
-            <div>
-              <div className="siteName">
-                Qurbonov Siyovush Jamaliddinzoda
-              </div>
+          <div className="topActions">
+            <button
+              type="button"
+              className="topSmallButton"
+              onClick={goHome}
+            >
+              Asosiy sahifa
+            </button>
 
-              <div className="siteSub">
-                English Vocabulary boshqaruv paneli
-              </div>
-            </div>
-          </div>
-
-          <div className="adminBadge">
-            <span className="adminDot" />
-            Admin
+            <button
+              type="button"
+              className="topBlueButton"
+              onClick={logout}
+            >
+              Chiqish
+            </button>
           </div>
         </div>
 
         {/* =====================================================
-            TITLE
+            MAIN ADMIN BLOCK
         ===================================================== */}
 
-        <div className="titleBlock">
-          <div className="titleLine" />
+        <section className="adminBox">
+          <div className="adminTitle">
+            Lug‘at boshqaruvi
+          </div>
 
-          <div>
-            <h1>English Vocabulary</h1>
+          {/* BOOK + UNIT CARD */}
 
-            <p>
-              4000 Essential English Words — so‘zlar va misol gaplarni
-              boshqarish
+          <div className="innerCard">
+            <h2>English Vocabulary</h2>
+
+            <p className="subtitle">
+              4000 Essential English Words — so‘zlar va misol gaplarni boshqarish
             </p>
-          </div>
-        </div>
 
-        {/* =====================================================
-            MAIN CARD
-        ===================================================== */}
+            <div className="selectorGrid">
+              <div className="field">
+                <label>Book</label>
 
-        <section className="panel">
-          <div className="panelTop">
-            <div>
-              <div className="sectionLabel">LUG‘AT BOSHQARUVI</div>
-
-              <h2>Unitga so‘z qo‘shish</h2>
-            </div>
-
-            <div className="selectionBadge">
-              Book {book} / Unit {unit}
-            </div>
-          </div>
-
-          {/* BOOK UNIT */}
-
-          <div className="selectorGrid">
-            <div className="field">
-              <label>Book</label>
-
-              <div className="input3d">
                 <select
                   value={book}
                   onChange={(e) => {
@@ -337,12 +301,10 @@ export default function DictionaryAdminPage() {
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="field">
-              <label>Unit</label>
+              <div className="field">
+                <label>Unit</label>
 
-              <div className="input3d">
                 <select
                   value={unit}
                   onChange={(e) => {
@@ -360,72 +322,44 @@ export default function DictionaryAdminPage() {
                 </select>
               </div>
             </div>
-          </div>
 
-          {/* CURRENT SELECTION */}
-
-          <div className="currentSelection">
-            <div className="currentCircle">✓</div>
-
-            <div>
-              <span>Tanlangan bo‘lim</span>
-
+            <div className="selectedInfo">
+              Tanlandi:
               <strong>
-                Book {book}
-                <b>→</b>
-                Unit {unit}
+                {" "}
+                Book {book} → Unit {unit}
               </strong>
             </div>
-          </div>
 
-          {/* MESSAGES */}
+            {message && (
+              <div className="message success">
+                {message}
+              </div>
+            )}
 
-          {message && (
-            <div className="alert successAlert">
-              <div className="alertIcon">✓</div>
-              {message}
-            </div>
-          )}
+            {error && (
+              <div className="message error">
+                {error}
+              </div>
+            )}
 
-          {error && (
-            <div className="alert errorAlert">
-              <div className="alertIcon">!</div>
-              {error}
-            </div>
-          )}
-
-          {/* EDITOR HEADER */}
-
-          <div className="editorHeader">
-            <div>
-              <h3>So‘zlarni kiriting</h3>
-
-              <p>
-                Format:
-                <strong>
-                  {" "}
-                  English | Uzbek | English example | Uzbek example
-                </strong>
-              </p>
-
-              <p>
-                Misol gap bo‘lmasa:
-                <strong> English | Uzbek</strong>
-              </p>
+            <div className="editorTitle">
+              So‘zlarni kiriting
             </div>
 
-            <div className="lineCounter">
-              {totalLines === 0 ? "0 qator" : `${totalLines} qator`}
+            <div className="formatText">
+              Format:
+              <strong>
+                {" "}
+                English | Uzbek | English example | Uzbek example
+              </strong>
             </div>
-          </div>
 
-          {/* TEXTAREA */}
+            <div className="formatText">
+              Misol gap bo‘lmasa:
+              <strong> English | Uzbek</strong>
+            </div>
 
-          <div
-            className={`textareaOuter ${
-              invalidLines > 0 ? "textareaInvalid" : ""
-            }`}
-          >
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -434,149 +368,132 @@ export default function DictionaryAdminPage() {
 agree | rozi bo‘lmoq | I agree with you. | Men sizga qo‘shilaman.
 angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
             />
-          </div>
 
-          {/* STATISTICS + BUTTON */}
+            <div className="bottomRow">
+              <div className="stats">
+                <div>
+                  Qator:
+                  <strong> {totalLines}</strong>
+                </div>
 
-          <div className="controlRow">
-            <div className="stats">
-              <div className="statItem">
-                <span>Qator</span>
-                <strong>{totalLines}</strong>
-              </div>
+                <div>
+                  To‘g‘ri:
+                  <strong className="green">
+                    {" "}
+                    {parsedWords.length}
+                  </strong>
+                </div>
 
-              <div className="statItem good">
-                <span>To‘g‘ri</span>
-                <strong>{parsedWords.length}</strong>
-              </div>
+                <div>
+                  Xato:
+                  <strong className={invalidLines > 0 ? "red" : ""}>
+                    {" "}
+                    {invalidLines}
+                  </strong>
+                </div>
 
-              <div className={`statItem ${invalidLines > 0 ? "bad" : ""}`}>
-                <span>Xato</span>
-                <strong>{invalidLines}</strong>
-              </div>
-
-              <div className="statItem">
-                <span>Misol gap</span>
-                <strong>{exampleCount}</strong>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="importButton"
-              disabled={
-                saving ||
-                parsedWords.length === 0 ||
-                invalidLines > 0
-              }
-              onClick={handleImport}
-            >
-              {saving ? "Saqlanmoqda..." : "Import qilish"}
-            </button>
-          </div>
-        </section>
-
-        {/* =====================================================
-            SAVED WORDS
-        ===================================================== */}
-
-        <section className="panel savedPanel">
-          <div className="savedTop">
-            <div>
-              <div className="sectionLabel">SAQLANGAN MA’LUMOTLAR</div>
-
-              <h2>Saqlangan so‘zlar</h2>
-
-              <p>
-                Book {book} → Unit {unit}
-              </p>
-            </div>
-
-            <div className="savedControls">
-              <div className="savedCount">
-                {savedWords.length}
-                <span> ta</span>
+                <div>
+                  Misol gap:
+                  <strong> {exampleCount}</strong>
+                </div>
               </div>
 
               <button
                 type="button"
-                className="smallButton editButton"
-                onClick={loadSavedIntoEditor}
-                disabled={loading || savedWords.length === 0}
+                className="blueButton"
+                disabled={
+                  saving ||
+                  parsedWords.length === 0 ||
+                  invalidLines > 0
+                }
+                onClick={handleImport}
               >
-                Tahrirlash
-              </button>
-
-              <button
-                type="button"
-                className="smallButton refreshButton"
-                onClick={loadWords}
-                disabled={loading}
-              >
-                {loading ? "Yuklanmoqda..." : "Yangilash"}
+                {saving ? "Saqlanmoqda..." : "Import qilish"}
               </button>
             </div>
           </div>
 
-          {loading ? (
-            <div className="emptyState">
-              <div className="spinner" />
-              <strong>So‘zlar yuklanmoqda...</strong>
-            </div>
-          ) : savedWords.length === 0 ? (
-            <div className="emptyState">
-              <strong>Bu Unit uchun hali so‘z saqlanmagan.</strong>
+          {/* SAVED WORDS */}
 
-              <span>
-                So‘zlarni yuqoridagi maydonga kiriting va Import qilish
-                tugmasini bosing.
-              </span>
-            </div>
-          ) : (
-            <div className="wordList">
-              {savedWords.map((item, index) => (
-                <div
-                  className="wordRow"
-                  key={`${item.word}-${index}`}
+          <div className="innerCard savedCard">
+            <div className="savedTop">
+              <div>
+                <h2>Saqlangan so‘zlar</h2>
+
+                <p>
+                  Book {book} → Unit {unit}
+                </p>
+              </div>
+
+              <div className="savedButtons">
+                <button
+                  type="button"
+                  className="grayButton"
+                  onClick={loadSavedIntoEditor}
+                  disabled={savedWords.length === 0}
                 >
-                  <div className="wordNumber">
-                    {index + 1}
-                  </div>
+                  Tahrirlash
+                </button>
 
-                  <div className="wordContent">
-                    <div className="wordLine">
-                      <strong className="englishWord">
-                        {item.word}
-                      </strong>
+                <button
+                  type="button"
+                  className="blueButton small"
+                  onClick={loadWords}
+                  disabled={loading}
+                >
+                  {loading ? "Yuklanmoqda..." : "Yangilash"}
+                </button>
+              </div>
+            </div>
 
-                      <span className="divider">—</span>
-
-                      <span className="uzbekWord">
-                        {item.translation}
-                      </span>
+            {loading ? (
+              <div className="emptyBox">
+                So‘zlar yuklanmoqda...
+              </div>
+            ) : savedWords.length === 0 ? (
+              <div className="emptyBox">
+                Bu Unit uchun hali so‘z saqlanmagan.
+              </div>
+            ) : (
+              <div className="wordList">
+                {savedWords.map((item, index) => (
+                  <div
+                    className="wordRow"
+                    key={`${item.word}-${index}`}
+                  >
+                    <div className="numberBox">
+                      {index + 1}
                     </div>
 
-                    {(item.example ||
-                      item.exampleTranslation) && (
-                      <div className="exampleArea">
-                        {item.example && (
-                          <div className="englishExample">
-                            {item.example}
-                          </div>
-                        )}
-
-                        {item.exampleTranslation && (
-                          <div className="uzbekExample">
-                            {item.exampleTranslation}
-                          </div>
-                        )}
+                    <div className="wordBody">
+                      <div className="wordMain">
+                        <strong>{item.word}</strong>
+                        <span>—</span>
+                        <span>{item.translation}</span>
                       </div>
-                    )}
+
+                      {(item.example ||
+                        item.exampleTranslation) && (
+                        <div className="exampleBox">
+                          {item.example && (
+                            <div className="exampleEn">
+                              {item.example}
+                            </div>
+                          )}
+
+                          {item.exampleTranslation && (
+                            <div className="exampleUz">
+                              {item.exampleTranslation}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
@@ -587,302 +504,272 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
 
         .page {
           min-height: 100vh;
-          position: relative;
-          overflow: hidden;
 
-          padding: 28px 20px 60px;
+          padding: 14px 20px 70px;
 
-          font-family: "Bell MT", "Times New Roman", serif;
-
-          color: #1c2733;
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
 
           background:
             linear-gradient(
               180deg,
-              #f3f5f7 0%,
-              #e8ebef 50%,
-              #dde2e7 100%
+              #ffffff 0%,
+              #f2f4f5 55%,
+              #e7eaec 100%
             );
+
+          color: #111;
         }
 
-        .pageGlow {
-          position: fixed;
-          pointer-events: none;
-          border-radius: 50%;
-          filter: blur(100px);
-          opacity: 0.18;
-        }
-
-        .pageGlowOne {
-          width: 380px;
-          height: 380px;
-          background: #789fc2;
-
-          top: -180px;
-          left: -150px;
-        }
-
-        .pageGlowTwo {
-          width: 420px;
-          height: 420px;
-          background: #aac2d6;
-
-          right: -220px;
-          bottom: 70px;
-        }
-
-        .container {
-          position: relative;
-          z-index: 2;
-
-          max-width: 1180px;
+        .wrapper {
+          max-width: 1020px;
           margin: 0 auto;
         }
 
-        /* =====================================================
-           TOP PANEL
-        ===================================================== */
+        /* ========================================
+           TOP BAR
+        ======================================== */
 
-        .topPanel {
+        .topBar {
+          min-height: 77px;
+
           display: flex;
           justify-content: space-between;
           align-items: center;
 
-          gap: 20px;
+          gap: 18px;
 
-          padding: 18px 22px;
-
-          border: 1px solid #cdd3da;
+          padding: 13px 18px;
 
           border-radius: 18px;
 
-          background:
-            linear-gradient(
-              145deg,
-              #f7f8fa,
-              #dde2e7
-            );
-
-          box-shadow:
-            8px 8px 18px rgba(83, 92, 103, 0.18),
-            -7px -7px 16px rgba(255, 255, 255, 0.92),
-            inset 1px 1px 0 rgba(255, 255, 255, 0.8);
-        }
-
-        .topLeft {
-          display: flex;
-          align-items: center;
-          gap: 15px;
-        }
-
-        .logoMark {
-          width: 48px;
-          height: 48px;
-
-          display: grid;
-          place-items: center;
-
-          border-radius: 13px;
-
-          color: white;
-
-          font-family: "Times New Roman", serif;
-          font-size: 16px;
-          font-weight: 700;
-
-          background:
-            linear-gradient(
-              145deg,
-              #628cac,
-              #315c7d
-            );
-
-          box-shadow:
-            4px 5px 9px rgba(43, 70, 91, 0.3),
-            inset 2px 2px 4px rgba(255,255,255,.3);
-        }
-
-        .siteName {
-          color: #143d5d;
-          font-size: 20px;
-          font-weight: 700;
-        }
-
-        .siteSub {
-          margin-top: 3px;
-          color: #7a828b;
-          font-size: 14px;
-        }
-
-        .adminBadge {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-
-          padding: 9px 14px;
-
-          border-radius: 11px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #ffffff,
-              #d9dee4
-            );
-
-          border: 1px solid #d0d6dc;
-
-          color: #40515f;
-
-          font-size: 14px;
-          font-weight: 700;
-
-          box-shadow:
-            4px 4px 8px rgba(80, 90, 101, 0.14),
-            -4px -4px 8px rgba(255,255,255,.85);
-        }
-
-        .adminDot {
-          width: 7px;
-          height: 7px;
-
-          border-radius: 50%;
-
-          background: #3d8761;
-        }
-
-        /* =====================================================
-           TITLE
-        ===================================================== */
-
-        .titleBlock {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-
-          margin: 31px 5px 22px;
-        }
-
-        .titleLine {
-          width: 5px;
-          height: 59px;
-
-          border-radius: 6px;
+          border: 2px solid #133f5c;
 
           background:
             linear-gradient(
               180deg,
-              #315d7e,
-              #8ba8bd
+              #79ccf2 0%,
+              #57acd7 55%,
+              #4799c6 100%
             );
 
           box-shadow:
-            2px 2px 5px rgba(41, 69, 90, 0.22);
+            0 7px 0 #123d59,
+            0 12px 22px rgba(0, 0, 0, 0.18),
+            inset 0 2px 0 rgba(255, 255, 255, 0.65);
         }
 
-        .titleBlock h1 {
-          margin: 0;
+        .brandButton {
+          min-height: 43px;
 
-          color: #163f5f;
+          padding: 0 18px;
 
-          font-size: 36px;
-          line-height: 1;
-        }
+          border-radius: 10px;
 
-        .titleBlock p {
-          margin: 8px 0 0;
-
-          color: #757e87;
-
-          font-size: 16px;
-        }
-
-        /* =====================================================
-           PANEL
-        ===================================================== */
-
-        .panel {
-          border-radius: 20px;
-
-          padding: 27px;
-
-          border: 1px solid #cbd1d7;
+          border: 1px solid #4e5960;
 
           background:
             linear-gradient(
-              145deg,
-              #f4f6f8,
-              #dfe3e7
+              180deg,
+              #ffffff 0%,
+              #ececec 52%,
+              #cfcfcf 100%
+            );
+
+          color: #111;
+
+          font-family: inherit;
+
+          font-size: 16px;
+          font-weight: 700;
+
+          cursor: pointer;
+
+          box-shadow:
+            0 4px 0 #666,
+            inset 0 2px 0 #fff;
+        }
+
+        .brandButton:active {
+          transform: translateY(3px);
+          box-shadow:
+            0 1px 0 #666;
+        }
+
+        .topActions {
+          display: flex;
+          gap: 10px;
+        }
+
+        .topSmallButton,
+        .topBlueButton {
+          min-width: 94px;
+          height: 38px;
+
+          border-radius: 9px;
+
+          font-family: inherit;
+
+          font-size: 12px;
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .topSmallButton {
+          border: 1px solid #777;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #d4d4d4
             );
 
           box-shadow:
-            10px 10px 22px rgba(76, 85, 95, 0.18),
-            -8px -8px 18px rgba(255,255,255,.9),
-            inset 1px 1px 0 rgba(255,255,255,.8);
+            0 4px 0 #777,
+            inset 0 2px 0 #fff;
         }
 
-        .panelTop,
-        .savedTop {
-          display: flex;
+        .topBlueButton {
+          color: #07344e;
 
-          justify-content: space-between;
-          align-items: center;
+          border: 1px solid #155476;
 
-          flex-wrap: wrap;
+          background:
+            linear-gradient(
+              180deg,
+              #69c4ed,
+              #48a7d6
+            );
 
-          gap: 17px;
-
-          margin-bottom: 25px;
+          box-shadow:
+            0 4px 0 #14506f,
+            inset 0 2px 0 rgba(255,255,255,.6);
         }
 
-        .sectionLabel {
-          margin-bottom: 5px;
-
-          color: #6f8190;
-
-          font-family: Arial, sans-serif;
-
-          font-size: 10px;
-          font-weight: 800;
-
-          letter-spacing: 1.8px;
+        .topSmallButton:active,
+        .topBlueButton:active {
+          transform: translateY(3px);
+          box-shadow: none;
         }
 
-        .panel h2 {
-          margin: 0;
+        /* ========================================
+           ADMIN BOX
+        ======================================== */
 
-          color: #202f3c;
+        .adminBox {
+          position: relative;
 
-          font-size: 27px;
+          margin: 68px auto 0;
+
+          max-width: 900px;
+
+          padding: 47px 24px 27px;
+
+          border-radius: 18px;
+
+          border: 2px solid #343a3d;
+
+          background:
+            linear-gradient(
+              180deg,
+              #666b6e 0%,
+              #555a5d 55%,
+              #44494c 100%
+            );
+
+          box-shadow:
+            0 7px 0 #282d30,
+            0 13px 25px rgba(0,0,0,.2),
+            inset 0 2px 0 rgba(255,255,255,.15);
         }
 
-        .selectionBadge {
-          padding: 9px 14px;
+        .adminTitle {
+          position: absolute;
+
+          top: -24px;
+          left: 50%;
+
+          transform: translateX(-50%);
+
+          min-width: 230px;
+
+          padding: 11px 25px;
+
+          text-align: center;
 
           border-radius: 11px;
 
-          color: #294d68;
+          border: 2px solid #145071;
+
+          background:
+            linear-gradient(
+              180deg,
+              #78cdf3,
+              #51add9
+            );
+
+          color: #143e5d;
+
+          font-size: 22px;
+          font-weight: 700;
+
+          box-shadow:
+            0 5px 0 #174d68,
+            inset 0 2px 0 rgba(255,255,255,.55);
+        }
+
+        /* ========================================
+           INNER CARDS
+        ======================================== */
+
+        .innerCard {
+          padding: 25px;
+
+          border-radius: 14px;
+
+          border: 1px solid #d7d7d7;
 
           background:
             linear-gradient(
               145deg,
-              #e6edf3,
-              #cbd6df
+              #f9f9f9 0%,
+              #ececec 45%,
+              #d1d1d1 100%
             );
 
-          border: 1px solid #c4cfd7;
-
           box-shadow:
-            4px 4px 8px rgba(70, 82, 92, .15),
-            -3px -3px 6px rgba(255,255,255,.8);
-
-          font-size: 14px;
-          font-weight: 700;
+            0 7px 0 #777c7e,
+            0 10px 18px rgba(0,0,0,.16),
+            inset 0 2px 0 #ffffff;
         }
 
-        /* =====================================================
-           FIELDS
-        ===================================================== */
+        .innerCard h2 {
+          margin: 0;
+
+          text-align: center;
+
+          color: #111;
+
+          font-size: 26px;
+        }
+
+        .subtitle {
+          margin: 6px 0 24px;
+
+          text-align: center;
+
+          color: #555;
+
+          font-size: 15px;
+        }
+
+        /* ========================================
+           BOOK UNIT
+        ======================================== */
 
         .selectorGrid {
           display: grid;
@@ -890,857 +777,471 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
           grid-template-columns:
             repeat(2, minmax(0, 1fr));
 
-          gap: 20px;
+          gap: 24px;
         }
 
         .field label {
           display: block;
 
-          margin: 0 0 8px 3px;
-
-          color: #3d4a55;
+          margin: 0 0 7px 5px;
 
           font-size: 17px;
+
           font-weight: 700;
-        }
-
-        .input3d {
-          padding: 3px;
-
-          border-radius: 12px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #cbd0d6,
-              #ffffff
-            );
-
-          box-shadow:
-            inset 3px 3px 6px rgba(68, 79, 90, .17),
-            inset -3px -3px 6px rgba(255,255,255,.88);
         }
 
         select {
           width: 100%;
-          height: 51px;
-
-          padding: 0 15px;
-
-          border: none;
-
-          border-radius: 10px;
-
-          outline: none;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #f1f3f5
-            );
-
-          color: #2b3946;
-
-          font-family: inherit;
-
-          font-size: 17px;
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        /* =====================================================
-           CURRENT SELECTION
-        ===================================================== */
-
-        .currentSelection {
-          display: flex;
-          align-items: center;
-
-          gap: 13px;
-
-          margin-top: 22px;
-
-          padding: 13px 16px;
-
-          border-radius: 13px;
-
-          border: 1px solid #bccbd6;
-
-          background:
-            linear-gradient(
-              145deg,
-              #dfe8ef,
-              #cbd9e3
-            );
-
-          box-shadow:
-            inset 2px 2px 4px rgba(255,255,255,.7),
-            4px 4px 9px rgba(70, 87, 99, .13);
-        }
-
-        .currentCircle {
-          width: 35px;
-          height: 35px;
-
-          display: grid;
-          place-items: center;
-
-          border-radius: 50%;
-
-          color: white;
-
-          background:
-            linear-gradient(
-              145deg,
-              #547e9e,
-              #2e5776
-            );
-
-          box-shadow:
-            3px 3px 6px rgba(41,68,89,.25),
-            inset 2px 2px 3px rgba(255,255,255,.3);
-
-          font-family: Arial, sans-serif;
-          font-weight: 800;
-        }
-
-        .currentSelection span {
-          display: block;
-
-          margin-bottom: 2px;
-
-          color: #667684;
-
-          font-size: 12px;
-        }
-
-        .currentSelection strong {
-          color: #234d6b;
-
-          font-size: 17px;
-        }
-
-        .currentSelection b {
-          margin: 0 9px;
-        }
-
-        /* =====================================================
-           ALERTS
-        ===================================================== */
-
-        .alert {
-          display: flex;
-          align-items: center;
-
-          gap: 10px;
-
-          padding: 12px 15px;
-
-          margin-top: 16px;
-
-          border-radius: 11px;
-
-          font-weight: 700;
-        }
-
-        .successAlert {
-          color: #416554;
-
-          border: 1px solid #bfcfc6;
-
-          background: #e6eee9;
-        }
-
-        .errorAlert {
-          color: #874d4a;
-
-          border: 1px solid #dbc2bf;
-
-          background: #f1e6e4;
-        }
-
-        .alertIcon {
-          width: 27px;
-          height: 27px;
-
-          display: grid;
-          place-items: center;
-
-          border-radius: 50%;
-
-          background: rgba(255,255,255,.65);
-
-          font-family: Arial, sans-serif;
-        }
-
-        /* =====================================================
-           EDITOR
-        ===================================================== */
-
-        .editorHeader {
-          display: flex;
-
-          justify-content: space-between;
-          align-items: flex-end;
-
-          gap: 20px;
-
-          flex-wrap: wrap;
-
-          margin-top: 27px;
-          margin-bottom: 11px;
-        }
-
-        .editorHeader h3 {
-          margin: 0 0 7px;
-
-          color: #263847;
-
-          font-size: 21px;
-        }
-
-        .editorHeader p {
-          margin: 3px 0;
-
-          color: #747d85;
-
-          font-size: 14px;
-        }
-
-        .lineCounter {
-          padding: 8px 12px;
-
-          border-radius: 10px;
-
-          color: #556978;
-
-          background:
-            linear-gradient(
-              145deg,
-              #f4f6f8,
-              #d4d9df
-            );
-
-          border: 1px solid #d0d5da;
-
-          box-shadow:
-            3px 3px 6px rgba(79,89,99,.12),
-            -3px -3px 6px rgba(255,255,255,.85);
-
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .textareaOuter {
-          padding: 4px;
-
-          border-radius: 14px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #c4cad1,
-              #fefefe
-            );
-
-          box-shadow:
-            inset 4px 4px 8px rgba(62,74,85,.15),
-            inset -4px -4px 8px rgba(255,255,255,.85),
-            4px 5px 10px rgba(74,84,93,.12);
-        }
-
-        .textareaInvalid {
-          background: #d8a5a2;
-        }
-
-        textarea {
-          display: block;
-
-          width: 100%;
-          min-height: 285px;
-
-          resize: vertical;
-
-          padding: 17px;
-
-          border: none;
-          outline: none;
-
-          border-radius: 11px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #f6f7f8
-            );
-
-          color: #313c46;
-
-          font-family: Arial, sans-serif;
-
-          font-size: 15px;
-          line-height: 1.75;
-        }
-
-        textarea::placeholder {
-          color: #9199a1;
-        }
-
-        /* =====================================================
-           CONTROLS
-        ===================================================== */
-
-        .controlRow {
-          display: flex;
-
-          justify-content: space-between;
-          align-items: center;
-
-          gap: 20px;
-
-          flex-wrap: wrap;
-
-          margin-top: 21px;
-        }
-
-        .stats {
-          display: flex;
-
-          gap: 8px;
-
-          flex-wrap: wrap;
-        }
-
-        .statItem {
-          min-width: 77px;
-
-          padding: 7px 10px;
-
-          text-align: center;
-
-          border-radius: 10px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #f5f6f7,
-              #d9dde1
-            );
-
-          border: 1px solid #d1d6da;
-
-          box-shadow:
-            3px 3px 6px rgba(79,89,99,.12),
-            -3px -3px 6px rgba(255,255,255,.8);
-        }
-
-        .statItem span {
-          display: block;
-
-          color: #7d858c;
-
-          font-family: Arial, sans-serif;
-
-          font-size: 10px;
-        }
-
-        .statItem strong {
-          display: block;
-
-          margin-top: 2px;
-
-          color: #344756;
-
-          font-size: 17px;
-        }
-
-        .good strong {
-          color: #527263;
-        }
-
-        .bad strong {
-          color: #93534f;
-        }
-
-        .importButton {
-          min-width: 165px;
-
-          height: 48px;
-
-          padding: 0 22px;
-
-          border: 1px solid #294c66;
-
-          border-radius: 12px;
-
-          color: #ffffff;
-
-          background:
-            linear-gradient(
-              145deg,
-              #527c9b,
-              #294f6c
-            );
-
-          box-shadow:
-            5px 6px 11px rgba(37,64,84,.28),
-            inset 2px 2px 4px rgba(255,255,255,.25),
-            inset -3px -3px 5px rgba(25,45,61,.25);
-
-          font-family: inherit;
-
-          font-size: 16px;
-          font-weight: 700;
-
-          cursor: pointer;
-
-          transition: .15s ease;
-        }
-
-        .importButton:hover:not(:disabled) {
-          transform: translateY(-1px);
-
-          filter: brightness(1.04);
-        }
-
-        .importButton:active:not(:disabled) {
-          transform: translateY(2px);
-
-          box-shadow:
-            inset 4px 4px 8px rgba(20,42,58,.28);
-        }
-
-        .importButton:disabled {
-          opacity: .45;
-          cursor: not-allowed;
-        }
-
-        /* =====================================================
-           SAVED PANEL
-        ===================================================== */
-
-        .savedPanel {
-          margin-top: 25px;
-        }
-
-        .savedTop {
-          margin-bottom: 0;
-        }
-
-        .savedTop p {
-          margin: 5px 0 0;
-
-          color: #7a838c;
-
-          font-size: 14px;
-        }
-
-        .savedControls {
-          display: flex;
-
-          align-items: center;
-
-          gap: 8px;
-
-          flex-wrap: wrap;
-        }
-
-        .savedCount {
-          min-width: 55px;
-
-          padding: 8px 11px;
-
-          text-align: center;
-
-          border-radius: 10px;
-
-          color: #3b5b72;
-
-          background:
-            linear-gradient(
-              145deg,
-              #e5ebef,
-              #cbd4dc
-            );
-
-          border: 1px solid #c6d0d8;
-
-          box-shadow:
-            3px 3px 6px rgba(73,84,94,.13),
-            -3px -3px 6px rgba(255,255,255,.8);
-
-          font-weight: 700;
-        }
-
-        .savedCount span {
-          font-size: 12px;
-          font-weight: 400;
-        }
-
-        .smallButton {
-          height: 39px;
+          height: 49px;
 
           padding: 0 14px;
 
           border-radius: 9px;
 
+          border: 1px solid #7a7a7a;
+
+          outline: none;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #eeeeee
+            );
+
+          box-shadow:
+            inset 0 2px 2px #ffffff,
+            0 4px 0 #888;
+
+          font-family: inherit;
+
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .selectedInfo {
+          margin-top: 22px;
+
+          padding: 12px 15px;
+
+          border-radius: 9px;
+
+          border: 1px solid #367a9f;
+
+          background:
+            linear-gradient(
+              180deg,
+              #d8f0fb,
+              #bcdfee
+            );
+
+          color: #153d55;
+
+          box-shadow:
+            0 4px 0 #8ba7b5,
+            inset 0 2px 0 #ffffff;
+
+          font-size: 16px;
+        }
+
+        /* ========================================
+           ALERTS
+        ======================================== */
+
+        .message {
+          margin-top: 16px;
+
+          padding: 11px 14px;
+
+          border-radius: 8px;
+
+          font-weight: 700;
+        }
+
+        .success {
+          background: #dff0e5;
+          border: 1px solid #7cab8c;
+          color: #245c36;
+        }
+
+        .error {
+          background: #f2dddd;
+          border: 1px solid #b97979;
+          color: #7a2525;
+        }
+
+        /* ========================================
+           EDITOR
+        ======================================== */
+
+        .editorTitle {
+          margin-top: 28px;
+
+          font-size: 22px;
+          font-weight: 700;
+        }
+
+        .formatText {
+          margin-top: 4px;
+
+          color: #555;
+
+          font-size: 14px;
+        }
+
+        textarea {
+          width: 100%;
+          min-height: 280px;
+
+          margin-top: 12px;
+
+          resize: vertical;
+
+          padding: 15px;
+
+          border-radius: 9px;
+
+          border: 1px solid #777;
+
+          outline: none;
+
+          background: #ffffff;
+
+          box-shadow:
+            inset 3px 3px 6px rgba(0,0,0,.14),
+            inset -2px -2px 4px rgba(255,255,255,.8);
+
+          font-family: Arial, sans-serif;
+
+          font-size: 15px;
+          line-height: 1.7;
+        }
+
+        .bottomRow {
+          display: flex;
+
+          justify-content: space-between;
+          align-items: center;
+
+          gap: 15px;
+
+          flex-wrap: wrap;
+
+          margin-top: 18px;
+        }
+
+        .stats {
+          display: flex;
+
+          gap: 15px;
+
+          flex-wrap: wrap;
+
+          font-size: 14px;
+        }
+
+        .green {
+          color: #166b39;
+        }
+
+        .red {
+          color: #a52525;
+        }
+
+        /* ========================================
+           BUTTONS
+        ======================================== */
+
+        .blueButton,
+        .grayButton {
+          min-width: 120px;
+
+          height: 39px;
+
+          padding: 0 16px;
+
+          border-radius: 8px;
+
           font-family: inherit;
 
           font-size: 14px;
           font-weight: 700;
 
           cursor: pointer;
-
-          transition: .15s ease;
         }
 
-        .editButton {
-          color: #314e63;
+        .blueButton {
+          color: #123b53;
 
-          border: 1px solid #b9c5ce;
+          border: 1px solid #155679;
 
           background:
             linear-gradient(
-              145deg,
-              #edf1f4,
-              #d0d8df
+              180deg,
+              #74cff6,
+              #4eaadb
             );
 
           box-shadow:
-            3px 3px 6px rgba(76,87,98,.12),
-            -3px -3px 6px rgba(255,255,255,.8);
+            0 5px 0 #15506e,
+            inset 0 2px 0 rgba(255,255,255,.6);
         }
 
-        .refreshButton {
-          color: #4b5359;
-
-          border: 1px solid #c5c9cd;
+        .grayButton {
+          border: 1px solid #777;
 
           background:
             linear-gradient(
-              145deg,
-              #f7f8f9,
-              #d9dcdf
+              180deg,
+              #ffffff,
+              #d7d7d7
             );
 
           box-shadow:
-            3px 3px 6px rgba(76,84,92,.12),
-            -3px -3px 6px rgba(255,255,255,.82);
+            0 5px 0 #777,
+            inset 0 2px 0 #ffffff;
         }
 
-        .smallButton:hover:not(:disabled) {
-          transform: translateY(-1px);
+        .blueButton:active,
+        .grayButton:active {
+          transform: translateY(4px);
+
+          box-shadow: none;
         }
 
-        .smallButton:disabled {
+        .blueButton:disabled,
+        .grayButton:disabled {
           opacity: .45;
+
           cursor: not-allowed;
         }
 
-        /* =====================================================
-           EMPTY
-        ===================================================== */
+        .blueButton.small {
+          min-width: 100px;
+        }
 
-        .emptyState {
-          min-height: 160px;
+        /* ========================================
+           SAVED
+        ======================================== */
 
-          margin-top: 22px;
+        .savedCard {
+          margin-top: 28px;
+        }
 
+        .savedTop {
           display: flex;
-          flex-direction: column;
 
+          justify-content: space-between;
           align-items: center;
-          justify-content: center;
 
-          gap: 6px;
+          gap: 20px;
 
-          padding: 20px;
+          flex-wrap: wrap;
+        }
 
-          border-radius: 14px;
+        .savedTop h2 {
+          text-align: left;
+        }
 
-          color: #7b858e;
+        .savedTop p {
+          margin: 4px 0 0;
+          color: #555;
+        }
+
+        .savedButtons {
+          display: flex;
+          gap: 10px;
+        }
+
+        .emptyBox {
+          margin-top: 20px;
+
+          padding: 24px;
+
+          text-align: center;
+
+          border-radius: 9px;
+
+          border: 1px dashed #888;
 
           background:
             linear-gradient(
-              145deg,
-              #dfe3e7,
-              #f4f6f8
+              180deg,
+              #f4f4f4,
+              #dddddd
             );
 
-          border: 1px solid #d3d8dc;
-
-          box-shadow:
-            inset 5px 5px 10px rgba(78,88,98,.11),
-            inset -5px -5px 10px rgba(255,255,255,.82);
+          color: #555;
         }
 
-        .emptyState strong {
-          color: #4f5e69;
-          font-size: 16px;
-        }
-
-        .emptyState span {
-          font-family: Arial, sans-serif;
-          font-size: 12px;
-        }
-
-        .spinner {
-          width: 26px;
-          height: 26px;
-
-          margin-bottom: 4px;
-
-          border-radius: 50%;
-
-          border: 3px solid #c7cfd5;
-          border-top-color: #416b89;
-
-          animation: spin .8s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        /* =====================================================
-           WORDS
-        ===================================================== */
+        /* ========================================
+           WORD LIST
+        ======================================== */
 
         .wordList {
           display: grid;
 
-          gap: 11px;
+          gap: 10px;
 
-          margin-top: 22px;
+          margin-top: 20px;
         }
 
         .wordRow {
           display: flex;
 
-          gap: 13px;
+          gap: 12px;
 
-          padding: 14px 16px;
+          padding: 13px;
 
-          border-radius: 13px;
+          border-radius: 10px;
 
-          border: 1px solid #d0d5da;
+          border: 1px solid #aaa;
 
           background:
             linear-gradient(
               145deg,
-              #f5f6f7,
-              #e0e4e7
+              #f7f7f7,
+              #d8d8d8
             );
 
           box-shadow:
-            4px 4px 8px rgba(71,81,90,.12),
-            -4px -4px 8px rgba(255,255,255,.8);
-
-          transition: .15s ease;
+            0 4px 0 #888,
+            inset 0 2px 0 #ffffff;
         }
 
-        .wordRow:hover {
-          transform: translateY(-1px);
+        .numberBox {
+          width: 34px;
+          height: 34px;
 
-          box-shadow:
-            6px 6px 11px rgba(71,81,90,.14),
-            -5px -5px 9px rgba(255,255,255,.82);
-        }
-
-        .wordNumber {
-          width: 35px;
-          height: 35px;
-
-          flex: 0 0 35px;
+          flex: 0 0 34px;
 
           display: grid;
           place-items: center;
 
-          border-radius: 9px;
+          border-radius: 7px;
 
-          color: white;
+          color: #143b54;
 
           background:
             linear-gradient(
-              145deg,
-              #668ba6,
-              #365f7d
+              180deg,
+              #73cef4,
+              #4fa9d5
             );
 
-          box-shadow:
-            3px 3px 6px rgba(46,72,92,.23),
-            inset 1px 1px 3px rgba(255,255,255,.3);
+          border: 1px solid #18516f;
 
-          font-family: Arial, sans-serif;
-          font-size: 13px;
+          box-shadow:
+            0 3px 0 #15506d;
+
           font-weight: 700;
         }
 
-        .wordContent {
+        .wordBody {
           flex: 1;
-          min-width: 0;
         }
 
-        .wordLine {
+        .wordMain {
           display: flex;
-          align-items: baseline;
 
-          gap: 9px;
+          gap: 10px;
 
           flex-wrap: wrap;
-        }
 
-        .englishWord {
-          color: #243a4b;
-
-          font-size: 19px;
-        }
-
-        .divider {
-          color: #929aa1;
-        }
-
-        .uzbekWord {
-          color: #59656f;
+          align-items: center;
 
           font-size: 17px;
         }
 
-        .exampleArea {
-          margin-top: 9px;
-
-          padding: 10px 12px;
-
-          border-radius: 9px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #e0e4e7,
-              #f8f9fa
-            );
-
-          box-shadow:
-            inset 2px 2px 5px rgba(67,77,86,.09),
-            inset -2px -2px 5px rgba(255,255,255,.85);
+        .wordMain strong {
+          font-size: 19px;
         }
 
-        .englishExample {
-          color: #3e4c58;
+        .exampleBox {
+          margin-top: 8px;
 
-          font-family: "Times New Roman", serif;
+          padding: 10px;
+
+          border-radius: 7px;
+
+          background: rgba(255,255,255,.65);
+
+          border: 1px solid #c5c5c5;
+        }
+
+        .exampleEn {
+          font-style: italic;
 
           font-size: 16px;
-          font-style: italic;
+
           font-weight: 700;
         }
 
-        .uzbekExample {
-          margin-top: 3px;
+        .exampleUz {
+          margin-top: 4px;
 
-          color: #526f83;
+          color: #9b2525;
 
-          font-family: "Times New Roman", serif;
+          font-style: italic;
 
           font-size: 15px;
-          font-style: italic;
         }
 
-        /* =====================================================
-           RESPONSIVE
-        ===================================================== */
+        /* ========================================
+           MOBILE
+        ======================================== */
 
         @media (max-width: 760px) {
           .page {
-            padding: 16px 10px 40px;
+            padding: 10px 10px 50px;
           }
 
-          .topPanel {
-            padding: 14px;
+          .topBar {
+            padding: 12px;
           }
 
-          .adminBadge {
+          .brandButton {
+            font-size: 13px;
+          }
+
+          .topActions {
             display: none;
           }
 
-          .siteName {
-            font-size: 17px;
+          .adminBox {
+            margin-top: 55px;
+
+            padding:
+              40px 13px 20px;
           }
 
-          .siteSub {
-            font-size: 12px;
+          .adminTitle {
+            min-width: 190px;
+
+            font-size: 18px;
           }
 
-          .titleBlock h1 {
-            font-size: 29px;
-          }
-
-          .titleBlock p {
-            font-size: 14px;
-          }
-
-          .panel {
-            padding: 18px;
+          .innerCard {
+            padding: 17px;
           }
 
           .selectorGrid {
             grid-template-columns: 1fr;
           }
 
-          .controlRow {
+          .bottomRow {
             align-items: stretch;
           }
 
-          .stats {
-            width: 100%;
-
-            display: grid;
-
-            grid-template-columns:
-              repeat(2, 1fr);
-          }
-
-          .importButton {
+          .blueButton {
             width: 100%;
           }
 
-          textarea {
-            min-height: 240px;
-          }
-        }
-
-        @media (max-width: 470px) {
-          .logoMark {
-            width: 42px;
-            height: 42px;
-          }
-
-          .siteName {
-            font-size: 15px;
-          }
-
-          .titleBlock {
-            margin-top: 24px;
-          }
-
-          .titleBlock h1 {
-            font-size: 25px;
-          }
-
-          .panel h2 {
-            font-size: 23px;
-          }
-
-          .savedControls {
+          .savedButtons {
             width: 100%;
           }
 
-          .smallButton {
+          .savedButtons button {
             flex: 1;
           }
         }
