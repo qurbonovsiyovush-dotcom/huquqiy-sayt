@@ -3594,6 +3594,59 @@ function LearnContent() {
           }
         }
 
+
+        /* =====================================================
+           FINAL MOBILE TOOL BUTTON SIZE
+           Talaffuz + Qiyin so‘z telefonda kichik va markazda
+        ====================================================== */
+        @media (max-width: 640px) {
+          .wordTools {
+            width: auto !important;
+            max-width: none !important;
+            margin: 12px auto 0 !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            flex-wrap: nowrap !important;
+            gap: 10px !important;
+          }
+
+          .wordTools .toolButton {
+            flex: 0 0 132px !important;
+            width: 132px !important;
+            min-width: 132px !important;
+            max-width: 132px !important;
+            min-height: 32px !important;
+            height: 32px !important;
+            padding: 3px 6px !important;
+            font-size: 11px !important;
+            line-height: 1 !important;
+            border-radius: 7px !important;
+            border-width: 1.5px !important;
+            box-shadow:
+              inset 0 2px 2px rgba(255,255,255,.9),
+              inset 0 -2px 2px rgba(0,0,0,.08),
+              0 2px 0 #555d61 !important;
+          }
+        }
+
+        @media (max-width: 390px) {
+          .wordTools {
+            gap: 8px !important;
+          }
+
+          .wordTools .toolButton {
+            flex-basis: 118px !important;
+            width: 118px !important;
+            min-width: 118px !important;
+            max-width: 118px !important;
+            min-height: 30px !important;
+            height: 30px !important;
+            padding: 2px 4px !important;
+            font-size: 10px !important;
+          }
+        }
+
       `}</style>
     </main>
   );
