@@ -391,9 +391,18 @@ export default function DictionaryAdminPage() {
           `Book ${book}, Unit ${unit} uchun ${parsedWords.length} ta so‘z saqlandi.`
       );
 
-      setText("");
+      /*
+        POST javobining o‘zida yangi saqlangan words bor.
+        Blob'dan darhol qayta GET qilmaymiz.
+        Aks holda eski cached ma'lumot qaytishi mumkin.
+      */
+      setSavedWords(
+        Array.isArray(data.words)
+          ? data.words
+          : parsedWords
+      );
 
-      await loadWords();
+      setText("");
     } catch (err) {
       console.error(
         "Vocabulary import error:",
