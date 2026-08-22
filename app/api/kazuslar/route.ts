@@ -446,7 +446,13 @@ async function readAllCases(): Promise<
     undefined;
 
   do {
-    const result =
+    const result: {
+      blobs: Array<{
+        pathname: string;
+      }>;
+      hasMore: boolean;
+      cursor?: string;
+    } =
       await list({
         prefix:
           CASES_PREFIX,
