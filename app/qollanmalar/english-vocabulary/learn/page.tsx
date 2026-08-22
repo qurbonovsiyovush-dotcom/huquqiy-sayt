@@ -1800,12 +1800,6 @@ function LearnContent() {
           </button>
         </div>
 
-        <div className="directionHint">
-          {currentDirection === "en-uz"
-            ? "Inglizcha so‘zning o‘zbekcha ma’nosini toping"
-            : "O‘zbekcha ma’noning inglizcha so‘zini toping"}
-        </div>
-
         <div className="wordBox">
           {promptText}
         </div>
