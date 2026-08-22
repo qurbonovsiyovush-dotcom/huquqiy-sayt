@@ -1,4 +1,19 @@
-ocabularyWord = {
+"use client";
+
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { useSearchParams } from "next/navigation";
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type VocabularyWord = {
   word: string;
   translation: string;
   example?: string;
