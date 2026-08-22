@@ -509,6 +509,170 @@ export default function EnglishVocabularyPage() {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
+
+        /* =====================================================
+           MOBILE COMPACT — TELEFON UCHUN IXCHAM KO‘RINISH
+        ====================================================== */
+
+        @media (max-width: 640px) {
+          .page {
+            padding: 10px 8px 34px;
+          }
+
+          .shell {
+            width: 100%;
+          }
+
+          .guideBar {
+            min-height: 68px;
+            padding: 10px 12px;
+            margin-bottom: 22px;
+            border-radius: 18px;
+            border-width: 2px;
+
+            box-shadow:
+              inset 0 4px 4px rgba(255,255,255,.68),
+              inset 0 -4px 4px rgba(0,0,0,.10),
+              0 5px 0 #174d6d,
+              0 9px 12px rgba(0,0,0,.16);
+          }
+
+          .backButton {
+            width: auto;
+            min-width: 140px;
+            min-height: 40px;
+            padding: 7px 15px;
+            font-size: 13px;
+            border-radius: 8px;
+          }
+
+          .mainPanel,
+          .unitPanel {
+            margin-top: 55px;
+            padding: 48px 14px 22px;
+            border-radius: 18px;
+            border-width: 2px;
+
+            box-shadow:
+              inset 0 4px 4px rgba(255,255,255,.08),
+              inset 0 -5px 5px rgba(0,0,0,.18),
+              0 4px 0 #30373b,
+              0 8px 0 #242a2d,
+              0 12px 16px rgba(0,0,0,.18);
+          }
+
+          .unitPanel {
+            margin-top: 60px;
+            padding-top: 46px;
+          }
+
+          .floatingTitle {
+            top: -24px;
+            width: min(82%, 300px);
+            min-height: 46px;
+            padding: 7px 16px;
+            font-size: 22px;
+            border-width: 2px;
+            border-radius: 10px;
+
+            box-shadow:
+              inset 0 4px 4px rgba(255,255,255,.68),
+              inset 0 -4px 4px rgba(0,0,0,.12),
+              0 4px 0 #17415c,
+              0 7px 9px rgba(20,65,92,.20);
+          }
+
+          .unitFloatingTitle {
+            width: min(62%, 220px);
+            font-size: 20px;
+          }
+
+          .intro,
+          .unitIntro {
+            margin-bottom: 18px;
+          }
+
+          .intro h1,
+          .unitIntro h2 {
+            font-size: 21px;
+            line-height: 1.15;
+          }
+
+          .intro p,
+          .unitIntro p {
+            margin-top: 4px;
+            font-size: 13px;
+          }
+
+          .bookGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+
+          .bookCard {
+            min-height: 82px;
+            padding: 10px 8px;
+            gap: 3px;
+            border-radius: 11px;
+
+            box-shadow:
+              inset 0 5px 4px rgba(255,255,255,.92),
+              inset 0 -4px 4px rgba(0,0,0,.09),
+              0 4px 0 #596166,
+              0 7px 8px rgba(0,0,0,.14);
+          }
+
+          .bookName {
+            font-size: 19px;
+          }
+
+          .bookSub {
+            font-size: 11px;
+          }
+
+          .unitGrid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 11px 8px;
+          }
+
+          .unitButton {
+            min-height: 48px;
+            padding: 7px 4px;
+            font-size: 12px;
+            border-radius: 8px;
+            border-width: 1.5px;
+
+            box-shadow:
+              inset 0 4px 4px rgba(255,255,255,.92),
+              inset 0 -3px 3px rgba(0,0,0,.09),
+              0 3px 0 #596166,
+              0 5px 6px rgba(0,0,0,.13);
+          }
+        }
+
+        @media (max-width: 390px) {
+          .bookGrid {
+            gap: 10px;
+          }
+
+          .bookCard {
+            min-height: 74px;
+          }
+
+          .bookName {
+            font-size: 17px;
+          }
+
+          .unitGrid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .unitButton {
+            min-height: 46px;
+            font-size: 12px;
+          }
+        }
+
       `}</style>
     </main>
   );
