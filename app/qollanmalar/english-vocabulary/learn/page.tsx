@@ -475,12 +475,16 @@ function LearnContent() {
   }, [currentWord, words, learnMode]);
 
   const promptText =
-    currentDirection === "en-uz"
+    !currentWord
+      ? ""
+      : currentDirection === "en-uz"
       ? currentWord.word.toUpperCase()
       : currentWord.translation.toUpperCase();
 
   const correctCurrentAnswer =
-    currentDirection === "en-uz"
+    !currentWord
+      ? ""
+      : currentDirection === "en-uz"
       ? currentWord.translation
       : currentWord.word;
 
