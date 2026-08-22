@@ -526,9 +526,7 @@ export default function AdminRequestsPage() {
     try {
       const response =
         await fetch(
-          `/api/admin/codes/${encodeURIComponent(
-            id
-          )}`,
+          `/api/admin/codes?id=${encodeURIComponent(id)}`,
           {
             method:
               "DELETE",
