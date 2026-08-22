@@ -321,7 +321,7 @@ function LearnContent() {
 
         const response =
           await fetch(
-            `/api/vocabulary?book=${book}&unit=${unit}`,
+            `/api/vocabulary?book=${book}&unit=${unit}&t=${Date.now()}`,
             {
               method: "GET",
               cache: "no-store",
@@ -345,22 +345,33 @@ function LearnContent() {
           Array.isArray(
             data.words
           )
-            ? data.words
+            ? data.words.map(
+                (
+                  item:
+                    VocabularyWord
+                ) => ({
+                  word:
+                    String(
+                      item.word ?? ""
+                    ).trim(),
+
+                  translation:
+                    String(
+                      item.translation ?? ""
+                    ).trim(),
+
+                  example:
+                    String(
+                      item.example ?? ""
+                    ).trim(),
+
+                  exampleTranslation:
+                    String(
+                      item.exampleTranslation ?? ""
+                    ).trim(),
+                })
+              )
             : [];
-
-        console.log(
-          "DEBUG WORDS:",
-          loadedWords
-        );
-
-        if (
-          loadedWords.length > 0
-        ) {
-          console.log(
-            "DEBUG FIRST WORD:",
-            loadedWords[0]
-          );
-        }
 
         if (
           loadedWords.length < 2
@@ -1664,6 +1675,29 @@ function LearnContent() {
           className="wordBox"
         >
           {currentWord.word.toUpperCase()}
+        </div>
+
+        <div
+          style={{
+            width: "min(900px, 96%)",
+            marginTop: "14px",
+            padding: "12px 16px",
+            border: "2px dashed #b42318",
+            borderRadius: "12px",
+            background: "#fff4f2",
+            color: "#7a271a",
+            fontFamily: "Arial, sans-serif",
+            fontSize: "14px",
+            lineHeight: 1.55,
+            wordBreak: "break-word",
+          }}
+        >
+          <strong>DEBUG:</strong>{" "}
+          word={currentWord.word} |{" "}
+          example={currentWord.example || "YO‘Q"} |{" "}
+          exampleTranslation={
+            currentWord.exampleTranslation || "YO‘Q"
+          } | words={words.length} | queue={queue.length}
         </div>
 
         {/* TOOLS */}
