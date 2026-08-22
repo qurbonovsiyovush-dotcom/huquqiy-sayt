@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import "./page.module.css";
+import "./home.css";
 
 type UserRole = "admin" | "user" | null;
 
