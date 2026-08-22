@@ -26,6 +26,8 @@ type VocabularyResponse = {
   words?: VocabularyWord[];
 };
 
+type LearnMode = "en-uz" | "uz-en" | "mixed";
+
 type ExampleData = {
   english: string;
   uzbek: string;
@@ -308,6 +310,15 @@ function LearnContent() {
   ] =
     useState(false);
 
+  const [learnMode, setLearnMode] =
+    useState<LearnMode>("en-uz");
+
+  const [
+    currentDirection,
+    setCurrentDirection,
+  ] =
+    useState<"en-uz" | "uz-en">("en-uz");
+
   /* =======================================================
      API DAN SO‘ZLARNI OLISH
   ======================================================= */
@@ -410,65 +421,68 @@ function LearnContent() {
     ];
 
   /* =======================================================
-     2 TA VARIANT TAYYORLASH
+     YO‘NALISH + 2 TA VARIANT TAYYORLASH
   ======================================================= */
 
   useEffect(() => {
-    if (
-      !currentWord ||
-      words.length < 2
-    ) {
-      return;
-    }
+    if (!currentWord || words.length < 2) return;
 
-    const wrongCandidates =
-      words.filter(
-        (
-          item:
-            VocabularyWord
-        ) =>
-          item.translation !==
-          currentWord.translation
-      );
+    const direction: "en-uz" | "uz-en" =
+      learnMode === "mixed"
+        ? Math.random() < 0.5
+          ? "en-uz"
+          : "uz-en"
+        : learnMode;
 
-    if (
-      wrongCandidates.length ===
-      0
-    ) {
-      return;
-    }
+    setCurrentDirection(direction);
+
+    const correctAnswer =
+      direction === "en-uz"
+        ? currentWord.translation
+        : currentWord.word;
+
+    const wrongCandidates = words.filter((item) => {
+      const candidateAnswer =
+        direction === "en-uz"
+          ? item.translation
+          : item.word;
+
+      return candidateAnswer !== correctAnswer;
+    });
+
+    if (wrongCandidates.length === 0) return;
 
     const randomWrong =
       wrongCandidates[
-        Math.floor(
-          Math.random() *
-            wrongCandidates.length
-        )
+        Math.floor(Math.random() * wrongCandidates.length)
       ];
 
     const wrongAnswer =
-      randomWrong.translation;
+      direction === "en-uz"
+        ? randomWrong.translation
+        : randomWrong.word;
 
     setOptions(
       shuffleArray([
-        currentWord.translation,
+        correctAnswer,
         wrongAnswer,
       ])
     );
 
     setShowExample(false);
+    setSelectedAnswer(null);
+    setAnswerState(null);
+  }, [currentWord, words, learnMode]);
 
-    setSelectedAnswer(
-      null
-    );
+  const promptText =
+    currentDirection === "en-uz"
+      ? currentWord.word.toUpperCase()
+      : currentWord.translation.toUpperCase();
 
-    setAnswerState(
-      null
-    );
-  }, [
-    currentWord,
-    words,
-  ]);
+  const correctCurrentAnswer =
+    currentDirection === "en-uz"
+      ? currentWord.translation
+      : currentWord.word;
 
   /* =======================================================
      MISOL GAP
@@ -711,7 +725,7 @@ function LearnContent() {
 
     const isCorrect =
       answer ===
-      currentWord.translation;
+      correctCurrentAnswer;
 
     if (
       isCorrect
@@ -904,6 +918,25 @@ function LearnContent() {
     );
   }
 
+  function changeLearnMode(mode: LearnMode) {
+    setLearnMode(mode);
+
+    const baseWords = isReviewMode
+      ? words.filter((word) =>
+          difficultWords.includes(getWordKey(word))
+        )
+      : words;
+
+    setQueue(shuffleArray(baseWords));
+    setCurrentIndex(0);
+    setCorrectCount(0);
+    setWrongCount(0);
+    setFinished(false);
+    setShowExample(false);
+    setSelectedAnswer(null);
+    setAnswerState(null);
+  }
+
   /* =======================================================
      LOADING
   ======================================================= */
@@ -1085,6 +1118,14 @@ function LearnContent() {
 
             {isReviewMode &&
               " • Qiyin so‘zlar"}
+
+            {" • "}
+
+            {learnMode === "en-uz"
+              ? "English → Uzbek"
+              : learnMode === "uz-en"
+              ? "Uzbek → English"
+              : "Aralash"}
           </div>
 
           <h1>
@@ -1729,10 +1770,40 @@ function LearnContent() {
             SO‘Z
         ================================================= */}
 
-        <div
-          className="wordBox"
-        >
-          {currentWord.word.toUpperCase()}
+        <div className="modeSwitch">
+          <button
+            type="button"
+            className={learnMode === "en-uz" ? "modeButton modeActive" : "modeButton"}
+            onClick={() => changeLearnMode("en-uz")}
+          >
+            English → Uzbek
+          </button>
+
+          <button
+            type="button"
+            className={learnMode === "uz-en" ? "modeButton modeActive" : "modeButton"}
+            onClick={() => changeLearnMode("uz-en")}
+          >
+            Uzbek → English
+          </button>
+
+          <button
+            type="button"
+            className={learnMode === "mixed" ? "modeButton modeActive" : "modeButton"}
+            onClick={() => changeLearnMode("mixed")}
+          >
+            Aralash
+          </button>
+        </div>
+
+        <div className="directionHint">
+          {currentDirection === "en-uz"
+            ? "Inglizcha so‘zning o‘zbekcha ma’nosini toping"
+            : "O‘zbekcha ma’noning inglizcha so‘zini toping"}
+        </div>
+
+        <div className="wordBox">
+          {promptText}
         </div>
 
         {/* =================================================
@@ -1745,8 +1816,12 @@ function LearnContent() {
           <button
             type="button"
             className="toolButton"
-            onClick={
-              speakWord
+            onClick={speakWord}
+            disabled={currentDirection === "uz-en"}
+            title={
+              currentDirection === "uz-en"
+                ? "Javobni oldindan aytib qo‘ymaslik uchun talaffuz o‘chirilgan."
+                : "So‘zni tinglash"
             }
           >
             🔊 Talaffuz
@@ -1841,7 +1916,7 @@ function LearnContent() {
             ) => {
               const isCorrect =
                 answer ===
-                currentWord.translation;
+                correctCurrentAnswer;
 
               const isSelected =
                 selectedAnswer ===
@@ -2143,6 +2218,50 @@ function LearnContent() {
             center;
         }
 
+        /* ================= MODE SWITCH ================= */
+
+        .modeSwitch {
+          display: flex;
+          justify-content: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          margin-bottom: 18px;
+        }
+
+        .modeButton {
+          min-width: 180px;
+          min-height: 46px;
+          padding: 10px 18px;
+          border: 2px solid #51585c;
+          border-radius: 11px;
+          background: linear-gradient(180deg, #ffffff, #d7d7d7);
+          box-shadow: inset 0 4px 4px rgba(255,255,255,.95), 0 4px 0 #555d61;
+          color: #222;
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .modeButton:hover {
+          transform: translateY(-2px);
+        }
+
+        .modeActive {
+          color: #073b68;
+          border-color: #174461;
+          background: linear-gradient(180deg, #b8ecff, #58a8d7);
+          box-shadow: inset 0 4px 4px rgba(255,255,255,.82), 0 4px 0 #17415c;
+        }
+
+        .directionHint {
+          margin-bottom: 13px;
+          color: #596b78;
+          font-size: 17px;
+          font-weight: 700;
+          text-align: center;
+        }
+
         /* ================= WORD ================= */
 
         .wordBox {
@@ -2324,6 +2443,13 @@ function LearnContent() {
             translateY(
               2px
             );
+        }
+
+        .toolButton:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+          transform: none;
+          filter: none;
         }
 
         .difficultActive {
@@ -2842,6 +2968,15 @@ function LearnContent() {
           .learnArea {
             margin-top:
               30px;
+          }
+
+          .modeSwitch {
+            width: 100%;
+          }
+
+          .modeButton {
+            min-width: 0;
+            flex: 1 1 160px;
           }
 
           .answers {
