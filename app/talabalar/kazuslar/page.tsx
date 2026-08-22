@@ -52,6 +52,10 @@ export default function KazuslarPage() {
 
   const [search, setSearch] = useState("");
 
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfMessage, setPdfMessage] = useState("");
+
   useEffect(() => {
     loadRole();
     loadCases();
@@ -151,7 +155,74 @@ export default function KazuslarPage() {
 
   function openUploadMode() {
     setSaveMessage("");
+    setPdfFile(null);
+    setPdfMessage("");
     setMode("upload");
+  }
+
+  async function uploadPdf() {
+    if (role !== "admin") {
+      setPdfMessage("❌ PDF yuklash faqat administrator uchun.");
+      return;
+    }
+
+    if (!pdfFile) {
+      setPdfMessage("❌ Avval PDF faylni tanlang.");
+      return;
+    }
+
+    if (
+      pdfFile.type !== "application/pdf" &&
+      !pdfFile.name.toLowerCase().endsWith(".pdf")
+    ) {
+      setPdfMessage("❌ Faqat PDF fayl yuklash mumkin.");
+      return;
+    }
+
+    if (pdfFile.size > 10 * 1024 * 1024) {
+      setPdfMessage("❌ PDF hajmi 10 MB dan oshmasligi kerak.");
+      return;
+    }
+
+    try {
+      setPdfUploading(true);
+      setPdfMessage("");
+
+      const formData = new FormData();
+      formData.append("file", pdfFile);
+
+      const response = await fetch("/api/kazuslar/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || data.message || "PDF faylni yuklab bo‘lmadi."
+        );
+      }
+
+      setPdfMessage("✅ PDF muvaffaqiyatli yuklandi.");
+      setPdfFile(null);
+
+      window.setTimeout(() => {
+        setPdfMessage("");
+        setMode("list");
+      }, 1000);
+    } catch (error) {
+      console.error("PDF UPLOAD ERROR:", error);
+
+      setPdfMessage(
+        error instanceof Error
+          ? `❌ ${error.message}`
+          : "❌ PDF yuklashda xatolik yuz berdi."
+      );
+    } finally {
+      setPdfUploading(false);
+    }
   }
 
   function addQuestion() {
@@ -545,21 +616,50 @@ export default function KazuslarPage() {
             </p>
 
             <p className="comingSoon">
-              PDF saqlash API’sini keyingi bosqichda ulaymiz.
+              Faqat PDF formatidagi, 10 MB gacha bo‘lgan fayl yuklang.
             </p>
 
             <input
               className="fileInput"
               type="file"
               accept=".pdf,application/pdf"
+              disabled={pdfUploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setPdfFile(file);
+                setPdfMessage("");
+              }}
             />
+
+            {pdfFile && (
+              <p>
+                <strong>Tanlangan fayl:</strong> {pdfFile.name}
+              </p>
+            )}
+
+            {pdfMessage && (
+              <div
+                className={
+                  pdfMessage.startsWith("✅")
+                    ? "successBox"
+                    : "errorBox"
+                }
+              >
+                {pdfMessage}
+              </div>
+            )}
           </div>
 
           <div className="bottomButtons">
             <button
               className="cancelButton"
               type="button"
-              onClick={() => setMode("list")}
+              onClick={() => {
+                setPdfFile(null);
+                setPdfMessage("");
+                setMode("list");
+              }}
+              disabled={pdfUploading}
             >
               Bekor qilish
             </button>
@@ -567,11 +667,10 @@ export default function KazuslarPage() {
             <button
               className="saveButton"
               type="button"
-              onClick={() => {
-                alert("PDF yuklash keyingi bosqichda ulanadi.");
-              }}
+              onClick={uploadPdf}
+              disabled={pdfUploading || !pdfFile}
             >
-              PDF yuklash
+              {pdfUploading ? "PDF yuklanmoqda..." : "PDF yuklash"}
             </button>
           </div>
         </section>
