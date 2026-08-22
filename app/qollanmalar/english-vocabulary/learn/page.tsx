@@ -3537,6 +3537,63 @@ function LearnContent() {
           }
         }
 
+
+        @media (max-width: 640px) {
+          .wordTools {
+            width: min(92%, 420px);
+            margin-top: 12px;
+            gap: 8px;
+          }
+
+          .toolButton {
+            min-height: 34px;
+            padding: 5px 6px;
+            font-size: 12px;
+            border-radius: 7px;
+            border-width: 1.5px;
+
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.9),
+              0 2px 0 #555d61;
+          }
+
+          .exampleArea {
+            min-height: 68px;
+            margin-top: 8px;
+          }
+
+          .exampleButton {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 13px;
+          }
+
+          .laterButton {
+            margin-top: 14px;
+            padding: 6px 12px;
+            font-size: 11px;
+            border-radius: 12px;
+          }
+        }
+
+        @media (max-width: 390px) {
+          .toolButton {
+            min-height: 32px;
+            padding: 4px 5px;
+            font-size: 11px;
+          }
+
+          .exampleButton {
+            padding: 5px 10px;
+            font-size: 11px;
+          }
+
+          .laterButton {
+            padding: 5px 10px;
+            font-size: 10px;
+          }
+        }
+
       `}</style>
     </main>
   );
