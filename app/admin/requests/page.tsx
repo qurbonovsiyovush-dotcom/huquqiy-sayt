@@ -53,6 +53,15 @@ type HistoryItem = {
   date?: string;
 };
 
+type ActiveSection =
+  | "search"
+  | "new-code"
+  | "codes"
+  | "requests"
+  | "approved"
+  | "rejected"
+  | null;
+
 /* =========================================================
    PAGE
 ========================================================= */
@@ -84,9 +93,17 @@ export default function AdminRequestsPage() {
   const [workingId, setWorkingId] =
     useState<string | null>(null);
 
-  /* =======================================================
+  const [
+    activeSection,
+    setActiveSection,
+  ] =
+    useState<ActiveSection>(
+      null
+    );
+
+  /* =========================================================
      JSON
-  ======================================================= */
+  ========================================================= */
 
   async function readJson(
     response: Response
@@ -98,9 +115,9 @@ export default function AdminRequestsPage() {
     }
   }
 
-  /* =======================================================
+  /* =========================================================
      KODLARNI YUKLASH
-  ======================================================= */
+  ========================================================= */
 
   const loadCodes =
     useCallback(async () => {
@@ -146,9 +163,9 @@ export default function AdminRequestsPage() {
       }
     }, []);
 
-  /* =======================================================
+  /* =========================================================
      SO‘ROVLARNI YUKLASH
-  ======================================================= */
+  ========================================================= */
 
   const loadRequests =
     useCallback(async () => {
@@ -194,9 +211,9 @@ export default function AdminRequestsPage() {
       }
     }, []);
 
-  /* =======================================================
+  /* =========================================================
      TARIXNI YUKLASH
-  ======================================================= */
+  ========================================================= */
 
   const loadHistory =
     useCallback(async () => {
@@ -240,9 +257,9 @@ export default function AdminRequestsPage() {
       }
     }, []);
 
-  /* =======================================================
-     REFRESH
-  ======================================================= */
+  /* =========================================================
+     HAMMASINI YANGILASH
+  ========================================================= */
 
   const refreshAll =
     useCallback(async () => {
@@ -267,11 +284,13 @@ export default function AdminRequestsPage() {
     }
 
     start();
-  }, [refreshAll]);
+  }, [
+    refreshAll,
+  ]);
 
-  /* =======================================================
-     YANGI KOD
-  ======================================================= */
+  /* =========================================================
+     YANGI KOD YARATISH
+  ========================================================= */
 
   async function createCode() {
     const cleanName =
@@ -292,7 +311,8 @@ export default function AdminRequestsPage() {
         await fetch(
           "/api/admin/codes",
           {
-            method: "POST",
+            method:
+              "POST",
 
             headers: {
               "Content-Type":
@@ -327,6 +347,9 @@ export default function AdminRequestsPage() {
 
       await refreshAll();
 
+      window.alert(
+        "Maxsus kirish kodi yaratildi."
+      );
     } catch (error) {
       console.error(
         "Kod yaratish xatosi:",
@@ -336,15 +359,14 @@ export default function AdminRequestsPage() {
       window.alert(
         "Kod yaratishda server xatosi."
       );
-
     } finally {
       setCreating(false);
     }
   }
 
-  /* =======================================================
+  /* =========================================================
      QABUL / RAD
-  ======================================================= */
+  ========================================================= */
 
   async function requestAction(
     id: string,
@@ -352,14 +374,17 @@ export default function AdminRequestsPage() {
       | "approve"
       | "reject"
   ) {
-    setWorkingId(id);
+    setWorkingId(
+      id
+    );
 
     try {
       const response =
         await fetch(
           "/api/admin/requests",
           {
-            method: "POST",
+            method:
+              "POST",
 
             headers: {
               "Content-Type":
@@ -392,15 +417,21 @@ export default function AdminRequestsPage() {
       }
 
       await refreshAll();
-
+    } catch (error) {
+      console.error(
+        "Request action error:",
+        error
+      );
     } finally {
-      setWorkingId(null);
+      setWorkingId(
+        null
+      );
     }
   }
 
-  /* =======================================================
+  /* =========================================================
      RUXSATNI BEKOR QILISH
-  ======================================================= */
+  ========================================================= */
 
   async function revokeAccess(
     id: string
@@ -414,14 +445,17 @@ export default function AdminRequestsPage() {
       return;
     }
 
-    setWorkingId(id);
+    setWorkingId(
+      id
+    );
 
     try {
       const response =
         await fetch(
           "/api/admin/requests",
           {
-            method: "POST",
+            method:
+              "POST",
 
             headers: {
               "Content-Type":
@@ -455,15 +489,21 @@ export default function AdminRequestsPage() {
       }
 
       await refreshAll();
-
+    } catch (error) {
+      console.error(
+        "Revoke error:",
+        error
+      );
     } finally {
-      setWorkingId(null);
+      setWorkingId(
+        null
+      );
     }
   }
 
-  /* =======================================================
+  /* =========================================================
      BUTUNLAY O‘CHIRISH
-  ======================================================= */
+  ========================================================= */
 
   async function deleteUser(
     id: string
@@ -479,7 +519,9 @@ export default function AdminRequestsPage() {
       return;
     }
 
-    setWorkingId(id);
+    setWorkingId(
+      id
+    );
 
     try {
       const response =
@@ -514,38 +556,55 @@ export default function AdminRequestsPage() {
       }
 
       setCodes(
-        (current) =>
+        (
+          current
+        ) =>
           current.filter(
-            (item) =>
-              item.id !== id
+            (
+              item
+            ) =>
+              item.id !==
+              id
           )
       );
 
       setRequests(
-        (current) =>
+        (
+          current
+        ) =>
           current.filter(
-            (item) =>
-              item.id !== id
+            (
+              item
+            ) =>
+              item.id !==
+              id
           )
       );
 
       await refreshAll();
-
+    } catch (error) {
+      console.error(
+        "Delete error:",
+        error
+      );
     } finally {
-      setWorkingId(null);
+      setWorkingId(
+        null
+      );
     }
   }
 
-  /* =======================================================
+  /* =========================================================
      LOGOUT
-  ======================================================= */
+  ========================================================= */
 
   async function logout() {
     try {
       await fetch(
         "/api/logout",
         {
-          method: "POST",
+          method:
+            "POST",
         }
       );
     } finally {
@@ -557,9 +616,9 @@ export default function AdminRequestsPage() {
     }
   }
 
-  /* =======================================================
+  /* =========================================================
      SEARCH
-  ======================================================= */
+  ========================================================= */
 
   const searchText =
     search
@@ -572,7 +631,9 @@ export default function AdminRequestsPage() {
       code?: string;
     }
   ) {
-    if (!searchText) {
+    if (
+      !searchText
+    ) {
       return true;
     }
 
@@ -611,7 +672,9 @@ export default function AdminRequestsPage() {
     useMemo(
       () =>
         requests.filter(
-          (item) =>
+          (
+            item
+          ) =>
             !item.approved &&
             matchesSearch(
               item
@@ -627,40 +690,52 @@ export default function AdminRequestsPage() {
     useMemo(
       () =>
         filteredCodes.filter(
-          (item) =>
+          (
+            item
+          ) =>
             item.approved ===
               true &&
             item.active !==
               false
         ),
-      [filteredCodes]
+      [
+        filteredCodes,
+      ]
     );
 
   const rejectedCodes =
     useMemo(
       () =>
         filteredCodes.filter(
-          (item) =>
+          (
+            item
+          ) =>
             Boolean(
               item.rejectedAt
             )
         ),
-      [filteredCodes]
+      [
+        filteredCodes,
+      ]
     );
 
-  /* =======================================================
+  /* =========================================================
      DATE
-  ======================================================= */
+  ========================================================= */
 
   function formatDate(
-    value?: string | null
+    value?:
+      | string
+      | null
   ) {
     if (!value) {
       return "—";
     }
 
     const date =
-      new Date(value);
+      new Date(
+        value
+      );
 
     if (
       Number.isNaN(
@@ -675,50 +750,98 @@ export default function AdminRequestsPage() {
     );
   }
 
-  /* =======================================================
-     SCROLL
-  ======================================================= */
+  /* =========================================================
+     BO‘LIMNI OCHISH
+  ========================================================= */
 
-  function goToSection(
-    id: string
+  function openSection(
+    section:
+      ActiveSection
   ) {
-    document
-      .getElementById(id)
-      ?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+    setActiveSection(
+      section
+    );
+
+    window.setTimeout(
+      () => {
+        document
+          .getElementById(
+            "active-content"
+          )
+          ?.scrollIntoView({
+            behavior:
+              "smooth",
+
+            block:
+              "start",
+          });
+      },
+      80
+    );
   }
 
-  /* =======================================================
+  function closeSection() {
+    setActiveSection(
+      null
+    );
+
+    window.setTimeout(
+      () => {
+        document
+          .getElementById(
+            "management"
+          )
+          ?.scrollIntoView({
+            behavior:
+              "smooth",
+
+            block:
+              "start",
+          });
+      },
+      50
+    );
+  }
+
+  /* =========================================================
      JSX
-  ======================================================= */
+  ========================================================= */
 
   return (
     <main className="page">
 
-      {/* ===================================================
-          HEADER
-      =================================================== */}
+      {/* =====================================================
+          TOP HEADER
+      ===================================================== */}
 
       <header className="topPanel">
 
-        <div className="namePlate">
+        <button
+          type="button"
+          className="namePlate"
+          onClick={() =>
+            router.push("/")
+          }
+        >
           Qurbonov Siyovush Jamaliddinzoda
-        </div>
+        </button>
 
         <div className="topButtons">
 
           <button
+            type="button"
             className="topButton"
             onClick={() =>
-              router.push("/admin")
+              router.push(
+                "/admin"
+              )
             }
           >
             Admin panel
           </button>
 
           <button
+            type="button"
             className="topButton"
             onClick={() =>
               router.push("/")
@@ -728,8 +851,11 @@ export default function AdminRequestsPage() {
           </button>
 
           <button
+            type="button"
             className="exitButton"
-            onClick={logout}
+            onClick={
+              logout
+            }
           >
             Chiqish
           </button>
@@ -738,13 +864,13 @@ export default function AdminRequestsPage() {
 
       </header>
 
-      {/* ===================================================
-          TITLE
-      =================================================== */}
+      {/* =====================================================
+          PAGE TITLE
+      ===================================================== */}
 
-      <section className="adminHero">
+      <section className="heroPanel">
 
-        <div className="sectionTitle">
+        <div className="floatingTitle">
           Foydalanuvchilar
         </div>
 
@@ -753,38 +879,45 @@ export default function AdminRequestsPage() {
           ruxsatlarini boshqarish
         </h1>
 
+        <p>
+          Kerakli boshqaruv bo‘limini
+          tanlang.
+        </p>
+
       </section>
 
-      {/* ===================================================
-          6 TA 3D BLOK
-      =================================================== */}
+      {/* =====================================================
+          6 TA BOSHQARUV KARTASI
+      ===================================================== */}
 
-      <section className="dashboardBox">
+      <section
+        className="managementPanel"
+        id="management"
+      >
 
-        <div className="dashboardTitle">
+        <div className="floatingTitle">
           Boshqaruv bo‘limlari
         </div>
 
-        <div className="dashboardGrid">
+        <div className="managementGrid">
 
-          {/* 1 */}
-
-          <div className="dashboardCard">
+          <div className="managementCard">
 
             <h2>
               Qidiruv
             </h2>
 
             <p>
-              Foydalanuvchini ism yoki
-              maxsus kod orqali topish.
+              Ism yoki maxsus kod orqali
+              foydalanuvchini topish.
             </p>
 
             <button
-              className="blueButton dashboardButton"
+              type="button"
+              className="openButton"
               onClick={() =>
-                goToSection(
-                  "search-section"
+                openSection(
+                  "search"
                 )
               }
             >
@@ -793,9 +926,7 @@ export default function AdminRequestsPage() {
 
           </div>
 
-          {/* 2 */}
-
-          <div className="dashboardCard">
+          <div className="managementCard">
 
             <h2>
               Yangi kirish kodi
@@ -807,10 +938,11 @@ export default function AdminRequestsPage() {
             </p>
 
             <button
-              className="blueButton dashboardButton"
+              type="button"
+              className="openButton"
               onClick={() =>
-                goToSection(
-                  "new-code-section"
+                openSection(
+                  "new-code"
                 )
               }
             >
@@ -819,9 +951,7 @@ export default function AdminRequestsPage() {
 
           </div>
 
-          {/* 3 */}
-
-          <div className="dashboardCard">
+          <div className="managementCard">
 
             <h2>
               Yaratilgan kodlar
@@ -833,10 +963,11 @@ export default function AdminRequestsPage() {
             </p>
 
             <button
-              className="blueButton dashboardButton"
+              type="button"
+              className="openButton"
               onClick={() =>
-                goToSection(
-                  "codes-section"
+                openSection(
+                  "codes"
                 )
               }
             >
@@ -845,24 +976,23 @@ export default function AdminRequestsPage() {
 
           </div>
 
-          {/* 4 */}
-
-          <div className="dashboardCard">
+          <div className="managementCard">
 
             <h2>
               Kirish so‘rovlari
             </h2>
 
             <p>
-              Foydalanuvchilarning
-              kutilayotgan so‘rovlarini boshqarish.
+              Kutilayotgan kirish
+              so‘rovlarini boshqarish.
             </p>
 
             <button
-              className="blueButton dashboardButton"
+              type="button"
+              className="openButton"
               onClick={() =>
-                goToSection(
-                  "requests-section"
+                openSection(
+                  "requests"
                 )
               }
             >
@@ -871,9 +1001,7 @@ export default function AdminRequestsPage() {
 
           </div>
 
-          {/* 5 */}
-
-          <div className="dashboardCard">
+          <div className="managementCard">
 
             <h2>
               Ruxsat berilganlar
@@ -885,10 +1013,11 @@ export default function AdminRequestsPage() {
             </p>
 
             <button
-              className="blueButton dashboardButton"
+              type="button"
+              className="openButton"
               onClick={() =>
-                goToSection(
-                  "approved-section"
+                openSection(
+                  "approved"
                 )
               }
             >
@@ -897,24 +1026,23 @@ export default function AdminRequestsPage() {
 
           </div>
 
-          {/* 6 */}
-
-          <div className="dashboardCard">
+          <div className="managementCard">
 
             <h2>
               Rad etilganlar
             </h2>
 
             <p>
-              Kirish so‘rovi rad
-              etilgan foydalanuvchilar.
+              Kirish so‘rovi rad etilgan
+              foydalanuvchilar.
             </p>
 
             <button
-              className="blueButton dashboardButton"
+              type="button"
+              className="openButton"
               onClick={() =>
-                goToSection(
-                  "rejected-section"
+                openSection(
+                  "rejected"
                 )
               }
             >
@@ -927,664 +1055,712 @@ export default function AdminRequestsPage() {
 
       </section>
 
-      {/* ===================================================
-          QIDIRUV
-      =================================================== */}
+      {/* =====================================================
+          ACTIVE CONTENT
+      ===================================================== */}
 
-      <section
-        className="sectionBox"
-        id="search-section"
-      >
+      {activeSection && (
 
-        <div className="sectionTitle">
-          Qidiruv
-        </div>
+        <section
+          className="contentPanel"
+          id="active-content"
+        >
 
-        <div className="metalInner">
+          <button
+            type="button"
+            className="backButton"
+            onClick={
+              closeSection
+            }
+          >
+            ← Boshqaruv bo‘limlariga qaytish
+          </button>
 
-          <div className="searchWrapper">
+          {/* =================================================
+              QIDIRUV
+          ================================================= */}
 
-            <span className="searchIcon">
-              🔎
-            </span>
+          {activeSection ===
+            "search" && (
 
-            <input
-              className="searchInput"
-              type="text"
-              value={search}
-              onChange={(e) =>
-                setSearch(
-                  e.target.value
-                )
-              }
-              placeholder="Ism yoki maxsus kod bo‘yicha qidirish..."
-            />
+            <>
 
-            {search && (
-              <button
-                className="searchX"
-                onClick={() =>
-                  setSearch("")
-                }
-              >
-                ×
-              </button>
-            )}
-
-          </div>
-
-          {search.trim() && (
-
-            <div className="searchResults">
-
-              <div className="searchResultCount">
-
-                {filteredCodes.length > 0
-                  ? `${filteredCodes.length} ta natija topildi`
-                  : "Natija topilmadi"}
-
+              <div className="contentTitle">
+                Qidiruv
               </div>
 
-              {filteredCodes.length > 0 && (
+              <div className="innerPanel">
 
-                <div className="searchResultGrid">
+                <div className="searchWrapper">
 
-                  {filteredCodes.map(
-                    (item) => (
+                  <input
+                    type="text"
+                    className="searchInput"
+                    value={
+                      search
+                    }
+                    onChange={(
+                      e
+                    ) =>
+                      setSearch(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Ism yoki maxsus kod bo‘yicha qidirish..."
+                  />
 
-                      <article
-                        className="searchResultCard"
-                        key={item.id}
-                      >
+                  {search && (
 
-                        <button
-                          className="deleteX"
-                          title="Butunlay o‘chirish"
-                          disabled={
-                            workingId ===
-                            item.id
-                          }
-                          onClick={() =>
-                            deleteUser(
-                              item.id
-                            )
-                          }
-                        >
-                          ×
-                        </button>
+                    <button
+                      type="button"
+                      className="clearButton"
+                      onClick={() =>
+                        setSearch("")
+                      }
+                    >
+                      ×
+                    </button>
 
-                        <h3>
-                          {item.name}
-                        </h3>
-
-                        <div className="codeText">
-                          {item.code}
-                        </div>
-
-                        <div className="searchStatus">
-
-                          {item.approved &&
-                          item.active !==
-                            false
-                            ? "✓ Ruxsat berilgan"
-                            : item.rejectedAt
-                            ? "✕ Rad etilgan"
-                            : item.requestedAt
-                            ? "⏳ Ruxsat kutilmoqda"
-                            : "Hali so‘rov yubormagan"}
-
-                        </div>
-
-                        <small>
-                          Yaratilgan:{" "}
-                          {formatDate(
-                            item.createdAt
-                          )}
-                        </small>
-
-                      </article>
-
-                    )
                   )}
 
                 </div>
 
-              )}
+                {!search.trim() ? (
 
-            </div>
+                  <div className="empty">
+                    Qidirish uchun ism yoki
+                    maxsus kod kiriting.
+                  </div>
 
-          )}
+                ) : filteredCodes.length ===
+                  0 ? (
 
-        </div>
+                  <div className="empty">
+                    Natija topilmadi.
+                  </div>
 
-      </section>
+                ) : (
 
-      {/* ===================================================
-          YANGI KOD
-      =================================================== */}
+                  <div className="userGrid">
 
-      <section
-        className="sectionBox"
-        id="new-code-section"
-      >
+                    {filteredCodes.map(
+                      (
+                        item
+                      ) => (
 
-        <div className="sectionTitle">
-          Yangi kirish kodi
-        </div>
-
-        <div className="metalInner">
-
-          <div className="createRow">
-
-            <div className="inputGroup">
-
-              <label>
-                Foydalanuvchi ismi
-              </label>
-
-              <input
-                value={name}
-                onChange={(e) =>
-                  setName(
-                    e.target.value
-                  )
-                }
-                placeholder="Masalan: Ali Valiyev"
-              />
-
-            </div>
-
-            <button
-              className="blueButton"
-              onClick={createCode}
-              disabled={creating}
-            >
-              {creating
-                ? "Yaratilmoqda..."
-                : "Maxsus kod yaratish"}
-            </button>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* ===================================================
-          YARATILGAN KODLAR
-      =================================================== */}
-
-      <section
-        className="sectionBox"
-        id="codes-section"
-      >
-
-        <div className="sectionTitle">
-          Yaratilgan kodlar
-        </div>
-
-        <div className="metalInner">
-
-          {loading ? (
-
-            <div className="empty">
-              Yuklanmoqda...
-            </div>
-
-          ) : codes.length === 0 ? (
-
-            <div className="empty">
-              Yaratilgan kod yo‘q.
-            </div>
-
-          ) : (
-
-            <div className="twoRowScroll">
-
-              <div className="cardsGrid">
-
-                {codes.map(
-                  (item) => (
-
-                    <article
-                      className="userCard"
-                      key={item.id}
-                    >
-
-                      <button
-                        className="deleteX"
-                        title="Butunlay o‘chirish"
-                        disabled={
-                          workingId ===
-                          item.id
-                        }
-                        onClick={() =>
-                          deleteUser(
+                        <article
+                          className="userCard"
+                          key={
                             item.id
-                          )
-                        }
-                      >
-                        ×
-                      </button>
+                          }
+                        >
 
-                      <h3>
-                        {item.name}
-                      </h3>
+                          <button
+                            type="button"
+                            className="deleteButton"
+                            disabled={
+                              workingId ===
+                              item.id
+                            }
+                            onClick={() =>
+                              deleteUser(
+                                item.id
+                              )
+                            }
+                          >
+                            ×
+                          </button>
 
-                      <div className="codeText">
-                        {item.code}
-                      </div>
+                          <h3>
+                            {
+                              item.name
+                            }
+                          </h3>
 
-                      <small>
-                        Yaratilgan:{" "}
-                        {formatDate(
-                          item.createdAt
-                        )}
-                      </small>
+                          <div className="codeText">
+                            {
+                              item.code
+                            }
+                          </div>
 
-                      {!item.approved && (
-                        <div className="statusBox">
+                          <div className="statusText">
 
-                          {item.rejectedAt
-                            ? "Rad etilgan"
-                            : item.requestedAt
-                            ? "So‘rov yuborilgan"
-                            : "Hali so‘rov yubormagan"}
+                            {item.approved &&
+                            item.active !==
+                              false
+                              ? "Ruxsat berilgan"
+                              : item.rejectedAt
+                              ? "Rad etilgan"
+                              : item.requestedAt
+                              ? "Ruxsat kutilmoqda"
+                              : "So‘rov yuborilmagan"}
 
-                        </div>
-                      )}
+                          </div>
 
-                    </article>
+                          <small>
+                            Yaratilgan:{" "}
+                            {formatDate(
+                              item.createdAt
+                            )}
+                          </small>
 
-                  )
+                        </article>
+
+                      )
+                    )}
+
+                  </div>
+
                 )}
 
               </div>
 
-            </div>
+            </>
 
           )}
 
-        </div>
-
-      </section>
-
-      {/* ===================================================
-          KIRISH SO‘ROVLARI
-      =================================================== */}
-
-      <section
-        className="sectionBox"
-        id="requests-section"
-      >
-
-        <div className="sectionTitle">
-          Kirish so‘rovlari
-        </div>
-
-        <div className="metalInner">
-
-          <div className="subHeader">
-
-            <strong>
-              Kutilayotgan so‘rovlar
-            </strong>
-
-            <span className="counter">
-              {
-                pendingRequests.length
-              }
-            </span>
-
-          </div>
-
-          {pendingRequests.length === 0 ? (
-
-            <div className="empty">
-              Hozircha yangi kirish
-              so‘rovi yo‘q.
-            </div>
-
-          ) : (
-
-            <div className="requestList">
-
-              {pendingRequests.map(
-                (item) => (
-
-                  <article
-                    className="requestCard"
-                    key={item.id}
-                  >
-
-                    <div>
-
-                      <h3>
-                        {item.name}
-                      </h3>
-
-                      <div className="codeText">
-                        {item.code}
-                      </div>
-
-                      <small>
-                        So‘rov:{" "}
-                        {formatDate(
-                          item.requestedAt
-                        )}
-                      </small>
-
-                    </div>
-
-                    <div className="actionButtons">
-
-                      <button
-                        className="approveButton"
-                        onClick={() =>
-                          requestAction(
-                            item.id,
-                            "approve"
-                          )
-                        }
-                        disabled={
-                          workingId ===
-                          item.id
-                        }
-                      >
-                        Qabul qilish
-                      </button>
-
-                      <button
-                        className="rejectButton"
-                        onClick={() =>
-                          requestAction(
-                            item.id,
-                            "reject"
-                          )
-                        }
-                        disabled={
-                          workingId ===
-                          item.id
-                        }
-                      >
-                        Rad etish
-                      </button>
-
-                    </div>
-
-                  </article>
-
-                )
-              )}
-
-            </div>
-
-          )}
-
-        </div>
-
-      </section>
-
-      {/* ===================================================
-          RUXSAT BERILGANLAR
-      =================================================== */}
-
-      <section
-        className="sectionBox"
-        id="approved-section"
-      >
-
-        <div className="sectionTitle">
-          Ruxsat berilganlar
-        </div>
-
-        <div className="metalInner">
-
-          {approvedCodes.length === 0 ? (
-
-            <div className="empty">
-              Ruxsat berilgan
-              foydalanuvchi yo‘q.
-            </div>
-
-          ) : (
-
-            <div className="requestList">
-
-              {approvedCodes.map(
-                (item) => (
-
-                  <article
-                    className="approvedCard"
-                    key={item.id}
-                  >
-
-                    <button
-                      className="deleteX"
-                      title="Butunlay o‘chirish"
-                      disabled={
-                        workingId ===
-                        item.id
-                      }
-                      onClick={() =>
-                        deleteUser(
-                          item.id
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-
-                    <div>
-
-                      <h3>
-                        {item.name}
-                      </h3>
-
-                      <div className="codeText">
-                        {item.code}
-                      </div>
-
-                      <div className="approvedText">
-                        ✓ Ruxsat berilgan
-                      </div>
-
-                      <small>
-                        Tasdiqlangan:{" "}
-                        {formatDate(
-                          item.approvedAt
-                        )}
-                      </small>
-
-                    </div>
-
-                    <button
-                      className="revokeButton"
-                      disabled={
-                        workingId ===
-                        item.id
-                      }
-                      onClick={() =>
-                        revokeAccess(
-                          item.id
-                        )
-                      }
-                    >
-                      Ruxsatni bekor qilish
-                    </button>
-
-                  </article>
-
-                )
-              )}
-
-            </div>
-
-          )}
-
-        </div>
-
-      </section>
-
-      {/* ===================================================
-          RAD ETILGANLAR
-      =================================================== */}
-
-      <section
-        className="sectionBox"
-        id="rejected-section"
-      >
-
-        <div className="sectionTitle">
-          Rad etilganlar
-        </div>
-
-        <div className="metalInner">
-
-          {rejectedCodes.length === 0 ? (
-
-            <div className="empty">
-              Rad etilgan foydalanuvchi yo‘q.
-            </div>
-
-          ) : (
-
-            <div className="cardsGrid">
-
-              {rejectedCodes.map(
-                (item) => (
-
-                  <article
-                    className="userCard"
-                    key={item.id}
-                  >
-
-                    <button
-                      className="deleteX"
-                      disabled={
-                        workingId ===
-                        item.id
-                      }
-                      onClick={() =>
-                        deleteUser(
-                          item.id
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-
-                    <h3>
-                      {item.name}
-                    </h3>
-
-                    <div className="codeText">
-                      {item.code}
-                    </div>
-
-                    <div className="rejectedText">
-                      ✕ Rad etilgan
-                    </div>
-
-                  </article>
-
-                )
-              )}
-
-            </div>
-
-          )}
-
-        </div>
-
-      </section>
-
-      {/* ===================================================
-          TARIX
-      =================================================== */}
-
-      <section className="sectionBox">
-
-        <div className="sectionTitle">
-          Tarix
-        </div>
-
-        <div className="metalInner">
-
-          {history.length === 0 ? (
-
-            <div className="empty">
-              Hozircha tarix mavjud emas.
-            </div>
-
-          ) : (
-
-            <div className="historyScroll">
-
-              {history.map(
-                (item, index) => (
-
-                  <div
-                    className="historyItem"
-                    key={
-                      item.id ||
-                      index
+          {/* =================================================
+              YANGI KOD
+          ================================================= */}
+
+          {activeSection ===
+            "new-code" && (
+
+            <>
+
+              <div className="contentTitle">
+                Yangi kirish kodi
+              </div>
+
+              <div className="innerPanel">
+
+                <div className="createArea">
+
+                  <label>
+                    Foydalanuvchi ismi
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      name
+                    }
+                    onChange={(
+                      e
+                    ) =>
+                      setName(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Masalan: Ali Valiyev"
+                  />
+
+                  <button
+                    type="button"
+                    className="actionButton"
+                    onClick={
+                      createCode
+                    }
+                    disabled={
+                      creating
                     }
                   >
+                    {creating
+                      ? "Yaratilmoqda..."
+                      : "Maxsus kod yaratish"}
+                  </button>
 
-                    <div>
+                </div>
 
-                      <strong>
-                        {item.name ||
-                          "Foydalanuvchi"}
-                      </strong>
+              </div>
 
-                      {item.code && (
-                        <div className="historyCode">
-                          {item.code}
-                        </div>
-                      )}
+            </>
 
-                      <p>
-                        {item.message ||
-                          item.action ||
-                          "Amal bajarildi"}
-                      </p>
+          )}
 
-                    </div>
+          {/* =================================================
+              YARATILGAN KODLAR
+          ================================================= */}
 
-                    <small>
-                      {formatDate(
-                        item.createdAt ||
-                          item.date
-                      )}
-                    </small>
+          {activeSection ===
+            "codes" && (
+
+            <>
+
+              <div className="contentTitle">
+                Yaratilgan kodlar
+              </div>
+
+              <div className="innerPanel">
+
+                {loading ? (
+
+                  <div className="empty">
+                    Yuklanmoqda...
+                  </div>
+
+                ) : codes.length ===
+                  0 ? (
+
+                  <div className="empty">
+                    Yaratilgan kod mavjud emas.
+                  </div>
+
+                ) : (
+
+                  <div className="userGrid">
+
+                    {codes.map(
+                      (
+                        item
+                      ) => (
+
+                        <article
+                          className="userCard"
+                          key={
+                            item.id
+                          }
+                        >
+
+                          <button
+                            type="button"
+                            className="deleteButton"
+                            disabled={
+                              workingId ===
+                              item.id
+                            }
+                            onClick={() =>
+                              deleteUser(
+                                item.id
+                              )
+                            }
+                          >
+                            ×
+                          </button>
+
+                          <h3>
+                            {
+                              item.name
+                            }
+                          </h3>
+
+                          <div className="codeText">
+                            {
+                              item.code
+                            }
+                          </div>
+
+                          <small>
+                            Yaratilgan:{" "}
+                            {formatDate(
+                              item.createdAt
+                            )}
+                          </small>
+
+                        </article>
+
+                      )
+                    )}
 
                   </div>
 
-                )
-              )}
+                )}
 
-            </div>
+                {/* TARIX */}
+
+                <div className="historyBox">
+
+                  <h3>
+                    So‘nggi tarix
+                  </h3>
+
+                  {history.length ===
+                    0 ? (
+
+                    <div className="empty">
+                      Hozircha tarix mavjud emas.
+                    </div>
+
+                  ) : (
+
+                    <div className="historyList">
+
+                      {history.map(
+                        (
+                          item,
+                          index
+                        ) => (
+
+                          <div
+                            className="historyItem"
+                            key={
+                              item.id ||
+                              index
+                            }
+                          >
+
+                            <div>
+
+                              <strong>
+                                {item.name ||
+                                  "Foydalanuvchi"}
+                              </strong>
+
+                              <p>
+                                {item.message ||
+                                  item.action ||
+                                  "Amal bajarildi"}
+                              </p>
+
+                            </div>
+
+                            <small>
+                              {formatDate(
+                                item.createdAt ||
+                                  item.date
+                              )}
+                            </small>
+
+                          </div>
+
+                        )
+                      )}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              </div>
+
+            </>
 
           )}
 
-        </div>
+          {/* =================================================
+              KIRISH SO‘ROVLARI
+          ================================================= */}
 
-      </section>
+          {activeSection ===
+            "requests" && (
 
-      {/* ===================================================
+            <>
+
+              <div className="contentTitle">
+                Kirish so‘rovlari
+              </div>
+
+              <div className="innerPanel">
+
+                {pendingRequests.length ===
+                  0 ? (
+
+                  <div className="empty">
+                    Hozircha yangi kirish
+                    so‘rovi yo‘q.
+                  </div>
+
+                ) : (
+
+                  <div className="requestList">
+
+                    {pendingRequests.map(
+                      (
+                        item
+                      ) => (
+
+                        <article
+                          className="requestCard"
+                          key={
+                            item.id
+                          }
+                        >
+
+                          <div>
+
+                            <h3>
+                              {
+                                item.name
+                              }
+                            </h3>
+
+                            <div className="codeText">
+                              {
+                                item.code
+                              }
+                            </div>
+
+                            <small>
+                              So‘rov:{" "}
+                              {formatDate(
+                                item.requestedAt
+                              )}
+                            </small>
+
+                          </div>
+
+                          <div className="requestButtons">
+
+                            <button
+                              type="button"
+                              className="approveButton"
+                              disabled={
+                                workingId ===
+                                item.id
+                              }
+                              onClick={() =>
+                                requestAction(
+                                  item.id,
+                                  "approve"
+                                )
+                              }
+                            >
+                              Qabul qilish
+                            </button>
+
+                            <button
+                              type="button"
+                              className="rejectButton"
+                              disabled={
+                                workingId ===
+                                item.id
+                              }
+                              onClick={() =>
+                                requestAction(
+                                  item.id,
+                                  "reject"
+                                )
+                              }
+                            >
+                              Rad etish
+                            </button>
+
+                          </div>
+
+                        </article>
+
+                      )
+                    )}
+
+                  </div>
+
+                )}
+
+              </div>
+
+            </>
+
+          )}
+
+          {/* =================================================
+              RUXSAT BERILGANLAR
+          ================================================= */}
+
+          {activeSection ===
+            "approved" && (
+
+            <>
+
+              <div className="contentTitle">
+                Ruxsat berilganlar
+              </div>
+
+              <div className="innerPanel">
+
+                {approvedCodes.length ===
+                  0 ? (
+
+                  <div className="empty">
+                    Ruxsat berilgan
+                    foydalanuvchi yo‘q.
+                  </div>
+
+                ) : (
+
+                  <div className="requestList">
+
+                    {approvedCodes.map(
+                      (
+                        item
+                      ) => (
+
+                        <article
+                          className="requestCard"
+                          key={
+                            item.id
+                          }
+                        >
+
+                          <div>
+
+                            <h3>
+                              {
+                                item.name
+                              }
+                            </h3>
+
+                            <div className="codeText">
+                              {
+                                item.code
+                              }
+                            </div>
+
+                            <div className="approvedStatus">
+                              Ruxsat berilgan
+                            </div>
+
+                          </div>
+
+                          <div className="requestButtons">
+
+                            <button
+                              type="button"
+                              className="revokeButton"
+                              disabled={
+                                workingId ===
+                                item.id
+                              }
+                              onClick={() =>
+                                revokeAccess(
+                                  item.id
+                                )
+                              }
+                            >
+                              Ruxsatni bekor qilish
+                            </button>
+
+                            <button
+                              type="button"
+                              className="deleteSecondary"
+                              disabled={
+                                workingId ===
+                                item.id
+                              }
+                              onClick={() =>
+                                deleteUser(
+                                  item.id
+                                )
+                              }
+                            >
+                              Butunlay o‘chirish
+                            </button>
+
+                          </div>
+
+                        </article>
+
+                      )
+                    )}
+
+                  </div>
+
+                )}
+
+              </div>
+
+            </>
+
+          )}
+
+          {/* =================================================
+              RAD ETILGANLAR
+          ================================================= */}
+
+          {activeSection ===
+            "rejected" && (
+
+            <>
+
+              <div className="contentTitle">
+                Rad etilganlar
+              </div>
+
+              <div className="innerPanel">
+
+                {rejectedCodes.length ===
+                  0 ? (
+
+                  <div className="empty">
+                    Rad etilgan
+                    foydalanuvchi yo‘q.
+                  </div>
+
+                ) : (
+
+                  <div className="userGrid">
+
+                    {rejectedCodes.map(
+                      (
+                        item
+                      ) => (
+
+                        <article
+                          className="userCard"
+                          key={
+                            item.id
+                          }
+                        >
+
+                          <button
+                            type="button"
+                            className="deleteButton"
+                            disabled={
+                              workingId ===
+                              item.id
+                            }
+                            onClick={() =>
+                              deleteUser(
+                                item.id
+                              )
+                            }
+                          >
+                            ×
+                          </button>
+
+                          <h3>
+                            {
+                              item.name
+                            }
+                          </h3>
+
+                          <div className="codeText">
+                            {
+                              item.code
+                            }
+                          </div>
+
+                          <div className="rejectedStatus">
+                            Rad etilgan
+                          </div>
+
+                        </article>
+
+                      )
+                    )}
+
+                  </div>
+
+                )}
+
+              </div>
+
+            </>
+
+          )}
+
+        </section>
+
+      )}
+
+      {/* =====================================================
           CSS
-      =================================================== */}
+      ===================================================== */}
 
       <style jsx>{`
 
         * {
           box-sizing: border-box;
-        }
-
-        html {
-          scroll-behavior: smooth;
         }
 
         .page {
@@ -1595,8 +1771,10 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #ffffff,
-              #f2f5f7
+              180deg,
+              #ffffff 0%,
+              #f4f6f7 55%,
+              #edf1f3 100%
             );
 
           font-family:
@@ -1612,50 +1790,41 @@ export default function AdminRequestsPage() {
           font-family: inherit;
         }
 
-        /* =================================================
-           TOP
-        ================================================= */
+        /* =====================================================
+           HEADER
+        ===================================================== */
 
         .topPanel {
-          min-height: 110px;
+          width: min(
+            1580px,
+            98%
+          );
 
-          padding: 22px 28px;
+          min-height: 105px;
+
+          margin: 0 auto;
+
+          padding:
+            18px 27px;
 
           display: flex;
           justify-content:
             space-between;
           align-items: center;
 
-          gap: 20px;
+          gap: 25px;
 
           border:
             3px solid #173e58;
 
-          border-radius: 25px;
+          border-radius: 24px;
 
           background:
             linear-gradient(
-              #91d9ff,
-              #4999ce
-            );
-
-          box-shadow:
-            0 7px 0 #173c55;
-        }
-
-        .namePlate {
-          padding:
-            17px 25px;
-
-          border:
-            3px solid #42494e;
-
-          border-radius: 14px;
-
-          background:
-            linear-gradient(
-              #fafafa,
-              #aaaaaa
+              180deg,
+              #8bd5fb 0%,
+              #57afdd 50%,
+              #3b91bf 100%
             );
 
           box-shadow:
@@ -1664,117 +1833,165 @@ export default function AdminRequestsPage() {
                 255,
                 255,
                 255,
-                .7
+                .6
               ),
 
-            0 5px 0
-              #555d61;
+            0 7px 0
+              #173c55,
 
-          font-size: 24px;
+            0 13px 20px
+              rgba(
+                0,
+                0,
+                0,
+                .18
+              );
+        }
+
+        .namePlate {
+          min-height: 58px;
+
+          padding:
+            0 25px;
+
+          border:
+            3px solid #50585d;
+
+          border-radius: 13px;
+
+          color: #111;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #c8c8c8
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              white,
+
+            0 5px 0
+              #60686c;
+
+          font-size: 21px;
           font-weight: 700;
+
+          cursor: pointer;
         }
 
         .topButtons {
           display: flex;
+
           gap: 15px;
         }
 
         .topButton,
         .exitButton {
-          min-width: 145px;
-          height: 55px;
+          min-width: 130px;
 
-          border-radius: 13px;
+          min-height: 52px;
 
-          cursor: pointer;
+          padding:
+            8px 20px;
+
+          border-radius: 11px;
 
           font-weight: 700;
+
+          cursor: pointer;
         }
 
         .topButton {
+          border:
+            2px solid #777;
+
           background:
             linear-gradient(
               #ffffff,
-              #bbbbbb
-            );
-        }
-
-        .exitButton {
-          color: white;
-
-          border:
-            2px solid #174461;
-
-          background:
-            linear-gradient(
-              #6bc2ec,
-              #3288b6
+              #c8c8c8
             );
 
           box-shadow:
-            0 4px 0 #174461;
+            0 4px 0 #666;
         }
 
-        /* =================================================
-           HERO / SECTION
-        ================================================= */
+        .exitButton {
+          border:
+            2px solid #174461;
 
-        .adminHero,
-        .sectionBox,
-        .dashboardBox {
+          color: #ffffff;
+
+          background:
+            linear-gradient(
+              #74c7ed,
+              #348ab8
+            );
+
+          box-shadow:
+            0 4px 0
+              #174461;
+        }
+
+        /* =====================================================
+           HERO
+        ===================================================== */
+
+        .heroPanel {
           position: relative;
 
           width:
             min(
-              1200px,
-              94%
+              1030px,
+              90%
             );
 
+          min-height:
+            180px;
+
           margin:
-            85px auto 65px;
+            85px auto 70px;
+
+          padding:
+            65px 35px 30px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          text-align: center;
 
           border:
             3px solid #303538;
 
-          border-radius: 27px;
+          border-radius: 24px;
 
           background:
             linear-gradient(
               145deg,
-              #686c6f,
-              #363a3d
+              #666b6e,
+              #3b4043
             );
 
           box-shadow:
-            0 7px 0 #272b2e,
+            0 7px 0
+              #272c2f,
+
             0 15px 24px
               rgba(
                 0,
                 0,
                 0,
-                .25
+                .22
               );
         }
 
-        .adminHero {
-          min-height: 220px;
-
-          padding:
-            75px 35px 45px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .heroPanel h1 {
+          margin: 0;
 
           color: white;
-
-          text-align: center;
-        }
-
-        .adminHero h1 {
-          max-width: 850px;
-
-          margin: 0;
 
           font-size:
             clamp(
@@ -1782,46 +1999,57 @@ export default function AdminRequestsPage() {
               3vw,
               38px
             );
+
+          text-shadow:
+            0 2px 2px
+              rgba(
+                0,
+                0,
+                0,
+                .4
+              );
         }
 
-        .sectionBox {
-          padding:
-            70px 38px 38px;
+        .heroPanel p {
+          margin:
+            14px 0 0;
 
-          scroll-margin-top: 120px;
+          color: #e9eef1;
+
+          font-size: 17px;
         }
 
-        .sectionTitle,
-        .dashboardTitle {
+        .floatingTitle {
           position: absolute;
 
-          top: -32px;
+          top: -31px;
           left: 50%;
 
           transform:
             translateX(-50%);
 
-          min-width: 300px;
-          min-height: 64px;
+          min-width: 260px;
+
+          min-height: 62px;
+
+          padding:
+            10px 25px;
 
           display: flex;
           align-items: center;
           justify-content: center;
 
-          padding:
-            10px 25px;
-
           border:
             3px solid #174461;
 
-          border-radius: 15px;
+          border-radius: 14px;
 
           color: #073b68;
 
           background:
             linear-gradient(
-              #9bd9ff,
-              #4e9ccc
+              #9edcff,
+              #4c9bc9
             );
 
           box-shadow:
@@ -1836,22 +2064,60 @@ export default function AdminRequestsPage() {
             0 5px 0
               #17415c;
 
-          font-size: 27px;
+          font-size: 26px;
+
           font-weight: 700;
 
-          z-index: 10;
+          white-space: nowrap;
         }
 
-        /* =================================================
-           6 TA OCH KULRANG 3D BLOK
-        ================================================= */
+        /* =====================================================
+           MANAGEMENT
+        ===================================================== */
 
-        .dashboardBox {
+        .managementPanel {
+          position: relative;
+
+          width:
+            min(
+              1100px,
+              92%
+            );
+
+          margin:
+            0 auto;
+
           padding:
-            78px 36px 42px;
+            65px 28px 32px;
+
+          scroll-margin-top: 30px;
+
+          border:
+            3px solid #303538;
+
+          border-radius: 25px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #686d70,
+              #3d4245
+            );
+
+          box-shadow:
+            0 8px 0
+              #292e31,
+
+            0 17px 28px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
         }
 
-        .dashboardGrid {
+        .managementGrid {
           display: grid;
 
           grid-template-columns:
@@ -1863,14 +2129,14 @@ export default function AdminRequestsPage() {
               )
             );
 
-          gap: 28px;
+          gap: 24px;
         }
 
-        .dashboardCard {
-          min-height: 245px;
+        .managementCard {
+          min-height: 220px;
 
           padding:
-            30px 24px;
+            25px 20px;
 
           display: flex;
           flex-direction: column;
@@ -1880,15 +2146,16 @@ export default function AdminRequestsPage() {
           text-align: center;
 
           border:
-            3px solid #565e62;
+            3px solid
+              #565e62;
 
-          border-radius: 19px;
+          border-radius: 17px;
 
           background:
             linear-gradient(
               145deg,
-              #f5f5f5 0%,
-              #dddddd 42%,
+              #f7f7f7 0%,
+              #e0e0e0 45%,
               #bdbdbd 100%
             );
 
@@ -1901,14 +2168,6 @@ export default function AdminRequestsPage() {
                 .95
               ),
 
-            inset 0 -5px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .10
-              ),
-
             0 7px 0
               #555d61,
 
@@ -1917,250 +2176,60 @@ export default function AdminRequestsPage() {
                 0,
                 0,
                 0,
-                .25
+                .22
               );
 
           transition:
             transform .15s ease;
         }
 
-        .dashboardCard:hover {
+        .managementCard:hover {
           transform:
-            translateY(-5px);
+            translateY(-4px);
         }
 
-        .dashboardCard h2 {
+        .managementCard h2 {
           margin:
-            0 0 15px;
+            0 0 12px;
 
-          color: #111;
-
-          font-size: 27px;
+          font-size: 24px;
         }
 
-        .dashboardCard p {
-          min-height: 54px;
+        .managementCard p {
+          flex: 1;
 
           margin:
-            0 0 25px;
+            0 0 20px;
 
-          color: #4a4a4a;
+          max-width: 270px;
 
-          font-size: 16px;
+          color: #4b4b4b;
+
+          font-size: 15px;
 
           line-height: 1.45;
         }
 
-        .dashboardButton {
+        .openButton,
+        .actionButton {
           min-width: 145px;
-        }
 
-        /* =================================================
-           METAL INNER
-        ================================================= */
-
-        .metalInner {
-          padding: 28px;
-
-          border:
-            2px solid #4c5357;
-
-          border-radius: 20px;
-
-          background:
-            linear-gradient(
-              #ededed,
-              #aaaaaa
-            );
-
-          box-shadow:
-            inset 6px 6px 9px
-              rgba(
-                255,
-                255,
-                255,
-                .9
-              ),
-
-            0 6px 0 #4a5054;
-        }
-
-        /* =================================================
-           SEARCH
-        ================================================= */
-
-        .searchWrapper {
-          height: 72px;
-
-          display: flex;
-          align-items: center;
-
-          overflow: hidden;
-
-          border:
-            2px solid #159bd3;
-
-          border-radius: 15px;
-
-          background: white;
-        }
-
-        .searchIcon {
-          width: 65px;
-
-          text-align: center;
-
-          font-size: 25px;
-        }
-
-        .searchInput {
-          flex: 1;
-
-          height: 100%;
-
-          border: none;
-          outline: none;
-
-          font-size: 21px;
-        }
-
-        .searchX {
-          width: 65px;
-          height: 100%;
-
-          border: none;
-
-          background:
-            transparent;
-
-          cursor: pointer;
-
-          color: #a41414;
-
-          font-size: 30px;
-          font-weight: 700;
-        }
-
-        .searchResults {
-          margin-top: 28px;
-        }
-
-        .searchResultCount {
-          margin-bottom: 18px;
-
-          padding: 12px;
-
-          border:
-            2px solid #3485ad;
-
-          border-radius: 11px;
-
-          background:
-            #a8d9f2;
-
-          text-align: center;
-
-          color: #073b68;
-
-          font-size: 18px;
-          font-weight: 700;
-        }
-
-        .searchResultGrid {
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              3,
-              1fr
-            );
-
-          gap: 20px;
-        }
-
-        .searchResultCard {
-          position: relative;
+          min-height: 50px;
 
           padding:
-            35px 22px 22px;
-
-          text-align: center;
+            8px 20px;
 
           border:
-            2px solid #4d5559;
-
-          border-radius: 16px;
-
-          background:
-            linear-gradient(
-              #f5f5f5,
-              #bbbbbb
-            );
-
-          box-shadow:
-            0 6px 0 #555d61;
-        }
-
-        .searchStatus {
-          margin:
-            12px 0;
-
-          font-weight: 700;
-        }
-
-        /* =================================================
-           CREATE
-        ================================================= */
-
-        .createRow {
-          display: grid;
-
-          grid-template-columns:
-            1fr 220px;
-
-          gap: 18px;
-
-          align-items: end;
-        }
-
-        .inputGroup label {
-          display: block;
-
-          margin-bottom: 9px;
-
-          font-size: 18px;
-          font-weight: 700;
-        }
-
-        .inputGroup input {
-          width: 100%;
-          height: 58px;
-
-          padding:
-            0 18px;
-
-          border:
-            2px solid #646b70;
+            3px solid #174461;
 
           border-radius: 10px;
 
-          font-size: 18px;
-        }
-
-        .blueButton {
-          height: 58px;
-
-          border:
-            2px solid #174461;
-
-          border-radius: 12px;
-
           color: #073b68;
 
           background:
             linear-gradient(
-              #9bd9ff,
-              #5ba9d8
+              #9edcff,
+              #55a8d8
             );
 
           box-shadow:
@@ -2169,147 +2238,367 @@ export default function AdminRequestsPage() {
                 255,
                 255,
                 255,
-                .6
+                .55
               ),
 
-            0 4px 0 #17415c;
-
-          cursor: pointer;
+            0 4px 0
+              #17415c;
 
           font-size: 16px;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        /* =====================================================
+           ACTIVE SECTION
+        ===================================================== */
+
+        .contentPanel {
+          position: relative;
+
+          width:
+            min(
+              1100px,
+              92%
+            );
+
+          margin:
+            75px auto 0;
+
+          padding:
+            80px 35px 40px;
+
+          scroll-margin-top: 25px;
+
+          border:
+            3px solid #303538;
+
+          border-radius: 25px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #686d70,
+              #3d4245
+            );
+
+          box-shadow:
+            0 8px 0
+              #292e31,
+
+            0 17px 28px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
+        }
+
+        .contentTitle {
+          position: absolute;
+
+          top: -31px;
+          left: 50%;
+
+          transform:
+            translateX(-50%);
+
+          min-width: 280px;
+
+          min-height: 62px;
+
+          padding:
+            10px 25px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border:
+            3px solid
+              #174461;
+
+          border-radius: 14px;
+
+          color: #073b68;
+
+          background:
+            linear-gradient(
+              #9edcff,
+              #4c9bc9
+            );
+
+          box-shadow:
+            0 5px 0
+              #17415c;
+
+          font-size: 25px;
+
+          font-weight: 700;
+
+          text-align: center;
+        }
+
+        .backButton {
+          display: block;
+
+          margin:
+            0 auto 30px;
+
+          min-height: 48px;
+
+          padding:
+            9px 22px;
+
+          border:
+            2px solid #60686c;
+
+          border-radius: 10px;
+
+          color: #173d55;
+
+          background:
+            linear-gradient(
+              #ffffff,
+              #c9c9c9
+            );
+
+          box-shadow:
+            0 4px 0 #596166;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .innerPanel {
+          padding: 28px;
+
+          border:
+            3px solid
+              #5a6266;
+
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #f4f4f4,
+              #c3c3c3
+            );
+
+          box-shadow:
+            inset 0 6px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+
+            0 6px 0
+              #555d61;
+        }
+
+        /* =====================================================
+           SEARCH
+        ===================================================== */
+
+        .searchWrapper {
+          min-height: 65px;
+
+          display: flex;
+
+          border:
+            2px solid #328dbb;
+
+          border-radius: 12px;
+
+          overflow: hidden;
+
+          background: white;
+        }
+
+        .searchInput {
+          flex: 1;
+
+          min-width: 0;
+
+          padding:
+            0 20px;
+
+          border: none;
+
+          outline: none;
+
+          font-size: 19px;
+        }
+
+        .clearButton {
+          width: 60px;
+
+          border: none;
+
+          color: #a41414;
+
+          background:
+            transparent;
+
+          font-size: 29px;
+
+          cursor: pointer;
+        }
+
+        /* =====================================================
+           CREATE
+        ===================================================== */
+
+        .createArea {
+          max-width: 700px;
+
+          margin: 0 auto;
+
+          display: flex;
+          flex-direction: column;
+
+          gap: 16px;
+        }
+
+        .createArea label {
+          font-size: 19px;
+
           font-weight: 700;
         }
 
-        /* =================================================
-           CARDS
-        ================================================= */
+        .createArea input {
+          width: 100%;
 
-        .twoRowScroll {
-          max-height: 435px;
+          min-height: 58px;
 
-          overflow-y: auto;
+          padding:
+            0 18px;
 
-          padding-right: 8px;
+          border:
+            2px solid #676f73;
+
+          border-radius: 10px;
+
+          font-size: 18px;
         }
 
-        .cardsGrid {
+        .createArea .actionButton {
+          align-self: center;
+
+          min-width: 220px;
+        }
+
+        /* =====================================================
+           USER CARDS
+        ===================================================== */
+
+        .userGrid {
+          margin-top: 25px;
+
           display: grid;
 
           grid-template-columns:
             repeat(
               3,
-              1fr
+              minmax(
+                0,
+                1fr
+              )
             );
 
-          gap: 22px;
-        }
-
-        .userCard,
-        .requestCard,
-        .approvedCard {
-          position: relative;
-
-          border:
-            2px solid #4d5559;
-
-          border-radius: 17px;
-
-          background:
-            linear-gradient(
-              #f5f5f5,
-              #b7b7b7
-            );
-
-          box-shadow:
-            0 6px 0 #555d61;
+          gap: 20px;
         }
 
         .userCard {
+          position: relative;
+
+          min-height: 180px;
+
           padding:
-            28px 22px 20px;
+            28px 20px;
 
           text-align: center;
+
+          border:
+            2px solid #51595d;
+
+          border-radius: 15px;
+
+          background:
+            linear-gradient(
+              #f7f7f7,
+              #c3c3c3
+            );
+
+          box-shadow:
+            0 5px 0 #555d61;
+        }
+
+        .userCard h3,
+        .requestCard h3 {
+          margin:
+            0 0 10px;
+
+          font-size: 22px;
         }
 
         .codeText {
           margin:
             7px 0;
 
-          color: #064a79;
+          color: #07517e;
 
-          font-size: 21px;
+          font-size: 20px;
+
           font-weight: 700;
         }
 
-        .statusBox {
-          margin-top: 18px;
+        .statusText {
+          margin:
+            12px 0;
 
-          padding: 10px;
-
-          border:
-            1px solid #999;
-
-          border-radius: 9px;
+          font-weight: 700;
         }
 
-        .deleteX {
+        .deleteButton {
           position: absolute;
 
-          top: 10px;
-          right: 10px;
+          top: 9px;
+          right: 9px;
 
-          width: 35px;
-          height: 35px;
+          width: 34px;
+          height: 34px;
 
           border:
-            2px solid #8e0000;
+            2px solid #8f1616;
 
           border-radius: 50%;
-
-          cursor: pointer;
 
           color: white;
 
           background:
             linear-gradient(
-              #ff6262,
-              #a90000
+              #f26565,
+              #ad1111
             );
 
-          font-size: 25px;
+          font-size: 23px;
+
           font-weight: 700;
+
+          cursor: pointer;
         }
 
-        /* =================================================
-           REQUESTS
-        ================================================= */
-
-        .subHeader {
-          margin-bottom: 22px;
-
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          align-items: center;
-        }
-
-        .counter {
-          width: 35px;
-          height: 35px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 50%;
-
-          color: white;
-
-          background:
-            #c90e0e;
-        }
+        /* =====================================================
+           REQUEST LIST
+        ===================================================== */
 
         .requestList {
           display: grid;
@@ -2317,103 +2606,160 @@ export default function AdminRequestsPage() {
           gap: 20px;
         }
 
-        .requestCard,
-        .approvedCard {
-          min-height: 150px;
+        .requestCard {
+          min-height: 145px;
 
-          padding: 25px;
+          padding: 24px;
 
           display: flex;
-
-          justify-content:
-            space-between;
 
           align-items: center;
-
-          gap: 30px;
-        }
-
-        .actionButtons {
-          display: flex;
-
-          gap: 15px;
-        }
-
-        .approveButton,
-        .rejectButton,
-        .revokeButton {
-          min-width: 145px;
-
-          height: 50px;
-
-          border-radius: 10px;
-
-          cursor: pointer;
-
-          font-weight: 700;
-        }
-
-        .approveButton {
-          background:
-            #7ee8a1;
-        }
-
-        .rejectButton {
-          color: white;
-
-          background:
-            #cf2424;
-        }
-
-        .revokeButton {
-          background:
-            #e5ac22;
-        }
-
-        .approvedText {
-          margin: 8px 0;
-
-          color: #08772c;
-
-          font-weight: 700;
-        }
-
-        .rejectedText {
-          margin: 12px 0;
-
-          color: #b51010;
-
-          font-weight: 700;
-        }
-
-        /* =================================================
-           HISTORY
-        ================================================= */
-
-        .historyScroll {
-          max-height: 390px;
-
-          overflow-y: auto;
-
-          display: grid;
-
-          gap: 15px;
-        }
-
-        .historyItem {
-          padding: 18px;
-
-          display: flex;
-
           justify-content:
             space-between;
 
           gap: 25px;
 
           border:
-            1px solid #777;
+            2px solid #51595d;
 
-          border-radius: 12px;
+          border-radius: 15px;
+
+          background:
+            linear-gradient(
+              #f7f7f7,
+              #c3c3c3
+            );
+
+          box-shadow:
+            0 5px 0 #555d61;
+        }
+
+        .requestButtons {
+          display: flex;
+
+          flex-wrap: wrap;
+
+          gap: 12px;
+        }
+
+        .approveButton,
+        .rejectButton,
+        .revokeButton,
+        .deleteSecondary {
+          min-height: 48px;
+
+          padding:
+            8px 18px;
+
+          border-radius: 9px;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .approveButton {
+          border:
+            2px solid #307544;
+
+          background:
+            linear-gradient(
+              #a9e9ba,
+              #73c58b
+            );
+        }
+
+        .rejectButton,
+        .deleteSecondary {
+          border:
+            2px solid #902020;
+
+          color: white;
+
+          background:
+            linear-gradient(
+              #ef6666,
+              #b41f1f
+            );
+        }
+
+        .revokeButton {
+          border:
+            2px solid #8d701d;
+
+          background:
+            linear-gradient(
+              #f3d779,
+              #d5ac32
+            );
+        }
+
+        .approvedStatus {
+          margin:
+            10px 0;
+
+          color: #167237;
+
+          font-weight: 700;
+        }
+
+        .rejectedStatus {
+          margin:
+            10px 0;
+
+          color: #a41717;
+
+          font-weight: 700;
+        }
+
+        /* =====================================================
+           HISTORY
+        ===================================================== */
+
+        .historyBox {
+          margin-top: 35px;
+
+          padding-top: 25px;
+
+          border-top:
+            2px solid #858585;
+        }
+
+        .historyBox > h3 {
+          margin:
+            0 0 18px;
+
+          text-align: center;
+
+          color: #173d55;
+
+          font-size: 23px;
+        }
+
+        .historyList {
+          max-height: 330px;
+
+          overflow-y: auto;
+
+          display: grid;
+
+          gap: 12px;
+        }
+
+        .historyItem {
+          padding: 15px;
+
+          display: flex;
+
+          justify-content:
+            space-between;
+
+          gap: 20px;
+
+          border:
+            1px solid #838383;
+
+          border-radius: 10px;
 
           background:
             rgba(
@@ -2424,33 +2770,42 @@ export default function AdminRequestsPage() {
             );
         }
 
-        .historyCode {
-          color: #07517e;
-
-          font-weight: 700;
+        .historyItem p {
+          margin:
+            5px 0 0;
         }
+
+        /* =====================================================
+           EMPTY
+        ===================================================== */
 
         .empty {
           min-height: 110px;
 
+          padding: 20px;
+
           display: flex;
 
           align-items: center;
-
           justify-content: center;
 
           text-align: center;
+
+          color: #555;
+
+          font-size: 18px;
         }
 
-        /* =================================================
+        /* =====================================================
            RESPONSIVE
-        ================================================= */
+        ===================================================== */
 
         @media (
-          max-width: 1000px
+          max-width: 950px
         ) {
 
-          .dashboardGrid {
+          .managementGrid,
+          .userGrid {
             grid-template-columns:
               repeat(
                 2,
@@ -2458,18 +2813,9 @@ export default function AdminRequestsPage() {
               );
           }
 
-          .cardsGrid,
-          .searchResultGrid {
-            grid-template-columns:
-              repeat(
-                2,
-                1fr
-              );
-          }
-
-          .createRow {
-            grid-template-columns:
-              1fr;
+          .topPanel {
+            flex-direction:
+              column;
           }
 
         }
@@ -2478,9 +2824,17 @@ export default function AdminRequestsPage() {
           max-width: 650px
         ) {
 
+          .page {
+            padding:
+              10px 8px 50px;
+          }
+
           .topPanel {
-            flex-direction:
-              column;
+            width: 100%;
+          }
+
+          .namePlate {
+            width: 100%;
           }
 
           .topButtons {
@@ -2495,22 +2849,38 @@ export default function AdminRequestsPage() {
             width: 100%;
           }
 
-          .dashboardGrid,
-          .cardsGrid,
-          .searchResultGrid {
+          .heroPanel,
+          .managementPanel,
+          .contentPanel {
+            width: 100%;
+          }
+
+          .managementGrid,
+          .userGrid {
             grid-template-columns:
               1fr;
           }
 
-          .requestCard,
-          .approvedCard {
+          .requestCard {
+            flex-direction:
+              column;
+
+            align-items:
+              stretch;
+          }
+
+          .requestButtons {
             flex-direction:
               column;
           }
 
-          .actionButtons {
-            flex-direction:
-              column;
+          .floatingTitle,
+          .contentTitle {
+            min-width: 210px;
+
+            max-width: 90%;
+
+            white-space: normal;
           }
 
         }
