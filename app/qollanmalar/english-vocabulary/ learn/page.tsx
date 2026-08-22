@@ -348,6 +348,20 @@ function LearnContent() {
             ? data.words
             : [];
 
+        console.log(
+          "DEBUG WORDS:",
+          loadedWords
+        );
+
+        if (
+          loadedWords.length > 0
+        ) {
+          console.log(
+            "DEBUG FIRST WORD:",
+            loadedWords[0]
+          );
+        }
+
         if (
           loadedWords.length < 2
         ) {
