@@ -1,3 +1,105 @@
+Bular tepada qotib turishadimi ?
+
+mana shu joyini ham olib tashla. 
+Hozir qarada, men adminni bossam, shu panel chiqyabti. 
+to'liq kod ber ! Yuqoridagi sahifani ham tartibga keltie
+qara admin so'zini bosganimdan keyin. shu sahifalar chiqsin. Agar men foydalanuvcgilarini bsoganimdan keyin narigi sahifaga o'tsin. Hozir adminni bosgandan u sahifaga to'gridan-to'g'ri o'tyabti
+Вставленный текст(20260822-062115).txt
+Документ
+to'liq yangi kod ber 
+nimaga bu xato deybati
+Вставленный текст(20260822-063048).txt
+Документ
+o'chirishni bossam, shu yozuv chiqyabti nimaga ?
+Вставленный текст(20260822-063931).txt
+Документ
+Вставленный текст(20260822-064608).txt
+Документ
+Вставленный текст(20260822-064656).txt
+Документ
+so'z chiqmayabtiku
+Вставленный текст(20260822-070520).txt
+Документ
+Вставленный текст(20260822-070644).txt
+Документ
+Вставленный текст(20260822-070815).txt
+Документ
+Вставленный текст(20260822-070934).txt
+Документ
+Вставленный текст(20260822-071113).txt
+Документ
+Вставленный текст(20260822-071303).txt
+Документ
+Вставленный текст(20260822-071651).txt
+Документ
+Вставленный текст(20260822-072034).txt
+Документ
+barbir chiqmadi
+Вставленный текст(20260822-073809).txt
+Документ
+SHUNI O'CHIRISH KKMI ?
+qandaydir manash saytda lug'atlar bittada saqlanmayabti
+Вставленный текст(20260822-102139).txt
+Документ
+Вставленный текст(20260822-102300).txt
+Документ
+O'zi shu saytni o'zini ham 3d format qilib tartibga keltiraylik. Och kulrang ko'k ramglar bilar. 3d FORMATDA
+Редактировать
+BLEE NIMA BU EE ? o'ZIMIZNI SAYT QNADAY EDI SHUNGA MOS QIL ! 
+ADmin tugmasi ishlamayabti. 
+Mana shu dizynga mos qil ! Yiban ! 
+Hozir mana shunday ko'rinishda saqlangan. 
+Вставленный текст(20260822-122013).txt
+Документ
+Mana shu tepadagi 3ta tugmani yana qaerga qo'yish mumkin. Uyerda sal ga'ati turibti
+Mana shu tugmalarni ham bosganda ko'k bo'ladigan qilish kerakda. qaysi unitni ishlaganligini bilishi uchun
+ee dalbayob buzib qo'yding. Men shunchai ishlayotgan uniti kok bo'lsin dedim. Belgi qo'y demadimku.
+Вставленный текст(20260822-125229).txt
+Документ
+Kirmayabtiku bu testga ?
+qara bir qanday xunik qilib qo'yding bleeee
+qani yana shu ahvolku
+Bizni saytni qara, u bo'lim ham shunga mos bo'lsin
+Анализ приостановлен
+
+Ha, endi rasm bo‘yicha aniq qildim. Bu versiya siz yuborgan ko‘rinishga mos: tepada Asosiy sahifa, markazda English Vocabulary, pastda to‘q kulrang 3D Book tanlash paneli, undan keyin Book N + Unit 1–30 bloki.
+
+To‘liq kodni yuklab ol
+
+Buni:
+
+app/qollanmalar/english-vocabulary/page.tsx
+
+ga qo‘y.
+
+Muhimi, learn/page.tsxga tegmaysan. Unit bosilganda shu mavjud testga o‘tadi. 
+
+english-vocabulary-exact-reference.tsx
+Код
+eee dalbayob tushun sen. English Vocabulary ochganda. chiqadigan oinani ushbu saytga moslat ! Keyin test kitoblari chiqsin. masalan 1-kitobni bossam, 30 unit chiqsin. 1-unitni tansam oldingidek. shakillar bo'lsin
+
+Endi aynan tushundim: English Vocabulary ochilganda alohida chiroyli 3D sahifa chiqadi, u asosiy saytdagi Qo‘llanmalar blokining dizayniga mos bo‘ladi.
+
+Keyin Book 1–6 chiqadi. Masalan, Book 1ni bossang, faqat Book 1 uchun 30 ta Unit chiqadi. Unit 1ni bossang esa oldingi test sahifangga:
+
+/qollanmalar/english-vocabulary/learn?book=1&unit=1
+
+o‘tadi. learn/page.tsxga umuman tegilmaydi.
+
+To‘liq moslashtirilgan page.tsx kodini yuklab ol
+
+Buni aynan:
+
+app/qollanmalar/english-vocabulary/page.tsx
+
+ga qo‘y. 
+
+english-vocabulary-final-site-matched.tsx
+Код
+
+Библиотека
+/
+english-vocabulary-final-site-matched.tsx
 "use client";
 
 import { useState } from "react";
@@ -6,122 +108,38 @@ const BOOKS = [1, 2, 3, 4, 5, 6];
 const UNITS = Array.from({ length: 30 }, (_, i) => i + 1);
 
 export default function EnglishVocabularyPage() {
-  const [selectedBook, setSelectedBook] = useState(1);
-  const [pressedUnit, setPressedUnit] = useState<number | null>(null);
+  const [selectedBook, setSelectedBook] = useState<number | null>(null);
 
   function goBack() {
     window.location.href = "/qollanmalar";
   }
 
-  function selectBook(book: number) {
-    setSelectedBook(book);
-    setPressedUnit(null);
-  }
-
   function openUnit(unit: number) {
-    setPressedUnit(unit);
+    if (!selectedBook) return;
 
-    window.setTimeout(() => {
-      window.location.href =
-        `/qollanmalar/english-vocabulary/learn?book=${selectedBook}&unit=${unit}`;
-    }, 110);
+    window.location.href =
+      `/qollanmalar/english-vocabulary/learn?book=${selectedBook}&unit=${unit}`;
   }
 
   return (
     <main className="page">
-      <div className="pageShell">
-        {/* =========================
-            TOP NAVIGATION
-        ========================== */}
-        <header className="topNav3d">
-          <button
-            type="button"
-            className="brandPlate"
-            onClick={() => {
-              window.location.href = "/";
-            }}
-          >
-            Qurbonov Siyovush Jamaliddinzoda
-          </button>
+      <div className="shell">
+        <button
+          type="button"
+          className="backButton"
+          onClick={goBack}
+        >
+          ← Qo‘llanmalar
+        </button>
 
-          <div className="navActions">
-            <button
-              type="button"
-              className="navButton"
-              onClick={() => {
-                window.location.href = "/talabalar";
-              }}
-            >
-              Talabalar
-            </button>
-
-            <button
-              type="button"
-              className="navButton"
-              onClick={() => {
-                window.location.href = "/abituriyent";
-              }}
-            >
-              Abituriyent
-            </button>
-
-            <button
-              type="button"
-              className="navButton"
-              onClick={() => {
-                window.location.href = "/savol-javob";
-              }}
-            >
-              Savol-javob
-            </button>
-
-            <button
-              type="button"
-              className="navButton navActive"
-              onClick={goBack}
-            >
-              Qo‘llanmalar
-            </button>
-
-            <button
-              type="button"
-              className="navButton navAdmin"
-              onClick={() => {
-                window.location.href = "/admin";
-              }}
-            >
-              Admin
-            </button>
-
-            <button
-              type="button"
-              className="navButton navExit"
-              onClick={() => {
-                window.location.href = "/";
-              }}
-            >
-              Chiqish
-            </button>
-          </div>
-        </header>
-
-        {/* =========================
-            TITLE BADGE
-        ========================== */}
-        <div className="titleBadge3d">
-          English Vocabulary
-        </div>
-
-        {/* =========================
-            MAIN BOOK PANEL
-        ========================== */}
-        <section className="darkPanel3d">
-          <div className="panelTitle">
-            4000 Essential English Words
+        <section className="mainPanel">
+          <div className="floatingTitle">
+            English Vocabulary
           </div>
 
-          <div className="panelSubtitle">
-            Avval Book tanlang, keyin Unitni tanlab testni boshlang.
+          <div className="intro">
+            <h1>4000 Essential English Words</h1>
+            <p>Kitobni tanlang</p>
           </div>
 
           <div className="bookGrid">
@@ -131,51 +149,45 @@ export default function EnglishVocabularyPage() {
                 type="button"
                 className={
                   selectedBook === book
-                    ? "bookButton3d bookSelected"
-                    : "bookButton3d"
+                    ? "bookCard bookCardActive"
+                    : "bookCard"
                 }
-                onClick={() => selectBook(book)}
+                onClick={() => setSelectedBook(book)}
               >
-                Book {book}
+                <span className="bookName">Book {book}</span>
+                <span className="bookSub">30 ta Unit</span>
               </button>
             ))}
           </div>
         </section>
 
-        {/* =========================
-            UNIT TITLE BADGE
-        ========================== */}
-        <div className="sectionBadge3d">
-          Book {selectedBook}
-        </div>
+        {selectedBook && (
+          <section className="unitPanel">
+            <div className="floatingTitle unitFloatingTitle">
+              Book {selectedBook}
+            </div>
 
-        {/* =========================
-            UNIT PANEL
-        ========================== */}
-        <section className="darkPanel3d unitPanel">
-          <div className="unitHint">
-            Unitni tanlang
-          </div>
+            <div className="unitIntro">
+              <h2>Unitni tanlang</h2>
+              <p>
+                Book {selectedBook} bo‘yicha 30 ta Unit
+              </p>
+            </div>
 
-          <div className="unitGrid">
-            {UNITS.map((unit) => (
-              <button
-                key={unit}
-                type="button"
-                className={
-                  pressedUnit === unit
-                    ? "unitButton3d unitPressed"
-                    : "unitButton3d"
-                }
-                onMouseDown={() => setPressedUnit(unit)}
-                onMouseLeave={() => setPressedUnit(null)}
-                onClick={() => openUnit(unit)}
-              >
-                Unit {unit}
-              </button>
-            ))}
-          </div>
-        </section>
+            <div className="unitGrid">
+              {UNITS.map((unit) => (
+                <button
+                  key={unit}
+                  type="button"
+                  className="unitButton"
+                  onClick={() => openUnit(unit)}
+                >
+                  Unit {unit}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       <style jsx>{`
@@ -185,206 +197,119 @@ export default function EnglishVocabularyPage() {
 
         .page {
           min-height: 100vh;
-          padding: 18px 16px 70px;
+          padding: 24px 18px 70px;
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #f7f8f9 48%,
-              #eceff1 100%
+              #f5f7f8 60%,
+              #e9edef 100%
             );
-          color: #111;
           font-family:
             "Bell MT",
             "Times New Roman",
             serif;
+          color: #111;
         }
 
-        .pageShell {
-          width: min(1600px, 100%);
+        .shell {
+          width: min(1200px, 96%);
           margin: 0 auto;
         }
 
-        /* =========================================
-           TOP NAVIGATION — ASOSIY SAYTGA MOS
-        ========================================== */
+        .backButton {
+          min-width: 150px;
+          min-height: 44px;
+          padding: 8px 16px;
 
-        .topNav3d {
-          min-height: 118px;
-          display: grid;
-          grid-template-columns: minmax(330px, 1fr) auto;
-          align-items: center;
-          gap: 26px;
-          padding: 18px 28px;
-
-          border: 3px solid #15394f;
-          border-radius: 24px;
+          border: 2px solid #174461;
+          border-radius: 9px;
 
           background:
             linear-gradient(
               180deg,
-              #8dd8ff 0%,
-              #64b9e9 42%,
-              #4499cc 72%,
-              #3785b1 100%
+              #a8e7ff 0%,
+              #72c3eb 55%,
+              #4b9dcd 100%
             );
 
           box-shadow:
-            inset 0 7px 7px rgba(255,255,255,.72),
-            inset 0 -8px 8px rgba(0,0,0,.18),
-            0 7px 0 #173d55,
-            0 11px 0 #0b2c41,
-            0 18px 22px rgba(0,0,0,.20);
-        }
+            inset 0 4px 4px rgba(255,255,255,.8),
+            inset 0 -3px 3px rgba(0,0,0,.12),
+            0 4px 0 #17415c,
+            0 8px 10px rgba(0,0,0,.18);
 
-        .brandPlate {
-          justify-self: start;
-          min-width: 420px;
-          min-height: 64px;
-          padding: 10px 24px;
-
-          border: 2px solid #62696d;
-          border-radius: 12px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #ececec 38%,
-              #c8c8c8 100%
-            );
-
-          box-shadow:
-            inset 0 5px 4px rgba(255,255,255,.95),
-            inset 0 -4px 4px rgba(0,0,0,.10),
-            0 5px 0 #5c6367,
-            0 9px 10px rgba(0,0,0,.18);
-
-          color: #111;
-          text-align: left;
-          font-family: inherit;
-          font-size: 24px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .navActions {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 14px;
-          flex-wrap: wrap;
-        }
-
-        .navButton {
-          min-width: 132px;
-          min-height: 54px;
-          padding: 9px 17px;
-
-          border: 2px solid #596267;
-          border-radius: 11px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #e7e7e7 40%,
-              #c7c7c7 100%
-            );
-
-          box-shadow:
-            inset 0 5px 4px rgba(255,255,255,.95),
-            inset 0 -4px 4px rgba(0,0,0,.10),
-            0 5px 0 #586064,
-            0 8px 10px rgba(0,0,0,.16);
-
-          color: #111;
+          color: #073b68;
           font-family: inherit;
           font-size: 14px;
           font-weight: 700;
           cursor: pointer;
         }
 
-        .navButton:hover,
-        .brandPlate:hover {
+        .backButton:hover {
           transform: translateY(-2px);
-          filter: brightness(1.035);
         }
 
-        .navButton:active,
-        .brandPlate:active {
+        .backButton:active {
           transform: translateY(3px);
-        }
-
-        .navActive,
-        .navAdmin {
-          color: #ffffff;
-          border-color: #174461;
-
-          background:
-            linear-gradient(
-              180deg,
-              #77c9f2 0%,
-              #4aa4d5 55%,
-              #2c7eb0 100%
-            );
-
           box-shadow:
-            inset 0 5px 4px rgba(255,255,255,.38),
-            inset 0 -4px 4px rgba(0,0,0,.15),
-            0 5px 0 #17415c,
-            0 8px 10px rgba(20,65,92,.24);
+            inset 0 4px 5px rgba(0,0,0,.10),
+            0 1px 0 #17415c;
         }
 
-        .navExit {
-          color: #ffffff;
-          border-color: #8f0e0e;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ff6767 0%,
-              #e72f2f 50%,
-              #bd1010 100%
-            );
-
-          box-shadow:
-            inset 0 5px 4px rgba(255,255,255,.35),
-            inset 0 -4px 4px rgba(0,0,0,.15),
-            0 5px 0 #8d1111,
-            0 8px 10px rgba(100,0,0,.20);
-        }
-
-        /* =========================================
-           TITLE BADGE
-        ========================================== */
-
-        .titleBadge3d,
-        .sectionBadge3d {
-          width: fit-content;
-          margin: 20px auto -18px;
+        .mainPanel,
+        .unitPanel {
           position: relative;
-          z-index: 3;
+          margin-top: 76px;
+          padding: 70px 30px 34px;
 
-          min-width: 560px;
-          min-height: 62px;
-          padding: 11px 30px;
+          border: 3px solid #333a3e;
+          border-radius: 23px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #62686b 0%,
+              #505659 46%,
+              #3d4346 100%
+            );
+
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.10),
+            inset 0 -7px 7px rgba(0,0,0,.22),
+            0 6px 0 #30373b,
+            0 11px 0 #242a2d,
+            0 17px 24px rgba(0,0,0,.22);
+        }
+
+        .unitPanel {
+          margin-top: 82px;
+          padding-top: 64px;
+        }
+
+        .floatingTitle {
+          position: absolute;
+          left: 50%;
+          top: -31px;
+          transform: translateX(-50%);
+
+          min-width: 340px;
+          min-height: 58px;
+          padding: 10px 28px;
 
           display: flex;
           align-items: center;
           justify-content: center;
 
           border: 3px solid #174461;
-          border-radius: 13px;
-
-          color: #073b68;
+          border-radius: 12px;
 
           background:
             linear-gradient(
               180deg,
-              #a8e4ff 0%,
-              #77c8f0 44%,
-              #4b9fd0 100%
+              #a9e7ff 0%,
+              #75c5ed 47%,
+              #4a9dce 100%
             );
 
           box-shadow:
@@ -393,94 +318,77 @@ export default function EnglishVocabularyPage() {
             0 6px 0 #17415c,
             0 10px 13px rgba(20,65,92,.24);
 
-          font-size: 31px;
+          color: #073b68;
+          font-size: 30px;
           font-weight: 700;
           text-align: center;
+          white-space: nowrap;
         }
 
-        .sectionBadge3d {
-          min-width: 270px;
-          font-size: 25px;
-          margin-top: 42px;
+        .unitFloatingTitle {
+          min-width: 250px;
+          font-size: 27px;
         }
 
-        /* =========================================
-           DARK 3D PANEL
-        ========================================== */
-
-        .darkPanel3d {
-          padding: 56px 42px 40px;
-
-          border: 3px solid #333a3e;
-          border-radius: 24px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #61676a 0%,
-              #505659 45%,
-              #3d4346 100%
-            );
-
-          box-shadow:
-            inset 0 5px 5px rgba(255,255,255,.10),
-            inset 0 -7px 7px rgba(0,0,0,.22),
-            0 6px 0 #30373b,
-            0 11px 0 #23292c,
-            0 17px 24px rgba(0,0,0,.22);
-        }
-
-        .panelTitle {
+        .intro,
+        .unitIntro {
           text-align: center;
+          margin-bottom: 30px;
+        }
+
+        .intro h1,
+        .unitIntro h2 {
+          margin: 0;
           color: #ffffff;
-          font-size: 25px;
+          font-size: 28px;
           font-weight: 700;
-          text-shadow: 0 2px 0 rgba(0,0,0,.38);
+          text-shadow:
+            0 2px 0 rgba(0,0,0,.35);
         }
 
-        .panelSubtitle {
-          margin-top: 8px;
-          margin-bottom: 28px;
-          text-align: center;
+        .intro p,
+        .unitIntro p {
+          margin: 7px 0 0;
           color: #e7eaec;
-          font-size: 15px;
+          font-size: 16px;
+          font-weight: 700;
         }
-
-        /* =========================================
-           BOOK BUTTONS
-        ========================================== */
 
         .bookGrid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 22px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 26px;
         }
 
-        .bookButton3d {
-          min-height: 104px;
-          padding: 16px 18px;
+        .bookCard {
+          min-height: 160px;
+          padding: 18px 20px;
 
-          border: 2px solid #5b6367;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+
+          border: 2px solid #596166;
           border-radius: 15px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #ececec 42%,
+              #ededed 42%,
               #c8c8c8 100%
             );
 
           box-shadow:
             inset 0 7px 6px rgba(255,255,255,.95),
             inset 0 -5px 5px rgba(0,0,0,.10),
-            0 6px 0 #5b6367,
-            0 11px 12px rgba(0,0,0,.17);
+            0 6px 0 #596166,
+            0 11px 12px rgba(0,0,0,.18);
 
           color: #111;
           font-family: inherit;
-          font-size: 23px;
-          font-weight: 700;
           cursor: pointer;
 
           transition:
@@ -489,19 +397,16 @@ export default function EnglishVocabularyPage() {
             box-shadow .10s ease;
         }
 
-        .bookButton3d:hover {
+        .bookCard:hover {
           transform: translateY(-3px);
           filter: brightness(1.035);
         }
 
-        .bookButton3d:active {
+        .bookCard:active {
           transform: translateY(4px);
-          box-shadow:
-            inset 0 5px 6px rgba(0,0,0,.12),
-            0 2px 0 #596166;
         }
 
-        .bookSelected {
+        .bookCardActive {
           color: #073b68;
           border-color: #174461;
 
@@ -520,186 +425,23 @@ export default function EnglishVocabularyPage() {
             0 11px 14px rgba(20,65,92,.25);
         }
 
-        /* =========================================
-           UNIT PANEL
-        ========================================== */
-
-        .unitPanel {
-          padding-top: 50px;
+        .bookName {
+          font-size: 28px;
+          font-weight: 700;
         }
 
-        .unitHint {
-          margin-bottom: 25px;
-          color: #ffffff;
-          text-align: center;
-          font-size: 20px;
+        .bookSub {
+          font-size: 14px;
           font-weight: 700;
-          text-shadow: 0 2px 0 rgba(0,0,0,.35);
+          opacity: .75;
         }
 
         .unitGrid {
           display: grid;
           grid-template-columns: repeat(8, minmax(0, 1fr));
-          gap: 18px 15px;
+          gap: 18px 14px;
         }
 
-        .unitButton3d {
+        .unitButton {
           min-height: 68px;
-          padding: 12px 14px;
-
-          border: 2px solid #5b6367;
-          border-radius: 11px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #ededed 42%,
-              #c8c8c8 100%
-            );
-
-          box-shadow:
-            inset 0 6px 5px rgba(255,255,255,.95),
-            inset 0 -4px 4px rgba(0,0,0,.10),
-            0 5px 0 #596166,
-            0 9px 10px rgba(0,0,0,.16);
-
-          color: #111;
-          font-family: inherit;
-          font-size: 16px;
-          font-weight: 700;
-          cursor: pointer;
-
-          transition:
-            transform .08s ease,
-            filter .08s ease,
-            background .08s ease,
-            box-shadow .08s ease;
-        }
-
-        .unitButton3d:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.035);
-        }
-
-        .unitPressed,
-        .unitButton3d:active {
-          transform: translateY(4px);
-
-          color: #073b68;
-          border-color: #174461;
-
-          background:
-            linear-gradient(
-              180deg,
-              #abe6ff 0%,
-              #78c8ef 42%,
-              #4b9fd0 100%
-            );
-
-          box-shadow:
-            inset 0 5px 6px rgba(0,0,0,.10),
-            inset 0 2px 2px rgba(255,255,255,.55),
-            0 2px 0 #17415c,
-            0 5px 7px rgba(20,65,92,.21);
-        }
-
-        /* =========================================
-           RESPONSIVE
-        ========================================== */
-
-        @media (max-width: 1450px) {
-          .topNav3d {
-            grid-template-columns: 1fr;
-          }
-
-          .brandPlate {
-            justify-self: center;
-            min-width: 420px;
-            text-align: center;
-          }
-
-          .navActions {
-            justify-content: center;
-          }
-        }
-
-        @media (max-width: 1100px) {
-          .bookGrid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-          }
-
-          .unitGrid {
-            grid-template-columns: repeat(6, minmax(0, 1fr));
-          }
-        }
-
-        @media (max-width: 820px) {
-          .titleBadge3d {
-            min-width: 0;
-            width: min(92%, 560px);
-            font-size: 26px;
-          }
-
-          .bookGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-
-          .unitGrid {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-          }
-
-          .darkPanel3d {
-            padding-left: 18px;
-            padding-right: 18px;
-          }
-        }
-
-        @media (max-width: 620px) {
-          .page {
-            padding: 10px 8px 50px;
-          }
-
-          .brandPlate {
-            min-width: 0;
-            width: 100%;
-            font-size: 19px;
-          }
-
-          .navActions {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            width: 100%;
-          }
-
-          .navButton {
-            min-width: 0;
-            width: 100%;
-          }
-
-          .bookGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .unitGrid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-          }
-
-          .bookButton3d {
-            min-height: 82px;
-          }
-
-          .sectionBadge3d {
-            min-width: 220px;
-          }
-        }
-
-        @media (max-width: 440px) {
-          .unitGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
-      `}</style>
-    </main>
-  );
-}
+          padding: 12px 12px;
