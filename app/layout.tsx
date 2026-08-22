@@ -17,15 +17,75 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Qurbonovv.uz",
+  metadataBase: new URL("https://qurbonovv.uz"),
+
+  title: {
+    default: "Qurbonovv.uz | Huquqiy ta’lim platformasi",
+    template: "%s | Qurbonovv.uz",
+  },
 
   description:
-    "Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi. Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar va qo‘llanmalar.",
+    "Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi. Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar, kodekslar, qonunchilik hujjatlari va qo‘llanmalar.",
+
+  keywords: [
+    "Qurbonovv",
+    "Qurbonovv.uz",
+    "Qurbonov Siyovush",
+    "Qurbonov Siyovush Jamaliddinzoda",
+    "huquq",
+    "huquqiy ta’lim",
+    "huquqiy ta’lim platformasi",
+    "huquq testlari",
+    "yuridik testlar",
+    "kodekslar",
+    "qonunchilik hujjatlari",
+    "kazuslar",
+    "huquq qo‘llanmalar",
+    "talabalar uchun huquq",
+    "abituriyentlar uchun huquq",
+    "English Vocabulary",
+    "4000 Essential English Words",
+  ],
+
+  authors: [
+    {
+      name: "Qurbonov Siyovush Jamaliddinzoda",
+    },
+  ],
+
+  creator: "Qurbonov Siyovush Jamaliddinzoda",
+  publisher: "Qurbonov Siyovush Jamaliddinzoda",
+
+  alternates: {
+    canonical: "/",
+  },
 
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
     apple: "/icon.png",
+  },
+
+  openGraph: {
+    type: "website",
+    locale: "uz_UZ",
+    url: "https://qurbonovv.uz",
+    siteName: "Qurbonovv.uz",
+
+    title: "Qurbonovv.uz | Huquqiy ta’lim platformasi",
+
+    description:
+      "Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar, kodekslar, qonunchilik hujjatlari va qo‘llanmalar.",
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+
+    googleBot: {
+      index: true,
+      follow: true,
+    },
   },
 };
 
