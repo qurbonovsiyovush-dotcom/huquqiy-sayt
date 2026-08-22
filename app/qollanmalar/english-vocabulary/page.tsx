@@ -9,7 +9,7 @@ export default function EnglishVocabularyPage() {
   const [selectedBook, setSelectedBook] = useState<number | null>(null);
 
   function goBack() {
-    window.location.href = "/qollanmalar";
+    window.location.href = "/";
   }
 
   function openUnit(unit: number) {
@@ -28,7 +28,7 @@ export default function EnglishVocabularyPage() {
             className="backButton"
             onClick={goBack}
           >
-            ← Qo‘llanmalar
+            ← Asosiy sahifa
           </button>
         </div>
 
@@ -669,6 +669,21 @@ export default function EnglishVocabularyPage() {
 
           .unitButton {
             min-height: 46px;
+            font-size: 12px;
+          }
+        }
+
+
+        @media (max-width: 640px) {
+          .guideBar {
+            min-height: 58px;
+            padding: 8px 10px;
+          }
+
+          .backButton {
+            min-width: 128px;
+            min-height: 36px;
+            padding: 6px 12px;
             font-size: 12px;
           }
         }
