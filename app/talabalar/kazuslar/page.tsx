@@ -53,6 +53,8 @@ export default function KazuslarPage() {
   const [search, setSearch] = useState("");
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfSubject, setPdfSubject] = useState("");
+  const [pdfTitle, setPdfTitle] = useState("");
   const [pdfUploading, setPdfUploading] = useState(false);
   const [pdfMessage, setPdfMessage] = useState("");
 
@@ -156,6 +158,8 @@ export default function KazuslarPage() {
   function openUploadMode() {
     setSaveMessage("");
     setPdfFile(null);
+    setPdfSubject("");
+    setPdfTitle("");
     setPdfMessage("");
     setMode("upload");
   }
@@ -163,6 +167,16 @@ export default function KazuslarPage() {
   async function uploadPdf() {
     if (role !== "admin") {
       setPdfMessage("❌ PDF yuklash faqat administrator uchun.");
+      return;
+    }
+
+    if (!pdfSubject.trim()) {
+      setPdfMessage("❌ Fan nomini kiriting.");
+      return;
+    }
+
+    if (!pdfTitle.trim()) {
+      setPdfMessage("❌ Kazus nomini kiriting.");
       return;
     }
 
@@ -190,6 +204,8 @@ export default function KazuslarPage() {
 
       const formData = new FormData();
       formData.append("file", pdfFile);
+      formData.append("subject", pdfSubject.trim());
+      formData.append("title", pdfTitle.trim());
 
       const response = await fetch("/api/kazuslar/upload", {
         method: "POST",
@@ -207,6 +223,8 @@ export default function KazuslarPage() {
 
       setPdfMessage("✅ PDF muvaffaqiyatli yuklandi.");
       setPdfFile(null);
+      setPdfSubject("");
+      setPdfTitle("");
 
       window.setTimeout(() => {
         setPdfMessage("");
@@ -619,6 +637,36 @@ export default function KazuslarPage() {
               Faqat PDF formatidagi, 10 MB gacha bo‘lgan fayl yuklang.
             </p>
 
+            <div className="pdfMetaFields">
+              <div className="pdfField">
+                <label>Fan nomi</label>
+                <input
+                  type="text"
+                  value={pdfSubject}
+                  onChange={(e) => {
+                    setPdfSubject(e.target.value);
+                    setPdfMessage("");
+                  }}
+                  placeholder="Masalan: Jinoyat huquqi"
+                  disabled={pdfUploading}
+                />
+              </div>
+
+              <div className="pdfField">
+                <label>Kazus nomi</label>
+                <input
+                  type="text"
+                  value={pdfTitle}
+                  onChange={(e) => {
+                    setPdfTitle(e.target.value);
+                    setPdfMessage("");
+                  }}
+                  placeholder="Masalan: 1-kazus"
+                  disabled={pdfUploading}
+                />
+              </div>
+            </div>
+
             <input
               className="fileInput"
               type="file"
@@ -656,6 +704,8 @@ export default function KazuslarPage() {
               type="button"
               onClick={() => {
                 setPdfFile(null);
+                setPdfSubject("");
+                setPdfTitle("");
                 setPdfMessage("");
                 setMode("list");
               }}
@@ -668,7 +718,12 @@ export default function KazuslarPage() {
               className="saveButton"
               type="button"
               onClick={uploadPdf}
-              disabled={pdfUploading || !pdfFile}
+              disabled={
+                pdfUploading ||
+                !pdfFile ||
+                !pdfSubject.trim() ||
+                !pdfTitle.trim()
+              }
             >
               {pdfUploading ? "PDF yuklanmoqda..." : "PDF yuklash"}
             </button>
@@ -1174,6 +1229,44 @@ export default function KazuslarPage() {
           font-weight: 700;
         }
 
+        .pdfMetaFields {
+          max-width: 650px;
+          margin: 28px auto 0;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 18px;
+          text-align: left;
+        }
+
+        .pdfField {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .pdfField label {
+          color: #173e58;
+          font-size: 18px;
+          font-weight: 700;
+        }
+
+        .pdfField input {
+          width: 100%;
+          min-height: 50px;
+          padding: 10px 14px;
+          border: 2px solid #525a5f;
+          border-radius: 10px;
+          outline: none;
+          font-family: inherit;
+          font-size: 17px;
+          background: #ffffff;
+          box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.12);
+        }
+
+        .pdfField input:focus {
+          border-color: #5cb6eb;
+        }
+
         .fileInput {
           max-width: 600px;
           margin-top: 25px;
@@ -1400,6 +1493,10 @@ export default function KazuslarPage() {
           }
 
           .bottomButtons {
+            grid-template-columns: 1fr;
+          }
+
+          .pdfMetaFields {
             grid-template-columns: 1fr;
           }
 
