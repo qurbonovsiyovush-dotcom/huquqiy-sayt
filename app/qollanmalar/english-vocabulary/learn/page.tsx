@@ -1693,9 +1693,265 @@ function LearnContent() {
             max-width:
               700px
           ) {
+            .finishedPage {
+              align-items:
+                flex-start;
+
+              padding:
+                18px 10px 30px;
+            }
+
+            .finishedCard {
+              width:
+                100%;
+
+              padding:
+                24px 14px;
+
+              border-radius:
+                18px;
+
+              border-width:
+                2px;
+
+              box-shadow:
+                inset 0 5px 4px
+                  rgba(
+                    255,
+                    255,
+                    255,
+                    .80
+                  ),
+
+                inset 0 -5px 5px
+                  rgba(
+                    0,
+                    0,
+                    0,
+                    .10
+                  ),
+
+                0 5px 0
+                  #51585c,
+
+                0 10px 16px
+                  rgba(
+                    0,
+                    0,
+                    0,
+                    .20
+                  );
+            }
+
+            .finishedTop {
+              font-size:
+                15px;
+
+              line-height:
+                1.25;
+            }
+
+            h1 {
+              margin:
+                10px 0 6px;
+
+              font-size:
+                30px;
+
+              line-height:
+                1.05;
+            }
+
+            .finishText {
+              font-size:
+                16px;
+
+              line-height:
+                1.25;
+            }
+
             .resultRow {
               grid-template-columns:
+                repeat(
+                  3,
+                  minmax(
+                    0,
+                    1fr
+                  )
+                );
+
+              gap:
+                8px;
+
+              margin:
+                22px 0;
+            }
+
+            .resultBox {
+              min-height:
+                82px;
+
+              padding:
+                10px 5px;
+
+              border-radius:
+                11px;
+
+              border-width:
+                1.5px;
+
+              box-shadow:
+                inset 0 3px 3px
+                  white,
+
+                0 3px 0
+                  #555d61;
+            }
+
+            .resultBox strong {
+              margin-bottom:
+                2px;
+
+              font-size:
+                28px;
+            }
+
+            .resultBox span {
+              font-size:
+                12px;
+
+              line-height:
+                1.1;
+            }
+
+            .difficultList {
+              margin:
+                10px 0 20px;
+
+              padding:
+                13px;
+
+              border-radius:
+                12px;
+            }
+
+            .difficultTitle {
+              margin-bottom:
+                10px;
+
+              font-size:
+                17px;
+            }
+
+            .wordChips {
+              gap:
+                7px;
+            }
+
+            .wordChip {
+              padding:
+                5px 10px;
+
+              font-size:
+                13px;
+            }
+
+            .finishButtons {
+              display:
+                grid;
+
+              grid-template-columns:
+                repeat(
+                  2,
+                  minmax(
+                    0,
+                    1fr
+                  )
+                );
+
+              gap:
+                10px;
+
+              width:
+                100%;
+            }
+
+            .finishButtons button {
+              min-width:
+                0;
+
+              width:
+                100%;
+
+              min-height:
+                42px;
+
+              padding:
+                8px 8px;
+
+              border-radius:
+                9px;
+
+              font-size:
+                13px;
+            }
+
+            .reviewButton {
+              grid-column:
+                1 / -1;
+            }
+          }
+
+          @media (
+            max-width:
+              390px
+          ) {
+            .finishedCard {
+              padding:
+                20px 10px;
+            }
+
+            h1 {
+              font-size:
+                27px;
+            }
+
+            .finishText {
+              font-size:
+                15px;
+            }
+
+            .resultRow {
+              gap:
+                6px;
+            }
+
+            .resultBox {
+              min-height:
+                76px;
+
+              padding:
+                8px 3px;
+            }
+
+            .resultBox strong {
+              font-size:
+                25px;
+            }
+
+            .resultBox span {
+              font-size:
+                11px;
+            }
+
+            .finishButtons {
+              grid-template-columns:
                 1fr;
+            }
+
+            .reviewButton {
+              grid-column:
+                auto;
             }
           }
         `}</style>
