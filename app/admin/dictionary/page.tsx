@@ -24,7 +24,6 @@ export default function DictionaryAdminPage() {
   const [text, setText] = useState("");
 
   const [savedWords, setSavedWords] = useState<VocabularyWord[]>([]);
-
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -35,7 +34,7 @@ export default function DictionaryAdminPage() {
   const units = Array.from({ length: 30 }, (_, i) => i + 1);
 
   /* =========================================================
-     TEXTDAN SO‘ZLARNI AJRATISH
+     SO‘ZLARNI PARSE QILISH
   ========================================================= */
 
   const parsedWords = useMemo(() => {
@@ -69,10 +68,6 @@ export default function DictionaryAdminPage() {
       .filter((item): item is VocabularyWord => item !== null);
   }, [text]);
 
-  /* =========================================================
-     STATISTIKA
-  ========================================================= */
-
   const totalLines = useMemo(() => {
     return text
       .split("\n")
@@ -89,7 +84,7 @@ export default function DictionaryAdminPage() {
   }, [parsedWords]);
 
   /* =========================================================
-     UNITDAGI SO‘ZLARNI YUKLASH
+     SO‘ZLARNI YUKLASH
   ========================================================= */
 
   async function loadWords() {
@@ -195,14 +190,6 @@ export default function DictionaryAdminPage() {
         );
       }
 
-      /*
-        MUHIM:
-        importdan keyin yana darhol GET qilmaymiz.
-
-        POST javobidagi yangi words ni to‘g‘ridan-to‘g‘ri
-        ekranga chiqaramiz.
-      */
-
       const newlySavedWords = Array.isArray(data.words)
         ? data.words
         : parsedWords;
@@ -229,7 +216,7 @@ export default function DictionaryAdminPage() {
   }
 
   /* =========================================================
-     TAHRIRLASH UCHUN TEXTAREA GA QAYTARISH
+     TAHRIRLASH
   ========================================================= */
 
   function loadSavedIntoEditor() {
@@ -262,14 +249,43 @@ export default function DictionaryAdminPage() {
 
   return (
     <main className="page">
-      <div className="ambient ambient1" />
-      <div className="ambient ambient2" />
+      <div className="pageGlow pageGlowOne" />
+      <div className="pageGlow pageGlowTwo" />
 
-      <div className="wrapper">
-        {/* HEADER */}
+      <div className="container">
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
 
-        <header className="hero3d">
-          <div className="heroIcon">📘</div>
+        <div className="topPanel">
+          <div className="topLeft">
+            <div className="logoMark">
+              <span>QS</span>
+            </div>
+
+            <div>
+              <div className="siteName">
+                Qurbonov Siyovush Jamaliddinzoda
+              </div>
+
+              <div className="siteSub">
+                English Vocabulary boshqaruv paneli
+              </div>
+            </div>
+          </div>
+
+          <div className="adminBadge">
+            <span className="adminDot" />
+            Admin
+          </div>
+        </div>
+
+        {/* =====================================================
+            TITLE
+        ===================================================== */}
+
+        <div className="titleBlock">
+          <div className="titleLine" />
 
           <div>
             <h1>English Vocabulary</h1>
@@ -279,37 +295,32 @@ export default function DictionaryAdminPage() {
               boshqarish
             </p>
           </div>
+        </div>
 
-          <div className="heroBadge">
-            <span>●</span>
-            Admin panel
-          </div>
-        </header>
+        {/* =====================================================
+            MAIN CARD
+        ===================================================== */}
 
-        {/* ASOSIY PANEL */}
-
-        <section className="mainCard">
-          <div className="cardHeader">
+        <section className="panel">
+          <div className="panelTop">
             <div>
-              <div className="miniTitle">VOCABULARY MANAGER</div>
+              <div className="sectionLabel">LUG‘AT BOSHQARUVI</div>
+
               <h2>Unitga so‘z qo‘shish</h2>
             </div>
 
-            <div className="selectedTop">
-              Book {book} · Unit {unit}
+            <div className="selectionBadge">
+              Book {book} / Unit {unit}
             </div>
           </div>
 
-          {/* BOOK / UNIT */}
+          {/* BOOK UNIT */}
 
           <div className="selectorGrid">
-            <div className="fieldGroup">
-              <label>
-                <span className="labelIcon">📚</span>
-                Book
-              </label>
+            <div className="field">
+              <label>Book</label>
 
-              <div className="selectShell">
+              <div className="input3d">
                 <select
                   value={book}
                   onChange={(e) => {
@@ -328,13 +339,10 @@ export default function DictionaryAdminPage() {
               </div>
             </div>
 
-            <div className="fieldGroup">
-              <label>
-                <span className="labelIcon">📖</span>
-                Unit
-              </label>
+            <div className="field">
+              <label>Unit</label>
 
-              <div className="selectShell">
+              <div className="input3d">
                 <select
                   value={unit}
                   onChange={(e) => {
@@ -354,112 +362,108 @@ export default function DictionaryAdminPage() {
             </div>
           </div>
 
-          {/* TANLANGAN */}
+          {/* CURRENT SELECTION */}
 
-          <div className="selectedBar">
-            <div className="check3d">✓</div>
+          <div className="currentSelection">
+            <div className="currentCircle">✓</div>
 
             <div>
-              <small>Hozirgi tanlov</small>
+              <span>Tanlangan bo‘lim</span>
 
               <strong>
                 Book {book}
-                <span className="arrow">→</span>
+                <b>→</b>
                 Unit {unit}
               </strong>
             </div>
           </div>
 
-          {/* MESSAGE */}
+          {/* MESSAGES */}
 
           {message && (
-            <div className="message success">
-              <div className="messageIcon">✓</div>
-              <div>{message}</div>
+            <div className="alert successAlert">
+              <div className="alertIcon">✓</div>
+              {message}
             </div>
           )}
 
           {error && (
-            <div className="message danger">
-              <div className="messageIcon">!</div>
-              <div>{error}</div>
+            <div className="alert errorAlert">
+              <div className="alertIcon">!</div>
+              {error}
             </div>
           )}
 
-          {/* TEXTAREA */}
+          {/* EDITOR HEADER */}
 
-          <div className="editorSection">
-            <div className="editorHeading">
-              <div>
-                <h3>So‘zlarni kiriting</h3>
+          <div className="editorHeader">
+            <div>
+              <h3>So‘zlarni kiriting</h3>
 
-                <p>
-                  Format:
-                  <strong>
-                    {" "}
-                    English | Uzbek | English example | Uzbek example
-                  </strong>
-                </p>
+              <p>
+                Format:
+                <strong>
+                  {" "}
+                  English | Uzbek | English example | Uzbek example
+                </strong>
+              </p>
 
-                <p>
-                  Misol gaplar bo‘lmasa:
-                  <strong> English | Uzbek</strong>
-                </p>
-              </div>
-
-              <div className="formatBadge">
-                {totalLines === 0 ? "Tayyor" : `${totalLines} qator`}
-              </div>
+              <p>
+                Misol gap bo‘lmasa:
+                <strong> English | Uzbek</strong>
+              </p>
             </div>
 
-            <div
-              className={`textareaShell ${
-                invalidLines > 0 ? "textareaError" : ""
-              }`}
-            >
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                spellCheck={false}
-                placeholder={`afraid | qo‘rqqan | I am afraid of dogs. | Men itlardan qo‘rqaman.
-agree | rozi bo‘lmoq | I agree with you. | Men sizga qo‘shilaman.
-angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
-              />
+            <div className="lineCounter">
+              {totalLines === 0 ? "0 qator" : `${totalLines} qator`}
             </div>
           </div>
 
-          {/* BOTTOM CONTROL */}
+          {/* TEXTAREA */}
 
-          <div className="bottomControl">
+          <div
+            className={`textareaOuter ${
+              invalidLines > 0 ? "textareaInvalid" : ""
+            }`}
+          >
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              spellCheck={false}
+              placeholder={`afraid | qo‘rqqan | I am afraid of dogs. | Men itlardan qo‘rqaman.
+agree | rozi bo‘lmoq | I agree with you. | Men sizga qo‘shilaman.
+angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
+            />
+          </div>
+
+          {/* STATISTICS + BUTTON */}
+
+          <div className="controlRow">
             <div className="stats">
-              <div className="stat">
+              <div className="statItem">
                 <span>Qator</span>
                 <strong>{totalLines}</strong>
               </div>
 
-              <div className="stat successStat">
+              <div className="statItem good">
                 <span>To‘g‘ri</span>
                 <strong>{parsedWords.length}</strong>
               </div>
 
-              <div
-                className={`stat ${
-                  invalidLines > 0 ? "errorStat" : ""
-                }`}
-              >
+              <div className={`statItem ${invalidLines > 0 ? "bad" : ""}`}>
                 <span>Xato</span>
                 <strong>{invalidLines}</strong>
               </div>
 
-              <div className="stat">
-                <span>Misolli</span>
+              <div className="statItem">
+                <span>Misol gap</span>
                 <strong>{exampleCount}</strong>
               </div>
             </div>
 
             <button
               type="button"
-              className="importBtn"
+              className="importButton"
               disabled={
                 saving ||
                 parsedWords.length === 0 ||
@@ -467,21 +471,19 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
               }
               onClick={handleImport}
             >
-              <span className="importIcon">
-                {saving ? "◌" : "⇧"}
-              </span>
-
               {saving ? "Saqlanmoqda..." : "Import qilish"}
             </button>
           </div>
         </section>
 
-        {/* SAQLANGAN SO‘ZLAR */}
+        {/* =====================================================
+            SAVED WORDS
+        ===================================================== */}
 
-        <section className="savedCard">
-          <div className="savedHeader">
+        <section className="panel savedPanel">
+          <div className="savedTop">
             <div>
-              <div className="miniTitle">DATABASE</div>
+              <div className="sectionLabel">SAQLANGAN MA’LUMOTLAR</div>
 
               <h2>Saqlangan so‘zlar</h2>
 
@@ -490,85 +492,88 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
               </p>
             </div>
 
-            <div className="savedActions">
-              <div className="wordCount">
+            <div className="savedControls">
+              <div className="savedCount">
                 {savedWords.length}
-                <small> ta so‘z</small>
+                <span> ta</span>
               </div>
 
               <button
-                className="editBtn"
                 type="button"
+                className="smallButton editButton"
                 onClick={loadSavedIntoEditor}
                 disabled={loading || savedWords.length === 0}
               >
-                ✏ Tahrirlash
+                Tahrirlash
               </button>
 
               <button
-                className="refreshBtn"
                 type="button"
+                className="smallButton refreshButton"
                 onClick={loadWords}
                 disabled={loading}
               >
-                {loading ? "⟳ Yuklanmoqda..." : "⟳ Yangilash"}
+                {loading ? "Yuklanmoqda..." : "Yangilash"}
               </button>
             </div>
           </div>
 
           {loading ? (
-            <div className="empty3d">
-              <div className="loadingSpinner" />
+            <div className="emptyState">
+              <div className="spinner" />
               <strong>So‘zlar yuklanmoqda...</strong>
             </div>
           ) : savedWords.length === 0 ? (
-            <div className="empty3d">
-              <div className="emptyIcon">📭</div>
-
-              <strong>
-                Bu Unit uchun hali so‘z saqlanmagan.
-              </strong>
+            <div className="emptyState">
+              <strong>Bu Unit uchun hali so‘z saqlanmagan.</strong>
 
               <span>
-                Yuqoridagi maydonga so‘zlarni kiriting va Import qilish
+                So‘zlarni yuqoridagi maydonga kiriting va Import qilish
                 tugmasini bosing.
               </span>
             </div>
           ) : (
-            <div className="wordGrid">
+            <div className="wordList">
               {savedWords.map((item, index) => (
-                <article
-                  className="wordCard"
+                <div
+                  className="wordRow"
                   key={`${item.word}-${index}`}
                 >
-                  <div className="wordTop">
-                    <div className="numberBadge">
-                      {index + 1}
-                    </div>
-
-                    <div className="wordMain">
-                      <strong>{item.word}</strong>
-                      <span>{item.translation}</span>
-                    </div>
+                  <div className="wordNumber">
+                    {index + 1}
                   </div>
 
-                  {(item.example ||
-                    item.exampleTranslation) && (
-                    <div className="exampleBox">
-                      {item.example && (
-                        <div className="exampleEnglish">
-                          {item.example}
-                        </div>
-                      )}
+                  <div className="wordContent">
+                    <div className="wordLine">
+                      <strong className="englishWord">
+                        {item.word}
+                      </strong>
 
-                      {item.exampleTranslation && (
-                        <div className="exampleUzbek">
-                          {item.exampleTranslation}
-                        </div>
-                      )}
+                      <span className="divider">—</span>
+
+                      <span className="uzbekWord">
+                        {item.translation}
+                      </span>
                     </div>
-                  )}
-                </article>
+
+                    {(item.example ||
+                      item.exampleTranslation) && (
+                      <div className="exampleArea">
+                        {item.example && (
+                          <div className="englishExample">
+                            {item.example}
+                          </div>
+                        )}
+
+                        {item.exampleTranslation && (
+                          <div className="uzbekExample">
+                            {item.exampleTranslation}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -581,782 +586,917 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         }
 
         .page {
-          position: relative;
           min-height: 100vh;
+          position: relative;
           overflow: hidden;
-          padding: 42px 22px 70px;
+
+          padding: 28px 20px 60px;
+
           font-family: "Bell MT", "Times New Roman", serif;
 
+          color: #1c2733;
+
           background:
-            radial-gradient(
-              circle at 15% 0%,
-              rgba(122, 189, 255, 0.23),
-              transparent 31%
-            ),
-            radial-gradient(
-              circle at 88% 8%,
-              rgba(202, 214, 231, 0.45),
-              transparent 30%
-            ),
             linear-gradient(
-              145deg,
-              #eef3f8 0%,
-              #f8fafc 42%,
-              #e5ebf2 100%
+              180deg,
+              #f3f5f7 0%,
+              #e8ebef 50%,
+              #dde2e7 100%
             );
-
-          color: #11243b;
         }
 
-        .ambient {
+        .pageGlow {
           position: fixed;
-          border-radius: 999px;
-          filter: blur(80px);
           pointer-events: none;
-          opacity: 0.35;
+          border-radius: 50%;
+          filter: blur(100px);
+          opacity: 0.18;
         }
 
-        .ambient1 {
-          width: 300px;
-          height: 300px;
-          background: #68b6ff;
-          top: -120px;
-          left: -100px;
+        .pageGlowOne {
+          width: 380px;
+          height: 380px;
+          background: #789fc2;
+
+          top: -180px;
+          left: -150px;
         }
 
-        .ambient2 {
-          width: 350px;
-          height: 350px;
-          background: #bac9da;
-          right: -150px;
-          top: 200px;
+        .pageGlowTwo {
+          width: 420px;
+          height: 420px;
+          background: #aac2d6;
+
+          right: -220px;
+          bottom: 70px;
         }
 
-        .wrapper {
+        .container {
           position: relative;
           z-index: 2;
-          max-width: 1240px;
+
+          max-width: 1180px;
           margin: 0 auto;
         }
 
-        /* HEADER */
+        /* =====================================================
+           TOP PANEL
+        ===================================================== */
 
-        .hero3d {
+        .topPanel {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 18px;
 
-          padding: 22px 26px;
-          margin-bottom: 28px;
+          gap: 20px;
 
-          border-radius: 25px;
+          padding: 18px 22px;
+
+          border: 1px solid #cdd3da;
+
+          border-radius: 18px;
 
           background:
             linear-gradient(
               145deg,
-              rgba(255, 255, 255, 0.97),
-              rgba(224, 232, 241, 0.96)
+              #f7f8fa,
+              #dde2e7
             );
 
-          border: 1px solid rgba(255,255,255,.95);
-
           box-shadow:
-            14px 14px 28px rgba(72, 91, 115, 0.18),
-            -12px -12px 25px rgba(255,255,255,.95),
-            inset 1px 1px 0 rgba(255,255,255,.9);
+            8px 8px 18px rgba(83, 92, 103, 0.18),
+            -7px -7px 16px rgba(255, 255, 255, 0.92),
+            inset 1px 1px 0 rgba(255, 255, 255, 0.8);
         }
 
-        .heroIcon {
-          width: 64px;
-          height: 64px;
+        .topLeft {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+
+        .logoMark {
+          width: 48px;
+          height: 48px;
 
           display: grid;
           place-items: center;
 
-          border-radius: 18px;
+          border-radius: 13px;
 
-          font-size: 30px;
+          color: white;
+
+          font-family: "Times New Roman", serif;
+          font-size: 16px;
+          font-weight: 700;
 
           background:
             linear-gradient(
               145deg,
-              #78c5ff,
-              #217bd2
+              #628cac,
+              #315c7d
             );
 
           box-shadow:
-            7px 7px 13px rgba(21, 86, 145, 0.35),
-            inset 3px 3px 5px rgba(255,255,255,.55),
-            inset -4px -4px 7px rgba(5,61,117,.25);
+            4px 5px 9px rgba(43, 70, 91, 0.3),
+            inset 2px 2px 4px rgba(255,255,255,.3);
         }
 
-        .hero3d h1 {
-          margin: 0;
-
-          font-size: clamp(30px, 4vw, 44px);
-          color: #073b68;
-
-          letter-spacing: -0.5px;
+        .siteName {
+          color: #143d5d;
+          font-size: 20px;
+          font-weight: 700;
         }
 
-        .hero3d p {
-          margin: 6px 0 0;
-          color: #66758a;
-          font-size: 17px;
+        .siteSub {
+          margin-top: 3px;
+          color: #7a828b;
+          font-size: 14px;
         }
 
-        .heroBadge {
-          margin-left: auto;
-
+        .adminBadge {
           display: flex;
           align-items: center;
           gap: 8px;
 
-          padding: 12px 18px;
+          padding: 9px 14px;
 
-          border-radius: 15px;
+          border-radius: 11px;
 
           background:
             linear-gradient(
               145deg,
-              #f8fbff,
-              #dce6f1
+              #ffffff,
+              #d9dee4
             );
 
-          color: #275275;
+          border: 1px solid #d0d6dc;
+
+          color: #40515f;
+
+          font-size: 14px;
           font-weight: 700;
 
           box-shadow:
-            5px 5px 12px rgba(71, 89, 111, 0.2),
-            -4px -4px 9px #ffffff;
+            4px 4px 8px rgba(80, 90, 101, 0.14),
+            -4px -4px 8px rgba(255,255,255,.85);
         }
 
-        .heroBadge span {
-          color: #27ae60;
+        .adminDot {
+          width: 7px;
+          height: 7px;
+
+          border-radius: 50%;
+
+          background: #3d8761;
         }
 
-        /* MAIN CARD */
+        /* =====================================================
+           TITLE
+        ===================================================== */
 
-        .mainCard,
-        .savedCard {
-          padding: 30px;
+        .titleBlock {
+          display: flex;
+          align-items: center;
+          gap: 16px;
 
-          border-radius: 28px;
+          margin: 31px 5px 22px;
+        }
+
+        .titleLine {
+          width: 5px;
+          height: 59px;
+
+          border-radius: 6px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #315d7e,
+              #8ba8bd
+            );
+
+          box-shadow:
+            2px 2px 5px rgba(41, 69, 90, 0.22);
+        }
+
+        .titleBlock h1 {
+          margin: 0;
+
+          color: #163f5f;
+
+          font-size: 36px;
+          line-height: 1;
+        }
+
+        .titleBlock p {
+          margin: 8px 0 0;
+
+          color: #757e87;
+
+          font-size: 16px;
+        }
+
+        /* =====================================================
+           PANEL
+        ===================================================== */
+
+        .panel {
+          border-radius: 20px;
+
+          padding: 27px;
+
+          border: 1px solid #cbd1d7;
 
           background:
             linear-gradient(
               145deg,
-              rgba(248, 251, 255, 0.98),
-              rgba(224, 231, 239, 0.98)
+              #f4f6f8,
+              #dfe3e7
             );
 
-          border: 1px solid rgba(255,255,255,.9);
-
           box-shadow:
-            16px 16px 32px rgba(63, 78, 97, 0.18),
-            -14px -14px 28px rgba(255,255,255,.95),
-            inset 1px 1px 0 rgba(255,255,255,.9);
+            10px 10px 22px rgba(76, 85, 95, 0.18),
+            -8px -8px 18px rgba(255,255,255,.9),
+            inset 1px 1px 0 rgba(255,255,255,.8);
         }
 
-        .cardHeader,
-        .savedHeader {
+        .panelTop,
+        .savedTop {
           display: flex;
+
           justify-content: space-between;
           align-items: center;
-          gap: 20px;
+
           flex-wrap: wrap;
 
-          margin-bottom: 28px;
+          gap: 17px;
+
+          margin-bottom: 25px;
         }
 
-        .miniTitle {
-          font-family: Arial, sans-serif;
-          font-size: 11px;
-          letter-spacing: 2px;
-          font-weight: 800;
-          color: #4786bc;
+        .sectionLabel {
           margin-bottom: 5px;
+
+          color: #6f8190;
+
+          font-family: Arial, sans-serif;
+
+          font-size: 10px;
+          font-weight: 800;
+
+          letter-spacing: 1.8px;
         }
 
-        .cardHeader h2,
-        .savedHeader h2 {
+        .panel h2 {
           margin: 0;
-          font-size: 30px;
-          color: #102d49;
+
+          color: #202f3c;
+
+          font-size: 27px;
         }
 
-        .selectedTop {
-          padding: 10px 17px;
+        .selectionBadge {
+          padding: 9px 14px;
+
+          border-radius: 11px;
+
+          color: #294d68;
+
+          background:
+            linear-gradient(
+              145deg,
+              #e6edf3,
+              #cbd6df
+            );
+
+          border: 1px solid #c4cfd7;
+
+          box-shadow:
+            4px 4px 8px rgba(70, 82, 92, .15),
+            -3px -3px 6px rgba(255,255,255,.8);
+
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        /* =====================================================
+           FIELDS
+        ===================================================== */
+
+        .selectorGrid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+          gap: 20px;
+        }
+
+        .field label {
+          display: block;
+
+          margin: 0 0 8px 3px;
+
+          color: #3d4a55;
+
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .input3d {
+          padding: 3px;
+
+          border-radius: 12px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #cbd0d6,
+              #ffffff
+            );
+
+          box-shadow:
+            inset 3px 3px 6px rgba(68, 79, 90, .17),
+            inset -3px -3px 6px rgba(255,255,255,.88);
+        }
+
+        select {
+          width: 100%;
+          height: 51px;
+
+          padding: 0 15px;
+
+          border: none;
+
+          border-radius: 10px;
+
+          outline: none;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #f1f3f5
+            );
+
+          color: #2b3946;
+
+          font-family: inherit;
+
+          font-size: 17px;
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        /* =====================================================
+           CURRENT SELECTION
+        ===================================================== */
+
+        .currentSelection {
+          display: flex;
+          align-items: center;
+
+          gap: 13px;
+
+          margin-top: 22px;
+
+          padding: 13px 16px;
+
+          border-radius: 13px;
+
+          border: 1px solid #bccbd6;
+
+          background:
+            linear-gradient(
+              145deg,
+              #dfe8ef,
+              #cbd9e3
+            );
+
+          box-shadow:
+            inset 2px 2px 4px rgba(255,255,255,.7),
+            4px 4px 9px rgba(70, 87, 99, .13);
+        }
+
+        .currentCircle {
+          width: 35px;
+          height: 35px;
+
+          display: grid;
+          place-items: center;
+
+          border-radius: 50%;
+
+          color: white;
+
+          background:
+            linear-gradient(
+              145deg,
+              #547e9e,
+              #2e5776
+            );
+
+          box-shadow:
+            3px 3px 6px rgba(41,68,89,.25),
+            inset 2px 2px 3px rgba(255,255,255,.3);
+
+          font-family: Arial, sans-serif;
+          font-weight: 800;
+        }
+
+        .currentSelection span {
+          display: block;
+
+          margin-bottom: 2px;
+
+          color: #667684;
+
+          font-size: 12px;
+        }
+
+        .currentSelection strong {
+          color: #234d6b;
+
+          font-size: 17px;
+        }
+
+        .currentSelection b {
+          margin: 0 9px;
+        }
+
+        /* =====================================================
+           ALERTS
+        ===================================================== */
+
+        .alert {
+          display: flex;
+          align-items: center;
+
+          gap: 10px;
+
+          padding: 12px 15px;
+
+          margin-top: 16px;
+
+          border-radius: 11px;
+
+          font-weight: 700;
+        }
+
+        .successAlert {
+          color: #416554;
+
+          border: 1px solid #bfcfc6;
+
+          background: #e6eee9;
+        }
+
+        .errorAlert {
+          color: #874d4a;
+
+          border: 1px solid #dbc2bf;
+
+          background: #f1e6e4;
+        }
+
+        .alertIcon {
+          width: 27px;
+          height: 27px;
+
+          display: grid;
+          place-items: center;
+
+          border-radius: 50%;
+
+          background: rgba(255,255,255,.65);
+
+          font-family: Arial, sans-serif;
+        }
+
+        /* =====================================================
+           EDITOR
+        ===================================================== */
+
+        .editorHeader {
+          display: flex;
+
+          justify-content: space-between;
+          align-items: flex-end;
+
+          gap: 20px;
+
+          flex-wrap: wrap;
+
+          margin-top: 27px;
+          margin-bottom: 11px;
+        }
+
+        .editorHeader h3 {
+          margin: 0 0 7px;
+
+          color: #263847;
+
+          font-size: 21px;
+        }
+
+        .editorHeader p {
+          margin: 3px 0;
+
+          color: #747d85;
+
+          font-size: 14px;
+        }
+
+        .lineCounter {
+          padding: 8px 12px;
+
+          border-radius: 10px;
+
+          color: #556978;
+
+          background:
+            linear-gradient(
+              145deg,
+              #f4f6f8,
+              #d4d9df
+            );
+
+          border: 1px solid #d0d5da;
+
+          box-shadow:
+            3px 3px 6px rgba(79,89,99,.12),
+            -3px -3px 6px rgba(255,255,255,.85);
+
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .textareaOuter {
+          padding: 4px;
 
           border-radius: 14px;
 
           background:
             linear-gradient(
               145deg,
-              #d9ecff,
-              #b9d8f5
-            );
-
-          color: #07549a;
-          font-weight: 800;
-
-          box-shadow:
-            5px 5px 10px rgba(64, 105, 145, 0.2),
-            -4px -4px 8px #ffffff;
-        }
-
-        /* SELECTORS */
-
-        .selectorGrid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 24px;
-        }
-
-        .fieldGroup label {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-
-          margin: 0 0 10px 4px;
-
-          font-size: 18px;
-          color: #1e3b59;
-          font-weight: 800;
-        }
-
-        .labelIcon {
-          filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
-        }
-
-        .selectShell {
-          padding: 4px;
-
-          border-radius: 17px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #d6dee8,
-              #ffffff
+              #c4cad1,
+              #fefefe
             );
 
           box-shadow:
-            inset 3px 3px 7px rgba(76, 94, 115, 0.15),
-            inset -3px -3px 7px #ffffff,
-            4px 4px 9px rgba(67, 84, 106, 0.14);
+            inset 4px 4px 8px rgba(62,74,85,.15),
+            inset -4px -4px 8px rgba(255,255,255,.85),
+            4px 5px 10px rgba(74,84,93,.12);
         }
 
-        select {
-          width: 100%;
-          height: 56px;
-
-          border: none;
-          outline: none;
-
-          border-radius: 13px;
-
-          padding: 0 18px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #eef3f8
-            );
-
-          color: #17314c;
-          font-size: 18px;
-          font-weight: 700;
-          font-family: inherit;
-
-          cursor: pointer;
-        }
-
-        /* SELECTED BAR */
-
-        .selectedBar {
-          margin-top: 25px;
-
-          display: flex;
-          align-items: center;
-          gap: 15px;
-
-          padding: 16px 18px;
-
-          border-radius: 18px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #d9edff,
-              #c4def5
-            );
-
-          border: 1px solid #b0d6fa;
-
-          box-shadow:
-            inset 3px 3px 7px rgba(255,255,255,.7),
-            7px 7px 14px rgba(76, 105, 132, 0.17);
-        }
-
-        .check3d {
-          width: 42px;
-          height: 42px;
-
-          display: grid;
-          place-items: center;
-
-          border-radius: 50%;
-
-          color: white;
-          font-family: Arial, sans-serif;
-          font-weight: 900;
-          font-size: 21px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #4caaff,
-              #176dd1
-            );
-
-          box-shadow:
-            4px 5px 9px rgba(24, 91, 157, 0.35),
-            inset 2px 2px 4px rgba(255,255,255,.5);
-        }
-
-        .selectedBar small {
-          display: block;
-          font-family: Arial, sans-serif;
-          color: #55748e;
-          margin-bottom: 2px;
-        }
-
-        .selectedBar strong {
-          color: #074c8c;
-          font-size: 19px;
-        }
-
-        .arrow {
-          margin: 0 11px;
-        }
-
-        /* MESSAGES */
-
-        .message {
-          display: flex;
-          gap: 12px;
-          align-items: center;
-
-          margin-top: 20px;
-          padding: 14px 17px;
-
-          border-radius: 16px;
-
-          font-weight: 800;
-        }
-
-        .success {
-          background: #e9f8ef;
-          color: #08783c;
-          border: 1px solid #bfe7ce;
-        }
-
-        .danger {
-          background: #fff0f0;
-          color: #b32318;
-          border: 1px solid #fac7c3;
-        }
-
-        .messageIcon {
-          width: 31px;
-          height: 31px;
-          display: grid;
-          place-items: center;
-          border-radius: 50%;
-          background: rgba(255,255,255,.65);
-        }
-
-        /* EDITOR */
-
-        .editorSection {
-          margin-top: 30px;
-        }
-
-        .editorHeading {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          gap: 20px;
-          flex-wrap: wrap;
-
-          margin-bottom: 13px;
-        }
-
-        .editorHeading h3 {
-          font-size: 23px;
-          color: #173552;
-          margin: 0 0 7px;
-        }
-
-        .editorHeading p {
-          margin: 3px 0;
-          color: #6d7888;
-          font-size: 15px;
-        }
-
-        .formatBadge {
-          padding: 9px 14px;
-
-          border-radius: 12px;
-
-          font-family: Arial, sans-serif;
-          font-size: 13px;
-          font-weight: 800;
-
-          color: #33678f;
-
-          background:
-            linear-gradient(
-              145deg,
-              #edf5fc,
-              #dbe5ee
-            );
-
-          box-shadow:
-            4px 4px 8px rgba(83, 100, 119, 0.12),
-            -3px -3px 7px #ffffff;
-        }
-
-        .textareaShell {
-          padding: 5px;
-
-          border-radius: 20px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #cad4df,
-              #ffffff
-            );
-
-          box-shadow:
-            inset 5px 5px 10px rgba(76, 92, 110, 0.18),
-            inset -5px -5px 10px #ffffff,
-            6px 7px 14px rgba(69, 85, 105, 0.15);
-        }
-
-        .textareaError {
-          background: #f7b1ac;
+        .textareaInvalid {
+          background: #d8a5a2;
         }
 
         textarea {
           display: block;
 
           width: 100%;
-          min-height: 310px;
+          min-height: 285px;
 
           resize: vertical;
 
-          padding: 20px;
+          padding: 17px;
 
           border: none;
           outline: none;
 
-          border-radius: 16px;
+          border-radius: 11px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff,
-              #f7f9fc
+              #f6f7f8
             );
 
-          color: #26394c;
+          color: #313c46;
 
           font-family: Arial, sans-serif;
-          font-size: 16px;
-          line-height: 1.8;
+
+          font-size: 15px;
+          line-height: 1.75;
         }
 
         textarea::placeholder {
-          color: #8995a3;
+          color: #9199a1;
         }
 
-        /* BOTTOM */
+        /* =====================================================
+           CONTROLS
+        ===================================================== */
 
-        .bottomControl {
-          margin-top: 24px;
-
+        .controlRow {
           display: flex;
+
           justify-content: space-between;
           align-items: center;
+
           gap: 20px;
+
           flex-wrap: wrap;
+
+          margin-top: 21px;
         }
 
         .stats {
           display: flex;
-          gap: 10px;
+
+          gap: 8px;
+
           flex-wrap: wrap;
         }
 
-        .stat {
-          min-width: 86px;
+        .statItem {
+          min-width: 77px;
 
-          padding: 9px 13px;
-
-          border-radius: 13px;
+          padding: 7px 10px;
 
           text-align: center;
 
+          border-radius: 10px;
+
           background:
             linear-gradient(
               145deg,
-              #f9fbfd,
-              #dce4ec
+              #f5f6f7,
+              #d9dde1
+            );
+
+          border: 1px solid #d1d6da;
+
+          box-shadow:
+            3px 3px 6px rgba(79,89,99,.12),
+            -3px -3px 6px rgba(255,255,255,.8);
+        }
+
+        .statItem span {
+          display: block;
+
+          color: #7d858c;
+
+          font-family: Arial, sans-serif;
+
+          font-size: 10px;
+        }
+
+        .statItem strong {
+          display: block;
+
+          margin-top: 2px;
+
+          color: #344756;
+
+          font-size: 17px;
+        }
+
+        .good strong {
+          color: #527263;
+        }
+
+        .bad strong {
+          color: #93534f;
+        }
+
+        .importButton {
+          min-width: 165px;
+
+          height: 48px;
+
+          padding: 0 22px;
+
+          border: 1px solid #294c66;
+
+          border-radius: 12px;
+
+          color: #ffffff;
+
+          background:
+            linear-gradient(
+              145deg,
+              #527c9b,
+              #294f6c
             );
 
           box-shadow:
-            4px 4px 8px rgba(65, 80, 98, 0.13),
-            -4px -4px 8px #ffffff;
-        }
-
-        .stat span {
-          display: block;
-          color: #778495;
-          font-family: Arial, sans-serif;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.7px;
-        }
-
-        .stat strong {
-          display: block;
-          margin-top: 3px;
-          color: #21425f;
-          font-size: 20px;
-        }
-
-        .successStat strong {
-          color: #16834e;
-        }
-
-        .errorStat strong {
-          color: #c22c23;
-        }
-
-        .importBtn {
-          min-width: 190px;
-          height: 57px;
-
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 10px;
-
-          border: none;
-          border-radius: 17px;
-
-          color: white;
+            5px 6px 11px rgba(37,64,84,.28),
+            inset 2px 2px 4px rgba(255,255,255,.25),
+            inset -3px -3px 5px rgba(25,45,61,.25);
 
           font-family: inherit;
-          font-size: 18px;
-          font-weight: 800;
 
-          background:
-            linear-gradient(
-              145deg,
-              #4baeff,
-              #1267ca
-            );
-
-          box-shadow:
-            8px 9px 16px rgba(20, 83, 145, 0.34),
-            inset 3px 3px 5px rgba(255,255,255,.48),
-            inset -4px -4px 7px rgba(4,57,117,.32);
+          font-size: 16px;
+          font-weight: 700;
 
           cursor: pointer;
-          transition: .18s ease;
+
+          transition: .15s ease;
         }
 
-        .importBtn:hover:not(:disabled) {
-          transform: translateY(-2px);
+        .importButton:hover:not(:disabled) {
+          transform: translateY(-1px);
+
+          filter: brightness(1.04);
         }
 
-        .importBtn:active:not(:disabled) {
+        .importButton:active:not(:disabled) {
           transform: translateY(2px);
 
           box-shadow:
-            inset 4px 4px 8px rgba(4,57,117,.28),
-            inset -3px -3px 6px rgba(255,255,255,.28);
+            inset 4px 4px 8px rgba(20,42,58,.28);
         }
 
-        .importBtn:disabled {
-          opacity: .48;
-          cursor: not-allowed;
-          filter: grayscale(.25);
-        }
-
-        .importIcon {
-          font-family: Arial, sans-serif;
-          font-size: 25px;
-        }
-
-        /* SAVED */
-
-        .savedCard {
-          margin-top: 30px;
-        }
-
-        .savedHeader {
-          margin-bottom: 0;
-        }
-
-        .savedHeader p {
-          color: #738095;
-          margin: 5px 0 0;
-        }
-
-        .savedActions {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .wordCount {
-          padding: 9px 13px;
-          border-radius: 12px;
-
-          background: #d9ecff;
-          color: #145b96;
-
-          font-weight: 900;
-
-          box-shadow:
-            inset 2px 2px 4px #ffffff,
-            4px 4px 8px rgba(61, 89, 115, 0.15);
-        }
-
-        .wordCount small {
-          font-weight: 600;
-        }
-
-        .editBtn,
-        .refreshBtn {
-          height: 43px;
-
-          padding: 0 16px;
-
-          border-radius: 12px;
-
-          font-family: inherit;
-          font-weight: 800;
-
-          cursor: pointer;
-
-          transition: .18s ease;
-        }
-
-        .editBtn {
-          border: 1px solid #7bb9e7;
-
-          color: #0b528d;
-
-          background:
-            linear-gradient(
-              145deg,
-              #e8f5ff,
-              #cfe4f5
-            );
-
-          box-shadow:
-            4px 4px 8px rgba(62, 91, 116, 0.15),
-            -3px -3px 7px #ffffff;
-        }
-
-        .refreshBtn {
-          border: 1px solid #c1ccd8;
-
-          color: #314b63;
-
-          background:
-            linear-gradient(
-              145deg,
-              #ffffff,
-              #e0e6ec
-            );
-
-          box-shadow:
-            4px 4px 8px rgba(62, 75, 92, 0.14),
-            -3px -3px 7px #ffffff;
-        }
-
-        .editBtn:hover:not(:disabled),
-        .refreshBtn:hover:not(:disabled) {
-          transform: translateY(-2px);
-        }
-
-        .editBtn:disabled,
-        .refreshBtn:disabled {
+        .importButton:disabled {
           opacity: .45;
           cursor: not-allowed;
         }
 
-        /* EMPTY */
+        /* =====================================================
+           SAVED PANEL
+        ===================================================== */
 
-        .empty3d {
-          min-height: 200px;
-
+        .savedPanel {
           margin-top: 25px;
+        }
 
+        .savedTop {
+          margin-bottom: 0;
+        }
+
+        .savedTop p {
+          margin: 5px 0 0;
+
+          color: #7a838c;
+
+          font-size: 14px;
+        }
+
+        .savedControls {
           display: flex;
-          flex-direction: column;
+
           align-items: center;
-          justify-content: center;
+
           gap: 8px;
 
-          border-radius: 20px;
+          flex-wrap: wrap;
+        }
 
-          color: #728094;
+        .savedCount {
+          min-width: 55px;
+
+          padding: 8px 11px;
+
+          text-align: center;
+
+          border-radius: 10px;
+
+          color: #3b5b72;
 
           background:
             linear-gradient(
               145deg,
-              #e6ecf2,
-              #f9fbfd
+              #e5ebef,
+              #cbd4dc
+            );
+
+          border: 1px solid #c6d0d8;
+
+          box-shadow:
+            3px 3px 6px rgba(73,84,94,.13),
+            -3px -3px 6px rgba(255,255,255,.8);
+
+          font-weight: 700;
+        }
+
+        .savedCount span {
+          font-size: 12px;
+          font-weight: 400;
+        }
+
+        .smallButton {
+          height: 39px;
+
+          padding: 0 14px;
+
+          border-radius: 9px;
+
+          font-family: inherit;
+
+          font-size: 14px;
+          font-weight: 700;
+
+          cursor: pointer;
+
+          transition: .15s ease;
+        }
+
+        .editButton {
+          color: #314e63;
+
+          border: 1px solid #b9c5ce;
+
+          background:
+            linear-gradient(
+              145deg,
+              #edf1f4,
+              #d0d8df
             );
 
           box-shadow:
-            inset 7px 7px 15px rgba(70, 84, 102, 0.12),
-            inset -7px -7px 15px #ffffff;
+            3px 3px 6px rgba(76,87,98,.12),
+            -3px -3px 6px rgba(255,255,255,.8);
         }
 
-        .emptyIcon {
-          font-size: 36px;
-          margin-bottom: 4px;
+        .refreshButton {
+          color: #4b5359;
+
+          border: 1px solid #c5c9cd;
+
+          background:
+            linear-gradient(
+              145deg,
+              #f7f8f9,
+              #d9dcdf
+            );
+
+          box-shadow:
+            3px 3px 6px rgba(76,84,92,.12),
+            -3px -3px 6px rgba(255,255,255,.82);
         }
 
-        .empty3d strong {
-          color: #40566c;
-          font-size: 17px;
+        .smallButton:hover:not(:disabled) {
+          transform: translateY(-1px);
         }
 
-        .empty3d span {
+        .smallButton:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
+        /* =====================================================
+           EMPTY
+        ===================================================== */
+
+        .emptyState {
+          min-height: 160px;
+
+          margin-top: 22px;
+
+          display: flex;
+          flex-direction: column;
+
+          align-items: center;
+          justify-content: center;
+
+          gap: 6px;
+
+          padding: 20px;
+
+          border-radius: 14px;
+
+          color: #7b858e;
+
+          background:
+            linear-gradient(
+              145deg,
+              #dfe3e7,
+              #f4f6f8
+            );
+
+          border: 1px solid #d3d8dc;
+
+          box-shadow:
+            inset 5px 5px 10px rgba(78,88,98,.11),
+            inset -5px -5px 10px rgba(255,255,255,.82);
+        }
+
+        .emptyState strong {
+          color: #4f5e69;
+          font-size: 16px;
+        }
+
+        .emptyState span {
           font-family: Arial, sans-serif;
-          font-size: 13px;
+          font-size: 12px;
         }
 
-        .loadingSpinner {
-          width: 30px;
-          height: 30px;
+        .spinner {
+          width: 26px;
+          height: 26px;
 
-          border: 4px solid #d0dfed;
-          border-top-color: #267ccc;
+          margin-bottom: 4px;
 
           border-radius: 50%;
+
+          border: 3px solid #c7cfd5;
+          border-top-color: #416b89;
 
           animation: spin .8s linear infinite;
         }
@@ -1367,201 +1507,241 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
           }
         }
 
-        /* WORD GRID */
+        /* =====================================================
+           WORDS
+        ===================================================== */
 
-        .wordGrid {
+        .wordList {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 18px;
 
-          margin-top: 25px;
+          gap: 11px;
+
+          margin-top: 22px;
         }
 
-        .wordCard {
-          padding: 18px;
+        .wordRow {
+          display: flex;
 
-          border-radius: 18px;
+          gap: 13px;
+
+          padding: 14px 16px;
+
+          border-radius: 13px;
+
+          border: 1px solid #d0d5da;
 
           background:
             linear-gradient(
               145deg,
-              #f8fbfe,
-              #dfe6ed
+              #f5f6f7,
+              #e0e4e7
             );
 
-          border: 1px solid rgba(255,255,255,.9);
+          box-shadow:
+            4px 4px 8px rgba(71,81,90,.12),
+            -4px -4px 8px rgba(255,255,255,.8);
+
+          transition: .15s ease;
+        }
+
+        .wordRow:hover {
+          transform: translateY(-1px);
 
           box-shadow:
-            7px 7px 14px rgba(67, 82, 100, 0.16),
-            -6px -6px 12px #ffffff;
-
-          transition: .18s ease;
+            6px 6px 11px rgba(71,81,90,.14),
+            -5px -5px 9px rgba(255,255,255,.82);
         }
 
-        .wordCard:hover {
-          transform: translateY(-3px);
-          box-shadow:
-            10px 11px 18px rgba(67, 82, 100, 0.18),
-            -7px -7px 14px #ffffff;
-        }
+        .wordNumber {
+          width: 35px;
+          height: 35px;
 
-        .wordTop {
-          display: flex;
-          gap: 13px;
-          align-items: center;
-        }
-
-        .numberBadge {
-          width: 38px;
-          height: 38px;
-
-          flex: 0 0 38px;
+          flex: 0 0 35px;
 
           display: grid;
           place-items: center;
 
-          border-radius: 12px;
+          border-radius: 9px;
 
           color: white;
-          font-family: Arial, sans-serif;
-          font-weight: 800;
 
           background:
             linear-gradient(
               145deg,
-              #58b5ff,
-              #1c72c6
+              #668ba6,
+              #365f7d
             );
 
           box-shadow:
-            4px 4px 8px rgba(21, 83, 141, 0.3),
-            inset 2px 2px 3px rgba(255,255,255,.45);
+            3px 3px 6px rgba(46,72,92,.23),
+            inset 1px 1px 3px rgba(255,255,255,.3);
+
+          font-family: Arial, sans-serif;
+          font-size: 13px;
+          font-weight: 700;
         }
 
-        .wordMain {
+        .wordContent {
+          flex: 1;
           min-width: 0;
         }
 
-        .wordMain strong {
-          display: block;
+        .wordLine {
+          display: flex;
+          align-items: baseline;
 
-          color: #102f4a;
+          gap: 9px;
 
-          font-size: 21px;
-          text-transform: uppercase;
+          flex-wrap: wrap;
         }
 
-        .wordMain span {
-          display: block;
-          margin-top: 2px;
+        .englishWord {
+          color: #243a4b;
 
-          color: #657485;
+          font-size: 19px;
+        }
+
+        .divider {
+          color: #929aa1;
+        }
+
+        .uzbekWord {
+          color: #59656f;
+
           font-size: 17px;
         }
 
-        .exampleBox {
-          margin-top: 14px;
+        .exampleArea {
+          margin-top: 9px;
 
-          padding: 13px 14px;
+          padding: 10px 12px;
 
-          border-radius: 13px;
+          border-radius: 9px;
 
           background:
             linear-gradient(
               145deg,
-              #dce5ed,
-              #ffffff
+              #e0e4e7,
+              #f8f9fa
             );
 
           box-shadow:
-            inset 3px 3px 7px rgba(74, 89, 106, 0.1),
-            inset -3px -3px 7px #ffffff;
+            inset 2px 2px 5px rgba(67,77,86,.09),
+            inset -2px -2px 5px rgba(255,255,255,.85);
         }
 
-        .exampleEnglish {
-          color: #263c50;
-          font-size: 17px;
-          font-style: italic;
-          font-weight: 700;
-          line-height: 1.45;
-        }
+        .englishExample {
+          color: #3e4c58;
 
-        .exampleUzbek {
-          margin-top: 5px;
-          color: #2272ac;
+          font-family: "Times New Roman", serif;
+
           font-size: 16px;
           font-style: italic;
-          line-height: 1.4;
+          font-weight: 700;
         }
 
-        /* RESPONSIVE */
+        .uzbekExample {
+          margin-top: 3px;
 
-        @media (max-width: 820px) {
+          color: #526f83;
+
+          font-family: "Times New Roman", serif;
+
+          font-size: 15px;
+          font-style: italic;
+        }
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 760px) {
           .page {
-            padding: 20px 12px 45px;
+            padding: 16px 10px 40px;
           }
 
-          .hero3d {
-            padding: 18px;
+          .topPanel {
+            padding: 14px;
           }
 
-          .heroBadge {
+          .adminBadge {
             display: none;
           }
 
-          .hero3d h1 {
-            font-size: 30px;
+          .siteName {
+            font-size: 17px;
           }
 
-          .hero3d p {
+          .siteSub {
+            font-size: 12px;
+          }
+
+          .titleBlock h1 {
+            font-size: 29px;
+          }
+
+          .titleBlock p {
             font-size: 14px;
           }
 
-          .mainCard,
-          .savedCard {
-            padding: 20px;
-            border-radius: 22px;
+          .panel {
+            padding: 18px;
           }
 
-          .selectorGrid,
-          .wordGrid {
+          .selectorGrid {
             grid-template-columns: 1fr;
           }
 
-          .bottomControl {
+          .controlRow {
             align-items: stretch;
           }
 
           .stats {
             width: 100%;
+
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+
+            grid-template-columns:
+              repeat(2, 1fr);
           }
 
-          .importBtn {
+          .importButton {
             width: 100%;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .heroIcon {
-            width: 50px;
-            height: 50px;
-            font-size: 23px;
-          }
-
-          .hero3d h1 {
-            font-size: 25px;
-          }
-
-          .cardHeader h2,
-          .savedHeader h2 {
-            font-size: 25px;
           }
 
           textarea {
-            min-height: 270px;
-            font-size: 14px;
+            min-height: 240px;
+          }
+        }
+
+        @media (max-width: 470px) {
+          .logoMark {
+            width: 42px;
+            height: 42px;
+          }
+
+          .siteName {
+            font-size: 15px;
+          }
+
+          .titleBlock {
+            margin-top: 24px;
+          }
+
+          .titleBlock h1 {
+            font-size: 25px;
+          }
+
+          .panel h2 {
+            font-size: 23px;
+          }
+
+          .savedControls {
+            width: 100%;
+          }
+
+          .smallButton {
+            flex: 1;
           }
         }
       `}</style>
