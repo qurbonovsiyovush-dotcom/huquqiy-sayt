@@ -1,24 +1,13 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
-type UserRole =
-  | "admin"
-  | "user"
-  | null;
+type UserRole = "admin" | "user" | null;
 
 export default function Home() {
-  const [now, setNow] =
-    useState<Date | null>(null);
-
-  const [role, setRole] =
-    useState<UserRole>(null);
-
-  const [roleLoading, setRoleLoading] =
-    useState(true);
+  const [now, setNow] = useState<Date | null>(null);
+  const [role, setRole] = useState<UserRole>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   /* =========================================
      SOAT
@@ -45,33 +34,24 @@ export default function Home() {
 
     async function loadRole() {
       try {
-        const response =
-          await fetch("/api/me", {
-            method: "GET",
-            cache: "no-store",
-            credentials: "include",
-          });
+        const response = await fetch("/api/me", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        });
 
         if (response.status === 401) {
-          window.location.replace(
-            "/login"
-          );
-
+          window.location.replace("/login");
           return;
         }
 
         if (!response.ok) {
-          throw new Error(
-            "Rolni aniqlab bo‘lmadi."
-          );
+          throw new Error("Rolni aniqlab bo‘lmadi.");
         }
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         if (data.role === "admin") {
           setRole("admin");
@@ -79,10 +59,7 @@ export default function Home() {
           setRole("user");
         }
       } catch (error) {
-        console.error(
-          "ROLE LOAD ERROR:",
-          error
-        );
+        console.error("ROLE LOAD ERROR:", error);
 
         if (!cancelled) {
           setRole("user");
@@ -112,9 +89,7 @@ export default function Home() {
         credentials: "include",
       });
     } finally {
-      window.location.replace(
-        "/login"
-      );
+      window.location.replace("/login");
     }
   }
 
@@ -122,15 +97,11 @@ export default function Home() {
      BO‘LIMGA TUSHISH
   ========================================= */
 
-  function scrollToSection(
-    id: string
-  ) {
-    document
-      .getElementById(id)
-      ?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }
 
   /* =========================================
@@ -138,8 +109,7 @@ export default function Home() {
   ========================================= */
 
   function openTests() {
-    window.location.href =
-      "/test-entry";
+    window.location.href = "/test-entry";
   }
 
   /* =========================================
@@ -172,57 +142,31 @@ export default function Home() {
   ];
 
   const timeText = now
-    ? `${String(
-        now.getHours()
-      ).padStart(
-        2,
-        "0"
-      )}:${String(
+    ? `${String(now.getHours()).padStart(2, "0")}:${String(
         now.getMinutes()
-      ).padStart(
-        2,
-        "0"
-      )}:${String(
-        now.getSeconds()
-      ).padStart(
-        2,
-        "0"
-      )}`
+      ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`
     : "--:--:--";
 
   const dateText = now
-    ? `${
-        uzWeekdays[
-          now.getDay()
-        ]
-      }, ${now.getDate()}-${
-        uzMonths[
-          now.getMonth()
-        ]
+    ? `${uzWeekdays[now.getDay()]}, ${now.getDate()}-${
+        uzMonths[now.getMonth()]
       } ${now.getFullYear()}`
     : "Sana yuklanmoqda...";
 
   return (
     <main className="page">
-
       {/* ================= HEADER ================= */}
 
       <header className="topPanel">
-
         <div className="namePlate">
           Qurbonov Siyovush Jamaliddinzoda
         </div>
 
         <nav className="navButtons">
-
           <button
             type="button"
             className="grayButton"
-            onClick={() =>
-              scrollToSection(
-                "talabalar"
-              )
-            }
+            onClick={() => scrollToSection("talabalar")}
           >
             Talabalar
           </button>
@@ -230,11 +174,7 @@ export default function Home() {
           <button
             type="button"
             className="grayButton"
-            onClick={() =>
-              scrollToSection(
-                "abituriyent"
-              )
-            }
+            onClick={() => scrollToSection("abituriyent")}
           >
             Abituriyent
           </button>
@@ -242,11 +182,7 @@ export default function Home() {
           <button
             type="button"
             className="grayButton"
-            onClick={() =>
-              scrollToSection(
-                "savoljavob"
-              )
-            }
+            onClick={() => scrollToSection("savoljavob")}
           >
             Savol-javob
           </button>
@@ -254,30 +190,24 @@ export default function Home() {
           <button
             type="button"
             className="grayButton"
-            onClick={() =>
-              scrollToSection(
-                "qollanmalar"
-              )
-            }
+            onClick={() => scrollToSection("qollanmalar")}
           >
             Qo‘llanmalar
           </button>
 
           {/* FAQAT ADMINDA KO‘RINADI */}
 
-          {!roleLoading &&
-            role === "admin" && (
-              <button
-                type="button"
-                className="adminButton"
-                onClick={() => {
-                  window.location.href =
-                    "/admin/requests";
-                }}
-              >
-                Admin
-              </button>
-            )}
+          {!roleLoading && role === "admin" && (
+            <button
+              type="button"
+              className="adminButton"
+              onClick={() => {
+                window.location.href = "/admin";
+              }}
+            >
+              Admin
+            </button>
+          )}
 
           <button
             type="button"
@@ -286,17 +216,13 @@ export default function Home() {
           >
             Chiqish
           </button>
-
         </nav>
-
       </header>
 
       {/* ================= SOAT ================= */}
 
       <section className="clockSection">
-
         <div className="clockPanel">
-
           <div className="clockTopLabel">
             Huquqiy ta’lim platformasi
           </div>
@@ -306,15 +232,11 @@ export default function Home() {
           </div>
 
           <div className="calendarBox">
-
             <div className="dateText">
               {dateText}
             </div>
-
           </div>
-
         </div>
-
       </section>
 
       {/* ================= TALABALAR ================= */}
@@ -323,18 +245,13 @@ export default function Home() {
         id="talabalar"
         className="mainSection"
       >
-
         <div className="sectionTitle">
           Talabalar
         </div>
 
         <div className="cards">
-
           <article className="card">
-
-            <h2>
-              Normativ-huquqiy hujjatlar
-            </h2>
+            <h2>Normativ-huquqiy hujjatlar</h2>
 
             <button
               type="button"
@@ -349,14 +266,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Kazuslar
-            </h2>
+            <h2>Kazuslar</h2>
 
             <button
               type="button"
@@ -368,14 +281,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Qo‘llanmalar
-            </h2>
+            <h2>Qo‘llanmalar</h2>
 
             <button
               type="button"
@@ -383,11 +292,8 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
-
         </div>
-
       </section>
 
       {/* ================= ABITURIYENT ================= */}
@@ -396,44 +302,33 @@ export default function Home() {
         id="abituriyent"
         className="mainSection"
       >
-
         <div className="sectionTitle">
           Abituriyent
         </div>
 
         <div className="cards">
-
           <article className="card">
+            <h2>Testlar</h2>
 
-            <h2>
-              Testlar
-            </h2>
-
-            {!roleLoading &&
-              role === "admin" && (
-                <div className="adminLabel">
-                  Administrator boshqaruvi
-                </div>
-              )}
+            {!roleLoading && role === "admin" && (
+              <div className="adminLabel">
+                Administrator boshqaruvi
+              </div>
+            )}
 
             <button
               type="button"
               className="openButton testButton"
               onClick={openTests}
             >
-              {!roleLoading &&
-              role === "admin"
+              {!roleLoading && role === "admin"
                 ? "Boshqarish"
                 : "Ochish"}
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Qo‘llanmalar
-            </h2>
+            <h2>Qo‘llanmalar</h2>
 
             <button
               type="button"
@@ -441,14 +336,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Video darslar
-            </h2>
+            <h2>Video darslar</h2>
 
             <button
               type="button"
@@ -456,31 +347,23 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
-
         </div>
-
       </section>
 
-      {/* ================= SAVOL JAVOB ================= */}
+      {/* ================= SAVOL-JAVOB ================= */}
 
       <section
         id="savoljavob"
         className="mainSection"
       >
-
         <div className="sectionTitle">
           Savol-javob
         </div>
 
         <div className="cards">
-
           <article className="card">
-
-            <h2>
-              Ko‘p beriladigan savollar
-            </h2>
+            <h2>Ko‘p beriladigan savollar</h2>
 
             <button
               type="button"
@@ -488,14 +371,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Savol yuborish
-            </h2>
+            <h2>Savol yuborish</h2>
 
             <button
               type="button"
@@ -503,14 +382,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Sud qarorlari tahlili
-            </h2>
+            <h2>Sud qarorlari tahlili</h2>
 
             <button
               type="button"
@@ -518,11 +393,8 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
-
         </div>
-
       </section>
 
       {/* ================= QO‘LLANMALAR ================= */}
@@ -531,18 +403,13 @@ export default function Home() {
         id="qollanmalar"
         className="mainSection"
       >
-
         <div className="sectionTitle">
           Qo‘llanmalar
         </div>
 
         <div className="cards">
-
           <article className="card">
-
-            <h2>
-              Kodekslar
-            </h2>
+            <h2>Kodekslar</h2>
 
             <button
               type="button"
@@ -550,14 +417,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Qonun va qonunchilik hujjatlari
-            </h2>
+            <h2>Qonun va qonunchilik hujjatlari</h2>
 
             <button
               type="button"
@@ -565,14 +428,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
           <article className="card">
-
-            <h2>
-              Darsliklar
-            </h2>
+            <h2>Darsliklar</h2>
 
             <button
               type="button"
@@ -580,16 +439,10 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
 
-          {/* ================= ENGLISH VOCABULARY ================= */}
-
           <article className="card">
-
-            <h2>
-              English Vocabulary
-            </h2>
+            <h2>English Vocabulary</h2>
 
             <div className="vocabularySubtitle">
               4000 Essential English Words
@@ -605,22 +458,17 @@ export default function Home() {
             >
               Ochish
             </button>
-
           </article>
-
         </div>
-
       </section>
 
       {/* ================= FOOTER ================= */}
 
       <footer className="footerBlue">
-        Qurbonov Siyovush Jamaliddinzodaning
-        huquqiy ta’lim platformasi
+        Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi
       </footer>
 
       <style jsx>{`
-
         * {
           box-sizing: border-box;
         }
@@ -629,13 +477,12 @@ export default function Home() {
           min-height: 100vh;
           padding: 15px 18px 40px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #f3f5f6 55%,
-              #e5e8ea 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #f3f5f6 55%,
+            #e5e8ea 100%
+          );
 
           color: #111;
 
@@ -663,30 +510,21 @@ export default function Home() {
 
           padding: 25px 32px;
 
-          border:
-            3px solid #173e58;
-
+          border: 3px solid #173e58;
           border-radius: 28px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #8bd3ff 0%,
-              #69b7e8 40%,
-              #4999ce 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #8bd3ff 0%,
+            #69b7e8 40%,
+            #4999ce 100%
+          );
 
           box-shadow:
-            inset 0 7px 6px
-              rgba(255,255,255,.75),
-
-            inset 0 -8px 8px
-              rgba(0,0,0,.18),
-
+            inset 0 7px 6px rgba(255, 255, 255, 0.75),
+            inset 0 -8px 8px rgba(0, 0, 0, 0.18),
             0 7px 0 #173c55,
-
-            0 12px 18px
-              rgba(0,0,0,.22);
+            0 12px 18px rgba(0, 0, 0, 0.22);
         }
 
         /* ================= ISM ================= */
@@ -704,31 +542,22 @@ export default function Home() {
           font-size: 28px;
           font-weight: 700;
 
-          border:
-            3px solid #42494e;
-
+          border: 3px solid #42494e;
           border-radius: 16px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #f7f7f7 0%,
-              #dedede 30%,
-              #b9b9b9 70%,
-              #9f9f9f 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #f7f7f7 0%,
+            #dedede 30%,
+            #b9b9b9 70%,
+            #9f9f9f 100%
+          );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.95),
-
-            inset 0 -6px 6px
-              rgba(0,0,0,.20),
-
+            inset 0 6px 5px rgba(255, 255, 255, 0.95),
+            inset 0 -6px 6px rgba(0, 0, 0, 0.2),
             0 5px 0 #4b5256,
-
-            0 9px 11px
-              rgba(0,0,0,.23);
+            0 9px 11px rgba(0, 0, 0, 0.23);
         }
 
         /* ================= NAV ================= */
@@ -762,94 +591,72 @@ export default function Home() {
           font-weight: 700;
 
           transition:
-            transform .15s ease,
-            filter .15s ease;
+            transform 0.15s ease,
+            filter 0.15s ease;
         }
 
         .grayButton {
           color: #111;
 
-          border:
-            3px solid #464c50;
+          border: 3px solid #464c50;
 
-          background:
-            linear-gradient(
-              180deg,
-              #f8f8f8 0%,
-              #dedede 30%,
-              #b8b8b8 70%,
-              #999999 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #f8f8f8 0%,
+            #dedede 30%,
+            #b8b8b8 70%,
+            #999999 100%
+          );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.95),
-
-            inset 0 -6px 6px
-              rgba(0,0,0,.20),
-
+            inset 0 5px 5px rgba(255, 255, 255, 0.95),
+            inset 0 -6px 6px rgba(0, 0, 0, 0.2),
             0 5px 0 #4b5256,
-
-            0 8px 10px
-              rgba(0,0,0,.22);
+            0 8px 10px rgba(0, 0, 0, 0.22);
         }
 
         .adminButton {
           color: white;
 
-          border:
-            3px solid #123d27;
+          border: 3px solid #174461;
 
-          background:
-            linear-gradient(
-              180deg,
-              #64cf8a 0%,
-              #32935a 55%,
-              #17663a 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #9bd9ff 0%,
+            #59a9d9 55%,
+            #2d7eae 100%
+          );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.35),
-
-            0 5px 0 #123d27,
-
-            0 8px 10px
-              rgba(0,0,0,.22);
+            inset 0 5px 5px rgba(255, 255, 255, 0.45),
+            0 5px 0 #17415c,
+            0 8px 10px rgba(0, 0, 0, 0.22);
         }
 
         .logoutButton {
           color: white;
 
-          border:
-            3px solid #7c1515;
+          border: 3px solid #7c1515;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ff8080 0%,
-              #e54646 40%,
-              #c32121 72%,
-              #981313 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ff8080 0%,
+            #e54646 40%,
+            #c32121 72%,
+            #981313 100%
+          );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.45),
-
+            inset 0 5px 5px rgba(255, 255, 255, 0.45),
             0 5px 0 #761010,
-
-            0 8px 10px
-              rgba(0,0,0,.22);
+            0 8px 10px rgba(0, 0, 0, 0.22);
         }
 
         .grayButton:hover,
         .adminButton:hover,
         .logoutButton:hover {
           filter: brightness(1.07);
-
-          transform:
-            translateY(-2px);
+          transform: translateY(-2px);
         }
 
         /* ================= SOAT ================= */
@@ -868,7 +675,6 @@ export default function Home() {
           position: relative;
 
           width: min(1400px, 95%);
-
           min-height: 500px;
 
           padding: 70px 50px 45px;
@@ -880,30 +686,21 @@ export default function Home() {
 
           gap: 32px;
 
-          border:
-            3px solid #303538;
-
+          border: 3px solid #303538;
           border-radius: 30px;
 
-          background:
-            linear-gradient(
-              145deg,
-              #686c6f 0%,
-              #505457 45%,
-              #363a3d 100%
-            );
+          background: linear-gradient(
+            145deg,
+            #686c6f 0%,
+            #505457 45%,
+            #363a3d 100%
+          );
 
           box-shadow:
-            inset 0 7px 6px
-              rgba(255,255,255,.23),
-
-            inset 0 -8px 8px
-              rgba(0,0,0,.32),
-
+            inset 0 7px 6px rgba(255, 255, 255, 0.23),
+            inset 0 -8px 8px rgba(0, 0, 0, 0.32),
             0 7px 0 #272b2e,
-
-            0 15px 24px
-              rgba(0,0,0,.30);
+            0 15px 24px rgba(0, 0, 0, 0.3);
         }
 
         .clockTopLabel {
@@ -912,8 +709,7 @@ export default function Home() {
           top: -35px;
           left: 50%;
 
-          transform:
-            translateX(-50%);
+          transform: translateX(-50%);
 
           width: min(650px, 80%);
           min-height: 68px;
@@ -928,44 +724,28 @@ export default function Home() {
 
           color: #073b68;
 
-          font-size:
-            clamp(
-              25px,
-              2.8vw,
-              38px
-            );
-
+          font-size: clamp(25px, 2.8vw, 38px);
           font-weight: 700;
 
-          border:
-            3px solid #174461;
-
+          border: 3px solid #174461;
           border-radius: 17px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #9bd9ff 0%,
-              #73bdea 45%,
-              #4e9ccc 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #9bd9ff 0%,
+            #73bdea 45%,
+            #4e9ccc 100%
+          );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.75),
-
-            inset 0 -6px 6px
-              rgba(0,0,0,.16),
-
+            inset 0 6px 5px rgba(255, 255, 255, 0.75),
+            inset 0 -6px 6px rgba(0, 0, 0, 0.16),
             0 5px 0 #17415c,
-
-            0 9px 13px
-              rgba(0,0,0,.25);
+            0 9px 13px rgba(0, 0, 0, 0.25);
         }
 
         .clockTime {
           width: min(850px, 90%);
-
           min-height: 185px;
 
           padding: 25px 30px;
@@ -978,46 +758,30 @@ export default function Home() {
 
           color: #0c0c0c;
 
-          font-size:
-            clamp(
-              65px,
-              8vw,
-              130px
-            );
-
+          font-size: clamp(65px, 8vw, 130px);
           font-weight: 700;
           letter-spacing: 8px;
 
-          border:
-            4px solid #42494e;
-
+          border: 4px solid #42494e;
           border-radius: 25px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #f5f5f5 0%,
-              #dddddd 30%,
-              #b8b8b8 72%,
-              #989898 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #f5f5f5 0%,
+            #dddddd 30%,
+            #b8b8b8 72%,
+            #989898 100%
+          );
 
           box-shadow:
-            inset 0 8px 7px
-              rgba(255,255,255,.96),
-
-            inset 0 -8px 8px
-              rgba(0,0,0,.22),
-
+            inset 0 8px 7px rgba(255, 255, 255, 0.96),
+            inset 0 -8px 8px rgba(0, 0, 0, 0.22),
             0 7px 0 #4b5256,
-
-            0 13px 18px
-              rgba(0,0,0,.27);
+            0 13px 18px rgba(0, 0, 0, 0.27);
         }
 
         .calendarBox {
           width: min(850px, 90%);
-
           min-height: 130px;
 
           padding: 20px 30px;
@@ -1026,30 +790,21 @@ export default function Home() {
           align-items: center;
           justify-content: center;
 
-          border:
-            3px solid #174461;
-
+          border: 3px solid #174461;
           border-radius: 20px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #a7deff 0%,
-              #72bde9 55%,
-              #4d9bcb 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #a7deff 0%,
+            #72bde9 55%,
+            #4d9bcb 100%
+          );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.72),
-
-            inset 0 -6px 6px
-              rgba(0,0,0,.15),
-
+            inset 0 6px 5px rgba(255, 255, 255, 0.72),
+            inset 0 -6px 6px rgba(0, 0, 0, 0.15),
             0 5px 0 #17415c,
-
-            0 10px 14px
-              rgba(0,0,0,.22);
+            0 10px 14px rgba(0, 0, 0, 0.22);
         }
 
         .dateText {
@@ -1059,13 +814,7 @@ export default function Home() {
 
           text-align: center;
 
-          font-size:
-            clamp(
-              26px,
-              3vw,
-              40px
-            );
-
+          font-size: clamp(26px, 3vw, 40px);
           font-weight: 700;
         }
 
@@ -1075,41 +824,29 @@ export default function Home() {
           position: relative;
 
           width: min(1400px, 96%);
-
           min-height: 330px;
 
-          margin:
-            0 auto 95px;
+          margin: 0 auto 95px;
 
-          padding:
-            65px 32px 45px;
+          padding: 65px 32px 45px;
 
           scroll-margin-top: 60px;
 
-          border:
-            3px solid #303538;
-
+          border: 3px solid #303538;
           border-radius: 28px;
 
-          background:
-            linear-gradient(
-              145deg,
-              #686c6f 0%,
-              #505457 45%,
-              #363a3d 100%
-            );
+          background: linear-gradient(
+            145deg,
+            #686c6f 0%,
+            #505457 45%,
+            #363a3d 100%
+          );
 
           box-shadow:
-            inset 0 7px 6px
-              rgba(255,255,255,.23),
-
-            inset 0 -8px 8px
-              rgba(0,0,0,.32),
-
+            inset 0 7px 6px rgba(255, 255, 255, 0.23),
+            inset 0 -8px 8px rgba(0, 0, 0, 0.32),
             0 7px 0 #272b2e,
-
-            0 15px 24px
-              rgba(0,0,0,.30);
+            0 15px 24px rgba(0, 0, 0, 0.3);
         }
 
         .sectionTitle {
@@ -1118,8 +855,7 @@ export default function Home() {
           top: -35px;
           left: 50%;
 
-          transform:
-            translateX(-50%);
+          transform: translateX(-50%);
 
           width: 310px;
           height: 66px;
@@ -1135,30 +871,21 @@ export default function Home() {
           font-size: 28px;
           font-weight: 700;
 
-          border:
-            3px solid #174461;
-
+          border: 3px solid #174461;
           border-radius: 15px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #9bd9ff 0%,
-              #73bdea 45%,
-              #4e9ccc 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #9bd9ff 0%,
+            #73bdea 45%,
+            #4e9ccc 100%
+          );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.75),
-
-            inset 0 -6px 6px
-              rgba(0,0,0,.16),
-
+            inset 0 6px 5px rgba(255, 255, 255, 0.75),
+            inset 0 -6px 6px rgba(0, 0, 0, 0.16),
             0 5px 0 #17415c,
-
-            0 9px 13px
-              rgba(0,0,0,.25);
+            0 9px 13px rgba(0, 0, 0, 0.25);
         }
 
         /* ================= KARTALAR ================= */
@@ -1167,10 +894,7 @@ export default function Home() {
           display: grid;
 
           grid-template-columns:
-            repeat(
-              3,
-              minmax(0, 1fr)
-            );
+            repeat(3, minmax(0, 1fr));
 
           gap: 30px;
         }
@@ -1187,30 +911,21 @@ export default function Home() {
 
           text-align: center;
 
-          border:
-            2px solid #3d4347;
-
+          border: 2px solid #3d4347;
           border-radius: 20px;
 
-          background:
-            linear-gradient(
-              145deg,
-              #e1e1e1 0%,
-              #c5c5c5 50%,
-              #a6a6a6 100%
-            );
+          background: linear-gradient(
+            145deg,
+            #e1e1e1 0%,
+            #c5c5c5 50%,
+            #a6a6a6 100%
+          );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.86),
-
-            inset 0 -7px 7px
-              rgba(0,0,0,.18),
-
+            inset 0 6px 5px rgba(255, 255, 255, 0.86),
+            inset 0 -7px 7px rgba(0, 0, 0, 0.18),
             0 6px 0 #4a5054,
-
-            0 11px 16px
-              rgba(0,0,0,.25);
+            0 11px 16px rgba(0, 0, 0, 0.25);
         }
 
         .card h2 {
@@ -1224,35 +939,24 @@ export default function Home() {
 
           color: #111;
 
-          font-size:
-            clamp(
-              22px,
-              2vw,
-              28px
-            );
+          font-size: clamp(22px, 2vw, 28px);
         }
 
         .adminLabel {
-          margin:
-            -15px 0 18px;
+          margin: -15px 0 18px;
 
-          padding:
-            7px 14px;
+          padding: 7px 14px;
 
           color: #125a32;
 
           font-size: 14px;
           font-weight: 700;
 
-          border:
-            1px solid #2d8450;
-
+          border: 1px solid #2d8450;
           border-radius: 8px;
 
           background: #d8f1df;
         }
-
-        /* ================= VOCABULARY ================= */
 
         .vocabularySubtitle {
           margin: -18px 0 22px;
@@ -1263,15 +967,13 @@ export default function Home() {
           font-weight: 700;
         }
 
-        /* ================= OCHISH ================= */
+        /* ================= TUGMALAR ================= */
 
         .openButton {
           width: 165px;
           height: 48px;
 
-          border:
-            2px solid #4e565b;
-
+          border: 2px solid #4e565b;
           border-radius: 9px;
 
           cursor: pointer;
@@ -1281,32 +983,28 @@ export default function Home() {
           font-size: 17px;
           font-weight: 700;
 
-          background:
-            linear-gradient(
-              180deg,
-              #f8f8f8 0%,
-              #bdbdbd 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #f8f8f8 0%,
+            #bdbdbd 100%
+          );
 
           box-shadow:
             inset 0 4px 4px white,
             0 4px 0 #555d61;
 
           transition:
-            transform .15s ease,
-            filter .15s ease;
+            transform 0.15s ease,
+            filter 0.15s ease;
         }
 
         .openButton:hover {
           filter: brightness(1.06);
-
-          transform:
-            translateY(-2px);
+          transform: translateY(-2px);
         }
 
         .openButton:active {
-          transform:
-            translateY(2px);
+          transform: translateY(2px);
         }
 
         .testButton {
@@ -1314,17 +1012,14 @@ export default function Home() {
 
           border-color: #174461;
 
-          background:
-            linear-gradient(
-              180deg,
-              #b8ecff 0%,
-              #58a8d7 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #b8ecff 0%,
+            #58a8d7 100%
+          );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.8),
-
+            inset 0 4px 4px rgba(255, 255, 255, 0.8),
             0 4px 0 #17415c;
         }
 
@@ -1332,7 +1027,6 @@ export default function Home() {
 
         .footerBlue {
           width: min(1400px, 96%);
-
           min-height: 100px;
 
           margin: 10px auto;
@@ -1347,45 +1041,29 @@ export default function Home() {
 
           color: #073b68;
 
-          font-size:
-            clamp(
-              24px,
-              2.7vw,
-              35px
-            );
-
+          font-size: clamp(24px, 2.7vw, 35px);
           font-weight: 700;
 
-          border:
-            3px solid #17425e;
-
+          border: 3px solid #17425e;
           border-radius: 20px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #91d5ff 0%,
-              #67b7e8 50%,
-              #4998cd 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #91d5ff 0%,
+            #67b7e8 50%,
+            #4998cd 100%
+          );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.72),
-
-            inset 0 -7px 7px
-              rgba(0,0,0,.17),
-
+            inset 0 6px 5px rgba(255, 255, 255, 0.72),
+            inset 0 -7px 7px rgba(0, 0, 0, 0.17),
             0 6px 0 #16415b,
-
-            0 12px 17px
-              rgba(0,0,0,.22);
+            0 12px 17px rgba(0, 0, 0, 0.22);
         }
 
         /* ================= RESPONSIVE ================= */
 
         @media (max-width: 1350px) {
-
           .topPanel {
             flex-direction: column;
           }
@@ -1402,14 +1080,12 @@ export default function Home() {
         }
 
         @media (max-width: 950px) {
-
           .cards {
             grid-template-columns: 1fr;
           }
         }
 
         @media (max-width: 700px) {
-
           .page {
             padding: 10px;
           }
@@ -1432,8 +1108,7 @@ export default function Home() {
 
             display: grid;
 
-            grid-template-columns:
-              1fr 1fr;
+            grid-template-columns: 1fr 1fr;
           }
 
           .grayButton,
@@ -1445,8 +1120,7 @@ export default function Home() {
           .clockPanel {
             width: 97%;
 
-            padding:
-              70px 15px 30px;
+            padding: 70px 15px 30px;
           }
 
           .clockTopLabel {
@@ -1456,7 +1130,6 @@ export default function Home() {
 
           .clockTime {
             width: 96%;
-
             min-height: 130px;
 
             font-size: 50px;
@@ -1466,7 +1139,6 @@ export default function Home() {
 
           .calendarBox {
             width: 96%;
-
             min-height: 110px;
           }
 
@@ -1477,8 +1149,7 @@ export default function Home() {
           .mainSection {
             width: 97%;
 
-            padding:
-              60px 18px 35px;
+            padding: 60px 18px 35px;
           }
 
           .sectionTitle {
@@ -1495,21 +1166,16 @@ export default function Home() {
         }
 
         @media (max-width: 450px) {
-
           .navButtons {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
 
           .clockTime {
             font-size: 42px;
-
             letter-spacing: 1px;
           }
         }
-
       `}</style>
-
     </main>
   );
 }
