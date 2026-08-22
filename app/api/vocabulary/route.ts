@@ -10,9 +10,30 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const VOCABULARY_BLOB_PATH =
+/*
+  ESKI BAZA:
+  Oldingi barcha lug‘atlar shu faylda qoladi.
+  Uni o‘chirmaymiz va eski ma’lumotlar yo‘qolmaydi.
+*/
+const LEGACY_VOCABULARY_BLOB_PATH =
   "huquqiy-sayt/vocabulary.json";
+
+/*
+  YANGI TIZIM:
+  Har bir Book + Unit alohida faylga saqlanadi.
+
+  Masalan:
+  huquqiy-sayt/vocabulary/book-1/unit-1.json
+  huquqiy-sayt/vocabulary/book-6/unit-24.json
+
+  Natija:
+  - bitta Unitni saqlaganda boshqa Unitlarga tegmaydi;
+  - katta vocabulary.json ni har safar qayta yozmaydi;
+  - parallel saqlashda ma’lumotlar bir-birini bosib ketmaydi;
+  - saqlash tezroq va ishonchliroq bo‘ladi.
+*/
 
 /* =========================================================
    TYPES
@@ -21,7 +42,6 @@ const VOCABULARY_BLOB_PATH =
 type VocabularyWord = {
   word: string;
   translation: string;
-
   example?: string;
   exampleTranslation?: string;
 };
@@ -47,6 +67,17 @@ type VocabularyPostBody = {
 };
 
 /* =========================================================
+   COMMON RESPONSE HEADERS
+========================================================= */
+
+const NO_CACHE_HEADERS = {
+  "Cache-Control":
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
+/* =========================================================
    BLOB TOKEN
 ========================================================= */
 
@@ -62,7 +93,21 @@ function checkBlobToken() {
 }
 
 /* =========================================================
-   BOOK VALIDATION
+   PATH
+========================================================= */
+
+function getUnitBlobPath(
+  book: number,
+  unit: number
+) {
+  return (
+    `huquqiy-sayt/vocabulary/` +
+    `book-${book}/unit-${unit}.json`
+  );
+}
+
+/* =========================================================
+   VALIDATION
 ========================================================= */
 
 function isValidBook(
@@ -74,10 +119,6 @@ function isValidBook(
     book <= 6
   );
 }
-
-/* =========================================================
-   UNIT VALIDATION
-========================================================= */
 
 function isValidUnit(
   unit: number
@@ -143,7 +184,74 @@ function normalizeWord(
 }
 
 /* =========================================================
-   VOCABULARY NORMALIZE
+   UNIT NORMALIZE
+========================================================= */
+
+function normalizeUnit(
+  value: unknown
+): VocabularyUnit | null {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
+    return null;
+  }
+
+  const raw =
+    value as Record<
+      string,
+      unknown
+    >;
+
+  const book =
+    Number(raw.book);
+
+  const unit =
+    Number(raw.unit);
+
+  if (
+    !isValidBook(book) ||
+    !isValidUnit(unit)
+  ) {
+    return null;
+  }
+
+  const rawWords =
+    Array.isArray(
+      raw.words
+    )
+      ? raw.words
+      : [];
+
+  const words =
+    rawWords
+      .map((word) =>
+        normalizeWord(
+          (word ?? {}) as RawVocabularyWord
+        )
+      )
+      .filter(
+        (
+          word
+        ): word is VocabularyWord =>
+          word !== null
+      );
+
+  return {
+    book,
+    unit,
+    words,
+
+    updatedAt:
+      typeof raw.updatedAt ===
+      "string"
+        ? raw.updatedAt
+        : "",
+  };
+}
+
+/* =========================================================
+   LEGACY VOCABULARY NORMALIZE
 ========================================================= */
 
 function normalizeVocabulary(
@@ -155,81 +263,136 @@ function normalizeVocabulary(
     return [];
   }
 
-  const result: VocabularyUnit[] =
-    [];
+  const result:
+    VocabularyUnit[] = [];
 
   for (
     const item of value
   ) {
-    if (
-      !item ||
-      typeof item !==
-        "object"
-    ) {
-      continue;
-    }
-
-    const raw =
-      item as Record<
-        string,
-        unknown
-      >;
-
-    const book =
-      Number(raw.book);
-
-    const unit =
-      Number(raw.unit);
+    const normalized =
+      normalizeUnit(item);
 
     if (
-      !isValidBook(book) ||
-      !isValidUnit(unit)
+      normalized
     ) {
-      continue;
+      result.push(
+        normalized
+      );
     }
-
-    const rawWords =
-      Array.isArray(
-        raw.words
-      )
-        ? raw.words
-        : [];
-
-    const words =
-      rawWords
-        .map((word) =>
-          normalizeWord(
-            (word ?? {}) as RawVocabularyWord
-          )
-        )
-        .filter(
-          (
-            word
-          ): word is VocabularyWord =>
-            word !== null
-        );
-
-    result.push({
-      book,
-      unit,
-      words,
-
-      updatedAt:
-        typeof raw.updatedAt ===
-        "string"
-          ? raw.updatedAt
-          : "",
-    });
   }
 
   return result;
 }
 
 /* =========================================================
-   VOCABULARY O‘QISH
+   STREAM -> TEXT
 ========================================================= */
 
-async function readVocabulary(): Promise<
+async function streamToText(
+  stream: ReadableStream<Uint8Array>
+) {
+  return await new Response(
+    stream
+  ).text();
+}
+
+/* =========================================================
+   YANGI UNIT FAYLINI O‘QISH
+========================================================= */
+
+async function readUnitFile(
+  book: number,
+  unit: number
+): Promise<
+  VocabularyUnit | null
+> {
+  checkBlobToken();
+
+  const path =
+    getUnitBlobPath(
+      book,
+      unit
+    );
+
+  try {
+    const result =
+      await get(
+        path,
+        {
+          access:
+            "private",
+        }
+      );
+
+    if (
+      !result ||
+      result.statusCode !==
+        200 ||
+      !result.stream
+    ) {
+      return null;
+    }
+
+    const text =
+      await streamToText(
+        result.stream
+      );
+
+    if (
+      !text.trim()
+    ) {
+      return null;
+    }
+
+    const parsed:
+      unknown =
+      JSON.parse(
+        text
+      );
+
+    const normalized =
+      normalizeUnit(
+        parsed
+      );
+
+    if (
+      !normalized
+    ) {
+      return null;
+    }
+
+    if (
+      normalized.book !==
+        book ||
+      normalized.unit !==
+        unit
+    ) {
+      return null;
+    }
+
+    return normalized;
+  } catch (error) {
+    /*
+      Fayl hali mavjud bo‘lmasa ham
+      xato deb hisoblamaymiz.
+      Keyin eski vocabulary.json dan qidiramiz.
+    */
+    console.warn(
+      `readUnitFile ${path}:`,
+      error instanceof Error
+        ? error.message
+        : error
+    );
+
+    return null;
+  }
+}
+
+/* =========================================================
+   ESKI vocabulary.json NI O‘QISH
+========================================================= */
+
+async function readLegacyVocabulary(): Promise<
   VocabularyUnit[]
 > {
   checkBlobToken();
@@ -237,7 +400,7 @@ async function readVocabulary(): Promise<
   try {
     const result =
       await get(
-        VOCABULARY_BLOB_PATH,
+        LEGACY_VOCABULARY_BLOB_PATH,
         {
           access:
             "private",
@@ -254,9 +417,9 @@ async function readVocabulary(): Promise<
     }
 
     const text =
-      await new Response(
+      await streamToText(
         result.stream
-      ).text();
+      );
 
     if (
       !text.trim()
@@ -264,15 +427,18 @@ async function readVocabulary(): Promise<
       return [];
     }
 
-    const parsed: unknown =
-      JSON.parse(text);
+    const parsed:
+      unknown =
+      JSON.parse(
+        text
+      );
 
     return normalizeVocabulary(
       parsed
     );
   } catch (error) {
     console.error(
-      "readVocabulary ERROR:",
+      "readLegacyVocabulary ERROR:",
       error
     );
 
@@ -281,16 +447,63 @@ async function readVocabulary(): Promise<
 }
 
 /* =========================================================
-   VOCABULARY YOZISH
+   UNITNI O‘QISH
+   1. Avval yangi alohida fayldan
+   2. Topilmasa eski vocabulary.json dan
 ========================================================= */
 
-async function writeVocabulary(
-  data: VocabularyUnit[]
+async function readVocabularyUnit(
+  book: number,
+  unit: number
+): Promise<
+  VocabularyUnit | null
+> {
+  const newUnit =
+    await readUnitFile(
+      book,
+      unit
+    );
+
+  if (
+    newUnit
+  ) {
+    return newUnit;
+  }
+
+  const legacy =
+    await readLegacyVocabulary();
+
+  return (
+    legacy.find(
+      (
+        item
+      ) =>
+        item.book ===
+          book &&
+        item.unit ===
+          unit
+    ) ??
+    null
+  );
+}
+
+/* =========================================================
+   UNITNI YOZISH
+========================================================= */
+
+async function writeUnitFile(
+  data: VocabularyUnit
 ) {
   checkBlobToken();
 
+  const path =
+    getUnitBlobPath(
+      data.book,
+      data.unit
+    );
+
   await put(
-    VOCABULARY_BLOB_PATH,
+    path,
 
     JSON.stringify(
       data,
@@ -311,10 +524,96 @@ async function writeVocabulary(
       contentType:
         "application/json; charset=utf-8",
 
+      /*
+        Vercel Blob cacheControlMaxAge
+        uchun eng xavfsiz minimal qiymat.
+        API javobining o‘zi esa no-store.
+      */
       cacheControlMaxAge:
         60,
     }
   );
+}
+
+/* =========================================================
+   VERIFY HELPERS
+========================================================= */
+
+function sameWords(
+  a: VocabularyWord[],
+  b: VocabularyWord[]
+) {
+  return (
+    JSON.stringify(a) ===
+    JSON.stringify(b)
+  );
+}
+
+function wait(
+  ms: number
+) {
+  return new Promise<void>(
+    (resolve) => {
+      setTimeout(
+        resolve,
+        ms
+      );
+    }
+  );
+}
+
+/*
+  Blobga yozgandan keyin
+  qayta o‘qib tekshiramiz.
+
+  Ba’zan storage/CDN propagation
+  juda qisqa kechikishi mumkin.
+*/
+async function verifySavedUnit(
+  expected:
+    VocabularyUnit
+) {
+  const delays =
+    [
+      0,
+      120,
+      250,
+      500,
+    ];
+
+  for (
+    const delay of delays
+  ) {
+    if (
+      delay > 0
+    ) {
+      await wait(
+        delay
+      );
+    }
+
+    const actual =
+      await readUnitFile(
+        expected.book,
+        expected.unit
+      );
+
+    if (
+      actual &&
+      actual.book ===
+        expected.book &&
+      actual.unit ===
+        expected.unit &&
+      sameWords(
+        actual.words,
+        expected.words
+      )
+    ) {
+      return actual;
+    }
+  }
+
+  return null;
 }
 
 /* =========================================================
@@ -323,7 +622,8 @@ async function writeVocabulary(
 ========================================================= */
 
 export async function GET(
-  request: NextRequest
+  request:
+    NextRequest
 ) {
   try {
     const {
@@ -361,6 +661,9 @@ export async function GET(
         {
           status:
             400,
+
+          headers:
+            NO_CACHE_HEADERS,
         }
       );
     }
@@ -379,23 +682,17 @@ export async function GET(
         {
           status:
             400,
+
+          headers:
+            NO_CACHE_HEADERS,
         }
       );
     }
 
-    const vocabulary =
-      await readVocabulary();
-
     const found =
-      vocabulary.find(
-        (
-          item:
-            VocabularyUnit
-        ) =>
-          item.book ===
-            book &&
-          item.unit ===
-            unit
+      await readVocabularyUnit(
+        book,
+        unit
       );
 
     return NextResponse.json(
@@ -413,15 +710,17 @@ export async function GET(
         words:
           found?.words ??
           [],
+
+        updatedAt:
+          found?.updatedAt ??
+          null,
       },
       {
         status:
           200,
 
-        headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
-        },
+        headers:
+          NO_CACHE_HEADERS,
       }
     );
   } catch (error) {
@@ -443,6 +742,9 @@ export async function GET(
       {
         status:
           500,
+
+        headers:
+          NO_CACHE_HEADERS,
       }
     );
   }
@@ -454,7 +756,8 @@ export async function GET(
 ========================================================= */
 
 export async function POST(
-  request: NextRequest
+  request:
+    NextRequest
 ) {
   try {
     const body =
@@ -484,6 +787,9 @@ export async function POST(
         {
           status:
             400,
+
+          headers:
+            NO_CACHE_HEADERS,
         }
       );
     }
@@ -502,6 +808,9 @@ export async function POST(
         {
           status:
             400,
+
+          headers:
+            NO_CACHE_HEADERS,
         }
       );
     }
@@ -513,14 +822,15 @@ export async function POST(
         ? body.words
         : [];
 
-    const words: VocabularyWord[] =
+    const words:
+      VocabularyWord[] =
       incomingWords
         .map((item) =>
           normalizeWord(
-            (item ?? {}) as RawVocabularyWord
+            (item ??
+              {}) as RawVocabularyWord
           )
         )
-
         .filter(
           (
             item
@@ -543,39 +853,19 @@ export async function POST(
         {
           status:
             400,
+
+          headers:
+            NO_CACHE_HEADERS,
         }
       );
     }
-
-    /*
-      Mavjud vocabulary ni
-      avval o‘qiymiz.
-
-      Shu sababli boshqa
-      Book va Unitlar
-      o‘chib ketmaydi.
-    */
-
-    const vocabulary =
-      await readVocabulary();
 
     const now =
       new Date()
         .toISOString();
 
-    const existingIndex =
-      vocabulary.findIndex(
-        (
-          item:
-            VocabularyUnit
-        ) =>
-          item.book ===
-            book &&
-          item.unit ===
-            unit
-      );
-
-    const unitData: VocabularyUnit =
+    const unitData:
+      VocabularyUnit =
       {
         book,
         unit,
@@ -585,59 +875,33 @@ export async function POST(
       };
 
     /*
-      Unit mavjud bo‘lsa
-      faqat shu Unit
-      yangilanadi.
+      MUHIM:
+      Endi butun vocabulary.json
+      o‘qilmaydi va qayta yozilmaydi.
 
-      Boshqa Unitlar
-      o‘z joyida qoladi.
+      Faqat tanlangan Book + Unit
+      alohida faylga yoziladi.
     */
-
-    if (
-      existingIndex >=
-      0
-    ) {
-      vocabulary[
-        existingIndex
-      ] = unitData;
-    } else {
-      vocabulary.push(
-        unitData
-      );
-    }
+    await writeUnitFile(
+      unitData
+    );
 
     /*
-      Tartibli saqlaymiz:
-      Book → Unit
+      Haqiqatan yozilganini
+      server tomonda tekshiramiz.
     */
+    const verified =
+      await verifySavedUnit(
+        unitData
+      );
 
-    vocabulary.sort(
-      (
-        a:
-          VocabularyUnit,
-        b:
-          VocabularyUnit
-      ) => {
-        if (
-          a.book !==
-          b.book
-        ) {
-          return (
-            a.book -
-            b.book
-          );
-        }
-
-        return (
-          a.unit -
-          b.unit
-        );
-      }
-    );
-
-    await writeVocabulary(
-      vocabulary
-    );
+    if (
+      !verified
+    ) {
+      throw new Error(
+        "So‘zlar Blobga yuborildi, lekin saqlanganini tasdiqlab bo‘lmadi. Iltimos, yana urinib ko‘ring."
+      );
+    }
 
     return NextResponse.json(
       {
@@ -645,19 +909,26 @@ export async function POST(
           true,
 
         message:
-          `Book ${book}, Unit ${unit} uchun ${words.length} ta so‘z saqlandi.`,
+          `Book ${book}, Unit ${unit} uchun ${verified.words.length} ta so‘z saqlandi.`,
 
         book,
         unit,
 
         count:
-          words.length,
+          verified.words.length,
 
-        words,
+        words:
+          verified.words,
+
+        updatedAt:
+          verified.updatedAt,
       },
       {
         status:
           200,
+
+        headers:
+          NO_CACHE_HEADERS,
       }
     );
   } catch (error) {
@@ -679,6 +950,9 @@ export async function POST(
       {
         status:
           500,
+
+        headers:
+          NO_CACHE_HEADERS,
       }
     );
   }
