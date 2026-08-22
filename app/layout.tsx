@@ -17,9 +17,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Huquqiy ta’lim platformasi | Qurbonov Siyovush",
+  title: "Qurbonovv.uz",
+
   description:
-  "Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi. Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar va qo‘llanmalar.",
+    "Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi. Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar va qo‘llanmalar.",
+
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 type RootLayoutProps = {
