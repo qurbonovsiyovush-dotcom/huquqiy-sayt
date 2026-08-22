@@ -1,27 +1,77 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type UserRole = "admin" | "user" | null;
 
 export default function Home() {
-  const [now, setNow] = useState<Date | null>(null);
   const [role, setRole] = useState<UserRole>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
+  const clockRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
+
   /* =========================================
-     SOAT
+     SOAT — OPTIMALLASHTIRILGAN
+
+     Muhim: vaqt har soniyada React state orqali
+     yangilanmaydi. Faqat soat va sana DOM matni
+     o‘zgaradi. Shu sabab butun 3D sahifa har
+     soniyada qayta render bo‘lmaydi.
   ========================================= */
 
   useEffect(() => {
-    setNow(new Date());
+    const uzMonths = [
+      "yanvar",
+      "fevral",
+      "mart",
+      "aprel",
+      "may",
+      "iyun",
+      "iyul",
+      "avgust",
+      "sentabr",
+      "oktabr",
+      "noyabr",
+      "dekabr",
+    ];
 
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+    const uzWeekdays = [
+      "Yakshanba",
+      "Dushanba",
+      "Seshanba",
+      "Chorshanba",
+      "Payshanba",
+      "Juma",
+      "Shanba",
+    ];
+
+    function updateClock() {
+      const current = new Date();
+
+      const timeText = `${String(current.getHours()).padStart(2, "0")}:${String(
+        current.getMinutes()
+      ).padStart(2, "0")}:${String(current.getSeconds()).padStart(2, "0")}`;
+
+      const dateText = `${uzWeekdays[current.getDay()]}, ${current.getDate()}-${
+        uzMonths[current.getMonth()]
+      } ${current.getFullYear()}`;
+
+      if (clockRef.current) {
+        clockRef.current.textContent = timeText;
+      }
+
+      if (dateRef.current) {
+        dateRef.current.textContent = dateText;
+      }
+    }
+
+    updateClock();
+
+    const timer = window.setInterval(updateClock, 1000);
 
     return () => {
-      clearInterval(timer);
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -112,47 +162,6 @@ export default function Home() {
     window.location.href = "/test-entry";
   }
 
-  /* =========================================
-     SANA
-  ========================================= */
-
-  const uzMonths = [
-    "yanvar",
-    "fevral",
-    "mart",
-    "aprel",
-    "may",
-    "iyun",
-    "iyul",
-    "avgust",
-    "sentabr",
-    "oktabr",
-    "noyabr",
-    "dekabr",
-  ];
-
-  const uzWeekdays = [
-    "Yakshanba",
-    "Dushanba",
-    "Seshanba",
-    "Chorshanba",
-    "Payshanba",
-    "Juma",
-    "Shanba",
-  ];
-
-  const timeText = now
-    ? `${String(now.getHours()).padStart(2, "0")}:${String(
-        now.getMinutes()
-      ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`
-    : "--:--:--";
-
-  const dateText = now
-    ? `${uzWeekdays[now.getDay()]}, ${now.getDate()}-${
-        uzMonths[now.getMonth()]
-      } ${now.getFullYear()}`
-    : "Sana yuklanmoqda...";
-
   return (
     <main className="page">
       {/* ================= HEADER ================= */}
@@ -227,13 +236,19 @@ export default function Home() {
             Huquqiy ta’lim platformasi
           </div>
 
-          <div className="clockTime">
-            {timeText}
+          <div
+            ref={clockRef}
+            className="clockTime"
+          >
+            --:--:--
           </div>
 
           <div className="calendarBox">
-            <div className="dateText">
-              {dateText}
+            <div
+              ref={dateRef}
+              className="dateText"
+            >
+              Sana yuklanmoqda...
             </div>
           </div>
         </div>
