@@ -16,6 +16,8 @@ import { useSearchParams } from "next/navigation";
 type VocabularyWord = {
   word: string;
   translation: string;
+  example?: string;
+  exampleTranslation?: string;
 };
 
 type VocabularyResponse = {
@@ -470,14 +472,33 @@ function LearnContent() {
 
   /* =======================================================
      MISOL GAP
+
+     1-o‘rinda: API / BLOB orqali kelgan misol gap
+     2-o‘rinda: eski Unit 1 uchun EXAMPLES fallback
   ======================================================= */
 
   const example =
-    useMemo(() => {
+    useMemo<ExampleData | null>(() => {
       if (
         !currentWord
       ) {
         return null;
+      }
+
+      const english =
+        currentWord.example?.trim();
+
+      const uzbek =
+        currentWord.exampleTranslation?.trim();
+
+      if (
+        english
+      ) {
+        return {
+          english,
+          uzbek:
+            uzbek || "",
+        };
       }
 
       const key =
