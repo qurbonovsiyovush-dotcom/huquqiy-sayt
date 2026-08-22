@@ -1,19 +1,4 @@
-"use client";
-
-import {
-  Suspense,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import { useSearchParams } from "next/navigation";
-
-/* =========================================================
-   TYPES
-========================================================= */
-
-type VocabularyWord = {
+ocabularyWord = {
   word: string;
   translation: string;
   example?: string;
@@ -3079,6 +3064,208 @@ function LearnContent() {
               130px;
           }
         }
+
+        /* =====================================================
+           MOBILE COMPACT — TEST SAHIFASI
+        ====================================================== */
+
+        @media (max-width: 640px) {
+          .page {
+            padding: 10px 8px 28px;
+          }
+
+          .topBar {
+            width: 100%;
+            min-height: 138px;
+            padding: 12px 10px 14px;
+            gap: 9px;
+            border-radius: 18px;
+            border-width: 2px;
+
+            grid-template-columns: 1fr auto;
+
+            box-shadow:
+              inset 0 5px 4px rgba(255,255,255,.68),
+              inset 0 -5px 5px rgba(0,0,0,.14),
+              0 5px 0 #17415c,
+              0 9px 12px rgba(0,0,0,.18);
+          }
+
+          .topCenter {
+            grid-column: 1 / -1;
+            grid-row: 1;
+            width: 100%;
+            gap: 8px;
+          }
+
+          .unitInfo {
+            font-size: 17px;
+          }
+
+          .topModeSwitch {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+          }
+
+          .topModeSwitch .modeButton {
+            width: 100%;
+            min-width: 0;
+            min-height: 34px;
+            padding: 5px 4px;
+            font-size: 11px;
+            line-height: 1.1;
+            border-radius: 7px;
+
+            box-shadow:
+              inset 0 2px 2px rgba(255,255,255,.86),
+              0 2px 0 #555d61;
+          }
+
+          .backMini {
+            grid-column: 1;
+            grid-row: 2;
+            justify-self: start;
+            min-height: 38px;
+            padding: 7px 12px;
+            font-size: 13px;
+          }
+
+          .progress {
+            grid-column: 2;
+            grid-row: 2;
+            justify-self: end;
+            font-size: 15px;
+          }
+
+          .learnArea {
+            width: 100%;
+            min-height: auto;
+            margin-top: 24px;
+          }
+
+          .wordBox {
+            width: min(88%, 360px);
+            min-height: 76px;
+            padding: 12px;
+            font-size: clamp(25px, 8vw, 32px);
+            border-radius: 14px;
+            border-width: 2px;
+
+            box-shadow:
+              inset 0 5px 4px rgba(255,255,255,.60),
+              inset 0 -5px 5px rgba(0,0,0,.13),
+              0 4px 0 #17415c,
+              0 7px 10px rgba(0,0,0,.20);
+          }
+
+          .wordTools {
+            width: 100%;
+            margin-top: 16px;
+            gap: 10px;
+            flex-wrap: nowrap;
+          }
+
+          .toolButton {
+            flex: 1 1 0;
+            min-width: 0;
+            min-height: 38px;
+            padding: 7px 6px;
+            font-size: 13px;
+            border-radius: 8px;
+          }
+
+          .exampleArea {
+            min-height: 88px;
+            margin-top: 12px;
+          }
+
+          .exampleButton {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 16px;
+          }
+
+          .englishExample {
+            font-size: 22px;
+          }
+
+          .uzbekExample {
+            font-size: 20px;
+          }
+
+          .answers {
+            width: 100%;
+            margin-top: 8px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 11px;
+          }
+
+          .answerButton {
+            min-height: 72px;
+            padding: 10px 8px;
+            border-width: 2px;
+            border-radius: 12px;
+            font-size: clamp(17px, 4.8vw, 22px);
+            line-height: 1.15;
+
+            box-shadow:
+              inset 0 5px 4px rgba(255,255,255,.88),
+              inset 0 -4px 4px rgba(0,0,0,.13),
+              0 4px 0 #555d61,
+              0 7px 9px rgba(0,0,0,.17);
+          }
+
+          .laterButton {
+            margin-top: 18px;
+            padding: 8px 15px;
+            font-size: 13px;
+            border-radius: 15px;
+          }
+
+          .feedbackArea {
+            min-height: 38px;
+            margin-top: 15px;
+          }
+
+          .correctText {
+            font-size: 19px;
+          }
+
+          .wrongText {
+            font-size: 18px;
+          }
+        }
+
+        @media (max-width: 390px) {
+          .topBar {
+            min-height: 132px;
+          }
+
+          .topModeSwitch .modeButton {
+            font-size: 10px;
+          }
+
+          .wordBox {
+            width: 92%;
+            min-height: 70px;
+          }
+
+          .answers {
+            gap: 9px;
+          }
+
+          .answerButton {
+            min-height: 68px;
+            font-size: 16px;
+          }
+
+          .toolButton {
+            font-size: 12px;
+          }
+        }
+
       `}</style>
     </main>
   );
