@@ -2313,7 +2313,7 @@ export default function KazuslarPage() {
           {questions.map((item, index) => (
             <div className="questionCard" key={item.id}>
               <div className="questionHeader">
-                <h3>{index + 1}-savol</h3>
+                <div />
 
                 {questions.length > 1 && (
                   <button
@@ -2326,17 +2326,26 @@ export default function KazuslarPage() {
                 )}
               </div>
 
-              <label>Savol</label>
+              <div className="questionEditor3D">
+                <div className="questionInlineRow">
+                  <div className="questionNumberInline3D">
+                    {index + 1}-savol.
+                  </div>
 
-              <RichEditor
-                value={item.question}
-                onChange={(value) =>
-                  changeQuestion(item.id, "question", value)
-                }
-                placeholder={`${index + 1}-savolni yozing...`}
-                minHeight={120}
-                label={`${index + 1}-savol muharriri`}
-              />
+                  <div className="questionInlineEditorWrap">
+                    <RichEditor
+                      value={item.question}
+                      onChange={(value) =>
+                        changeQuestion(item.id, "question", value)
+                      }
+                      placeholder="Savol matnini yozing..."
+                      minHeight={120}
+                      label=""
+                      paragraphMode="question"
+                    />
+                  </div>
+                </div>
+              </div>
 
               <label>Javob</label>
 
@@ -2542,14 +2551,17 @@ export default function KazuslarPage() {
             {selectedCase.questions.map((item, index) => (
               <div className="viewerQuestionCard" key={item.id}>
                 <div className="viewerQuestion">
-                  <div className="caseNumber3D">{index + 1}-kazus</div>
-
                   <div className="viewerQuestion3D">
-                    <strong className="questionInlineStrong">Savol matni. </strong>
-                    <div
-                      className="richViewerContent inlineQuestionContent"
-                      dangerouslySetInnerHTML={{ __html: item.question }}
-                    />
+                    <div className="questionInlineRow viewerInlineRow">
+                      <div className="questionNumberInline3D">
+                        {index + 1}-savol.
+                      </div>
+
+                      <div
+                        className="richViewerContent inlineQuestionContent"
+                        dangerouslySetInnerHTML={{ __html: item.question }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -2980,45 +2992,82 @@ export default function KazuslarPage() {
           font-size: 24px;
         }
 
-        .caseNumber3D {
-          width: fit-content;
-          min-width: 92px;
-          padding: 6px 15px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          color: #073b68;
-          font-size: 16px;
-          font-weight: 700;
-          border: 2px solid #174461;
-          border-radius: 8px;
-          background: linear-gradient(180deg, #c6edff 0%, #85ccef 48%, #4f9fcf 100%);
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.9),
-            inset 0 -2px 3px rgba(0,0,0,.14),
-            0 4px 0 #17415c,
-            0 7px 10px rgba(0,0,0,.20);
-          text-shadow: 0 1px 0 rgba(255,255,255,.8);
-        }
-
         .questionEditor3D {
           margin-top: 4px;
-          padding: 18px;
+          padding: 24px 26px;
           border: 2px solid #62686c;
           border-radius: 15px;
-          background: linear-gradient(145deg, #f8f8f8, #dddddd);
+          background: linear-gradient(145deg, #ffffff, #e3e3e3);
           box-shadow:
-            inset 0 5px 5px rgba(255,255,255,.9),
+            inset 0 5px 5px rgba(255,255,255,.92),
             inset 0 -4px 5px rgba(0,0,0,.08),
             0 5px 0 #666d71,
             0 10px 16px rgba(0,0,0,.18);
         }
 
-        .questionInlineLabel {
-          margin: 0 0 8px 4px;
-          color: #111;
-          font-size: 19px;
+        .questionInlineRow {
+          display: flex;
+          align-items: flex-start;
+          gap: 20px;
+          width: 100%;
+        }
+
+        .questionNumberInline3D {
+          flex: 0 0 auto;
+          width: fit-content;
+          min-width: 116px;
+          padding: 10px 18px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #073b68;
+          font-size: 18px;
           font-weight: 700;
+          white-space: nowrap;
+          border: 2px solid #174461;
+          border-radius: 9px;
+          background: linear-gradient(
+            180deg,
+            #c6edff 0%,
+            #85ccef 48%,
+            #4f9fcf 100%
+          );
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.92),
+            inset 0 -2px 3px rgba(0,0,0,.14),
+            0 4px 0 #17415c,
+            0 7px 10px rgba(0,0,0,.20);
+          text-shadow: 0 1px 0 rgba(255,255,255,.82);
+        }
+
+        .questionInlineEditorWrap {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+
+        .questionInlineEditorWrap :global(.richEditorShell) {
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
+        }
+
+        .questionInlineEditorWrap :global(.richToolbar) {
+          margin-bottom: 12px;
+          border-radius: 10px;
+        }
+
+        .questionInlineEditorWrap :global(.richEditor) {
+          min-height: 110px !important;
+          padding: 0;
+          background: transparent;
+          font-size: 20px;
+          line-height: 1.7;
+          text-align: justify;
+        }
+
+        .questionInlineEditorWrap :global(.richEditorHint) {
+          display: none;
         }
 
         .questionTextarea {
@@ -3321,8 +3370,7 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion3D {
-          margin-top: 18px;
-          padding: 22px 24px;
+          padding: 27px 30px;
           border: 2px solid #62686c;
           border-radius: 15px;
           background: linear-gradient(145deg, #ffffff, #e1e1e1);
@@ -3335,27 +3383,31 @@ export default function KazuslarPage() {
           text-justify: inter-word;
         }
 
-        .questionInlineStrong {
-          display: inline;
-          font-weight: 700;
+        .viewerInlineRow {
+          align-items: flex-start;
         }
 
         .inlineQuestionContent {
-          display: inline;
+          flex: 1 1 auto;
+          min-width: 0;
+          display: block;
           text-align: justify;
+          text-justify: inter-word;
+          font-size: 20px;
+          line-height: 1.7;
         }
 
         .inlineQuestionContent :global(p),
         .inlineQuestionContent :global(div) {
-          display: inline;
           margin: 0;
+          text-align: justify;
           text-indent: 0;
         }
 
         .inlineQuestionContent :global(p + p),
         .inlineQuestionContent :global(div + div) {
-          display: block;
-          margin-top: 10px;
+          margin-top: 12px;
+          text-indent: 2em;
         }
 
         .viewerAnswer {
@@ -3439,6 +3491,21 @@ export default function KazuslarPage() {
           }
 
           .questionCard {
+            padding: 18px;
+          }
+
+          .questionInlineRow {
+            gap: 12px;
+          }
+
+          .questionNumberInline3D {
+            min-width: 96px;
+            padding: 8px 12px;
+            font-size: 16px;
+          }
+
+          .viewerQuestion3D,
+          .questionEditor3D {
             padding: 18px;
           }
 
