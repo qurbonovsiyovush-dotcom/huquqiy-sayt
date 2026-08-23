@@ -380,11 +380,11 @@ export default function KazuslarPage() {
 
   async function openCase(item: AnyCase) {
     if (item.type === "pdf") {
-      const pdfUrl =
-        `/api/kazuslar/pdf?id=${encodeURIComponent(item.id)}`;
+      const viewerUrl =
+        `/talabalar/kazuslar/pdf/${encodeURIComponent(item.id)}`;
 
       window.open(
-        pdfUrl,
+        viewerUrl,
         "_blank",
         "noopener,noreferrer"
       );
