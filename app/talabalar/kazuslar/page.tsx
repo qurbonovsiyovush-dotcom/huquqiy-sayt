@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type UserRole = "admin" | "user" | null;
 
@@ -38,6 +38,630 @@ type PdfCase = {
 type AnyCase = PlatformCase | PdfCase;
 
 type Mode = "list" | "write" | "upload" | "view";
+
+
+function stripHtml(value: string) {
+  if (!value) return "";
+
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+type RichEditorProps = {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  minHeight?: number;
+  label?: string;
+};
+
+function RichEditor({
+  value,
+  onChange,
+  placeholder = "Matn yozing...",
+  minHeight = 260,
+  label = "Matn muharriri",
+}: RichEditorProps) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [showColors, setShowColors] = useState(false);
+  const [showShapes, setShowShapes] = useState(false);
+  const [showTable, setShowTable] = useState(false);
+  const [tableRows, setTableRows] = useState(3);
+  const [tableCols, setTableCols] = useState(3);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    if (editor.innerHTML !== value) {
+      editor.innerHTML = value;
+    }
+  }, [value]);
+
+  function syncValue() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    onChange(editor.innerHTML);
+  }
+
+  function runCommand(command: string, commandValue?: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    document.execCommand(command, false, commandValue);
+    syncValue();
+  }
+
+  function insertHtml(html: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    document.execCommand("insertHTML", false, html);
+    syncValue();
+  }
+
+  function insertTable() {
+    const rows = Math.min(Math.max(Number(tableRows) || 1, 1), 20);
+    const cols = Math.min(Math.max(Number(tableCols) || 1, 1), 10);
+
+    let html = `
+      <div style="margin:16px 0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;background:#fff;">
+    `;
+
+    for (let r = 0; r < rows; r += 1) {
+      html += "<tr>";
+
+      for (let c = 0; c < cols; c += 1) {
+        const isHeader = r === 0;
+
+        html += isHeader
+          ? `<th style="border:1px solid #444;padding:10px;background:#dceffd;text-align:center;">Sarlavha</th>`
+          : `<td style="border:1px solid #444;padding:10px;min-width:90px;">Matn</td>`;
+      }
+
+      html += "</tr>";
+    }
+
+    html += "</table></div><p><br></p>";
+
+    insertHtml(html);
+    setShowTable(false);
+  }
+
+  function insertShape(kind: string) {
+    const common =
+      "display:inline-flex;align-items:center;justify-content:center;min-width:150px;min-height:70px;padding:14px 20px;margin:12px;border:2px solid #174461;font-weight:700;text-align:center;";
+
+    const shapes: Record<string, string> = {
+      box: `<div style="${common}border-radius:14px;background:#dceffd;color:#073b68;">2D blok</div><p><br></p>`,
+      circle: `<div style="${common}width:130px;height:130px;min-width:130px;min-height:130px;border-radius:50%;background:#eaf6ff;color:#073b68;">Doira</div><p><br></p>`,
+      note: `<div style="${common}border-radius:10px;background:#fff4a8;color:#503f00;border-color:#9f8200;">Eslatma</div><p><br></p>`,
+      block3d: `<div style="${common}border-radius:14px;background:linear-gradient(145deg,#9bd9ff,#4e9ccc);color:#073b68;box-shadow:8px 8px 0 #17415c,14px 14px 18px rgba(0,0,0,.28);">3D blok</div><p><br></p>`,
+      card3d: `<div style="${common}border-radius:18px;background:linear-gradient(145deg,#eeeeee,#a7a7a7);color:#111;box-shadow:inset 0 5px 5px rgba(255,255,255,.8),0 8px 0 #555,0 14px 20px rgba(0,0,0,.3);">3D kartochka</div><p><br></p>`,
+      arrow: `<div style="${common}border:none;background:transparent;color:#174461;font-size:34px;min-width:210px;">BOSQICH 1&nbsp;&nbsp;➜&nbsp;&nbsp;BOSQICH 2</div><p><br></p>`,
+      timeline: `<div style="margin:18px 0;padding:18px;border-radius:14px;background:#eef6fb;border:2px solid #174461;"><b>1-bosqich</b> ━━━ ➜ <b>2-bosqich</b> ━━━ ➜ <b>3-bosqich</b></div><p><br></p>`,
+      four: `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0;">
+        <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>1. Subyekt</b><br>Matn</div>
+        <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>2. Obyekt</b><br>Matn</div>
+        <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>3. Subyektiv tomon</b><br>Matn</div>
+        <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>4. Obyektiv tomon</b><br>Matn</div>
+      </div><p><br></p>`,
+    };
+
+    insertHtml(shapes[kind] ?? shapes.box);
+    setShowShapes(false);
+  }
+
+  const colors = [
+    "#000000",
+    "#173e58",
+    "#c62828",
+    "#2e7d32",
+    "#1565c0",
+    "#6a1b9a",
+    "#ef6c00",
+    "#5d4037",
+  ];
+
+  const highlights = [
+    "#fff176",
+    "#b9f6ca",
+    "#80d8ff",
+    "#ff80ab",
+    "#ffcc80",
+    "#d1c4e9",
+  ];
+
+  return (
+    <div className={fullscreen ? "richEditorShell fullscreen" : "richEditorShell"}>
+      <div className="richEditorTop">
+        <div className="richEditorLabel">{label}</div>
+
+        <button
+          type="button"
+          className="fullScreenButton"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setFullscreen((old) => !old)}
+        >
+          {fullscreen ? "✕ To‘liq ekrandan chiqish" : "⛶ To‘liq ekran"}
+        </button>
+      </div>
+
+      <div className="richToolbar">
+        <select
+          defaultValue="3"
+          title="Yozuv o‘lchami"
+          onChange={(e) => runCommand("fontSize", e.target.value)}
+        >
+          <option value="1">10</option>
+          <option value="2">12</option>
+          <option value="3">14</option>
+          <option value="4">18</option>
+          <option value="5">24</option>
+          <option value="6">32</option>
+          <option value="7">48</option>
+        </select>
+
+        <select
+          defaultValue="Bell MT"
+          title="Shrift"
+          onChange={(e) => runCommand("fontName", e.target.value)}
+        >
+          <option>Bell MT</option>
+          <option>Times New Roman</option>
+          <option>Arial</option>
+          <option>Calibri</option>
+          <option>Georgia</option>
+          <option>Verdana</option>
+        </select>
+
+        <button type="button" title="Qalin" onMouseDown={(e) => { e.preventDefault(); runCommand("bold"); }}>
+          <b>B</b>
+        </button>
+
+        <button type="button" title="Kursiv" onMouseDown={(e) => { e.preventDefault(); runCommand("italic"); }}>
+          <i>I</i>
+        </button>
+
+        <button type="button" title="Tagiga chizish" onMouseDown={(e) => { e.preventDefault(); runCommand("underline"); }}>
+          <u>U</u>
+        </button>
+
+        <button type="button" title="Ustidan chizish" onMouseDown={(e) => { e.preventDefault(); runCommand("strikeThrough"); }}>
+          <s>S</s>
+        </button>
+
+        <button type="button" title="Chapga" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyLeft"); }}>
+          ≡←
+        </button>
+
+        <button type="button" title="Markazga" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyCenter"); }}>
+          ≡
+        </button>
+
+        <button type="button" title="O‘ngga" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyRight"); }}>
+          →≡
+        </button>
+
+        <button type="button" title="Ikki tomonga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyFull"); }}>
+          ☰
+        </button>
+
+        <button type="button" title="Raqamli ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertOrderedList"); }}>
+          1.
+        </button>
+
+        <button type="button" title="Belgili ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertUnorderedList"); }}>
+          •
+        </button>
+
+        <button type="button" title="Chapdan surish" onMouseDown={(e) => { e.preventDefault(); runCommand("outdent"); }}>
+          ⇤
+        </button>
+
+        <button type="button" title="Ichkariga surish" onMouseDown={(e) => { e.preventDefault(); runCommand("indent"); }}>
+          ⇥
+        </button>
+
+        <button type="button" title="Bekor qilish" onMouseDown={(e) => { e.preventDefault(); runCommand("undo"); }}>
+          ↶
+        </button>
+
+        <button type="button" title="Qaytarish" onMouseDown={(e) => { e.preventDefault(); runCommand("redo"); }}>
+          ↷
+        </button>
+
+        <div className="toolDrop">
+          <button
+            type="button"
+            title="Ranglar"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowColors((old) => !old)}
+          >
+            🎨 Rang
+          </button>
+
+          {showColors && (
+            <div className="colorPopup">
+              <div className="popupLabel">Matn rangi</div>
+              <div className="colorGrid">
+                {colors.map((color) => (
+                  <button
+                    key={`text-${color}`}
+                    type="button"
+                    className="colorSwatch"
+                    style={{ background: color }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      runCommand("foreColor", color);
+                      setShowColors(false);
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div className="popupLabel">Marker</div>
+              <div className="colorGrid">
+                {highlights.map((color) => (
+                  <button
+                    key={`hilite-${color}`}
+                    type="button"
+                    className="colorSwatch"
+                    style={{ background: color }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      runCommand("hiliteColor", color);
+                      setShowColors(false);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="toolDrop">
+          <button
+            type="button"
+            title="Jadval qo‘shish"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowTable((old) => !old)}
+          >
+            ▦ Jadval
+          </button>
+
+          {showTable && (
+            <div className="tablePopup">
+              <label>
+                Qator
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={tableRows}
+                  onChange={(e) => setTableRows(Number(e.target.value))}
+                />
+              </label>
+
+              <label>
+                Ustun
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={tableCols}
+                  onChange={(e) => setTableCols(Number(e.target.value))}
+                />
+              </label>
+
+              <button type="button" className="insertTableButton" onClick={insertTable}>
+                Jadvalni qo‘shish
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="toolDrop">
+          <button
+            type="button"
+            title="Shakllar"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowShapes((old) => !old)}
+          >
+            ◈ Shakl / 3D
+          </button>
+
+          {showShapes && (
+            <div className="shapePopup">
+              <button type="button" onClick={() => insertShape("box")}>▭ 2D blok</button>
+              <button type="button" onClick={() => insertShape("circle")}>◯ Doira</button>
+              <button type="button" onClick={() => insertShape("note")}>▰ Eslatma</button>
+              <button type="button" onClick={() => insertShape("block3d")}>◈ 3D blok</button>
+              <button type="button" onClick={() => insertShape("card3d")}>▣ 3D kartochka</button>
+              <button type="button" onClick={() => insertShape("arrow")}>➜ Strelka</button>
+              <button type="button" onClick={() => insertShape("timeline")}>━━➜ Timeline</button>
+              <button type="button" onClick={() => insertShape("four")}>⊞ 4 tarkib bloki</button>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          title="Gorizontal chiziq"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            insertHtml('<hr style="margin:18px 0;border:none;border-top:2px solid #555;"><p><br></p>');
+          }}
+        >
+          ━
+        </button>
+
+        <button
+          type="button"
+          title="Formatni tozalash"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand("removeFormat");
+          }}
+        >
+          Tx
+        </button>
+      </div>
+
+      <div
+        ref={editorRef}
+        className="richEditor"
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        style={{ minHeight }}
+        onInput={syncValue}
+        onBlur={syncValue}
+      />
+
+      <div className="richEditorHint">
+        Word uslubidagi muharrir: matn o‘lchami, rang, marker, jadval, 2D/3D shakllar, ro‘yxatlar va tekislash.
+      </div>
+
+      <style jsx>{`
+        .richEditorShell {
+          position: relative;
+          width: 100%;
+          border: 3px solid #4a5257;
+          border-radius: 15px;
+          background: #d7d7d7;
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.75),
+            0 5px 0 #343a3e;
+        }
+
+        .richEditorShell.fullscreen {
+          position: fixed;
+          z-index: 9999;
+          inset: 12px;
+          width: auto;
+          height: calc(100vh - 24px);
+          display: flex;
+          flex-direction: column;
+          background: #c9c9c9;
+        }
+
+        .richEditorTop {
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          border-bottom: 1px solid #858585;
+        }
+
+        .richEditorLabel {
+          color: #173e58;
+          font-size: 16px;
+          font-weight: 700;
+        }
+
+        .fullScreenButton {
+          padding: 7px 12px;
+          border: 2px solid #4e565b;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+          background: linear-gradient(#fff,#bdbdbd);
+        }
+
+        .richToolbar {
+          position: relative;
+          padding: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 7px;
+          border-bottom: 2px solid #777;
+          background: linear-gradient(#f5f5f5,#c1c1c1);
+        }
+
+        .richToolbar > button,
+        .richToolbar select,
+        .toolDrop > button {
+          min-height: 38px;
+          padding: 6px 10px;
+          border: 2px solid #545b60;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          background: linear-gradient(#fff,#c9c9c9);
+        }
+
+        .richToolbar > button:hover,
+        .toolDrop > button:hover,
+        .fullScreenButton:hover {
+          filter: brightness(1.08);
+        }
+
+        .toolDrop {
+          position: relative;
+        }
+
+        .colorPopup,
+        .tablePopup,
+        .shapePopup {
+          position: absolute;
+          z-index: 50;
+          top: calc(100% + 7px);
+          left: 0;
+          min-width: 230px;
+          padding: 12px;
+          border: 2px solid #555;
+          border-radius: 10px;
+          background: #f4f4f4;
+          box-shadow: 0 10px 24px rgba(0,0,0,.3);
+        }
+
+        .popupLabel {
+          margin: 4px 0 8px;
+          color: #173e58;
+          font-weight: 700;
+        }
+
+        .colorGrid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 7px;
+          margin-bottom: 12px;
+        }
+
+        .colorSwatch {
+          width: 38px;
+          height: 32px;
+          padding: 0;
+          border: 2px solid #555;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+
+        .tablePopup {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        .tablePopup label {
+          color: #173e58;
+          font-size: 14px;
+        }
+
+        .tablePopup input {
+          width: 100%;
+          margin-top: 5px;
+          padding: 7px;
+          border: 1px solid #555;
+          border-radius: 6px;
+        }
+
+        .insertTableButton {
+          grid-column: 1 / -1;
+          padding: 9px;
+          border: 2px solid #174461;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+          background: #9bd9ff;
+        }
+
+        .shapePopup {
+          min-width: 250px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .shapePopup button {
+          padding: 9px;
+          border: 2px solid #555;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+          background: #e9e9e9;
+        }
+
+        .richEditor {
+          padding: 22px;
+          outline: none;
+          overflow: auto;
+          color: #111;
+          font-family: "Bell MT","Times New Roman",serif;
+          font-size: 18px;
+          line-height: 1.55;
+          background: #fff;
+        }
+
+        .fullscreen .richEditor {
+          flex: 1;
+          min-height: 0 !important;
+        }
+
+        .richEditor:empty::before {
+          content: attr(data-placeholder);
+          color: #8b8b8b;
+          pointer-events: none;
+        }
+
+        .richEditorHint {
+          padding: 9px 12px;
+          color: #35464f;
+          font-size: 13px;
+          font-weight: 700;
+          background: #dceffd;
+          border-top: 1px solid #8aa7b8;
+        }
+
+        @media (max-width: 700px) {
+          .richEditorShell.fullscreen {
+            inset: 4px;
+            height: calc(100vh - 8px);
+          }
+
+          .richToolbar {
+            gap: 5px;
+          }
+
+          .richToolbar > button,
+          .richToolbar select,
+          .toolDrop > button {
+            min-height: 34px;
+            padding: 5px 8px;
+            font-size: 12px;
+          }
+
+          .colorPopup,
+          .tablePopup,
+          .shapePopup {
+            left: 50%;
+            transform: translateX(-50%);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default function KazuslarPage() {
   const [mode, setMode] = useState<Mode>("list");
@@ -529,9 +1153,9 @@ export default function KazuslarPage() {
                     {item.type === "platform" ? (
                       <>
                         <p className="casePreview">
-                          {item.caseText.length > 150
-                            ? `${item.caseText.slice(0, 150)}...`
-                            : item.caseText}
+                          {stripHtml(item.caseText).length > 150
+                            ? `${stripHtml(item.caseText).slice(0, 150)}...`
+                            : stripHtml(item.caseText)}
                         </p>
 
                         <div className="questionCount">
@@ -598,11 +1222,12 @@ export default function KazuslarPage() {
           <div className="formGroup">
             <label>Kazus matni</label>
 
-            <textarea
-              className="caseTextarea"
+            <RichEditor
               value={caseText}
-              onChange={(e) => setCaseText(e.target.value)}
+              onChange={setCaseText}
               placeholder="Kazusning to‘liq matnini shu yerga yozing..."
+              minHeight={320}
+              label="Kazus matni muharriri"
             />
           </div>
 
@@ -626,24 +1251,26 @@ export default function KazuslarPage() {
 
               <label>Savol</label>
 
-              <textarea
-                className="questionTextarea"
+              <RichEditor
                 value={item.question}
-                onChange={(e) =>
-                  changeQuestion(item.id, "question", e.target.value)
+                onChange={(value) =>
+                  changeQuestion(item.id, "question", value)
                 }
                 placeholder={`${index + 1}-savolni yozing...`}
+                minHeight={120}
+                label={`${index + 1}-savol muharriri`}
               />
 
               <label>Javob</label>
 
-              <textarea
-                className="answerTextarea"
+              <RichEditor
                 value={item.answer}
-                onChange={(e) =>
-                  changeQuestion(item.id, "answer", e.target.value)
+                onChange={(value) =>
+                  changeQuestion(item.id, "answer", value)
                 }
                 placeholder="Ushbu savolning javobini yozing..."
+                minHeight={220}
+                label="Javob muharriri"
               />
             </div>
           ))}
@@ -829,7 +1456,7 @@ export default function KazuslarPage() {
 
           <div className="caseTextBox">
             <h2>Kazus matni</h2>
-            <p>{selectedCase.caseText}</p>
+            <div className="richViewerContent" dangerouslySetInnerHTML={{ __html: selectedCase.caseText }} />
           </div>
 
           <div className="viewerQuestionsTitle">Savollar va javoblar</div>
@@ -838,12 +1465,16 @@ export default function KazuslarPage() {
             {selectedCase.questions.map((item, index) => (
               <div className="viewerQuestionCard" key={item.id}>
                 <div className="viewerQuestion">
-                  <strong>{index + 1}-savol.</strong> {item.question}
+                  <strong>{index + 1}-savol.</strong>
+                  <div
+                    className="richViewerContent inlineRich"
+                    dangerouslySetInnerHTML={{ __html: item.question }}
+                  />
                 </div>
 
                 <div className="viewerAnswer">
                   <div className="answerLabel">Javob</div>
-                  <p>{item.answer}</p>
+                  <div className="richViewerContent" dangerouslySetInnerHTML={{ __html: item.answer }} />
                 </div>
               </div>
             ))}
@@ -1502,6 +2133,25 @@ export default function KazuslarPage() {
           white-space: pre-wrap;
           line-height: 1.75;
           font-size: 18px;
+        }
+
+        .richViewerContent {
+          white-space: normal;
+          line-height: 1.75;
+          font-size: 18px;
+        }
+
+        .richViewerContent :global(table) {
+          max-width: 100%;
+        }
+
+        .inlineRich {
+          display: inline;
+        }
+
+        .inlineRich :global(p) {
+          display: inline;
+          margin: 0;
         }
 
         .viewerQuestions {
