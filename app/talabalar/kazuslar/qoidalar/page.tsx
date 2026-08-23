@@ -587,9 +587,7 @@ export default function QoidalarPage() {
                   </p>
                 )}
 
-                <div className="fileMeta">
-                  {item.fileName} · {formatFileSize(item.fileSize)}
-                </div>
+              {item.fileName} · {formatFileSize(item.fileSize)}
 
                 {!roleLoading && role === "admin" && (
                   <div className="adminCardActions">
