@@ -58,6 +58,15 @@ export default function PdfViewerPage({
   const [highlightMode, setHighlightMode] =
     useState(false);
 
+  const [eraseHighlightMode, setEraseHighlightMode] =
+    useState(false);
+
+  const [paletteOpen, setPaletteOpen] =
+    useState(false);
+
+  const [highlightColor, setHighlightColor] =
+    useState("#fff176");
+
   const [highlightMessage, setHighlightMessage] =
     useState("");
 
@@ -448,7 +457,7 @@ export default function PdfViewerPage({
     }
   }
 
-  function applyYellowHighlight() {
+  function applyHighlight() {
     if (!highlightMode) return;
 
     const selection =
@@ -491,6 +500,9 @@ export default function PdfViewerPage({
       mark.className =
         "pdfHighlight";
 
+      mark.style.backgroundColor =
+        highlightColor;
+
       range.surroundContents(
         mark
       );
@@ -498,7 +510,7 @@ export default function PdfViewerPage({
       selection.removeAllRanges();
 
       setHighlightMessage(
-        "✅ Sariq marker qo‘llandi."
+        "✅ Marker qo‘llandi."
       );
 
       window.setTimeout(() => {
@@ -516,6 +528,97 @@ export default function PdfViewerPage({
     }
   }
 
+  function removeHighlight(
+    target: EventTarget | null
+  ) {
+    if (
+      !eraseHighlightMode ||
+      !(target instanceof Element)
+    ) {
+      return;
+    }
+
+    const mark =
+      target.closest(
+        "mark.pdfHighlight"
+      );
+
+    if (
+      !mark
+    ) {
+      return;
+    }
+
+    const parent =
+      mark.parentNode;
+
+    if (
+      !parent
+    ) {
+      return;
+    }
+
+    while (
+      mark.firstChild
+    ) {
+      parent.insertBefore(
+        mark.firstChild,
+        mark
+      );
+    }
+
+    parent.removeChild(
+      mark
+    );
+
+    parent.normalize();
+
+    setHighlightMessage(
+      "✅ Marker o‘chirildi."
+    );
+
+    window.setTimeout(() => {
+      setHighlightMessage("");
+    }, 1200);
+  }
+
+
+  useEffect(() => {
+    if (!paletteOpen) return;
+
+    function closePalette(
+      event: MouseEvent
+    ) {
+      const target =
+        event.target;
+
+      if (
+        target instanceof Element &&
+        target.closest(
+          ".markerControls"
+        )
+      ) {
+        return;
+      }
+
+      setPaletteOpen(
+        false
+      );
+    }
+
+    document.addEventListener(
+      "mousedown",
+      closePalette
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        closePalette
+      );
+    };
+  }, [paletteOpen]);
+
 
   return (
     <main
@@ -524,7 +627,9 @@ export default function PdfViewerPage({
           ? "page adminPage"
           : highlightMode
             ? "page protectedPage highlightMode"
-            : "page protectedPage"
+            : eraseHighlightMode
+              ? "page protectedPage eraseHighlightMode"
+              : "page protectedPage"
       }
       onContextMenu={(
         event
@@ -625,31 +730,156 @@ export default function PdfViewerPage({
             +
           </button>
 
-          <button
-            type="button"
-            className={
-              highlightMode
-                ? "highlightButton active"
-                : "highlightButton"
-            }
-            onClick={() => {
-              setHighlightMode(
-                (value) => !value
-              );
+          <div className="markerControls">
+            <button
+              type="button"
+              className={
+                highlightMode
+                  ? "highlightButton active"
+                  : "highlightButton"
+              }
+              onClick={() => {
+                const next =
+                  !highlightMode;
 
-              setHighlightMessage("");
-            }}
-            title="Matnni sariq rang bilan belgilash"
-          >
-            🖍 Sariq marker
-          </button>
+                setHighlightMode(
+                  next
+                );
+
+                if (next) {
+                  setEraseHighlightMode(
+                    false
+                  );
+                }
+
+                setPaletteOpen(
+                  false
+                );
+
+                setHighlightMessage("");
+              }}
+              title="Tanlangan rang bilan matnni belgilash"
+            >
+              🖍 Marker
+            </button>
+
+            <button
+              type="button"
+              className="paletteButton"
+              onClick={() => {
+                setPaletteOpen(
+                  (value) => !value
+                );
+              }}
+              title="Marker rangini tanlash"
+            >
+              <span
+                className="currentColor"
+                style={{
+                  backgroundColor:
+                    highlightColor,
+                }}
+              />
+              Rang
+              <span className="caret">
+                ▾
+              </span>
+            </button>
+
+            {paletteOpen && (
+              <div className="colorPalette">
+                <div className="paletteTitle">
+                  Marker rangi
+                </div>
+
+                <div className="colorGrid">
+                  {[
+                    "#fff176",
+                    "#76ff03",
+                    "#64ffda",
+                    "#ff80ab",
+                    "#536dfe",
+                    "#ff5252",
+                    "#304ffe",
+                    "#18ffff",
+                    "#00c853",
+                    "#aa00ff",
+                    "#ff6d00",
+                    "#795548",
+                    "#c0ca33",
+                    "#90a4ae",
+                    "#eeeeee",
+                    "#000000",
+                  ].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={
+                        highlightColor === color
+                          ? "colorSwatch selected"
+                          : "colorSwatch"
+                      }
+                      style={{
+                        backgroundColor:
+                          color,
+                      }}
+                      onClick={() => {
+                        setHighlightColor(
+                          color
+                        );
+
+                        setPaletteOpen(
+                          false
+                        );
+
+                        setHighlightMode(
+                          true
+                        );
+
+                        setEraseHighlightMode(
+                          false
+                        );
+
+                        setHighlightMessage("");
+                      }}
+                      aria-label={`Marker rangi ${color}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="noColorButton"
+                  onClick={() => {
+                    setPaletteOpen(
+                      false
+                    );
+
+                    setHighlightMode(
+                      false
+                    );
+
+                    setEraseHighlightMode(
+                      true
+                    );
+
+                    setHighlightMessage("");
+                  }}
+                >
+                  🧽 Markerni o‘chirish
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="toolbarInfo">
             {role === "admin"
               ? "Administrator rejimi"
               : highlightMode
                 ? "Marker rejimi"
-                : "Faqat o‘qish rejimi"}
+                : eraseHighlightMode
+                  ? "Marker o‘chirish rejimi"
+                  : "Faqat o‘qish rejimi"}
           </div>
         </div>
 
@@ -672,7 +902,8 @@ export default function PdfViewerPage({
           ) => {
             if (
               role !== "admin" &&
-              !highlightMode
+              !highlightMode &&
+              !eraseHighlightMode
             ) {
               event.preventDefault();
             }
@@ -681,7 +912,16 @@ export default function PdfViewerPage({
             if (
               highlightMode
             ) {
-              applyYellowHighlight();
+              applyHighlight();
+            }
+          }}
+          onClick={(event) => {
+            if (
+              eraseHighlightMode
+            ) {
+              removeHighlight(
+                event.target
+              );
             }
           }}
         >
@@ -1085,15 +1325,26 @@ export default function PdfViewerPage({
           margin: 0 4px;
         }
 
-        .highlightButton {
+        .markerControls {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .highlightButton,
+        .paletteButton {
           min-height: 42px;
-          padding: 0 16px;
-          border: 2px solid #8a6d00;
+          padding: 0 14px;
           border-radius: 8px;
           cursor: pointer;
           font-family: inherit;
           font-size: 15px;
           font-weight: 700;
+        }
+
+        .highlightButton {
+          border: 2px solid #8a6d00;
           background:
             linear-gradient(
               #fff9a8,
@@ -1114,6 +1365,98 @@ export default function PdfViewerPage({
           box-shadow:
             inset 0 3px 5px rgba(0,0,0,.12),
             0 2px 0 #7d6b18;
+        }
+
+        .paletteButton {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: 2px solid #5b5b5b;
+          background:
+            linear-gradient(
+              #ffffff,
+              #d8d8d8
+            );
+          box-shadow:
+            inset 0 3px 4px rgba(255,255,255,.85),
+            0 3px 0 #555;
+        }
+
+        .currentColor {
+          width: 22px;
+          height: 22px;
+          display: inline-block;
+          border: 2px solid #333;
+          border-radius: 4px;
+        }
+
+        .caret {
+          font-size: 12px;
+        }
+
+        .colorPalette {
+          position: absolute;
+          z-index: 1000;
+          top: calc(100% + 10px);
+          left: 0;
+          width: 270px;
+          padding: 14px;
+          border: 2px solid #555;
+          border-radius: 12px;
+          background: #f5f5f5;
+          box-shadow:
+            0 10px 25px rgba(0,0,0,.35);
+        }
+
+        .paletteTitle {
+          margin-bottom: 10px;
+          color: #26343c;
+          font-size: 15px;
+          font-weight: 700;
+          text-align: left;
+        }
+
+        .colorGrid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+        }
+
+        .colorSwatch {
+          width: 100%;
+          aspect-ratio: 1;
+          border: 2px solid #5c5c5c;
+          border-radius: 5px;
+          cursor: pointer;
+          box-shadow:
+            inset 0 2px 3px rgba(255,255,255,.45);
+        }
+
+        .colorSwatch:hover {
+          transform: scale(1.06);
+        }
+
+        .colorSwatch.selected {
+          outline: 3px solid #173e58;
+          outline-offset: 2px;
+        }
+
+        .noColorButton {
+          width: 100%;
+          min-height: 40px;
+          margin-top: 12px;
+          border: 2px solid #6f5b5b;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          color: #4e2020;
+          background:
+            linear-gradient(
+              #fff4f4,
+              #e7b9b9
+            );
         }
 
         .highlightSuccess,
@@ -1253,10 +1596,19 @@ export default function PdfViewerPage({
         }
 
         .pdfHighlight {
-          background: #fff176 !important;
           color: inherit !important;
           padding: 0 !important;
           border-radius: 2px;
+        }
+
+        .eraseHighlightMode .pdfHighlight {
+          cursor: pointer !important;
+          outline: 2px dashed rgba(180, 40, 40, .55);
+          outline-offset: 1px;
+        }
+
+        .eraseHighlightMode .pdfHighlight:hover {
+          background: #ffb3b3 !important;
         }
 
         .loadingBox,
@@ -1351,6 +1703,16 @@ export default function PdfViewerPage({
 
           .toolbar {
             flex-wrap: wrap;
+          }
+
+          .markerControls {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+
+          .colorPalette {
+            left: 50%;
+            transform: translateX(-50%);
           }
 
           .toolbarInfo {
