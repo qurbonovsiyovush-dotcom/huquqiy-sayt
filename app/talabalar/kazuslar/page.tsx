@@ -1380,7 +1380,7 @@ function DiagramBuilder({
             overflow-x: hidden;
             border-width: 2px;
             border-radius: 9px;
-            background: #202326;
+            background: transparent;
           }
 
           .readerPaper {
@@ -1658,76 +1658,30 @@ function DiagramBuilder({
         }
 
         /* =====================================================
-           MOBILE READER — BUTUN SAHIFANI KICHIK KO‘RINISHDA
-           Elektron kutubxona/PDF viewer uslubi:
-           matn qayta joylashmaydi, butun sahifa proporsional kichrayadi.
+           MOBILE READER — elektron kutubxona/PDF ko‘rinishi
         ===================================================== */
         @media (max-width: 760px) {
           .readingViewerBox {
             width: 100%;
             margin: 0;
-            padding: 6px 0 10px;
+            padding: 8px 0 12px;
             border: 0;
             border-radius: 0;
-            background: #1f1f1f;
+            background: transparent !important;
             box-shadow: none;
             overflow-x: hidden;
           }
 
           .readingSectionTitle {
-            width: min(180px, 68%);
-            min-width: 0;
-            margin: 4px auto 8px;
-            padding: 6px 10px;
-            border-width: 1.5px;
-            border-radius: 8px;
-            font-size: 15px;
-            box-shadow:
-              inset 0 2px 2px rgba(255,255,255,.84),
-              0 2px 0 #17415c;
+            width: min(190px, 70%);
+            margin: 6px auto 10px;
           }
 
           .viewerHeader {
-            width: calc(100% - 10px);
-            margin: 0 auto 6px;
-            padding: 8px 10px;
-            display: grid;
-            grid-template-columns: 1fr auto;
-            align-items: center;
-            gap: 8px;
-            border-width: 1.5px;
-            border-radius: 9px;
-          }
-
-          .viewerSubject {
-            padding: 3px 7px;
-            font-size: 10px;
-            border-radius: 999px;
-          }
-
-          .viewerHeader h1 {
-            margin: 4px 0 0;
-            font-size: 16px;
-            line-height: 1.15;
-          }
-
-          .viewerHeaderActions {
-            width: auto;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-          }
-
-          .viewerHeaderActions button {
-            width: auto;
-            min-width: 82px;
-            min-height: 30px;
-            padding: 4px 7px;
-            border-width: 1.5px;
-            border-radius: 7px;
-            font-size: 10px;
-            box-shadow: 0 2px 0 #4b5256;
+            width: calc(100% - 16px);
+            margin: 0 auto 8px;
+            padding: 10px 12px;
+            border-radius: 11px;
           }
 
           .readerToolbar {
@@ -1735,170 +1689,63 @@ function DiagramBuilder({
             top: 0;
             z-index: 100;
             width: 100%;
-            max-width: none;
             margin: 0;
-            padding: 4px 5px;
-            display: flex;
-            flex-wrap: nowrap;
-            align-items: center;
-            gap: 4px;
-            overflow-x: auto;
-            overflow-y: hidden;
-            border-width: 1px 0;
+            padding: 6px 8px;
             border-radius: 0;
-            background: linear-gradient(#fafafa,#d8d8d8);
-            box-shadow: none;
-            scrollbar-width: none;
-          }
-
-          .readerToolbar::-webkit-scrollbar {
-            display: none;
-          }
-
-          .readerToolGroup {
-            width: auto;
-            flex: 0 0 auto;
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 4px;
-          }
-
-          .readerToolButton,
-          .readerModeButton {
-            min-width: 31px;
-            min-height: 29px;
-            padding: 3px 6px;
-            border-width: 1.5px;
-            border-radius: 6px;
-            font-size: 10px;
-            white-space: nowrap;
-            box-shadow: 0 1.5px 0 #575e62;
-          }
-
-          .readerToolButton {
-            font-size: 15px;
-          }
-
-          .readerZoomValue {
-            min-width: 42px;
-            font-size: 11px;
-          }
-
-          .readerColorControl {
-            min-height: 29px;
-            padding: 3px 5px;
-            gap: 4px;
-            border-width: 1.5px;
-            border-radius: 6px;
-            font-size: 10px;
-            white-space: nowrap;
-          }
-
-          .readerColorControl input {
-            width: 21px;
-            height: 19px;
-          }
-
-          .readerModeStatus {
-            display: none;
+            border-left: 0;
+            border-right: 0;
+            background: linear-gradient(#fafafa,#d6d6d6);
           }
 
           .readerViewport {
             width: 100%;
-            max-width: none;
-            min-height: 0;
             margin: 0;
-            padding: 5px 3px 16px;
-            overflow-x: hidden;
-            overflow-y: visible;
+            padding: 7px 4px 20px;
             border: 0;
             border-radius: 0;
-            background: #1f1f1f;
-            box-shadow: none;
+            background: transparent;
           }
 
-          /*
-            MUHIM:
-            Mobil telefonda matnni qayta qatorlamaymiz.
-            900px kenglikdagi hujjatni butunlay kichraytirib ko‘rsatamiz.
-            Shuning uchun rasm/PDFdagi kabi bir sahifa ko‘rinadi.
-          */
           .readerPaper {
-            width: 900px !important;
-            max-width: 900px !important;
+            width: calc(100% - 10px) !important;
+            max-width: 640px;
             margin: 0 auto;
-            padding: 38px 44px 46px;
-            border-radius: 0;
+            padding: 18px 14px 24px;
             background: #fff;
-            box-shadow: 0 0 0 1px rgba(0,0,0,.25);
-            transform: none !important;
-            transform-origin: top left !important;
-            zoom: calc((100vw - 10px) / 900);
+            box-shadow: 0 0 0 1px rgba(0,0,0,.18);
           }
 
           .readerCaseTextBox {
-            width: 100%;
-            max-width: none;
-            margin: 0;
             padding: 0;
             border: 0;
-            border-radius: 0;
             background: #fff;
-            box-shadow: none;
           }
 
-          .caseTextBox h2 {
-            margin: 0 0 14px;
-            font-size: 23px;
+          .readerPaper .richViewerContent,
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div,
+          .readerPaper .richViewerContent li,
+          .readerPaper .richViewerContent blockquote {
+            text-align: justify !important;
+            text-align-last: auto !important;
+            text-justify: inter-word;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
           }
 
-          /*
-            Desktopdagi asl formatni saqlaymiz:
-            justify, qalin, kursiv, underline, ranglar va abzaslar qoladi.
-            Faqat butun sahifa kichrayadi.
-          */
           .readerPaper .richViewerContent {
-            font-size: 18px;
-            line-height: 1.52;
+            font-size: 15px;
+            line-height: 1.42;
             color: #111;
-            letter-spacing: normal;
-            word-spacing: normal;
-            overflow-wrap: normal;
-            word-break: normal;
           }
 
           .readerPaper .richViewerContent p,
           .readerPaper .richViewerContent div {
-            margin-bottom: 9px;
-          }
-
-          .viewerQuestionsTitle {
-            margin: 22px 0 15px;
-            padding: 10px;
-            font-size: 20px;
-            border-radius: 8px;
-          }
-
-          .viewerQuestions {
-            gap: 18px;
-          }
-
-          .viewerQuestionCard {
-            padding: 8px;
-            border-radius: 11px;
+            margin: 0 0 7px;
           }
 
           .viewerQuestion3D {
-            padding: 11px 14px;
-            border-radius: 11px;
-          }
-
-          .questionNumberInline3D {
-            min-width: 72px;
-            padding: 5px 8px;
-            margin: 0 8px 2px 0;
-            font-size: 12px;
-            border-radius: 6px;
+            background: #f2f2f2;
           }
 
           .questionFlow,
@@ -1906,21 +1753,341 @@ function DiagramBuilder({
           .inlineQuestionContent p,
           .inlineQuestionContent div,
           .inlineQuestionContent span {
-            font-size: 18px !important;
-            line-height: 1.48 !important;
+            text-align: left !important;
+            word-spacing: normal !important;
             letter-spacing: normal !important;
+          }
+
+          .viewerAnswer {
+            background: #eef7ff;
+          }
+        }
+
+
+        /* =====================================================
+           FINAL MOBIL READER — PDF / A4 HUJJATGA O‘XSHASH
+           Qora tashqi fon yo‘q. Oq sahifa + kichik zich matn.
+        ===================================================== */
+        @media (max-width: 600px) {
+          html,
+          body {
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+          }
+
+          .readingViewerBox {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 6px 0 12px !important;
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            overflow-x: hidden !important;
+          }
+
+          .readerViewport {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 4px 3px 16px !important;
+            overflow-x: hidden !important;
+            overflow-y: visible !important;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+
+          .readerPaper {
+            width: calc(100vw - 10px) !important;
+            max-width: calc(100vw - 10px) !important;
+            min-width: 0 !important;
+            margin: 0 auto 8px !important;
+            padding: 14px 16px 18px !important;
+            box-sizing: border-box !important;
+            background: #fff !important;
+            border: 1px solid #333 !important;
+            border-radius: 0 !important;
+            box-shadow: 0 1px 4px rgba(0,0,0,.14) !important;
+            transform: none !important;
+            transform-origin: top center !important;
+            overflow: hidden !important;
+          }
+
+          .readerCaseTextBox {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 10px 12px !important;
+            box-sizing: border-box !important;
+            background: #f8f8f8 !important;
+            border: 1px solid #555 !important;
+            border-radius: 5px !important;
+            box-shadow: none !important;
+          }
+
+          .readerCaseTextBox h2,
+          .caseTextBox h2 {
+            margin: 0 0 8px !important;
+            padding: 0 !important;
+            font-size: 12.5px !important;
+            line-height: 1.15 !important;
+            color: #073f70 !important;
+            text-align: left !important;
+          }
+
+          /* Asosiy matn: PDF'dagidek kichik va zich */
+          .readerPaper .richViewerContent,
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div,
+          .readerPaper .richViewerContent li,
+          .readerPaper .richViewerContent blockquote {
+            font-family: "Bell MT", "Times New Roman", serif !important;
+            font-size: 10.5px !important;
+            line-height: 1.26 !important;
+            letter-spacing: 0 !important;
+            word-spacing: normal !important;
+            word-break: normal !important;
+            overflow-wrap: normal !important;
+            white-space: normal !important;
+            hyphens: none !important;
+            font-kerning: normal !important;
+            text-rendering: optimizeLegibility !important;
+          }
+
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div {
+            margin: 0 0 5px !important;
+            padding: 0 !important;
+            text-align: justify !important;
+            text-align-last: auto !important;
+            text-justify: inter-word !important;
+          }
+
+          /* Inline span formatlar rang/bold/underline bilan saqlansin,
+             lekin so'z oralig'ini buzmasin */
+          .readerPaper .richViewerContent span {
+            letter-spacing: 0 !important;
+            word-spacing: normal !important;
+          }
+
+          /* Savol va javob bo'limlari */
+          .viewerQuestionsTitle {
+            margin: 10px 0 7px !important;
+            padding: 6px 8px !important;
+            font-size: 12px !important;
+            line-height: 1.15 !important;
+            border-radius: 5px !important;
+          }
+
+          .viewerQuestions {
+            gap: 8px !important;
+          }
+
+          .viewerQuestionCard {
+            padding: 4px !important;
+            border-radius: 6px !important;
+          }
+
+          .viewerQuestion {
+            padding: 0 !important;
+          }
+
+          .viewerQuestion3D {
+            padding: 7px 8px !important;
+            border: 1px solid #555 !important;
+            border-radius: 5px !important;
+            background: #f4f4f4 !important;
+            box-shadow: 0 2px 0 #666 !important;
+          }
+
+          .questionNumberInline3D {
+            min-width: 54px !important;
+            padding: 4px 6px !important;
+            margin: 0 5px 2px 0 !important;
+            border-width: 1px !important;
+            border-radius: 5px !important;
+            font-size: 8.5px !important;
+            line-height: 1 !important;
+            box-shadow:
+              inset 0 1px 1px rgba(255,255,255,.85),
+              0 2px 0 #17415c !important;
+          }
+
+          .questionFlow,
+          .inlineQuestionContent,
+          .inlineQuestionContent p,
+          .inlineQuestionContent div,
+          .inlineQuestionContent span {
+            font-family: "Bell MT", "Times New Roman", serif !important;
+            font-size: 10.5px !important;
+            line-height: 1.24 !important;
+            text-align: left !important;
+            text-align-last: auto !important;
+            letter-spacing: 0 !important;
             word-spacing: normal !important;
           }
 
           .viewerAnswer {
-            margin-top: 12px;
-            padding: 16px 18px;
-            border-radius: 10px;
+            margin-top: 7px !important;
+            padding: 9px 10px !important;
+            border-radius: 5px !important;
+            background: #e9f5ff !important;
           }
 
           .answerLabel {
-            margin-bottom: 9px;
-            font-size: 18px;
+            margin-bottom: 5px !important;
+            font-size: 11px !important;
+            line-height: 1.1 !important;
+          }
+
+          /* Toolbar kichik, bir qatorlik */
+          .readerToolbar {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 100 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 0 5px !important;
+            padding: 4px 5px !important;
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            gap: 4px !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            border: 1px solid #777 !important;
+            border-left: 0 !important;
+            border-right: 0 !important;
+            border-radius: 0 !important;
+            background: linear-gradient(#fafafa,#dedede) !important;
+            box-shadow: none !important;
+            scrollbar-width: none !important;
+          }
+
+          .readerToolbar::-webkit-scrollbar {
+            display: none !important;
+          }
+
+          .readerToolGroup {
+            flex: 0 0 auto !important;
+            width: auto !important;
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            gap: 4px !important;
+          }
+
+          .readerToolButton,
+          .readerModeButton {
+            min-width: 29px !important;
+            min-height: 27px !important;
+            padding: 2px 5px !important;
+            border-width: 1px !important;
+            border-radius: 5px !important;
+            font-size: 9px !important;
+            white-space: nowrap !important;
+            box-shadow: 0 1px 0 #666 !important;
+          }
+
+          .readerToolButton {
+            font-size: 14px !important;
+          }
+
+          .readerZoomValue {
+            min-width: 40px !important;
+            font-size: 10px !important;
+          }
+
+          .readerColorControl {
+            min-height: 27px !important;
+            padding: 2px 5px !important;
+            gap: 3px !important;
+            border-width: 1px !important;
+            border-radius: 5px !important;
+            font-size: 9px !important;
+          }
+
+          .readerColorControl input {
+            width: 19px !important;
+            height: 18px !important;
+          }
+
+          .readerModeStatus {
+            display: none !important;
+          }
+
+          /* Reader tepasidagi fan/kazus bloki ham ixcham */
+          .readingSectionTitle {
+            width: min(170px, 65%) !important;
+            min-width: 0 !important;
+            margin: 4px auto 7px !important;
+            padding: 5px 8px !important;
+            border-width: 1px !important;
+            border-radius: 7px !important;
+            font-size: 13px !important;
+            box-shadow:
+              inset 0 2px 2px rgba(255,255,255,.85),
+              0 2px 0 #17415c !important;
+          }
+
+          .viewerHeader {
+            width: calc(100% - 8px) !important;
+            margin: 0 auto 6px !important;
+            padding: 7px 8px !important;
+            border-width: 1px !important;
+            border-radius: 7px !important;
+          }
+
+          .viewerSubject {
+            padding: 3px 6px !important;
+            font-size: 9px !important;
+          }
+
+          .viewerHeader h1 {
+            margin: 4px 0 0 !important;
+            font-size: 15px !important;
+            line-height: 1.1 !important;
+          }
+
+          .viewerHeaderActions {
+            margin-top: 6px !important;
+            gap: 5px !important;
+          }
+
+          .viewerHeaderActions button {
+            min-height: 28px !important;
+            padding: 3px 6px !important;
+            border-width: 1px !important;
+            border-radius: 5px !important;
+            font-size: 9px !important;
+          }
+
+          /* Jadval, rasm, diagramma sahifadan chiqib ketmasin */
+          .readerPaper table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            font-size: 8px !important;
+          }
+
+          .readerPaper td,
+          .readerPaper th {
+            padding: 2px 3px !important;
+            font-size: 8px !important;
+            line-height: 1.15 !important;
+            overflow-wrap: break-word !important;
+          }
+
+          .readerPaper img,
+          .readerPaper svg {
+            display: block !important;
+            max-width: 100% !important;
+            height: auto !important;
+            margin: 5px auto !important;
           }
         }
 
@@ -5803,11 +5970,11 @@ export default function KazuslarPage() {
           max-width: 1240px;
           min-height: 700px;
           margin: 0 auto;
-          padding: 34px 24px 80px;
+          padding: 18px 10px 50px;
           overflow: auto;
-          border: 3px solid #2f3437;
-          border-radius: 20px;
-          background: #24282b;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
           box-shadow:
             inset 0 7px 10px rgba(0,0,0,.45),
             0 8px 16px rgba(0,0,0,.24);
