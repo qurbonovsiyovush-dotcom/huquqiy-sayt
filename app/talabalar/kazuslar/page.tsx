@@ -1763,6 +1763,12 @@ export default function KazuslarPage() {
 
   const [selectedCase, setSelectedCase] = useState<PlatformCase | null>(null);
 
+  const [viewerZoom, setViewerZoom] = useState(100);
+  const [viewerMarkerMode, setViewerMarkerMode] =
+    useState<"off" | "mark" | "erase">("off");
+  const [viewerMarkerColor, setViewerMarkerColor] = useState("#fff176");
+  const viewerContentRef = useRef<HTMLDivElement | null>(null);
+
   const [subject, setSubject] = useState("");
   const [caseTitle, setCaseTitle] = useState("");
   const [caseText, setCaseText] = useState("");
@@ -2090,6 +2096,72 @@ export default function KazuslarPage() {
     }
   }
 
+
+  function changeViewerZoom(delta: number) {
+    setViewerZoom((old) =>
+      Math.min(200, Math.max(70, old + delta))
+    );
+  }
+
+  function clearViewerSelection() {
+    const selection = window.getSelection();
+    if (selection) selection.removeAllRanges();
+  }
+
+  function applyViewerHighlight() {
+    if (viewerMarkerMode !== "mark") return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const root = viewerContentRef.current;
+
+    if (
+      !root ||
+      !root.contains(range.commonAncestorContainer)
+    ) {
+      return;
+    }
+
+    try {
+      const fragment = range.extractContents();
+      const mark = document.createElement("span");
+      mark.setAttribute("data-reader-highlight", "1");
+      mark.style.background = viewerMarkerColor;
+      mark.style.borderRadius = "3px";
+      mark.style.padding = "0 1px";
+      mark.appendChild(fragment);
+      range.insertNode(mark);
+      clearViewerSelection();
+    } catch (error) {
+      console.error("MARKER ERROR:", error);
+    }
+  }
+
+  function eraseViewerHighlight(target: EventTarget | null) {
+    if (viewerMarkerMode !== "erase") return;
+
+    const element =
+      target instanceof HTMLElement
+        ? target.closest('[data-reader-highlight="1"]')
+        : null;
+
+    if (!element) return;
+
+    const parent = element.parentNode;
+    if (!parent) return;
+
+    while (element.firstChild) {
+      parent.insertBefore(element.firstChild, element);
+    }
+
+    parent.removeChild(element);
+    parent.normalize();
+  }
+
   async function openCase(item: AnyCase) {
     if (item.type === "pdf") {
       const viewerUrl =
@@ -2105,6 +2177,8 @@ export default function KazuslarPage() {
     }
 
     try {
+      setViewerZoom(100);
+      setViewerMarkerMode("off");
       setSelectedCase(item);
       setMode("view");
 
@@ -2161,25 +2235,47 @@ export default function KazuslarPage() {
 
       {mode === "list" && (
         <>
-          {!roleLoading && role === "admin" && (
-            <section className="controlBox">
-              <button
-                className="mainActionButton"
-                type="button"
-                onClick={openWriteMode}
-              >
-                ✍ Kazusga javob yozish
-              </button>
+          <section className="controlBox">
+            {!roleLoading && role === "admin" && (
+              <>
+                <button
+                  className="mainActionButton"
+                  type="button"
+                  onClick={openWriteMode}
+                >
+                  ✍ Kazusga javob yozish
+                </button>
 
-              <button
-                className="mainActionButton"
-                type="button"
-                onClick={openUploadMode}
-              >
-                📄 Kazus yuklash
-              </button>
-            </section>
-          )}
+                <button
+                  className="mainActionButton"
+                  type="button"
+                  onClick={openUploadMode}
+                >
+                  📄 Kazus yuklash
+                </button>
+              </>
+            )}
+
+            <button
+              className="mainActionButton examActionButton"
+              type="button"
+              onClick={() => {
+                window.location.href = "/talabalar/kazuslar/yakuniy";
+              }}
+            >
+              🎓 Yakuniy nazorat kazuslari
+            </button>
+
+            <button
+              className="mainActionButton examActionButton"
+              type="button"
+              onClick={() => {
+                window.location.href = "/talabalar/kazuslar/oraliq";
+              }}
+            >
+              📝 Oraliq nazorat kazuslari
+            </button>
+          </section>
 
           <section className="mainBox">
             <div className="sectionTitle">Kazuslar</div>
@@ -2227,40 +2323,12 @@ export default function KazuslarPage() {
 
                     <h2>{item.title}</h2>
 
-                    {item.type === "platform" ? (
-                      <>
-                        <p className="casePreview">
-                          {stripHtml(item.caseText).length > 150
-                            ? `${stripHtml(item.caseText).slice(0, 150)}...`
-                            : stripHtml(item.caseText)}
-                        </p>
-
-                        <div className="questionCount">
-                          {item.questions.length} ta savol
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="pdfCardIcon">PDF</div>
-
-                        <p className="casePreview pdfFileName">
-                          {item.originalFileName || "PDF hujjat"}
-                        </p>
-
-                        <div className="questionCount pdfInfo">
-                          {item.fileSize > 0
-                            ? `${(item.fileSize / 1024 / 1024).toFixed(2)} MB`
-                            : "PDF fayl"}
-                        </div>
-                      </>
-                    )}
-
                     <button
                       className="openButton"
                       type="button"
                       onClick={() => openCase(item)}
                     >
-                      {item.type === "pdf" ? "PDFni ochish" : "Ochish"}
+                      Ochish
                     </button>
                   </article>
                 ))}
@@ -2519,8 +2587,8 @@ export default function KazuslarPage() {
       )}
 
       {mode === "view" && selectedCase && (
-        <section className="viewerBox">
-          <div className="sectionTitle">Kazus</div>
+        <section className="viewerBox readingViewerBox">
+          <div className="sectionTitle">Kazusni o‘qish</div>
 
           <div className="viewerHeader">
             <div>
@@ -2533,6 +2601,7 @@ export default function KazuslarPage() {
               type="button"
               onClick={() => {
                 setSelectedCase(null);
+                setViewerMarkerMode("off");
                 setMode("list");
               }}
             >
@@ -2540,37 +2609,134 @@ export default function KazuslarPage() {
             </button>
           </div>
 
-          <div className="caseTextBox">
-            <h2>Kazus matni</h2>
-            <div className="richViewerContent" dangerouslySetInnerHTML={{ __html: selectedCase.caseText }} />
+          <div className="readerToolbar">
+            <div className="readerToolGroup">
+              <button
+                className="readerToolButton"
+                type="button"
+                onClick={() => changeViewerZoom(-10)}
+                disabled={viewerZoom <= 70}
+              >
+                −
+              </button>
+
+              <div className="readerZoomValue">{viewerZoom}%</div>
+
+              <button
+                className="readerToolButton"
+                type="button"
+                onClick={() => changeViewerZoom(10)}
+                disabled={viewerZoom >= 200}
+              >
+                +
+              </button>
+            </div>
+
+            <div className="readerToolGroup">
+              <button
+                className={
+                  viewerMarkerMode === "mark"
+                    ? "readerModeButton active"
+                    : "readerModeButton"
+                }
+                type="button"
+                onClick={() =>
+                  setViewerMarkerMode((old) =>
+                    old === "mark" ? "off" : "mark"
+                  )
+                }
+              >
+                🖍 Marker
+              </button>
+
+              <label className="readerColorControl">
+                <span>Rang</span>
+                <input
+                  type="color"
+                  value={viewerMarkerColor}
+                  onChange={(e) => setViewerMarkerColor(e.target.value)}
+                />
+              </label>
+
+              <button
+                className={
+                  viewerMarkerMode === "erase"
+                    ? "readerModeButton active erase"
+                    : "readerModeButton erase"
+                }
+                type="button"
+                onClick={() =>
+                  setViewerMarkerMode((old) =>
+                    old === "erase" ? "off" : "erase"
+                  )
+                }
+              >
+                ⌫ O‘chirg‘ich
+              </button>
+            </div>
+
+            <div className="readerModeStatus">
+              {viewerMarkerMode === "mark"
+                ? "Marker rejimi"
+                : viewerMarkerMode === "erase"
+                  ? "O‘chirish rejimi"
+                  : "Faqat o‘qish rejimi"}
+            </div>
           </div>
 
-          <div className="viewerQuestionsTitle">Savollar va javoblar</div>
+          <div
+            className="readerViewport"
+            onMouseUp={applyViewerHighlight}
+            onClick={(event) => eraseViewerHighlight(event.target)}
+          >
+            <div
+              ref={viewerContentRef}
+              className="readerPaper"
+              style={{
+                transform: `scale(${viewerZoom / 100})`,
+                transformOrigin: "top center",
+                width: `${10000 / viewerZoom}%`,
+              }}
+            >
+              <div className="caseTextBox readerCaseTextBox">
+                <h2>Kazus matni</h2>
+                <div
+                  className="richViewerContent"
+                  dangerouslySetInnerHTML={{ __html: selectedCase.caseText }}
+                />
+              </div>
 
-          <div className="viewerQuestions">
-            {selectedCase.questions.map((item, index) => (
-              <div className="viewerQuestionCard" key={item.id}>
-                <div className="viewerQuestion">
-                  <div className="viewerQuestion3D">
-                    <div className="questionInlineRow viewerInlineRow">
-                      <div className="questionNumberInline3D">
-                        {index + 1}-savol.
+              <div className="viewerQuestionsTitle">Savollar va javoblar</div>
+
+              <div className="viewerQuestions">
+                {selectedCase.questions.map((item, index) => (
+                  <div className="viewerQuestionCard" key={item.id}>
+                    <div className="viewerQuestion">
+                      <div className="viewerQuestion3D">
+                        <div className="questionInlineRow viewerInlineRow">
+                          <div className="questionNumberInline3D">
+                            {index + 1}-savol.
+                          </div>
+
+                          <div
+                            className="richViewerContent inlineQuestionContent"
+                            dangerouslySetInnerHTML={{ __html: item.question }}
+                          />
+                        </div>
                       </div>
+                    </div>
 
+                    <div className="viewerAnswer">
+                      <div className="answerLabel">Javob</div>
                       <div
-                        className="richViewerContent inlineQuestionContent"
-                        dangerouslySetInnerHTML={{ __html: item.question }}
+                        className="richViewerContent"
+                        dangerouslySetInnerHTML={{ __html: item.answer }}
                       />
                     </div>
                   </div>
-                </div>
-
-                <div className="viewerAnswer">
-                  <div className="answerLabel">Javob</div>
-                  <div className="richViewerContent" dangerouslySetInnerHTML={{ __html: item.answer }} />
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </section>
       )}
@@ -2667,20 +2833,20 @@ export default function KazuslarPage() {
         }
 
         .controlBox {
-          width: min(900px, 95%);
+          width: min(1500px, 97%);
           margin: 65px auto 0;
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 35px;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 20px;
         }
 
         .mainActionButton {
-          min-height: 80px;
+          min-height: 76px;
           border: 3px solid #174461;
           border-radius: 17px;
           cursor: pointer;
           font-family: inherit;
-          font-size: 23px;
+          font-size: 19px;
           font-weight: 700;
           color: #073b68;
           background: linear-gradient(
@@ -2792,32 +2958,34 @@ export default function KazuslarPage() {
         }
 
         .caseCard {
-          min-height: 300px;
-          padding: 25px;
+          min-height: 235px;
+          padding: 30px 24px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
+          gap: 24px;
           text-align: center;
-          border: 2px solid #3d4347;
+          border: 1px solid #8a8f93;
           border-radius: 20px;
           background: linear-gradient(
-            145deg,
-            #e1e1e1,
-            #c5c5c5 50%,
-            #a6a6a6
+            180deg,
+            #f6f6f6 0%,
+            #e2e2e2 55%,
+            #c8c8c8 100%
           );
           box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.86),
-            inset 0 -7px 7px rgba(0, 0, 0, 0.18),
-            0 6px 0 #4a5054,
-            0 11px 16px rgba(0, 0, 0, 0.25);
+            inset 0 5px 5px rgba(255, 255, 255, 0.92),
+            inset 0 -4px 5px rgba(0, 0, 0, 0.08),
+            0 5px 0 #6b7276,
+            0 10px 17px rgba(0, 0, 0, 0.19);
         }
 
         .caseCard h2 {
-          margin: 10px 0 12px;
-          font-size: 24px;
+          margin: 0;
+          font-size: 25px;
           line-height: 1.25;
+          color: #111;
         }
 
         .caseType,
@@ -2835,7 +3003,7 @@ export default function KazuslarPage() {
         }
 
         .pdfCaseCard {
-          border-color: #713232;
+          border-color: #8a8f93;
         }
 
         .pdfCaseType {
@@ -2869,13 +3037,28 @@ export default function KazuslarPage() {
         }
 
         .subjectBadge {
-          margin-top: 0;
-          padding: 5px 12px;
-          background: #edf4f8;
-          color: #234b63;
-          border: 1px solid #aab7bf;
-          font-size: 13px;
-          box-shadow: none;
+          margin: 0;
+          padding: 8px 17px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #073b68;
+          font-size: 14px;
+          font-weight: 700;
+          border: 2px solid #174461;
+          border-radius: 999px;
+          background: linear-gradient(
+            180deg,
+            #d8f2ff 0%,
+            #9bd7f5 45%,
+            #5ba9d6 100%
+          );
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.95),
+            inset 0 -2px 3px rgba(0,0,0,.13),
+            0 4px 0 #17415c,
+            0 7px 10px rgba(0,0,0,.18);
+          text-shadow: 0 1px 0 rgba(255,255,255,.9);
         }
 
         .questionCount {
@@ -2894,8 +3077,8 @@ export default function KazuslarPage() {
         }
 
         .openButton {
-          width: 170px;
-          height: 48px;
+          width: 175px;
+          height: 50px;
           border: 2px solid #4e565b;
           border-radius: 9px;
           cursor: pointer;
@@ -3256,6 +3439,145 @@ export default function KazuslarPage() {
           background: #d8dcde;
         }
 
+        .readingViewerBox {
+          padding-left: 28px;
+          padding-right: 28px;
+        }
+
+        .readerToolbar {
+          position: sticky;
+          top: 10px;
+          z-index: 60;
+          max-width: 1180px;
+          margin: 0 auto 24px;
+          padding: 13px 16px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 14px;
+          border: 2px solid #565d61;
+          border-radius: 14px;
+          background: linear-gradient(#f8f8f8, #c7c7c7);
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.9),
+            0 5px 0 #3f464a,
+            0 9px 14px rgba(0,0,0,.2);
+        }
+
+        .readerToolGroup {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .readerToolButton,
+        .readerModeButton {
+          min-height: 42px;
+          padding: 8px 14px;
+          border: 2px solid #4f575c;
+          border-radius: 9px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 700;
+          background: linear-gradient(#ffffff, #c8c8c8);
+          box-shadow: 0 3px 0 #575e62;
+        }
+
+        .readerToolButton {
+          min-width: 50px;
+          font-size: 23px;
+        }
+
+        .readerToolButton:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
+        .readerZoomValue {
+          min-width: 76px;
+          text-align: center;
+          color: #073b68;
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .readerModeButton.active {
+          border-color: #806c00;
+          background: linear-gradient(#fff79a, #e5c900);
+          box-shadow: 0 3px 0 #8d7a00;
+        }
+
+        .readerModeButton.erase.active {
+          color: #842020;
+          border-color: #8d3131;
+          background: linear-gradient(#ffdede, #e79b9b);
+          box-shadow: 0 3px 0 #8b3939;
+        }
+
+        .readerColorControl {
+          min-height: 42px;
+          padding: 6px 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #173e58;
+          border: 2px solid #4f575c;
+          border-radius: 9px;
+          background: #f5f5f5;
+        }
+
+        .readerColorControl input {
+          width: 34px;
+          height: 28px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+        }
+
+        .readerModeStatus {
+          margin-left: auto;
+          padding: 8px 14px;
+          border-radius: 999px;
+          color: #073b68;
+          font-size: 14px;
+          font-weight: 700;
+          background: #dceffd;
+        }
+
+        .readerViewport {
+          max-width: 1280px;
+          min-height: 700px;
+          margin: 0 auto;
+          padding: 34px 24px 80px;
+          overflow: auto;
+          border: 3px solid #2f3437;
+          border-radius: 20px;
+          background: #24282b;
+          box-shadow:
+            inset 0 7px 10px rgba(0,0,0,.45),
+            0 8px 16px rgba(0,0,0,.24);
+        }
+
+        .readerPaper {
+          margin: 0 auto;
+          padding: 42px;
+          border-radius: 4px;
+          background: #fff;
+          box-shadow: 0 8px 24px rgba(0,0,0,.3);
+          transition: transform .18s ease;
+        }
+
+        .readerCaseTextBox {
+          max-width: none;
+          margin-top: 0;
+          border: 0;
+          border-radius: 0;
+          background: #fff;
+          box-shadow: none;
+        }
+
         .viewerHeader {
           max-width: 1100px;
           margin: 0 auto 30px;
@@ -3519,10 +3841,38 @@ export default function KazuslarPage() {
           }
         }
 
+        @media (max-width: 620px) {
+          .controlBox {
+            grid-template-columns: 1fr;
+          }
+        }
+
         @media (max-width: 520px) {
           .mainActionButton {
             min-height: 62px;
-            font-size: 18px;
+            font-size: 17px;
+          }
+
+          .controlBox {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .readerToolbar {
+            align-items: stretch;
+          }
+
+          .readerModeStatus {
+            width: 100%;
+            margin-left: 0;
+            text-align: center;
+          }
+
+          .readerViewport {
+            padding: 18px 8px 55px;
+          }
+
+          .readerPaper {
+            padding: 24px 18px;
           }
 
           .caseCard {
