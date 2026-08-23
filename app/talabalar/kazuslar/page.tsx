@@ -2104,363 +2104,6 @@ function DiagramBuilder({
         }
 
 
-        /* =====================================================
-           KURS → SEMESTR → FAN → KAZUSLAR
-        ===================================================== */
-        .examLinksOnly {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          max-width: 980px;
-        }
-
-        .hierarchyBox {
-          min-height: 500px;
-        }
-
-        .breadcrumbRow {
-          max-width: 1180px;
-          margin: 0 auto 24px;
-          padding: 10px 14px;
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 8px;
-          border-radius: 11px;
-          background: rgba(255,255,255,.82);
-          border: 1px solid #949da3;
-        }
-
-        .crumb {
-          border: 0;
-          padding: 5px 9px;
-          border-radius: 7px;
-          cursor: pointer;
-          font-family: inherit;
-          color: #24536e;
-          background: transparent;
-          font-weight: 700;
-        }
-
-        .crumb:hover,
-        .crumb.active {
-          background: #d9effc;
-          color: #073b68;
-        }
-
-        .courseGrid,
-        .semesterGrid,
-        .subjectsGrid {
-          max-width: 1180px;
-          margin: 0 auto;
-          display: grid;
-          gap: 22px;
-        }
-
-        .courseGrid {
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-        }
-
-        .semesterGrid {
-          max-width: 760px;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .hierarchyCard {
-          min-height: 180px;
-          padding: 22px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          cursor: pointer;
-          font-family: inherit;
-          border: 2px solid #174461;
-          border-radius: 18px;
-          color: #073b68;
-          background: linear-gradient(180deg,#c9efff,#79c5ed 52%,#4b9ccc);
-          box-shadow:
-            inset 0 5px 5px rgba(255,255,255,.85),
-            inset 0 -5px 5px rgba(0,0,0,.12),
-            0 6px 0 #17415c,
-            0 11px 17px rgba(0,0,0,.19);
-        }
-
-        .hierarchyCard:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
-        }
-
-        .hierarchyBig {
-          font-size: 28px;
-          font-weight: 700;
-        }
-
-        .hierarchySmall {
-          font-size: 15px;
-          opacity: .82;
-        }
-
-        .subjectAdminBar,
-        .subjectMaterialActions {
-          max-width: 1180px;
-          margin: 0 auto 22px;
-          display: grid;
-          grid-template-columns: repeat(2,minmax(0,1fr));
-          gap: 14px;
-        }
-
-        .addSubjectButton {
-          min-height: 54px;
-          border: 2px solid #174461;
-          border-radius: 12px;
-          cursor: pointer;
-          font-family: inherit;
-          font-size: 17px;
-          font-weight: 700;
-          color: #073b68;
-          background: linear-gradient(#c9efff,#68b9e4);
-          box-shadow: 0 4px 0 #17415c;
-        }
-
-        .subjectForm3D {
-          max-width: 760px;
-          margin: 0 auto 24px;
-          padding: 20px;
-          border: 2px solid #555d62;
-          border-radius: 15px;
-          background: linear-gradient(#f8f8f8,#d9d9d9);
-          box-shadow:
-            inset 0 4px 4px rgba(255,255,255,.85),
-            0 5px 0 #5d6468,
-            0 9px 14px rgba(0,0,0,.15);
-        }
-
-        .subjectForm3D label {
-          display: block;
-          color: #173e58;
-          font-weight: 700;
-        }
-
-        .subjectForm3D input {
-          width: 100%;
-          margin-top: 7px;
-          padding: 12px 13px;
-          border: 2px solid #697176;
-          border-radius: 9px;
-          font-family: inherit;
-          font-size: 17px;
-        }
-
-        .subjectFormActions {
-          margin-top: 13px;
-          display: flex;
-          gap: 10px;
-        }
-
-        .saveSubjectButton,
-        .cancelSubjectButton {
-          flex: 1 1 0;
-          min-height: 44px;
-          border-radius: 9px;
-          cursor: pointer;
-          font-family: inherit;
-          font-weight: 700;
-        }
-
-        .saveSubjectButton {
-          color: #073b68;
-          border: 2px solid #174461;
-          background: #9edcff;
-        }
-
-        .cancelSubjectButton {
-          border: 2px solid #666;
-          background: #e7e7e7;
-        }
-
-        .subjectMessage {
-          margin-top: 12px;
-          font-weight: 700;
-        }
-
-        .subjectsGrid {
-          grid-template-columns: repeat(3,minmax(0,1fr));
-        }
-
-        .subjectFolderCard {
-          position: relative;
-          min-height: 185px;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          gap: 14px;
-          border: 1px solid #8a9398;
-          border-radius: 17px;
-          background: linear-gradient(#f8f8f8,#dedede);
-          box-shadow:
-            inset 0 4px 4px rgba(255,255,255,.9),
-            0 5px 0 #6b7276,
-            0 9px 14px rgba(0,0,0,.14);
-        }
-
-        .subjectFolderOpen {
-          flex: 1 1 auto;
-          border: 0;
-          cursor: pointer;
-          background: transparent;
-          font-family: inherit;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 14px;
-        }
-
-        .folderName3D {
-          max-width: 100%;
-          padding: 8px 14px;
-          color: #073b68;
-          font-size: 18px;
-          font-weight: 700;
-          text-align: center;
-          border: 2px solid #174461;
-          border-radius: 999px;
-          background: linear-gradient(#d7f2ff,#76c2eb);
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.9),
-            0 4px 0 #17415c;
-        }
-
-        .materialCount {
-          font-size: 14px;
-          color: #5c666c;
-          font-weight: 700;
-        }
-
-        .subjectFolderAdmin {
-          display: flex;
-          gap: 8px;
-        }
-
-        .miniEditButton,
-        .miniDeleteButton {
-          flex: 1 1 0;
-          min-height: 32px;
-          border-radius: 7px;
-          cursor: pointer;
-          font-family: inherit;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .miniEditButton {
-          color: #073b68;
-          border: 1.5px solid #174461;
-          background: #b9e6ff;
-        }
-
-        .miniDeleteButton {
-          color: #000;
-          border: 1.5px solid #9a2424;
-          background: #f08c8c;
-        }
-
-        .lockedSubjectInput {
-          background: #e8eef2 !important;
-          color: #173e58 !important;
-          cursor: not-allowed;
-        }
-
-        @media (max-width: 900px) {
-          .courseGrid {
-            grid-template-columns: repeat(2,minmax(0,1fr));
-          }
-
-          .subjectsGrid {
-            grid-template-columns: repeat(2,minmax(0,1fr));
-          }
-        }
-
-        @media (max-width: 600px) {
-          .examLinksOnly {
-            grid-template-columns: 1fr;
-            width: calc(100% - 18px);
-          }
-
-          .hierarchyBox {
-            padding-left: 8px !important;
-            padding-right: 8px !important;
-          }
-
-          .breadcrumbRow {
-            margin-bottom: 14px;
-            padding: 7px 8px;
-            gap: 4px;
-            font-size: 11px;
-          }
-
-          .crumb {
-            padding: 4px 5px;
-            font-size: 11px;
-          }
-
-          .courseGrid {
-            grid-template-columns: repeat(2,minmax(0,1fr));
-            gap: 10px;
-          }
-
-          .semesterGrid,
-          .subjectsGrid {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-
-          .hierarchyCard {
-            min-height: 112px;
-            padding: 12px 8px;
-            border-radius: 12px;
-            box-shadow:
-              inset 0 3px 3px rgba(255,255,255,.8),
-              0 4px 0 #17415c;
-          }
-
-          .hierarchyBig {
-            font-size: 19px;
-          }
-
-          .hierarchySmall {
-            font-size: 11px;
-          }
-
-          .subjectAdminBar,
-          .subjectMaterialActions {
-            grid-template-columns: 1fr;
-            gap: 9px;
-            margin-bottom: 14px;
-          }
-
-          .addSubjectButton {
-            min-height: 46px;
-            font-size: 14px;
-          }
-
-          .subjectFolderCard {
-            min-height: 135px;
-            padding: 11px;
-            border-radius: 12px;
-          }
-
-          .folderName3D {
-            padding: 6px 10px;
-            font-size: 14px;
-          }
-
-          .materialCount {
-            font-size: 11px;
-          }
-        }
-
       `}</style>
     </div>
   );
@@ -7477,6 +7120,451 @@ export default function KazuslarPage() {
             font-size: 16px;
           }
         }
+        /* =====================================================
+           KURS → SEMESTR → FAN → KAZUSLAR
+        ===================================================== */
+        .examLinksOnly {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          max-width: 980px;
+        }
+
+        .hierarchyBox {
+          min-height: 500px;
+        }
+
+        .breadcrumbRow {
+          max-width: 1180px;
+          margin: 0 auto 24px;
+          padding: 10px 14px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+          border-radius: 11px;
+          background: rgba(255,255,255,.82);
+          border: 1px solid #949da3;
+        }
+
+        .crumb {
+          border: 0;
+          padding: 5px 9px;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          color: #24536e;
+          background: transparent;
+          font-weight: 700;
+        }
+
+        .crumb:hover,
+        .crumb.active {
+          background: #d9effc;
+          color: #073b68;
+        }
+
+        .courseGrid,
+        .semesterGrid,
+        .subjectsGrid {
+          max-width: 1180px;
+          margin: 0 auto;
+          display: grid;
+          gap: 22px;
+        }
+
+        .courseGrid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .semesterGrid {
+          max-width: 760px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .hierarchyCard {
+          min-height: 180px;
+          padding: 22px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          cursor: pointer;
+          font-family: inherit;
+          border: 2px solid #174461;
+          border-radius: 18px;
+          color: #073b68;
+          background: linear-gradient(180deg,#c9efff,#79c5ed 52%,#4b9ccc);
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.85),
+            inset 0 -5px 5px rgba(0,0,0,.12),
+            0 6px 0 #17415c,
+            0 11px 17px rgba(0,0,0,.19);
+        }
+
+        .hierarchyCard:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+        }
+
+        .hierarchyBig {
+          font-size: 28px;
+          font-weight: 700;
+        }
+
+        .hierarchySmall {
+          font-size: 15px;
+          opacity: .82;
+        }
+
+        .subjectAdminBar,
+        .subjectMaterialActions {
+          max-width: 1180px;
+          margin: 0 auto 22px;
+          display: grid;
+          grid-template-columns: repeat(2,minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .addSubjectButton {
+          min-height: 54px;
+          border: 2px solid #174461;
+          border-radius: 12px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 17px;
+          font-weight: 700;
+          color: #073b68;
+          background: linear-gradient(#c9efff,#68b9e4);
+          box-shadow: 0 4px 0 #17415c;
+        }
+
+        .subjectForm3D {
+          max-width: 760px;
+          margin: 0 auto 24px;
+          padding: 20px;
+          border: 2px solid #555d62;
+          border-radius: 15px;
+          background: linear-gradient(#f8f8f8,#d9d9d9);
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.85),
+            0 5px 0 #5d6468,
+            0 9px 14px rgba(0,0,0,.15);
+        }
+
+        .subjectForm3D label {
+          display: block;
+          color: #173e58;
+          font-weight: 700;
+        }
+
+        .subjectForm3D input {
+          width: 100%;
+          margin-top: 7px;
+          padding: 12px 13px;
+          border: 2px solid #697176;
+          border-radius: 9px;
+          font-family: inherit;
+          font-size: 17px;
+        }
+
+        .subjectFormActions {
+          margin-top: 13px;
+          display: flex;
+          gap: 10px;
+        }
+
+        .saveSubjectButton,
+        .cancelSubjectButton {
+          flex: 1 1 0;
+          min-height: 44px;
+          border-radius: 9px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .saveSubjectButton {
+          color: #073b68;
+          border: 2px solid #174461;
+          background: #9edcff;
+        }
+
+        .cancelSubjectButton {
+          border: 2px solid #666;
+          background: #e7e7e7;
+        }
+
+        .subjectMessage {
+          margin-top: 12px;
+          font-weight: 700;
+        }
+
+        .subjectsGrid {
+          grid-template-columns: repeat(3,minmax(0,1fr));
+        }
+
+        .subjectFolderCard {
+          position: relative;
+          min-height: 185px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 14px;
+          border: 1px solid #8a9398;
+          border-radius: 17px;
+          background: linear-gradient(#f8f8f8,#dedede);
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.9),
+            0 5px 0 #6b7276,
+            0 9px 14px rgba(0,0,0,.14);
+        }
+
+        .subjectFolderOpen {
+          flex: 1 1 auto;
+          border: 0;
+          cursor: pointer;
+          background: transparent;
+          font-family: inherit;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+        }
+
+        .folderName3D {
+          max-width: 100%;
+          padding: 8px 14px;
+          color: #073b68;
+          font-size: 18px;
+          font-weight: 700;
+          text-align: center;
+          border: 2px solid #174461;
+          border-radius: 999px;
+          background: linear-gradient(#d7f2ff,#76c2eb);
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.9),
+            0 4px 0 #17415c;
+        }
+
+        .materialCount {
+          font-size: 14px;
+          color: #5c666c;
+          font-weight: 700;
+        }
+
+        .subjectFolderAdmin {
+          display: flex;
+          gap: 8px;
+        }
+
+        .miniEditButton,
+        .miniDeleteButton {
+          flex: 1 1 0;
+          min-height: 32px;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .miniEditButton {
+          color: #073b68;
+          border: 1.5px solid #174461;
+          background: #b9e6ff;
+        }
+
+        .miniDeleteButton {
+          color: #000;
+          border: 1.5px solid #9a2424;
+          background: #f08c8c;
+        }
+
+        .lockedSubjectInput {
+          background: #e8eef2 !important;
+          color: #173e58 !important;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 900px) {
+          .courseGrid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+          }
+
+          .subjectsGrid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+          }
+        }
+
+        @media (max-width: 600px) {
+          .examLinksOnly {
+            grid-template-columns: 1fr;
+            width: calc(100% - 18px);
+          }
+
+          .hierarchyBox {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+
+          .breadcrumbRow {
+            margin-bottom: 14px;
+            padding: 7px 8px;
+            gap: 4px;
+            font-size: 11px;
+          }
+
+          .crumb {
+            padding: 4px 5px;
+            font-size: 11px;
+          }
+
+          .courseGrid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+            gap: 10px;
+          }
+
+          .semesterGrid,
+          .subjectsGrid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .hierarchyCard {
+            min-height: 112px;
+            padding: 12px 8px;
+            border-radius: 12px;
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.8),
+              0 4px 0 #17415c;
+          }
+
+          .hierarchyBig {
+            font-size: 19px;
+          }
+
+          .hierarchySmall {
+            font-size: 11px;
+          }
+
+          .subjectAdminBar,
+          .subjectMaterialActions {
+            grid-template-columns: 1fr;
+            gap: 9px;
+            margin-bottom: 14px;
+          }
+
+          .addSubjectButton {
+            min-height: 46px;
+            font-size: 14px;
+          }
+
+          .subjectFolderCard {
+            min-height: 135px;
+            padding: 11px;
+            border-radius: 12px;
+          }
+
+          .folderName3D {
+            padding: 6px 10px;
+            font-size: 14px;
+          }
+
+          .materialCount {
+            font-size: 11px;
+          }
+        }
+
+
+
+        /* FINAL HIERARCHY OVERRIDE */
+        .hierarchyBox .courseGrid {
+          width: min(1180px, 100%);
+          margin: 12px auto 0;
+          display: grid !important;
+          grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+          gap: 22px !important;
+        }
+
+        .hierarchyBox .courseGrid > .hierarchyCard {
+          appearance: none;
+          width: 100% !important;
+          min-width: 0 !important;
+          min-height: 175px !important;
+          padding: 22px 16px !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 10px !important;
+          border: 2px solid #174461 !important;
+          border-radius: 18px !important;
+          color: #073b68 !important;
+          background: linear-gradient(
+            180deg,
+            #d1f1ff 0%,
+            #83cef0 48%,
+            #4d9dcd 100%
+          ) !important;
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.9),
+            inset 0 -4px 5px rgba(0,0,0,.13),
+            0 6px 0 #17415c,
+            0 11px 16px rgba(0,0,0,.20) !important;
+          cursor: pointer !important;
+          font-family: inherit !important;
+          text-align: center !important;
+        }
+
+        .hierarchyBox .courseGrid .hierarchyBig {
+          display: block !important;
+          font-size: 27px !important;
+          line-height: 1.1 !important;
+          font-weight: 700 !important;
+        }
+
+        .hierarchyBox .courseGrid .hierarchySmall {
+          display: block !important;
+          margin-top: 2px !important;
+          font-size: 14px !important;
+          line-height: 1.2 !important;
+          font-weight: 700 !important;
+          opacity: .78 !important;
+        }
+
+        @media (max-width: 900px) {
+          .hierarchyBox .courseGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 14px !important;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .hierarchyBox .courseGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 9px !important;
+          }
+
+          .hierarchyBox .courseGrid > .hierarchyCard {
+            min-height: 105px !important;
+            padding: 11px 6px !important;
+            border-radius: 11px !important;
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.85),
+              0 4px 0 #17415c !important;
+          }
+
+          .hierarchyBox .courseGrid .hierarchyBig {
+            font-size: 18px !important;
+          }
+
+          .hierarchyBox .courseGrid .hierarchySmall {
+            font-size: 10.5px !important;
+          }
+        }
+
       `}</style>
     </main>
   );
