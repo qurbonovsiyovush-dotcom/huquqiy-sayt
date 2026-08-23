@@ -58,12 +58,6 @@ export default function PdfViewerPage({
   const [downloading, setDownloading] =
     useState(false);
 
-  const [pdfData, setPdfData] =
-    useState<Uint8Array | null>(null);
-
-  const [pdfLoading, setPdfLoading] =
-    useState(true);
-
   const pdfUrl = useMemo(() => {
     return (
       `/api/kazuslar/pdf?id=` +
@@ -153,107 +147,6 @@ export default function PdfViewerPage({
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPdf() {
-      try {
-        setPdfLoading(true);
-        setLoadingError("");
-
-        const response = await fetch(
-          pdfUrl,
-          {
-            method: "GET",
-            cache: "no-store",
-            credentials: "include",
-          }
-        );
-
-        if (!response.ok) {
-          let message =
-            "PDF faylni ochib bo‘lmadi.";
-
-          try {
-            const data = await response.json();
-
-            if (
-              data &&
-              typeof data.error === "string"
-            ) {
-              message = data.error;
-            }
-          } catch {
-            // JSON bo‘lmasa, umumiy xabar qoladi.
-          }
-
-          throw new Error(message);
-        }
-
-        const contentType =
-          response.headers.get(
-            "content-type"
-          ) ?? "";
-
-        if (
-          !contentType
-            .toLowerCase()
-            .includes("application/pdf")
-        ) {
-          throw new Error(
-            "Server PDF fayl qaytarmadi."
-          );
-        }
-
-        const buffer =
-          await response.arrayBuffer();
-
-        if (
-          cancelled
-        ) {
-          return;
-        }
-
-        setPdfData(
-          new Uint8Array(
-            buffer
-          )
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          "PDF FETCH ERROR:",
-          error
-        );
-
-        if (
-          !cancelled
-        ) {
-          setPdfData(null);
-
-          setLoadingError(
-            error instanceof Error
-              ? error.message
-              : "PDF faylni ochib bo‘lmadi."
-          );
-        }
-      } finally {
-        if (
-          !cancelled
-        ) {
-          setPdfLoading(false);
-        }
-      }
-    }
-
-    loadPdf();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pdfUrl]);
 
   /*
     Oddiy foydalanuvchida:
@@ -752,25 +645,19 @@ export default function PdfViewerPage({
             }
           }}
         >
-          {pdfLoading ? (
-            <div className="loadingBox">
-              PDF yuklanmoqda...
-            </div>
-          ) : loadingError ? (
+          {loadingError ? (
             <div className="errorBox">
               {loadingError}
             </div>
-          ) : !pdfData ? (
-            <div className="errorBox">
-              PDF ma’lumotlari topilmadi.
-            </div>
           ) : (
             <Document
-              file={
-                pdfData
-                  ? { data: pdfData }
-                  : undefined
-              }
+              file={pdfUrl}
+              options={{
+                withCredentials: true,
+                httpHeaders: {
+                  "Cache-Control": "no-cache",
+                },
+              }}
               onLoadSuccess={
                 onDocumentLoadSuccess
               }
