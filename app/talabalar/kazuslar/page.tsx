@@ -2171,17 +2171,6 @@ export default function KazuslarPage() {
                     }`}
                     key={item.id}
                   >
-                    <div
-                      className={
-                        item.type === "pdf"
-                          ? "caseType pdfCaseType"
-                          : "caseType"
-                      }
-                    >
-                      {item.type === "pdf"
-                        ? "📄 PDF kazus"
-                        : "✍ Platformada yozilgan"}
-                    </div>
 
                     <div className="subjectBadge">{item.subject}</div>
 
@@ -2273,7 +2262,9 @@ export default function KazuslarPage() {
           {questions.map((item, index) => (
             <div className="questionCard" key={item.id}>
               <div className="questionHeader">
-                <h3>{index + 1}-savol</h3>
+                <h3 className="editorQuestionNumber3D">
+                  {index + 1}-savol
+                </h3>
 
                 {questions.length > 1 && (
                   <button
@@ -2502,9 +2493,12 @@ export default function KazuslarPage() {
             {selectedCase.questions.map((item, index) => (
               <div className="viewerQuestionCard" key={item.id}>
                 <div className="viewerQuestion">
-                  <strong>{index + 1}-savol.</strong>
+                  <div className="questionNumber3D">
+                    {index + 1}-savol
+                  </div>
+
                   <div
-                    className="richViewerContent inlineRich"
+                    className="richViewerContent viewerQuestionText"
                     dangerouslySetInnerHTML={{ __html: item.question }}
                   />
                 </div>
@@ -2736,31 +2730,33 @@ export default function KazuslarPage() {
         }
 
         .caseCard {
-          min-height: 300px;
-          padding: 25px;
+          min-height: 280px;
+          padding: 28px 24px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           text-align: center;
-          border: 2px solid #3d4347;
-          border-radius: 20px;
+          border: 1px solid #8a8f93;
+          border-radius: 18px;
           background: linear-gradient(
-            145deg,
-            #e1e1e1,
-            #c5c5c5 50%,
-            #a6a6a6
+            180deg,
+            #f4f4f4 0%,
+            #dddddd 58%,
+            #c7c7c7 100%
           );
           box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.86),
-            inset 0 -7px 7px rgba(0, 0, 0, 0.18),
-            0 6px 0 #4a5054,
-            0 11px 16px rgba(0, 0, 0, 0.25);
+            inset 0 4px 5px rgba(255, 255, 255, 0.9),
+            0 4px 0 #6d7478,
+            0 9px 16px rgba(0, 0, 0, 0.18);
         }
 
         .caseCard h2 {
-          margin: 12px 0;
-          font-size: 28px;
+          margin: 10px 0 12px;
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 1.25;
+          color: #111;
         }
 
         .caseType,
@@ -2812,15 +2808,24 @@ export default function KazuslarPage() {
         }
 
         .subjectBadge {
-          margin-top: 10px;
-          background: #d7e9f5;
-          color: #173e58;
+          margin-top: 0;
+          padding: 5px 12px;
+          border: 1px solid #aab7bf;
+          background: #edf4f8;
+          color: #234b63;
+          font-size: 13px;
+          font-weight: 700;
+          box-shadow: none;
         }
 
         .questionCount {
           margin: 12px 0 18px;
-          background: #d9dedf;
-          color: #29353c;
+          padding: 5px 11px;
+          background: #e9ecee;
+          color: #445159;
+          border: 1px solid #c8ced2;
+          font-size: 13px;
+          box-shadow: none;
         }
 
         .casePreview {
@@ -2927,8 +2932,6 @@ export default function KazuslarPage() {
 
         .questionHeader h3 {
           margin: 0;
-          color: #073b68;
-          font-size: 24px;
         }
 
         .questionTextarea {
@@ -3208,11 +3211,64 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion {
-          padding: 18px;
-          border-radius: 11px;
-          background: #f5f5f5;
+          padding: 22px;
+          border: 1px solid #d0d0d0;
+          border-radius: 14px;
+          background: #f7f7f7;
           font-size: 19px;
           line-height: 1.6;
+          box-shadow:
+            inset 0 2px 3px rgba(255, 255, 255, 0.9),
+            0 2px 5px rgba(0, 0, 0, 0.08);
+        }
+
+        .questionNumber3D,
+        .editorQuestionNumber3D {
+          width: fit-content;
+          min-width: 128px;
+          padding: 10px 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-family: "Bell MT", "Times New Roman", serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #073b68;
+          border: 2px solid #174461;
+          border-radius: 10px;
+          background: linear-gradient(
+            180deg,
+            #b9e7ff 0%,
+            #82c9ef 45%,
+            #4d9fd0 100%
+          );
+          box-shadow:
+            inset 0 4px 4px rgba(255, 255, 255, 0.9),
+            inset 0 -3px 4px rgba(0, 0, 0, 0.14),
+            0 5px 0 #17415c,
+            0 8px 12px rgba(0, 0, 0, 0.22);
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+        }
+
+        .questionNumber3D {
+          margin: 0 0 20px;
+        }
+
+        .editorQuestionNumber3D {
+          margin: 0;
+        }
+
+        .viewerQuestionText {
+          display: block;
+          width: 100%;
+          color: #111;
+          font-family: "Bell MT", "Times New Roman", serif;
+          font-size: 19px;
+          line-height: 1.65;
+        }
+
+        .viewerQuestionText :global(p) {
+          margin: 0;
         }
 
         .viewerAnswer {
@@ -3331,6 +3387,13 @@ export default function KazuslarPage() {
 
           .deleteButton {
             width: 100%;
+          }
+
+          .questionNumber3D,
+          .editorQuestionNumber3D {
+            min-width: 110px;
+            padding: 8px 18px;
+            font-size: 17px;
           }
 
           .addQuestionButton {
