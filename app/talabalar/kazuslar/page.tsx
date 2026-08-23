@@ -291,7 +291,7 @@ function DiagramBuilder({
     ) ?? null;
 
   function addNode(
-    direction: "right" | "below" = "right"
+    direction: "right" | "left" | "below" | "above" = "right"
   ) {
     const parentId =
       selectedId ??
@@ -323,17 +323,36 @@ function DiagramBuilder({
       parent.y +
       siblings.length * 96;
 
+    if (direction === "left") {
+      x =
+        Math.max(
+          10,
+          parent.x - 240 - 110
+        );
+      y =
+        parent.y +
+        siblings.length * 24;
+    }
+
     if (direction === "below") {
-      x = parent.x;
+      x =
+        parent.x +
+        siblings.length * 28;
       y =
         parent.y +
         parent.height +
-        55 +
-        siblings.filter(
-          (node) =>
-            node.x === parent.x
-        ).length *
-          90;
+        55;
+    }
+
+    if (direction === "above") {
+      x =
+        parent.x +
+        siblings.length * 28;
+      y =
+        Math.max(
+          10,
+          parent.y - 76 - 55
+        );
     }
 
     setNodes((old) => [
@@ -525,6 +544,10 @@ function DiagramBuilder({
       <div data-editor-object="diagram" style="
         position:relative;
         width:100%;
+        resize:both;
+        overflow:auto;
+        min-width:420px;
+        min-height:260px;
         min-width:${Math.min(maxX, 1200)}px;
         height:${maxY}px;
         margin:18px 0;
@@ -590,14 +613,28 @@ function DiagramBuilder({
             type="button"
             onClick={() => addNode("right")}
           >
-            + Yoniga blok
+            + O‘ngga
+          </button>
+
+          <button
+            type="button"
+            onClick={() => addNode("left")}
+          >
+            + Chapga
           </button>
 
           <button
             type="button"
             onClick={() => addNode("below")}
           >
-            + Pastiga blok
+            + Pastiga
+          </button>
+
+          <button
+            type="button"
+            onClick={() => addNode("above")}
+          >
+            + Tepaga
           </button>
 
           <button
@@ -1171,6 +1208,10 @@ function RichEditor({
   paragraphMode = "normal",
 }: RichEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const lastSelectedObjectRef =
+    useRef<HTMLElement | null>(null);
+  const lastSelectedCellRef =
+    useRef<HTMLTableCellElement | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [showShapes, setShowShapes] = useState(false);
@@ -1627,31 +1668,103 @@ function RichEditor({
     const selection = window.getSelection();
 
     if (
-      !editor ||
-      !selection ||
-      selection.rangeCount === 0
+      editor &&
+      selection &&
+      selection.rangeCount > 0
     ) {
-      return null;
+      let node: Node | null =
+        selection.anchorNode;
+
+      if (
+        node?.nodeType ===
+        Node.TEXT_NODE
+      ) {
+        node = node.parentNode;
+      }
+
+      if (
+        node instanceof
+        HTMLElement
+      ) {
+        const object =
+          node.closest<HTMLElement>(
+            "[data-editor-object]"
+          );
+
+        if (
+          object &&
+          editor.contains(object)
+        ) {
+          lastSelectedObjectRef.current =
+            object;
+          return object;
+        }
+      }
     }
 
-    let node: Node | null = selection.anchorNode;
+    const remembered =
+      lastSelectedObjectRef.current;
 
-    if (node?.nodeType === Node.TEXT_NODE) {
-      node = node.parentNode;
+    if (
+      remembered &&
+      editor?.contains(remembered)
+    ) {
+      return remembered;
     }
 
-    if (!(node instanceof HTMLElement)) {
-      return null;
+    return null;
+  }
+
+  function getSelectedTableCell() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+
+    if (
+      editor &&
+      selection &&
+      selection.rangeCount > 0
+    ) {
+      let node: Node | null =
+        selection.anchorNode;
+
+      if (
+        node?.nodeType ===
+        Node.TEXT_NODE
+      ) {
+        node = node.parentNode;
+      }
+
+      if (
+        node instanceof
+        HTMLElement
+      ) {
+        const cell =
+          node.closest<
+            HTMLTableCellElement
+          >("td,th");
+
+        if (
+          cell &&
+          editor.contains(cell)
+        ) {
+          lastSelectedCellRef.current =
+            cell;
+          return cell;
+        }
+      }
     }
 
-    const object =
-      node.closest<HTMLElement>("[data-editor-object]");
+    const remembered =
+      lastSelectedCellRef.current;
 
-    if (!object || !editor.contains(object)) {
-      return null;
+    if (
+      remembered &&
+      editor?.contains(remembered)
+    ) {
+      return remembered;
     }
 
-    return object;
+    return null;
   }
 
   function deleteSelectedObject() {
@@ -1679,6 +1792,229 @@ function RichEditor({
       "afterend",
       clone as HTMLElement
     );
+    syncValue();
+  }
+
+  function resizeSelectedObject(
+    widthDelta: number,
+    heightDelta: number
+  ) {
+    const object =
+      getSelectedEditorObject();
+
+    if (!object) {
+      alert(
+        "Avval jadval, shakl yoki diagramma ichini bosing."
+      );
+      return;
+    }
+
+    const rect =
+      object.getBoundingClientRect();
+
+    if (widthDelta !== 0) {
+      object.style.width =
+        `${Math.max(
+          100,
+          rect.width +
+            widthDelta
+        )}px`;
+      object.style.maxWidth =
+        "100%";
+    }
+
+    if (heightDelta !== 0) {
+      object.style.height =
+        `${Math.max(
+          50,
+          rect.height +
+            heightDelta
+        )}px`;
+    }
+
+    object.style.overflow =
+      "auto";
+
+    syncValue();
+  }
+
+  function addTableRow() {
+    const cell =
+      getSelectedTableCell();
+
+    const table =
+      cell?.closest("table");
+
+    if (!table) {
+      alert(
+        "Avval jadvalning bir katagini bosing."
+      );
+      return;
+    }
+
+    const columnCount =
+      table.rows[0]?.cells.length ||
+      1;
+
+    const row =
+      table.insertRow(
+        cell!.parentElement
+          ? (
+              cell!.parentElement as HTMLTableRowElement
+            ).rowIndex + 1
+          : -1
+      );
+
+    for (
+      let i = 0;
+      i < columnCount;
+      i += 1
+    ) {
+      const td =
+        row.insertCell();
+
+      td.textContent =
+        "Matn";
+
+      td.style.border =
+        "1px solid #444";
+      td.style.padding =
+        "10px";
+      td.style.minWidth =
+        "90px";
+    }
+
+    syncValue();
+  }
+
+  function removeTableRow() {
+    const cell =
+      getSelectedTableCell();
+
+    const row =
+      cell?.parentElement as
+        | HTMLTableRowElement
+        | null;
+
+    const table =
+      cell?.closest("table");
+
+    if (!row || !table) {
+      alert(
+        "Avval jadvalning bir katagini bosing."
+      );
+      return;
+    }
+
+    if (table.rows.length <= 1) {
+      alert(
+        "Jadvalda kamida 1 ta qator qolishi kerak."
+      );
+      return;
+    }
+
+    table.deleteRow(
+      row.rowIndex
+    );
+
+    lastSelectedCellRef.current =
+      null;
+
+    syncValue();
+  }
+
+  function addTableColumn() {
+    const cell =
+      getSelectedTableCell();
+
+    const table =
+      cell?.closest("table");
+
+    if (!cell || !table) {
+      alert(
+        "Avval jadvalning bir katagini bosing."
+      );
+      return;
+    }
+
+    const index =
+      cell.cellIndex + 1;
+
+    Array.from(
+      table.rows
+    ).forEach(
+      (
+        row,
+        rowIndex
+      ) => {
+        const nextCell =
+          row.insertCell(index);
+
+        nextCell.textContent =
+          rowIndex === 0
+            ? "Sarlavha"
+            : "Matn";
+
+        nextCell.style.border =
+          "1px solid #444";
+        nextCell.style.padding =
+          "10px";
+        nextCell.style.minWidth =
+          "90px";
+
+        if (rowIndex === 0) {
+          nextCell.style.background =
+            "#dceffd";
+          nextCell.style.fontWeight =
+            "700";
+          nextCell.style.textAlign =
+            "center";
+        }
+      }
+    );
+
+    syncValue();
+  }
+
+  function removeTableColumn() {
+    const cell =
+      getSelectedTableCell();
+
+    const table =
+      cell?.closest("table");
+
+    if (!cell || !table) {
+      alert(
+        "Avval jadvalning bir katagini bosing."
+      );
+      return;
+    }
+
+    const index =
+      cell.cellIndex;
+
+    const count =
+      table.rows[0]?.cells.length ||
+      0;
+
+    if (count <= 1) {
+      alert(
+        "Jadvalda kamida 1 ta ustun qolishi kerak."
+      );
+      return;
+    }
+
+    Array.from(
+      table.rows
+    ).forEach((row) => {
+      if (row.cells[index]) {
+        row.deleteCell(index);
+      }
+    });
+
+    lastSelectedCellRef.current =
+      null;
+
     syncValue();
   }
 
@@ -1722,8 +2058,8 @@ function RichEditor({
       block3d: `<div data-editor-object="shape" style="${common}border-radius:14px;background:linear-gradient(145deg,#9bd9ff,#4e9ccc);color:#073b68;box-shadow:8px 8px 0 #17415c,14px 14px 18px rgba(0,0,0,.28);">3D blok</div><p><br></p>`,
       card3d: `<div data-editor-object="shape" style="${common}border-radius:18px;background:linear-gradient(145deg,#eeeeee,#a7a7a7);color:#111;box-shadow:inset 0 5px 5px rgba(255,255,255,.8),0 8px 0 #555,0 14px 20px rgba(0,0,0,.3);">3D kartochka</div><p><br></p>`,
       arrow: `<div data-editor-object="shape" style="${common}border:none;background:transparent;color:#174461;font-size:34px;min-width:210px;">BOSQICH 1&nbsp;&nbsp;➜&nbsp;&nbsp;BOSQICH 2</div><p><br></p>`,
-      timeline: `<div data-editor-object="shape" style="margin:18px 0;padding:18px;border-radius:14px;background:#eef6fb;border:2px solid #174461;"><b>1-bosqich</b> ━━━ ➜ <b>2-bosqich</b> ━━━ ➜ <b>3-bosqich</b></div><p><br></p>`,
-      four: `<div data-editor-object="shape" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0;">
+      timeline: `<div data-editor-object="shape" style="margin:18px 0;padding:18px;border-radius:14px;background:#eef6fb;border:2px solid #174461;resize:both;overflow:auto;min-width:260px;min-height:70px;"><b>1-bosqich</b> ━━━ ➜ <b>2-bosqich</b> ━━━ ➜ <b>3-bosqich</b></div><p><br></p>`,
+      four: `<div data-editor-object="shape" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0;resize:both;overflow:auto;min-width:320px;min-height:160px;">
         <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>1. Subyekt</b><br>Matn</div>
         <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>2. Obyekt</b><br>Matn</div>
         <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>3. Subyektiv tomon</b><br>Matn</div>
@@ -1989,6 +2325,58 @@ function RichEditor({
 
           <button
             type="button"
+            title="Tanlangan obyekt kengligini kichraytirish"
+            onClick={() =>
+              resizeSelectedObject(
+                -40,
+                0
+              )
+            }
+          >
+            En −
+          </button>
+
+          <button
+            type="button"
+            title="Tanlangan obyekt kengligini oshirish"
+            onClick={() =>
+              resizeSelectedObject(
+                40,
+                0
+              )
+            }
+          >
+            En +
+          </button>
+
+          <button
+            type="button"
+            title="Tanlangan obyekt balandligini kichraytirish"
+            onClick={() =>
+              resizeSelectedObject(
+                0,
+                -30
+              )
+            }
+          >
+            Bo‘y −
+          </button>
+
+          <button
+            type="button"
+            title="Tanlangan obyekt balandligini oshirish"
+            onClick={() =>
+              resizeSelectedObject(
+                0,
+                30
+              )
+            }
+          >
+            Bo‘y +
+          </button>
+
+          <button
+            type="button"
             title="Tanlangan jadval/shakl/diagrammani nusxalash"
             onClick={duplicateSelectedObject}
           >
@@ -2003,6 +2391,42 @@ function RichEditor({
           >
             O‘chirish
           </button>
+
+          <span className="toolSeparator" />
+
+          <button
+            type="button"
+            title="Tanlangan jadval katagidan keyin qator qo‘shish"
+            onClick={addTableRow}
+          >
+            + Qator
+          </button>
+
+          <button
+            type="button"
+            title="Tanlangan jadval qatorini o‘chirish"
+            onClick={removeTableRow}
+          >
+            − Qator
+          </button>
+
+          <button
+            type="button"
+            title="Tanlangan jadval katagidan keyin ustun qo‘shish"
+            onClick={addTableColumn}
+          >
+            + Ustun
+          </button>
+
+          <button
+            type="button"
+            title="Tanlangan jadval ustunini o‘chirish"
+            onClick={removeTableColumn}
+          >
+            − Ustun
+          </button>
+
+          <span className="toolSeparator" />
 
           <button
             type="button"
@@ -2042,6 +2466,50 @@ function RichEditor({
         style={{ minHeight }}
         onInput={syncValue}
         onBlur={syncValue}
+        onMouseDown={(event) => {
+          const target =
+            event.target instanceof
+            HTMLElement
+              ? event.target
+              : null;
+
+          const object =
+            target?.closest<
+              HTMLElement
+            >(
+              "[data-editor-object]"
+            ) ?? null;
+
+          const cell =
+            target?.closest<
+              HTMLTableCellElement
+            >("td,th") ?? null;
+
+          if (
+            lastSelectedObjectRef.current &&
+            lastSelectedObjectRef.current !==
+              object
+          ) {
+            lastSelectedObjectRef.current.style.outline =
+              "";
+            lastSelectedObjectRef.current.style.outlineOffset =
+              "";
+          }
+
+          if (object) {
+            lastSelectedObjectRef.current =
+              object;
+            object.style.outline =
+              "2px solid #2196f3";
+            object.style.outlineOffset =
+              "3px";
+          }
+
+          if (cell) {
+            lastSelectedCellRef.current =
+              cell;
+          }
+        }}
         onPaste={handleSmartPaste}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
@@ -2054,7 +2522,7 @@ function RichEditor({
       />
 
       <div className="richEditorHint">
-        Word/PDF’dan qo‘yilganda qalin, kursiv, tagiga chizilgan, qizil/boshqa rangdagi va marker bilan ajratilgan joylar imkon qadar saqlanadi. Keraksiz PDF joylashuv kodlari esa tozalanadi. “1-qator →” faqat abzasning birinchi qatorini suradi.
+        Word/PDF’dan qo‘yilganda qalin, kursiv, tagiga chizilgan, rangli va markerli joylar imkon qadar saqlanadi; keraksiz PDF joylashuv kodlari tozalanadi. Diagrammada O‘ng/Chap/Past/Tepa blok qo‘shish, 8 nuqtadan resize, tagidan matn yozish; jadvalda qator/ustun qo‘shish-o‘chirish; obyektlarda en/bo‘y, nusxalash va o‘chirish mavjud.
       </div>
 
       <style jsx>{`
@@ -2145,6 +2613,14 @@ function RichEditor({
           border-color: #174461 !important;
           background: linear-gradient(#ccefff,#6fb9e4) !important;
           box-shadow: 0 3px 0 #17415c;
+        }
+
+        .toolSeparator {
+          width: 1px;
+          align-self: stretch;
+          min-height: 32px;
+          margin: 0 3px;
+          background: rgba(60,60,60,.35);
         }
 
         .dangerTool {
