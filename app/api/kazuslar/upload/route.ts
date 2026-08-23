@@ -345,13 +345,18 @@ export async function POST(
     const pdfPath =
       `${PDF_PREFIX}${id}-${safeName}`;
 
+    /*
+      MUHIM:
+      Sizning Vercel Blob store'ingiz PRIVATE.
+      Shuning uchun PDF ham PRIVATE qilib saqlanadi.
+    */
     const blob =
       await put(
         pdfPath,
         file,
         {
           access:
-            "public",
+            "private",
 
           addRandomSuffix:
             false,
@@ -375,7 +380,9 @@ export async function POST(
       PdfCaseMeta =
       {
         id,
-        type: "pdf",
+        type:
+          "pdf",
+
         subject,
         title,
 
@@ -388,6 +395,11 @@ export async function POST(
         mimeType:
           "application/pdf",
 
+        /*
+          PRIVATE Blob URL metadata sifatida saqlanadi.
+          PDFni brauzerda ochish uchun keyingi bosqichda
+          alohida secure endpoint qilamiz.
+        */
         url:
           blob.url,
 
@@ -401,6 +413,9 @@ export async function POST(
           now,
       };
 
+    /*
+      PDF metadata ham PRIVATE JSON sifatida saqlanadi.
+    */
     await put(
       `${PDF_META_PREFIX}${id}.json`,
 
@@ -430,7 +445,8 @@ export async function POST(
 
     return NextResponse.json(
       {
-        success: true,
+        success:
+          true,
 
         message:
           "PDF kazus muvaffaqiyatli yuklandi.",
@@ -439,7 +455,9 @@ export async function POST(
           meta,
       },
       {
-        status: 201,
+        status:
+          201,
+
         headers:
           NO_CACHE_HEADERS,
       }
@@ -451,8 +469,9 @@ export async function POST(
     );
 
     /*
-      PDF yuklandi-yu metadata yozishda xato bo‘lsa,
-      yetim PDF qolmasligi uchun rollback qilamiz.
+      Agar PDF yuklanib,
+      metadata yozishda xato chiqsa,
+      yetim PDF qolmasligi uchun o‘chiramiz.
     */
     if (
       uploadedPathname
@@ -473,7 +492,8 @@ export async function POST(
 
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
 
         error:
           error instanceof Error
@@ -481,7 +501,9 @@ export async function POST(
             : "PDF yuklashda xatolik yuz berdi.",
       },
       {
-        status: 500,
+        status:
+          500,
+
         headers:
           NO_CACHE_HEADERS,
       }
