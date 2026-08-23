@@ -1244,6 +1244,36 @@ function RichEditor({
     syncValue();
   }
 
+  function applyBlockStyle(
+    property: "lineHeight" | "marginTop" | "marginBottom",
+    value: string
+  ) {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    let node: Node | null = selection.anchorNode;
+
+    if (node?.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+
+    if (!(node instanceof HTMLElement)) return;
+
+    const block =
+      node.closest<HTMLElement>("p,div,li,blockquote") ||
+      editor;
+
+    if (!editor.contains(block) && block !== editor) return;
+
+    block.style[property] = value;
+    syncValue();
+  }
+
   function getCurrentBlock(): HTMLElement | null {
     const editor = editorRef.current;
     const selection = window.getSelection();
@@ -2200,6 +2230,43 @@ function RichEditor({
           <button type="button" title="Markazga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyCenter"); }}>Markaz</button>
           <button type="button" title="O‘ngga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyRight"); }}>O‘ng</button>
           <button type="button" title="Ikki tomonga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyFull"); }}>Justify</button>
+          <select
+            defaultValue="1.5"
+            title="Qator oralig‘i"
+            onChange={(e) =>
+              applyBlockStyle("lineHeight", e.target.value)
+            }
+          >
+            <option value="1">1.0</option>
+            <option value="1.15">1.15</option>
+            <option value="1.5">1.5</option>
+            <option value="2">2.0</option>
+            <option value="2.5">2.5</option>
+            <option value="3">3.0</option>
+          </select>
+
+          <button
+            type="button"
+            title="Abzas oldidan masofa qo‘shish"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyBlockStyle("marginTop", "12px");
+            }}
+          >
+            ↑ Interval
+          </button>
+
+          <button
+            type="button"
+            title="Abzasdan keyin masofa qo‘shish"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyBlockStyle("marginBottom", "12px");
+            }}
+          >
+            ↓ Interval
+          </button>
+
           <button type="button" title="Raqamli ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertOrderedList"); }}>1. Ro‘yxat</button>
           <button type="button" title="Belgili ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertUnorderedList"); }}>• Ro‘yxat</button>
           <button
@@ -2857,6 +2924,7 @@ export default function KazuslarPage() {
   const [casesError, setCasesError] = useState("");
 
   const [selectedCase, setSelectedCase] = useState<PlatformCase | null>(null);
+  const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
 
   const [viewerZoom, setViewerZoom] = useState(100);
   const [viewerMarkerMode, setViewerMarkerMode] =
@@ -2976,7 +3044,34 @@ export default function KazuslarPage() {
         answer: "",
       },
     ]);
+    setEditingCaseId(null);
     setSaveMessage("");
+  }
+
+  function openEditMode(item: PlatformCase) {
+    if (role !== "admin") return;
+
+    setEditingCaseId(item.id);
+    setSubject(item.subject);
+    setCaseTitle(item.title);
+    setCaseText(item.caseText);
+    setQuestions(
+      item.questions.length > 0
+        ? item.questions.map((question) => ({ ...question }))
+        : [
+            {
+              id: "1",
+              question: "",
+              answer: "",
+            },
+          ]
+    );
+    setSaveMessage("");
+    setMode("write");
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   function openWriteMode() {
@@ -3151,12 +3246,13 @@ export default function KazuslarPage() {
       setSaveMessage("");
 
       const response = await fetch("/api/kazuslar", {
-        method: "POST",
+        method: editingCaseId ? "PATCH" : "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          ...(editingCaseId ? { id: editingCaseId } : {}),
           subject: cleanSubject,
           title: cleanTitle,
           caseText: cleanCaseText,
@@ -3170,7 +3266,11 @@ export default function KazuslarPage() {
         throw new Error(data.message || "Kazusni saqlab bo‘lmadi.");
       }
 
-      setSaveMessage("✅ Kazus muvaffaqiyatli saqlandi.");
+      setSaveMessage(
+        editingCaseId
+          ? "✅ Kazus muvaffaqiyatli tahrirlandi."
+          : "✅ Kazus muvaffaqiyatli saqlandi."
+      );
 
       await loadCases();
 
@@ -3374,7 +3474,45 @@ export default function KazuslarPage() {
   }, [cases, search]);
 
   return (
-    <main className="page">
+    <main
+      className={
+        mode === "view" && role !== "admin"
+          ? "page protectedReaderPage"
+          : "page"
+      }
+      onContextMenu={(event) => {
+        if (mode === "view" && role !== "admin") {
+          event.preventDefault();
+        }
+      }}
+      onCopy={(event) => {
+        if (mode === "view" && role !== "admin") {
+          event.preventDefault();
+        }
+      }}
+      onCut={(event) => {
+        if (mode === "view" && role !== "admin") {
+          event.preventDefault();
+        }
+      }}
+      onDragStart={(event) => {
+        if (mode === "view" && role !== "admin") {
+          event.preventDefault();
+        }
+      }}
+      onKeyDownCapture={(event) => {
+        if (mode !== "view" || role === "admin") return;
+
+        const key = event.key.toLowerCase();
+
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          ["c", "x", "s", "p"].includes(key)
+        ) {
+          event.preventDefault();
+        }
+      }}
+    >
       <header className="topPanel">
         <div className="titlePlate">Talabalar — Kazuslar</div>
 
@@ -3393,7 +3531,7 @@ export default function KazuslarPage() {
                   type="button"
                   onClick={openWriteMode}
                 >
-                  ✍ Kazusga javob yozish
+                  Kazusga javob yozish
                 </button>
 
                 <button
@@ -3401,7 +3539,7 @@ export default function KazuslarPage() {
                   type="button"
                   onClick={openUploadMode}
                 >
-                  📄 Kazus yuklash
+                  Kazus yuklash
                 </button>
               </>
             )}
@@ -3413,7 +3551,7 @@ export default function KazuslarPage() {
                 window.location.href = "/talabalar/kazuslar/yakuniy";
               }}
             >
-              🎓 Yakuniy nazorat kazuslari
+              Yakuniy nazorat kazuslari
             </button>
 
             <button
@@ -3423,7 +3561,7 @@ export default function KazuslarPage() {
                 window.location.href = "/talabalar/kazuslar/oraliq";
               }}
             >
-              📝 Oraliq nazorat kazuslari
+              Oraliq nazorat kazuslari
             </button>
           </section>
 
@@ -3490,7 +3628,9 @@ export default function KazuslarPage() {
 
       {mode === "write" && (
         <section className="editorBox">
-          <div className="sectionTitle">Kazusga javob yozish</div>
+          <div className="sectionTitle">
+            {editingCaseId ? "Kazusni tahrirlash" : "Kazusga javob yozish"}
+          </div>
 
           <div className="formGroup">
             <label>Fan nomi</label>
@@ -3618,7 +3758,13 @@ export default function KazuslarPage() {
               onClick={saveCase}
               disabled={saving}
             >
-              {saving ? "Saqlanmoqda..." : "Kazusni saqlash"}
+              {saving
+                ? editingCaseId
+                  ? "Yangilanmoqda..."
+                  : "Saqlanmoqda..."
+                : editingCaseId
+                  ? "O‘zgarishlarni saqlash"
+                  : "Kazusni saqlash"}
             </button>
           </div>
         </section>
@@ -3746,17 +3892,29 @@ export default function KazuslarPage() {
               <h1>{selectedCase.title}</h1>
             </div>
 
-            <button
-              className="smallBackButton"
-              type="button"
-              onClick={() => {
-                setSelectedCase(null);
-                setViewerMarkerMode("off");
-                setMode("list");
-              }}
-            >
-              ← Ro‘yxatga
-            </button>
+            <div className="viewerHeaderActions">
+              {!roleLoading && role === "admin" && (
+                <button
+                  className="adminEditButton"
+                  type="button"
+                  onClick={() => openEditMode(selectedCase)}
+                >
+                  Tahrirlash
+                </button>
+              )}
+
+              <button
+                className="smallBackButton"
+                type="button"
+                onClick={() => {
+                  setSelectedCase(null);
+                  setViewerMarkerMode("off");
+                  setMode("list");
+                }}
+              >
+                ← Ro‘yxatga
+              </button>
+            </div>
           </div>
 
           <div className="readerToolbar">
@@ -4359,12 +4517,12 @@ export default function KazuslarPage() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-width: 108px;
-          padding: 8px 15px;
-          margin: 0 14px 7px 0;
+          min-width: 86px;
+          padding: 6px 11px;
+          margin: 0 10px 3px 0;
           vertical-align: middle;
           color: #073b68;
-          font-size: 17px;
+          font-size: 14px;
           font-weight: 700;
           white-space: nowrap;
           border: 2px solid #174461;
@@ -4599,6 +4757,11 @@ export default function KazuslarPage() {
           background: #d8dcde;
         }
 
+        .protectedReaderPage .readerPaper,
+        .protectedReaderPage .viewerHeader {
+          -webkit-user-drag: none;
+        }
+
         .readingViewerBox {
           padding: 34px 20px 40px;
           overflow-x: hidden;
@@ -4789,6 +4952,35 @@ export default function KazuslarPage() {
           color: #111;
         }
 
+        .viewerHeaderActions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 0 0 auto;
+        }
+
+        .adminEditButton {
+          min-width: 130px;
+          min-height: 50px;
+          padding: 10px 18px;
+          border: 3px solid #174461;
+          border-radius: 14px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 700;
+          color: #073b68;
+          background: linear-gradient(
+            180deg,
+            #b9e7ff,
+            #77c3ec 52%,
+            #4a99ca
+          );
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.85),
+            0 5px 0 #17415c;
+        }
+
         .viewerSubject {
           display: inline-block;
           padding: 7px 14px;
@@ -4881,9 +5073,9 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion3D {
-          padding: 20px 24px;
+          padding: 13px 16px;
           border: 2px solid #62686c;
-          border-radius: 18px;
+          border-radius: 15px;
           background: linear-gradient(
             145deg,
             #f6f6f6 0%,
@@ -4901,22 +5093,23 @@ export default function KazuslarPage() {
           display: block;
           width: 100%;
           color: #111;
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 700;
-          line-height: 1.72;
-          text-align: justify;
-          text-justify: inter-word;
+          line-height: 1.48;
+          text-align: left;
+          letter-spacing: normal;
           word-spacing: normal;
         }
 
         .inlineQuestionContent {
           display: inline;
           color: #111;
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 700;
-          line-height: 1.72;
-          text-align: justify;
-          text-justify: inter-word;
+          line-height: 1.48;
+          text-align: left;
+          letter-spacing: normal;
+          word-spacing: normal;
         }
 
         .inlineQuestionContent :global(p),
@@ -4924,7 +5117,9 @@ export default function KazuslarPage() {
           display: inline;
           margin: 0;
           text-indent: 0;
-          text-align: justify;
+          text-align: left;
+          letter-spacing: normal;
+          word-spacing: normal;
         }
 
         .inlineQuestionContent :global(p + p),
@@ -5061,6 +5256,177 @@ export default function KazuslarPage() {
           }
         }
 
+        @media (max-width: 760px) {
+          .page {
+            width: 100%;
+            overflow-x: hidden;
+          }
+
+          .topPanel {
+            width: calc(100% - 20px);
+            margin: 12px auto 0;
+            padding: 14px;
+            gap: 12px;
+            border-radius: 20px;
+          }
+
+          .titlePlate {
+            min-width: 0;
+            width: 100%;
+            padding: 14px 12px;
+            font-size: clamp(20px, 6vw, 27px);
+          }
+
+          .backButton {
+            width: 100%;
+            height: 52px;
+          }
+
+          .topPanel {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .controlBox {
+            width: calc(100% - 24px);
+            margin-top: 36px;
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .mainActionButton {
+            width: 100%;
+            min-height: 58px;
+            padding: 10px 12px;
+            font-size: clamp(15px, 4.5vw, 18px);
+            border-radius: 14px;
+          }
+
+          .mainBox,
+          .editorBox,
+          .viewerBox {
+            width: calc(100% - 16px);
+            margin: 58px auto 24px;
+            padding: 54px 8px 24px;
+            border-radius: 18px;
+          }
+
+          .readingViewerBox {
+            padding: 22px 8px 24px;
+          }
+
+          .readingSectionTitle {
+            min-width: 0;
+            width: min(230px, 78%);
+            margin-bottom: 20px;
+            padding: 9px 16px;
+            font-size: 19px;
+          }
+
+          .viewerHeader {
+            width: 100%;
+            margin-bottom: 18px;
+            padding: 16px;
+            gap: 14px;
+          }
+
+          .viewerHeader h1 {
+            font-size: clamp(22px, 7vw, 28px);
+          }
+
+          .viewerHeaderActions {
+            width: 100%;
+            flex-direction: column;
+          }
+
+          .viewerHeaderActions button {
+            width: 100%;
+          }
+
+          .readerToolbar {
+            position: static;
+            width: 100%;
+            padding: 10px;
+            gap: 9px;
+          }
+
+          .readerToolGroup {
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+          }
+
+          .readerModeStatus {
+            width: 100%;
+            margin-left: 0;
+            text-align: center;
+          }
+
+          .readerViewport {
+            width: 100%;
+            min-height: 500px;
+            padding: 12px 5px 40px;
+            border-radius: 14px;
+          }
+
+          .readerPaper {
+            width: 100% !important;
+            max-width: 100%;
+            padding: 16px 10px;
+            transform-origin: top center;
+          }
+
+          .caseTextBox {
+            padding: 14px 10px;
+          }
+
+          .richViewerContent {
+            font-size: 16px;
+            line-height: 1.55;
+          }
+
+          .viewerQuestion3D {
+            padding: 10px 10px;
+            border-radius: 12px;
+          }
+
+          .questionNumberInline3D {
+            min-width: 72px;
+            padding: 5px 8px;
+            margin-right: 7px;
+            font-size: 12px;
+          }
+
+          .questionFlow,
+          .inlineQuestionContent {
+            font-size: 16px;
+            line-height: 1.42;
+            word-spacing: normal;
+            letter-spacing: normal;
+          }
+
+          .viewerAnswer {
+            padding: 14px 10px;
+          }
+
+          .formGroup,
+          .questionsBox {
+            width: 100%;
+          }
+
+          .richEditorShell {
+            max-width: 100%;
+          }
+
+          .richToolbar {
+            overflow-x: auto;
+          }
+
+          .toolGroup {
+            min-width: 620px;
+          }
+        }
+
         @media (max-width: 520px) {
           .mainActionButton {
             min-height: 62px;
@@ -5068,7 +5434,7 @@ export default function KazuslarPage() {
           }
 
           .controlBox {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: 1fr;
           }
 
           .readerToolbar {
