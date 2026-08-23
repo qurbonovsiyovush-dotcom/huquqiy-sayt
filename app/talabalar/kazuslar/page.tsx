@@ -1339,6 +1339,7 @@ function RichEditor({
       "BLOCKQUOTE",
       "SUB",
       "SUP",
+      "FONT",
     ]);
 
     const all =
@@ -1359,34 +1360,57 @@ function RichEditor({
       const element =
         el as HTMLElement;
 
+      const computedStyle =
+        element.getAttribute("style") || "";
+
       const color =
-        element.style.color;
+        element.style.color ||
+        element.getAttribute("color") ||
+        "";
+
+      const backgroundColor =
+        element.style.backgroundColor ||
+        "";
 
       const fontWeight =
-        element.style.fontWeight;
+        element.style.fontWeight ||
+        "";
 
       const fontStyle =
-        element.style.fontStyle;
+        element.style.fontStyle ||
+        "";
 
       const textDecoration =
-        element.style.textDecoration;
+        element.style.textDecoration ||
+        element.style.textDecorationLine ||
+        "";
 
       const textAlign =
-        element.style.textAlign;
+        element.style.textAlign ||
+        "";
 
-      element.removeAttribute(
-        "class"
-      );
-      element.removeAttribute(
-        "id"
-      );
-      element.removeAttribute(
-        "dir"
-      );
+      const fontFamily =
+        element.style.fontFamily ||
+        "";
 
-      element.removeAttribute(
-        "style"
-      );
+      const fontSize =
+        element.style.fontSize ||
+        "";
+
+      const verticalAlign =
+        element.style.verticalAlign ||
+        "";
+
+      const whiteSpace =
+        element.style.whiteSpace ||
+        "";
+
+      element.removeAttribute("class");
+      element.removeAttribute("id");
+      element.removeAttribute("dir");
+      element.removeAttribute("face");
+      element.removeAttribute("size");
+      element.removeAttribute("style");
 
       if (color) {
         element.style.color =
@@ -1394,41 +1418,54 @@ function RichEditor({
       }
 
       if (
-        fontWeight &&
-        (
-          fontWeight === "bold" ||
-          Number(fontWeight) >= 600
-        )
+        backgroundColor &&
+        backgroundColor !== "transparent" &&
+        backgroundColor !== "rgba(0, 0, 0, 0)"
+      ) {
+        element.style.backgroundColor =
+          backgroundColor;
+      }
+
+      if (
+        element.tagName === "B" ||
+        element.tagName === "STRONG" ||
+        fontWeight === "bold" ||
+        Number(fontWeight) >= 600
       ) {
         element.style.fontWeight =
           "700";
       }
 
       if (
-        fontStyle === "italic"
+        element.tagName === "I" ||
+        element.tagName === "EM" ||
+        fontStyle === "italic" ||
+        fontStyle === "oblique"
       ) {
         element.style.fontStyle =
           "italic";
       }
 
+      const decorations: string[] = [];
+
       if (
-        textDecoration.includes(
-          "underline"
-        )
+        element.tagName === "U" ||
+        textDecoration.includes("underline")
       ) {
-        element.style.textDecoration =
-          "underline";
+        decorations.push("underline");
       }
 
       if (
-        textDecoration.includes(
-          "line-through"
-        )
+        element.tagName === "S" ||
+        element.tagName === "STRIKE" ||
+        textDecoration.includes("line-through")
       ) {
+        decorations.push("line-through");
+      }
+
+      if (decorations.length > 0) {
         element.style.textDecoration =
-          element.style.textDecoration
-            ? `${element.style.textDecoration} line-through`
-            : "line-through";
+          decorations.join(" ");
       }
 
       if (
@@ -1438,6 +1475,59 @@ function RichEditor({
       ) {
         element.style.textAlign =
           textAlign;
+      }
+
+      if (
+        fontFamily &&
+        fontFamily.length <= 120
+      ) {
+        element.style.fontFamily =
+          fontFamily;
+      }
+
+      if (
+        fontSize &&
+        /^(?:\d+(?:\.\d+)?)(?:px|pt|em|rem|%)$/.test(
+          fontSize.trim()
+        )
+      ) {
+        element.style.fontSize =
+          fontSize;
+      }
+
+      if (
+        element.tagName === "SUB"
+      ) {
+        element.style.verticalAlign =
+          "sub";
+      } else if (
+        element.tagName === "SUP"
+      ) {
+        element.style.verticalAlign =
+          "super";
+      } else if (
+        verticalAlign === "sub" ||
+        verticalAlign === "super"
+      ) {
+        element.style.verticalAlign =
+          verticalAlign;
+      }
+
+      if (
+        whiteSpace &&
+        whiteSpace !== "nowrap"
+      ) {
+        element.style.whiteSpace =
+          whiteSpace;
+      }
+
+      if (
+        computedStyle.includes("text-decoration") &&
+        !element.style.textDecoration &&
+        computedStyle.includes("underline")
+      ) {
+        element.style.textDecoration =
+          "underline";
       }
     }
 
@@ -1964,7 +2054,7 @@ function RichEditor({
       />
 
       <div className="richEditorHint">
-        Matn qo‘yilganda ortiqcha PDF/Word formatlari avtomatik tozalanadi; qalin, kursiv, tagiga chizish va ranglar imkon qadar saqlanadi. “1-qator →” faqat abzasning birinchi qatorini suradi.
+        Word/PDF’dan qo‘yilganda qalin, kursiv, tagiga chizilgan, qizil/boshqa rangdagi va marker bilan ajratilgan joylar imkon qadar saqlanadi. Keraksiz PDF joylashuv kodlari esa tozalanadi. “1-qator →” faqat abzasning birinchi qatorini suradi.
       </div>
 
       <style jsx>{`
