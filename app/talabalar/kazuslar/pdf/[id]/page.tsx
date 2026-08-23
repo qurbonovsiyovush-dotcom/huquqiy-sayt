@@ -457,6 +457,68 @@ export default function PdfViewerPage({
     }
   }
 
+  function wrapTextNodeRange(
+    node: Text,
+    startOffset: number,
+    endOffset: number,
+    color: string
+  ) {
+    if (
+      startOffset < 0 ||
+      endOffset > node.length ||
+      startOffset >= endOffset
+    ) {
+      return false;
+    }
+
+    const selectedText =
+      node.data.slice(
+        startOffset,
+        endOffset
+      );
+
+    if (
+      !selectedText.trim()
+    ) {
+      return false;
+    }
+
+    /*
+      Bir text node ichidagi qismni alohida mark bilan o‘raymiz.
+      Shu sabab tanlov bir nechta span, satr yoki paragrafdan
+      o‘tsa ham surroundContents xatosi chiqmaydi.
+    */
+    const localRange =
+      document.createRange();
+
+    localRange.setStart(
+      node,
+      startOffset
+    );
+
+    localRange.setEnd(
+      node,
+      endOffset
+    );
+
+    const mark =
+      document.createElement(
+        "mark"
+      );
+
+    mark.className =
+      "pdfHighlight";
+
+    mark.style.backgroundColor =
+      color;
+
+    localRange.surroundContents(
+      mark
+    );
+
+    return true;
+  }
+
   function applyHighlight() {
     if (!highlightMode) return;
 
@@ -471,47 +533,163 @@ export default function PdfViewerPage({
       return;
     }
 
-    const range =
+    const sourceRange =
       selection.getRangeAt(0);
 
-    const commonContainer =
-      range.commonAncestorContainer;
-
-    const element =
-      commonContainer.nodeType === Node.ELEMENT_NODE
-        ? (commonContainer as Element)
-        : commonContainer.parentElement;
+    const documentArea =
+      document.querySelector(
+        ".documentArea"
+      );
 
     if (
-      !element ||
-      !element.closest(
-        ".documentArea"
+      !documentArea ||
+      !documentArea.contains(
+        sourceRange.commonAncestorContainer
       )
     ) {
+      selection.removeAllRanges();
       return;
     }
 
     try {
-      const mark =
-        document.createElement(
-          "mark"
+      /*
+        PDF.js matnni juda ko‘p span/text node'larga bo‘ladi.
+        Tanlov bilan kesishgan barcha text node'larni oldindan
+        yig‘ib olamiz, keyin ularning har bir qismini alohida
+        markerlaymiz.
+      */
+      const walker =
+        document.createTreeWalker(
+          documentArea,
+          NodeFilter.SHOW_TEXT
         );
 
-      mark.className =
-        "pdfHighlight";
+      const segments: Array<{
+        node: Text;
+        start: number;
+        end: number;
+      }> = [];
 
-      mark.style.backgroundColor =
-        highlightColor;
+      let current =
+        walker.nextNode();
 
-      range.surroundContents(
-        mark
-      );
+      while (current) {
+        const node =
+          current as Text;
+
+        const parent =
+          node.parentElement;
+
+        const insideTextLayer =
+          parent?.closest(
+            ".react-pdf__Page__textContent"
+          );
+
+        if (
+          insideTextLayer &&
+          node.data.length > 0
+        ) {
+          let intersects =
+            false;
+
+          try {
+            intersects =
+              sourceRange.intersectsNode(
+                node
+              );
+          } catch {
+            intersects =
+              false;
+          }
+
+          if (intersects) {
+            let startOffset = 0;
+            let endOffset =
+              node.length;
+
+            if (
+              node ===
+              sourceRange.startContainer
+            ) {
+              startOffset =
+                sourceRange.startOffset;
+            }
+
+            if (
+              node ===
+              sourceRange.endContainer
+            ) {
+              endOffset =
+                sourceRange.endOffset;
+            }
+
+            if (
+              startOffset <
+              endOffset
+            ) {
+              segments.push({
+                node,
+                start:
+                  startOffset,
+                end:
+                  endOffset,
+              });
+            }
+          }
+        }
+
+        current =
+          walker.nextNode();
+      }
+
+      if (
+        segments.length === 0
+      ) {
+        setHighlightMessage(
+          "❌ Belgilangan matn topilmadi."
+        );
+
+        return;
+      }
+
+      /*
+        DOM o‘zgarganda keyingi segmentlarning offsetlari buzilmasligi
+        uchun oxiridan boshiga qarab markerlaymiz.
+      */
+      let applied = 0;
+
+      for (
+        let index =
+          segments.length - 1;
+        index >= 0;
+        index -= 1
+      ) {
+        const segment =
+          segments[index];
+
+        if (
+          wrapTextNodeRange(
+            segment.node,
+            segment.start,
+            segment.end,
+            highlightColor
+          )
+        ) {
+          applied += 1;
+        }
+      }
 
       selection.removeAllRanges();
 
-      setHighlightMessage(
-        "✅ Marker qo‘llandi."
-      );
+      if (applied > 0) {
+        setHighlightMessage(
+          "✅ Marker qo‘llandi."
+        );
+      } else {
+        setHighlightMessage(
+          "❌ Belgilangan qismda markerlanadigan matn topilmadi."
+        );
+      }
 
       window.setTimeout(() => {
         setHighlightMessage("");
@@ -522,10 +700,159 @@ export default function PdfViewerPage({
         error
       );
 
+      selection.removeAllRanges();
+
       setHighlightMessage(
-        "❌ Ushbu joyni belgilashda xatolik bo‘ldi. Matnning kichikroq qismini belgilang."
+        "❌ Marker qo‘llashda xatolik yuz berdi."
       );
     }
+  }
+
+  function highlightAllText() {
+    const documentArea =
+      document.querySelector(
+        ".documentArea"
+      );
+
+    if (!documentArea) return;
+
+    try {
+      const textNodes =
+        Array.from(
+          documentArea.querySelectorAll(
+            ".react-pdf__Page__textContent span"
+          )
+        );
+
+      let applied = 0;
+
+      for (
+        const span of textNodes
+      ) {
+        const walker =
+          document.createTreeWalker(
+            span,
+            NodeFilter.SHOW_TEXT
+          );
+
+        const nodes: Text[] =
+          [];
+
+        let current =
+          walker.nextNode();
+
+        while (current) {
+          nodes.push(
+            current as Text
+          );
+
+          current =
+            walker.nextNode();
+        }
+
+        /*
+          Shu span ichida ham oxiridan boshlaymiz.
+        */
+        for (
+          let index =
+            nodes.length - 1;
+          index >= 0;
+          index -= 1
+        ) {
+          const node =
+            nodes[index];
+
+          if (
+            node.parentElement?.closest(
+              "mark.pdfHighlight"
+            )
+          ) {
+            continue;
+          }
+
+          if (
+            wrapTextNodeRange(
+              node,
+              0,
+              node.length,
+              highlightColor
+            )
+          ) {
+            applied += 1;
+          }
+        }
+      }
+
+      setPaletteOpen(false);
+      setHighlightMode(true);
+      setEraseHighlightMode(false);
+
+      setHighlightMessage(
+        applied > 0
+          ? "✅ Barcha matn markerlandi."
+          : "❌ Markerlanadigan matn topilmadi."
+      );
+
+      window.setTimeout(() => {
+        setHighlightMessage("");
+      }, 1500);
+    } catch (error) {
+      console.error(
+        "HIGHLIGHT ALL ERROR:",
+        error
+      );
+
+      setHighlightMessage(
+        "❌ Barcha matnni markerlashda xatolik yuz berdi."
+      );
+    }
+  }
+
+  function removeAllHighlights() {
+    const marks =
+      Array.from(
+        document.querySelectorAll(
+          ".documentArea mark.pdfHighlight"
+        )
+      );
+
+    for (
+      const mark of marks
+    ) {
+      const parent =
+        mark.parentNode;
+
+      if (!parent) continue;
+
+      while (
+        mark.firstChild
+      ) {
+        parent.insertBefore(
+          mark.firstChild,
+          mark
+        );
+      }
+
+      parent.removeChild(
+        mark
+      );
+
+      parent.normalize();
+    }
+
+    setPaletteOpen(false);
+    setEraseHighlightMode(false);
+    setHighlightMode(false);
+
+    setHighlightMessage(
+      marks.length > 0
+        ? "✅ Barcha markerlar o‘chirildi."
+        : "Marker topilmadi."
+    );
+
+    window.setTimeout(() => {
+      setHighlightMessage("");
+    }, 1500);
   }
 
   function removeHighlight(
@@ -849,6 +1176,16 @@ export default function PdfViewerPage({
 
                 <button
                   type="button"
+                  className="highlightAllButton"
+                  onClick={
+                    highlightAllText
+                  }
+                >
+                  📄 Barcha matnni belgilash
+                </button>
+
+                <button
+                  type="button"
                   className="noColorButton"
                   onClick={() => {
                     setPaletteOpen(
@@ -866,7 +1203,17 @@ export default function PdfViewerPage({
                     setHighlightMessage("");
                   }}
                 >
-                  🧽 Markerni o‘chirish
+                  🧽 Bitta markerni o‘chirish
+                </button>
+
+                <button
+                  type="button"
+                  className="removeAllHighlightsButton"
+                  onClick={
+                    removeAllHighlights
+                  }
+                >
+                  🗑 Barcha markerlarni o‘chirish
                 </button>
               </div>
             )}
@@ -1441,21 +1788,46 @@ export default function PdfViewerPage({
           outline-offset: 2px;
         }
 
-        .noColorButton {
+        .highlightAllButton,
+        .noColorButton,
+        .removeAllHighlightsButton {
           width: 100%;
           min-height: 40px;
-          margin-top: 12px;
-          border: 2px solid #6f5b5b;
+          margin-top: 10px;
           border-radius: 8px;
           cursor: pointer;
           font-family: inherit;
           font-size: 14px;
           font-weight: 700;
+        }
+
+        .highlightAllButton {
+          border: 2px solid #8a6d00;
+          color: #5c4a00;
+          background:
+            linear-gradient(
+              #fff8a8,
+              #f0d34c
+            );
+        }
+
+        .noColorButton {
+          border: 2px solid #6f5b5b;
           color: #4e2020;
           background:
             linear-gradient(
               #fff4f4,
               #e7b9b9
+            );
+        }
+
+        .removeAllHighlightsButton {
+          border: 2px solid #8b1818;
+          color: white;
+          background:
+            linear-gradient(
+              #ef5b5b,
+              #a91616
             );
         }
 
