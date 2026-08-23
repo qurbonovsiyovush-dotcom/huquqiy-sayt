@@ -2141,16 +2141,7 @@ export default function KazuslarPage() {
     }
   }
 
-  function eraseViewerHighlight(target: EventTarget | null) {
-    if (viewerMarkerMode !== "erase") return;
-
-    const element =
-      target instanceof HTMLElement
-        ? target.closest('[data-reader-highlight="1"]')
-        : null;
-
-    if (!element) return;
-
+  function unwrapReaderHighlight(element: HTMLElement) {
     const parent = element.parentNode;
     if (!parent) return;
 
@@ -2160,6 +2151,70 @@ export default function KazuslarPage() {
 
     parent.removeChild(element);
     parent.normalize();
+  }
+
+  function eraseSelectedViewerHighlights() {
+    const root = viewerContentRef.current;
+    const selection = window.getSelection();
+
+    if (
+      !root ||
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return false;
+    }
+
+    const range = selection.getRangeAt(0);
+
+    const highlights = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        '[data-reader-highlight="1"]'
+      )
+    );
+
+    const matches = highlights.filter((highlight) => {
+      try {
+        return range.intersectsNode(highlight);
+      } catch {
+        return false;
+      }
+    });
+
+    if (matches.length === 0) {
+      return false;
+    }
+
+    matches.forEach(unwrapReaderHighlight);
+    clearViewerSelection();
+
+    return true;
+  }
+
+  function eraseViewerHighlight(target: EventTarget | null) {
+    if (viewerMarkerMode !== "erase") return;
+
+    if (eraseSelectedViewerHighlights()) {
+      return;
+    }
+
+    let element: HTMLElement | null = null;
+
+    if (target instanceof HTMLElement) {
+      element = target.closest<HTMLElement>(
+        '[data-reader-highlight="1"]'
+      );
+    } else if (target instanceof Node) {
+      element =
+        target.parentElement?.closest<HTMLElement>(
+          '[data-reader-highlight="1"]'
+        ) ?? null;
+    }
+
+    if (!element) return;
+
+    unwrapReaderHighlight(element);
+    clearViewerSelection();
   }
 
   async function openCase(item: AnyCase) {
@@ -2671,7 +2726,7 @@ export default function KazuslarPage() {
                   )
                 }
               >
-                ⌫ O‘chirg‘ich
+                O‘chirg‘ich
               </button>
             </div>
 
@@ -2686,8 +2741,18 @@ export default function KazuslarPage() {
 
           <div
             className="readerViewport"
-            onMouseUp={applyViewerHighlight}
-            onClick={(event) => eraseViewerHighlight(event.target)}
+            onMouseUp={(event) => {
+              if (viewerMarkerMode === "mark") {
+                applyViewerHighlight();
+              } else if (viewerMarkerMode === "erase") {
+                eraseViewerHighlight(event.target);
+              }
+            }}
+            onClick={(event) => {
+              if (viewerMarkerMode === "erase") {
+                eraseViewerHighlight(event.target);
+              }
+            }}
           >
             <div
               ref={viewerContentRef}
@@ -3440,15 +3505,17 @@ export default function KazuslarPage() {
         }
 
         .readingViewerBox {
-          padding-left: 28px;
-          padding-right: 28px;
+          padding-left: 20px;
+          padding-right: 20px;
+          overflow-x: hidden;
         }
 
         .readerToolbar {
           position: sticky;
           top: 10px;
           z-index: 60;
-          max-width: 1180px;
+          width: min(1100px, 100%);
+          max-width: 1100px;
           margin: 0 auto 24px;
           padding: 13px 16px;
           display: flex;
@@ -3472,8 +3539,8 @@ export default function KazuslarPage() {
 
         .readerToolButton,
         .readerModeButton {
-          min-height: 42px;
-          padding: 8px 14px;
+          min-height: 40px;
+          padding: 7px 12px;
           border: 2px solid #4f575c;
           border-radius: 9px;
           cursor: pointer;
@@ -3485,8 +3552,8 @@ export default function KazuslarPage() {
         }
 
         .readerToolButton {
-          min-width: 50px;
-          font-size: 23px;
+          min-width: 46px;
+          font-size: 22px;
         }
 
         .readerToolButton:disabled {
@@ -3495,7 +3562,7 @@ export default function KazuslarPage() {
         }
 
         .readerZoomValue {
-          min-width: 76px;
+          min-width: 68px;
           text-align: center;
           color: #073b68;
           font-size: 17px;
@@ -3547,7 +3614,8 @@ export default function KazuslarPage() {
         }
 
         .readerViewport {
-          max-width: 1280px;
+          width: min(1100px, 100%);
+          max-width: 1100px;
           min-height: 700px;
           margin: 0 auto;
           padding: 34px 24px 80px;
@@ -3561,6 +3629,7 @@ export default function KazuslarPage() {
         }
 
         .readerPaper {
+          max-width: 100%;
           margin: 0 auto;
           padding: 42px;
           border-radius: 4px;
