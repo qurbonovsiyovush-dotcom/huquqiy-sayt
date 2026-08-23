@@ -21,10 +21,8 @@ import "react-pdf/dist/Page/TextLayer.css";
   PDF.js worker.
   Next.js + react-pdf uchun shu usul qulay.
 */
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc =
+  `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type UserRole = "admin" | "user" | null;
 
@@ -59,6 +57,12 @@ export default function PdfViewerPage({
 
   const [downloading, setDownloading] =
     useState(false);
+
+  const [pdfData, setPdfData] =
+    useState<Uint8Array | null>(null);
+
+  const [pdfLoading, setPdfLoading] =
+    useState(true);
 
   const pdfUrl = useMemo(() => {
     return (
@@ -149,6 +153,107 @@ export default function PdfViewerPage({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPdf() {
+      try {
+        setPdfLoading(true);
+        setLoadingError("");
+
+        const response = await fetch(
+          pdfUrl,
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          let message =
+            "PDF faylni ochib bo‘lmadi.";
+
+          try {
+            const data = await response.json();
+
+            if (
+              data &&
+              typeof data.error === "string"
+            ) {
+              message = data.error;
+            }
+          } catch {
+            // JSON bo‘lmasa, umumiy xabar qoladi.
+          }
+
+          throw new Error(message);
+        }
+
+        const contentType =
+          response.headers.get(
+            "content-type"
+          ) ?? "";
+
+        if (
+          !contentType
+            .toLowerCase()
+            .includes("application/pdf")
+        ) {
+          throw new Error(
+            "Server PDF fayl qaytarmadi."
+          );
+        }
+
+        const buffer =
+          await response.arrayBuffer();
+
+        if (
+          cancelled
+        ) {
+          return;
+        }
+
+        setPdfData(
+          new Uint8Array(
+            buffer
+          )
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "PDF FETCH ERROR:",
+          error
+        );
+
+        if (
+          !cancelled
+        ) {
+          setPdfData(null);
+
+          setLoadingError(
+            error instanceof Error
+              ? error.message
+              : "PDF faylni ochib bo‘lmadi."
+          );
+        }
+      } finally {
+        if (
+          !cancelled
+        ) {
+          setPdfLoading(false);
+        }
+      }
+    }
+
+    loadPdf();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfUrl]);
 
   /*
     Oddiy foydalanuvchida:
@@ -524,7 +629,7 @@ export default function PdfViewerPage({
 
       <section className="viewerShell">
         <div className="viewerTitle">
-          Qurbonovv.uz PDF Viewer
+          Kazusni ko‘rish
         </div>
 
         <div className="toolbar">
@@ -647,13 +752,25 @@ export default function PdfViewerPage({
             }
           }}
         >
-          {loadingError ? (
+          {pdfLoading ? (
+            <div className="loadingBox">
+              PDF yuklanmoqda...
+            </div>
+          ) : loadingError ? (
             <div className="errorBox">
               {loadingError}
             </div>
+          ) : !pdfData ? (
+            <div className="errorBox">
+              PDF ma’lumotlari topilmadi.
+            </div>
           ) : (
             <Document
-              file={pdfUrl}
+              file={
+                pdfData
+                  ? { data: pdfData }
+                  : undefined
+              }
               onLoadSuccess={
                 onDocumentLoadSuccess
               }
