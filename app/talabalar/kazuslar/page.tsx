@@ -1076,6 +1076,7 @@ type RichEditorProps = {
   placeholder?: string;
   minHeight?: number;
   label?: string;
+  paragraphMode?: "normal" | "question";
 };
 
 function RichEditor({
@@ -1084,6 +1085,7 @@ function RichEditor({
   placeholder = "Matn yozing...",
   minHeight = 260,
   label = "Matn muharriri",
+  paragraphMode = "normal",
 }: RichEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -1202,18 +1204,20 @@ function RichEditor({
 
   return (
     <div className={fullscreen ? "richEditorShell fullscreen" : "richEditorShell"}>
-      <div className="richEditorTop">
-        <div className="richEditorLabel">{label}</div>
+      {label && (
+        <div className="richEditorTop">
+          <div className="richEditorLabel">{label}</div>
 
-        <button
+          <button
           type="button"
           className="fullScreenButton"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => setFullscreen((old) => !old)}
         >
-          {fullscreen ? "✕ To‘liq ekrandan chiqish" : "⛶ To‘liq ekran"}
-        </button>
-      </div>
+            {fullscreen ? "✕ To‘liq ekrandan chiqish" : "⛶ To‘liq ekran"}
+          </button>
+        </div>
+      )}
 
       <div className="richToolbar">
         <select
@@ -1459,13 +1463,25 @@ function RichEditor({
 
       <div
         ref={editorRef}
-        className="richEditor"
+        className={
+          paragraphMode === "question"
+            ? "richEditor questionParagraphMode"
+            : "richEditor normalParagraphMode"
+        }
         contentEditable
         suppressContentEditableWarning
         data-placeholder={placeholder}
         style={{ minHeight }}
         onInput={syncValue}
         onBlur={syncValue}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            document.execCommand("formatBlock", false, "p");
+            document.execCommand("insertParagraph", false);
+            syncValue();
+          }
+        }}
       />
 
       <div className="richEditorHint">
@@ -1659,6 +1675,41 @@ function RichEditor({
           content: attr(data-placeholder);
           color: #8b8b8b;
           pointer-events: none;
+        }
+
+        .normalParagraphMode {
+          text-align: justify;
+          text-justify: inter-word;
+          overflow-wrap: break-word;
+          word-break: normal;
+        }
+
+        .normalParagraphMode :global(p),
+        .normalParagraphMode :global(div) {
+          margin: 0 0 12px;
+          text-align: justify;
+          text-indent: 2em;
+        }
+
+        .questionParagraphMode {
+          text-align: justify;
+          text-justify: inter-word;
+          overflow-wrap: break-word;
+          word-break: normal;
+        }
+
+        .questionParagraphMode :global(p),
+        .questionParagraphMode :global(div) {
+          display: inline;
+          margin: 0;
+          text-align: justify;
+          text-indent: 0;
+        }
+
+        .questionParagraphMode :global(p + p),
+        .questionParagraphMode :global(div + div) {
+          display: block;
+          margin-top: 10px;
         }
 
         .richEditorHint {
@@ -2262,9 +2313,7 @@ export default function KazuslarPage() {
           {questions.map((item, index) => (
             <div className="questionCard" key={item.id}>
               <div className="questionHeader">
-                <h3 className="editorQuestionNumber3D">
-                  {index + 1}-savol
-                </h3>
+                <h3>{index + 1}-savol</h3>
 
                 {questions.length > 1 && (
                   <button
@@ -2493,14 +2542,15 @@ export default function KazuslarPage() {
             {selectedCase.questions.map((item, index) => (
               <div className="viewerQuestionCard" key={item.id}>
                 <div className="viewerQuestion">
-                  <div className="questionNumber3D">
-                    {index + 1}-savol
-                  </div>
+                  <div className="caseNumber3D">{index + 1}-kazus</div>
 
-                  <div
-                    className="richViewerContent viewerQuestionText"
-                    dangerouslySetInnerHTML={{ __html: item.question }}
-                  />
+                  <div className="viewerQuestion3D">
+                    <strong className="questionInlineStrong">Savol matni. </strong>
+                    <div
+                      className="richViewerContent inlineQuestionContent"
+                      dangerouslySetInnerHTML={{ __html: item.question }}
+                    />
+                  </div>
                 </div>
 
                 <div className="viewerAnswer">
@@ -2730,33 +2780,32 @@ export default function KazuslarPage() {
         }
 
         .caseCard {
-          min-height: 280px;
-          padding: 28px 24px;
+          min-height: 300px;
+          padding: 25px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           text-align: center;
-          border: 1px solid #8a8f93;
-          border-radius: 18px;
+          border: 2px solid #3d4347;
+          border-radius: 20px;
           background: linear-gradient(
-            180deg,
-            #f4f4f4 0%,
-            #dddddd 58%,
-            #c7c7c7 100%
+            145deg,
+            #e1e1e1,
+            #c5c5c5 50%,
+            #a6a6a6
           );
           box-shadow:
-            inset 0 4px 5px rgba(255, 255, 255, 0.9),
-            0 4px 0 #6d7478,
-            0 9px 16px rgba(0, 0, 0, 0.18);
+            inset 0 6px 5px rgba(255, 255, 255, 0.86),
+            inset 0 -7px 7px rgba(0, 0, 0, 0.18),
+            0 6px 0 #4a5054,
+            0 11px 16px rgba(0, 0, 0, 0.25);
         }
 
         .caseCard h2 {
           margin: 10px 0 12px;
           font-size: 24px;
-          font-weight: 700;
           line-height: 1.25;
-          color: #111;
         }
 
         .caseType,
@@ -2810,22 +2859,17 @@ export default function KazuslarPage() {
         .subjectBadge {
           margin-top: 0;
           padding: 5px 12px;
-          border: 1px solid #aab7bf;
           background: #edf4f8;
           color: #234b63;
+          border: 1px solid #aab7bf;
           font-size: 13px;
-          font-weight: 700;
           box-shadow: none;
         }
 
         .questionCount {
           margin: 12px 0 18px;
-          padding: 5px 11px;
-          background: #e9ecee;
-          color: #445159;
-          border: 1px solid #c8ced2;
-          font-size: 13px;
-          box-shadow: none;
+          background: #d9dedf;
+          color: #29353c;
         }
 
         .casePreview {
@@ -2932,6 +2976,49 @@ export default function KazuslarPage() {
 
         .questionHeader h3 {
           margin: 0;
+          color: #073b68;
+          font-size: 24px;
+        }
+
+        .caseNumber3D {
+          width: fit-content;
+          min-width: 92px;
+          padding: 6px 15px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #073b68;
+          font-size: 16px;
+          font-weight: 700;
+          border: 2px solid #174461;
+          border-radius: 8px;
+          background: linear-gradient(180deg, #c6edff 0%, #85ccef 48%, #4f9fcf 100%);
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.9),
+            inset 0 -2px 3px rgba(0,0,0,.14),
+            0 4px 0 #17415c,
+            0 7px 10px rgba(0,0,0,.20);
+          text-shadow: 0 1px 0 rgba(255,255,255,.8);
+        }
+
+        .questionEditor3D {
+          margin-top: 4px;
+          padding: 18px;
+          border: 2px solid #62686c;
+          border-radius: 15px;
+          background: linear-gradient(145deg, #f8f8f8, #dddddd);
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.9),
+            inset 0 -4px 5px rgba(0,0,0,.08),
+            0 5px 0 #666d71,
+            0 10px 16px rgba(0,0,0,.18);
+        }
+
+        .questionInlineLabel {
+          margin: 0 0 8px 4px;
+          color: #111;
+          font-size: 19px;
+          font-weight: 700;
         }
 
         .questionTextarea {
@@ -3179,10 +3266,24 @@ export default function KazuslarPage() {
           white-space: normal;
           line-height: 1.75;
           font-size: 18px;
+          text-align: justify;
+          text-justify: inter-word;
+          overflow-wrap: break-word;
+          word-break: normal;
         }
 
         .richViewerContent :global(table) {
           max-width: 100%;
+        }
+
+        .richViewerContent :global(p) {
+          margin: 0 0 12px;
+          text-align: justify;
+          text-indent: 2em;
+        }
+
+        .richViewerContent :global(div) {
+          text-align: justify;
         }
 
         .inlineRich {
@@ -3192,6 +3293,7 @@ export default function KazuslarPage() {
         .inlineRich :global(p) {
           display: inline;
           margin: 0;
+          text-indent: 0;
         }
 
         .viewerQuestions {
@@ -3211,64 +3313,49 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion {
-          padding: 22px;
-          border: 1px solid #d0d0d0;
+          padding: 18px;
           border-radius: 14px;
-          background: #f7f7f7;
+          background: transparent;
           font-size: 19px;
           line-height: 1.6;
-          box-shadow:
-            inset 0 2px 3px rgba(255, 255, 255, 0.9),
-            0 2px 5px rgba(0, 0, 0, 0.08);
         }
 
-        .questionNumber3D,
-        .editorQuestionNumber3D {
-          width: fit-content;
-          min-width: 128px;
-          padding: 10px 24px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-family: "Bell MT", "Times New Roman", serif;
-          font-size: 20px;
+        .viewerQuestion3D {
+          margin-top: 18px;
+          padding: 22px 24px;
+          border: 2px solid #62686c;
+          border-radius: 15px;
+          background: linear-gradient(145deg, #ffffff, #e1e1e1);
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.95),
+            inset 0 -4px 5px rgba(0,0,0,.08),
+            0 5px 0 #666d71,
+            0 10px 16px rgba(0,0,0,.18);
+          text-align: justify;
+          text-justify: inter-word;
+        }
+
+        .questionInlineStrong {
+          display: inline;
           font-weight: 700;
-          color: #073b68;
-          border: 2px solid #174461;
-          border-radius: 10px;
-          background: linear-gradient(
-            180deg,
-            #b9e7ff 0%,
-            #82c9ef 45%,
-            #4d9fd0 100%
-          );
-          box-shadow:
-            inset 0 4px 4px rgba(255, 255, 255, 0.9),
-            inset 0 -3px 4px rgba(0, 0, 0, 0.14),
-            0 5px 0 #17415c,
-            0 8px 12px rgba(0, 0, 0, 0.22);
-          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
         }
 
-        .questionNumber3D {
-          margin: 0 0 20px;
+        .inlineQuestionContent {
+          display: inline;
+          text-align: justify;
         }
 
-        .editorQuestionNumber3D {
+        .inlineQuestionContent :global(p),
+        .inlineQuestionContent :global(div) {
+          display: inline;
           margin: 0;
+          text-indent: 0;
         }
 
-        .viewerQuestionText {
+        .inlineQuestionContent :global(p + p),
+        .inlineQuestionContent :global(div + div) {
           display: block;
-          width: 100%;
-          color: #111;
-          font-family: "Bell MT", "Times New Roman", serif;
-          font-size: 19px;
-          line-height: 1.65;
-        }
-
-        .viewerQuestionText :global(p) {
-          margin: 0;
+          margin-top: 10px;
         }
 
         .viewerAnswer {
@@ -3387,13 +3474,6 @@ export default function KazuslarPage() {
 
           .deleteButton {
             width: 100%;
-          }
-
-          .questionNumber3D,
-          .editorQuestionNumber3D {
-            min-width: 110px;
-            padding: 8px 18px;
-            font-size: 17px;
           }
 
           .addQuestionButton {
