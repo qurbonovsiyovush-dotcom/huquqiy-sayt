@@ -1185,6 +1185,365 @@ function DiagramBuilder({
             border-bottom: 2px solid #777;
           }
         }
+
+        /* =========================================
+           TELEFON — HUJJAT/PDFGA O‘XSHASH O‘QISH
+        ========================================= */
+        @media (max-width: 760px) {
+          .page {
+            width: 100%;
+            min-width: 0;
+            overflow-x: hidden;
+          }
+
+          .topPanel {
+            width: calc(100% - 12px);
+            margin: 6px auto 0;
+            padding: 9px;
+            border-width: 2px;
+            border-radius: 15px;
+          }
+
+          .titlePlate {
+            min-width: 0;
+            width: 100%;
+            padding: 10px 8px;
+            border-width: 2px;
+            border-radius: 11px;
+            font-size: 20px;
+          }
+
+          .backButton {
+            width: 100%;
+            height: 46px;
+            border-width: 2px;
+            border-radius: 10px;
+          }
+
+          .controlBox {
+            width: calc(100% - 16px);
+            margin: 24px auto 0;
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .mainActionButton {
+            min-height: 50px;
+            padding: 8px 10px;
+            border-width: 2px;
+            border-radius: 11px;
+            font-size: 15px;
+            box-shadow:
+              inset 0 4px 4px rgba(255,255,255,.78),
+              0 4px 0 #17415c;
+          }
+
+          .mainBox,
+          .editorBox,
+          .viewerBox {
+            width: calc(100% - 8px);
+            margin: 42px auto 14px;
+            padding: 42px 4px 14px;
+            border-width: 2px;
+            border-radius: 13px;
+          }
+
+          .readingViewerBox {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px 2px 14px;
+            border-radius: 12px;
+          }
+
+          .readingSectionTitle {
+            width: min(190px, 72%);
+            min-width: 0;
+            margin: 0 auto 12px;
+            padding: 7px 12px;
+            border-width: 2px;
+            border-radius: 9px;
+            font-size: 17px;
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.85),
+              0 3px 0 #17415c;
+          }
+
+          .viewerHeader {
+            width: calc(100% - 8px);
+            margin: 0 auto 10px;
+            padding: 11px;
+            display: block;
+            border-width: 2px;
+            border-radius: 11px;
+          }
+
+          .viewerSubject {
+            padding: 5px 10px;
+            font-size: 13px;
+          }
+
+          .viewerHeader h1 {
+            margin-top: 8px;
+            font-size: 22px;
+            line-height: 1.2;
+          }
+
+          .viewerHeaderActions {
+            width: 100%;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: row;
+            gap: 7px;
+          }
+
+          .viewerHeaderActions button {
+            width: 100%;
+            min-width: 0;
+            min-height: 42px;
+            padding: 7px 9px;
+            border-width: 2px;
+            border-radius: 9px;
+            font-size: 13px;
+          }
+
+          .readerToolbar {
+            position: sticky;
+            top: 4px;
+            width: calc(100% - 8px);
+            max-width: none;
+            margin: 0 auto 10px;
+            padding: 6px;
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 5px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            border-width: 2px;
+            border-radius: 10px;
+            scrollbar-width: thin;
+          }
+
+          .readerToolGroup {
+            width: auto;
+            flex: 0 0 auto;
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 5px;
+          }
+
+          .readerToolButton,
+          .readerModeButton {
+            min-width: 38px;
+            min-height: 36px;
+            padding: 5px 8px;
+            border-width: 2px;
+            border-radius: 7px;
+            font-size: 13px;
+            white-space: nowrap;
+            box-shadow: 0 2px 0 #575e62;
+          }
+
+          .readerToolButton {
+            font-size: 18px;
+          }
+
+          .readerZoomValue {
+            min-width: 52px;
+            font-size: 14px;
+          }
+
+          .readerColorControl {
+            min-height: 36px;
+            padding: 4px 7px;
+            border-width: 2px;
+            border-radius: 7px;
+            font-size: 13px;
+            white-space: nowrap;
+          }
+
+          .readerColorControl input {
+            width: 27px;
+            height: 24px;
+          }
+
+          .readerModeStatus {
+            display: none;
+          }
+
+          .readerViewport {
+            width: 100%;
+            max-width: none;
+            min-height: 480px;
+            margin: 0;
+            padding: 7px 3px 24px;
+            overflow-x: hidden;
+            border-width: 2px;
+            border-radius: 9px;
+            background: #202326;
+          }
+
+          .readerPaper {
+            width: calc(100% - 6px) !important;
+            max-width: none;
+            margin: 0 auto;
+            padding: 12px 9px 18px;
+            border-radius: 1px;
+            transform-origin: top center;
+            box-shadow: 0 3px 12px rgba(0,0,0,.28);
+          }
+
+          .readerCaseTextBox {
+            width: 100%;
+            padding: 4px 2px 10px;
+          }
+
+          .caseTextBox h2 {
+            margin: 0 0 10px;
+            font-size: 19px;
+          }
+
+          /*
+            PDF/Word’dan kirgan inline justify/spacing mobil ekranda
+            so‘zlarni uzoqlashtirmasin. Bold/italic/underline/rang saqlanadi.
+          */
+          .readerPaper .richViewerContent,
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div,
+          .readerPaper .richViewerContent span,
+          .readerPaper .richViewerContent li,
+          .readerPaper .richViewerContent blockquote {
+            text-align: left !important;
+            text-align-last: auto !important;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+            white-space: normal !important;
+          }
+
+          .readerPaper .richViewerContent {
+            font-size: 15.5px;
+            line-height: 1.48;
+            overflow-wrap: anywhere;
+            word-break: normal;
+          }
+
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div {
+            margin-top: 0;
+            margin-bottom: 7px;
+          }
+
+          .viewerQuestionsTitle {
+            margin: 14px 0 10px;
+            padding: 8px;
+            font-size: 17px;
+            border-radius: 8px;
+          }
+
+          .viewerQuestions {
+            gap: 12px;
+          }
+
+          .viewerQuestionCard {
+            padding: 5px;
+            border-radius: 10px;
+          }
+
+          .viewerQuestion {
+            padding: 0;
+          }
+
+          .viewerQuestion3D {
+            padding: 8px 8px;
+            border-width: 1.5px;
+            border-radius: 9px;
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.9),
+              0 3px 0 #666d71;
+          }
+
+          .questionNumberInline3D {
+            min-width: 62px;
+            padding: 4px 6px;
+            margin: 0 6px 1px 0;
+            border-width: 1.5px;
+            border-radius: 6px;
+            font-size: 11px;
+            box-shadow:
+              inset 0 2px 2px rgba(255,255,255,.9),
+              0 2px 0 #17415c;
+          }
+
+          .questionFlow,
+          .inlineQuestionContent,
+          .inlineQuestionContent p,
+          .inlineQuestionContent div,
+          .inlineQuestionContent span {
+            font-size: 15px !important;
+            line-height: 1.42 !important;
+            text-align: left !important;
+            text-align-last: auto !important;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+          }
+
+          .viewerAnswer {
+            margin-top: 9px;
+            padding: 10px 8px;
+            border-radius: 9px;
+          }
+
+          .answerLabel {
+            margin-bottom: 7px;
+            font-size: 16px;
+          }
+
+          .caseCardActions {
+            flex-direction: column;
+          }
+
+          .caseCardActions button {
+            width: 100%;
+            min-width: 0;
+          }
+
+          /* Editor telefonning o‘zida ham ekrandan chiqmasin */
+          .formGroup,
+          .questionsBox,
+          .richEditorShell {
+            width: 100%;
+            max-width: 100%;
+          }
+
+          .richToolbar {
+            width: 100%;
+            overflow-x: auto;
+          }
+
+          .toolGroup {
+            min-width: 600px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .readerPaper .richViewerContent {
+            font-size: 14.5px;
+            line-height: 1.45;
+          }
+
+          .questionFlow,
+          .inlineQuestionContent,
+          .inlineQuestionContent p,
+          .inlineQuestionContent div,
+          .inlineQuestionContent span {
+            font-size: 14.5px !important;
+          }
+
+          .viewerHeader h1 {
+            font-size: 20px;
+          }
+        }
+
       `}</style>
     </div>
   );
@@ -2925,6 +3284,7 @@ export default function KazuslarPage() {
 
   const [selectedCase, setSelectedCase] = useState<PlatformCase | null>(null);
   const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
+  const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
 
   const [viewerZoom, setViewerZoom] = useState(100);
   const [viewerMarkerMode, setViewerMarkerMode] =
@@ -3412,6 +3772,89 @@ export default function KazuslarPage() {
     clearViewerSelection();
   }
 
+  async function deleteCase(item: AnyCase) {
+    if (role !== "admin") return;
+
+    const confirmed = window.confirm(
+      `“${item.title}” kazusini butunlay o‘chirmoqchimisiz?\n\nBu amalni ortga qaytarib bo‘lmaydi.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingCaseId(item.id);
+      setCasesError("");
+
+      let response = await fetch(
+        `/api/kazuslar?id=${encodeURIComponent(item.id)}&type=${encodeURIComponent(item.type)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: item.id,
+            type: item.type,
+          }),
+        }
+      );
+
+      // PDF uchun alohida upload route DELETE ishlatilgan loyihalarda fallback.
+      if (!response.ok && item.type === "pdf") {
+        response = await fetch(
+          `/api/kazuslar/upload?id=${encodeURIComponent(item.id)}`,
+          {
+            method: "DELETE",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              id: item.id,
+              type: item.type,
+            }),
+          }
+        );
+      }
+
+      let data: any = null;
+
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(
+          data?.error ||
+            data?.message ||
+            "Kazusni o‘chirib bo‘lmadi. API DELETE route tekshirilishi kerak."
+        );
+      }
+
+      setCases((old) =>
+        old.filter((caseItem) => caseItem.id !== item.id)
+      );
+
+      if (selectedCase?.id === item.id) {
+        setSelectedCase(null);
+        setMode("list");
+      }
+    } catch (error) {
+      console.error("DELETE CASE ERROR:", error);
+
+      setCasesError(
+        error instanceof Error
+          ? error.message
+          : "Kazusni o‘chirishda xatolik."
+      );
+    } finally {
+      setDeletingCaseId(null);
+    }
+  }
+
   async function openCase(item: AnyCase) {
     if (item.type === "pdf") {
       const viewerUrl =
@@ -3611,13 +4054,38 @@ export default function KazuslarPage() {
 
                     <h2>{item.title}</h2>
 
-                    <button
-                      className="openButton"
-                      type="button"
-                      onClick={() => openCase(item)}
-                    >
-                      Ochish
-                    </button>
+                    <div className="caseCardActions">
+                      <button
+                        className="openButton"
+                        type="button"
+                        onClick={() => openCase(item)}
+                      >
+                        Ochish
+                      </button>
+
+                      {!roleLoading && role === "admin" && item.type === "platform" && (
+                        <button
+                          className="cardEditButton"
+                          type="button"
+                          onClick={() => openEditMode(item)}
+                        >
+                          Tahrirlash
+                        </button>
+                      )}
+
+                      {!roleLoading && role === "admin" && (
+                        <button
+                          className="cardDeleteButton"
+                          type="button"
+                          disabled={deletingCaseId === item.id}
+                          onClick={() => deleteCase(item)}
+                        >
+                          {deletingCaseId === item.id
+                            ? "O‘chirilmoqda..."
+                            : "O‘chirish"}
+                        </button>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
@@ -4394,6 +4862,47 @@ export default function KazuslarPage() {
           font-size: 15px;
         }
 
+        .caseCardActions {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .cardEditButton,
+        .cardDeleteButton {
+          min-width: 120px;
+          height: 46px;
+          padding: 0 14px;
+          border-radius: 11px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.8),
+            0 4px 0 rgba(0,0,0,.28);
+        }
+
+        .cardEditButton {
+          color: #073b68;
+          border: 2px solid #174461;
+          background: linear-gradient(#c8edff,#62b3df);
+        }
+
+        .cardDeleteButton {
+          color: #801d1d;
+          border: 2px solid #8c3434;
+          background: linear-gradient(#ffe6e6,#e7a8a8);
+        }
+
+        .cardDeleteButton:disabled {
+          opacity: .55;
+          cursor: wait;
+        }
+
         .openButton {
           width: 175px;
           height: 50px;
@@ -4517,12 +5026,12 @@ export default function KazuslarPage() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-width: 86px;
-          padding: 6px 11px;
-          margin: 0 10px 3px 0;
+          min-width: 76px;
+          padding: 5px 9px;
+          margin: 0 8px 2px 0;
           vertical-align: middle;
           color: #073b68;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 700;
           white-space: nowrap;
           border: 2px solid #174461;
@@ -4797,8 +5306,8 @@ export default function KazuslarPage() {
           position: sticky;
           top: 10px;
           z-index: 60;
-          width: min(1100px, 100%);
-          max-width: 1100px;
+          width: min(1240px, 100%);
+          max-width: 1240px;
           margin: 0 auto 24px;
           padding: 13px 16px;
           display: flex;
@@ -4897,8 +5406,8 @@ export default function KazuslarPage() {
         }
 
         .readerViewport {
-          width: min(1100px, 100%);
-          max-width: 1100px;
+          width: min(1240px, 100%);
+          max-width: 1240px;
           min-height: 700px;
           margin: 0 auto;
           padding: 34px 24px 80px;
@@ -4931,7 +5440,7 @@ export default function KazuslarPage() {
         }
 
         .viewerHeader {
-          max-width: 1100px;
+          max-width: 1240px;
           margin: 0 auto 30px;
           padding: 25px;
           display: flex;
@@ -4991,7 +5500,7 @@ export default function KazuslarPage() {
         }
 
         .caseTextBox {
-          max-width: 1100px;
+          max-width: 1160px;
           margin: 0 auto;
           padding: 30px;
           border: 2px solid #434b50;
@@ -5016,8 +5525,8 @@ export default function KazuslarPage() {
 
         .richViewerContent {
           white-space: normal;
-          line-height: 1.7;
-          font-size: 18px;
+          line-height: 1.62;
+          font-size: 20px;
           text-align: left;
           overflow-wrap: break-word;
           word-break: normal;
@@ -5073,7 +5582,7 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion3D {
-          padding: 13px 16px;
+          padding: 10px 13px;
           border: 2px solid #62686c;
           border-radius: 15px;
           background: linear-gradient(
