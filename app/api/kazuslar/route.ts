@@ -35,6 +35,22 @@ type PlatformCase = {
   updatedAt: string;
 };
 
+type PdfCase = {
+  id: string;
+  type: "pdf";
+  subject: string;
+  title: string;
+  originalFileName: string;
+  fileSize: number;
+  mimeType: string;
+  url: string;
+  pathname: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AnyCase = PlatformCase | PdfCase;
+
 type RawQuestion = {
   id?: unknown;
   question?: unknown;
@@ -70,6 +86,9 @@ type MeResponse = {
 
 const CASES_PREFIX =
   "huquqiy-sayt/kazuslar/";
+
+const PDF_META_PREFIX =
+  "huquqiy-sayt/kazuslar-pdf/meta/";
 
 const NO_CACHE_HEADERS = {
   "Cache-Control":
@@ -525,6 +544,106 @@ async function readAllCases(): Promise<
 }
 
 /* =========================================================
+   PDF KAZUSLAR
+========================================================= */
+
+function normalizePdfCase(value: unknown): PdfCase | null {
+  if (!value || typeof value !== "object") return null;
+
+  const raw = value as Record<string, unknown>;
+  const id = cleanText(raw.id);
+  const subject = cleanText(raw.subject);
+  const title = cleanText(raw.title);
+  const url = cleanText(raw.url);
+  const pathname = cleanText(raw.pathname);
+  const fileSize = Number(raw.fileSize ?? 0);
+
+  if (!id || !subject || !title || !url || !pathname) return null;
+
+  return {
+    id,
+    type: "pdf",
+    subject,
+    title,
+    originalFileName: cleanText(raw.originalFileName),
+    fileSize: Number.isFinite(fileSize) ? fileSize : 0,
+    mimeType: cleanText(raw.mimeType) || "application/pdf",
+    url,
+    pathname,
+    createdAt: cleanText(raw.createdAt),
+    updatedAt: cleanText(raw.updatedAt),
+  };
+}
+
+function getPdfMetaPath(id: string) {
+  return `${PDF_META_PREFIX}${id}.json`;
+}
+
+async function readPdfCase(id: string): Promise<PdfCase | null> {
+  checkBlobToken();
+
+  try {
+    const result = await get(getPdfMetaPath(id), {
+      access: "private",
+    });
+
+    if (!result || result.statusCode !== 200 || !result.stream) return null;
+
+    const text = await new Response(result.stream).text();
+    if (!text.trim()) return null;
+
+    return normalizePdfCase(JSON.parse(text));
+  } catch (error) {
+    console.warn(`PDF kazus o‘qilmadi: ${id}`, error);
+    return null;
+  }
+}
+
+async function readAllPdfCases(): Promise<PdfCase[]> {
+  checkBlobToken();
+
+  const cases: PdfCase[] = [];
+  let cursor: string | undefined = undefined;
+
+  do {
+    const result: {
+      blobs: Array<{ pathname: string }>;
+      hasMore: boolean;
+      cursor?: string;
+    } = await list({
+      prefix: PDF_META_PREFIX,
+      cursor,
+      limit: 100,
+    });
+
+    for (const blob of result.blobs) {
+      if (!blob.pathname.endsWith(".json")) continue;
+
+      const id = blob.pathname
+        .slice(PDF_META_PREFIX.length)
+        .replace(/\.json$/, "");
+
+      if (!id) continue;
+
+      const item = await readPdfCase(id);
+      if (item) cases.push(item);
+    }
+
+    cursor = result.hasMore ? result.cursor : undefined;
+  } while (cursor);
+
+  return cases;
+}
+
+function sortCasesNewestFirst(cases: AnyCase[]) {
+  return cases.sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() -
+      new Date(a.createdAt).getTime()
+  );
+}
+
+/* =========================================================
    VALIDATION
 ========================================================= */
 
@@ -631,8 +750,14 @@ export async function GET(
     if (
       id
     ) {
-      const item =
+      const platformItem =
         await readCase(
+          id
+        );
+
+      const item =
+        platformItem ??
+        await readPdfCase(
           id
         );
 
@@ -675,8 +800,19 @@ export async function GET(
       );
     }
 
+    const [
+      platformCases,
+      pdfCases,
+    ] = await Promise.all([
+      readAllCases(),
+      readAllPdfCases(),
+    ]);
+
     const cases =
-      await readAllCases();
+      sortCasesNewestFirst([
+        ...platformCases,
+        ...pdfCases,
+      ]);
 
     return NextResponse.json(
       {
@@ -685,6 +821,12 @@ export async function GET(
 
         count:
           cases.length,
+
+        platformCount:
+          platformCases.length,
+
+        pdfCount:
+          pdfCases.length,
 
         cases,
       },
