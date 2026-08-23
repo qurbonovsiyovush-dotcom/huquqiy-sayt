@@ -46,9 +46,6 @@ export default function PdfViewerPage({
   const [numPages, setNumPages] =
     useState(0);
 
-  const [currentPage, setCurrentPage] =
-    useState(1);
-
   const [scale, setScale] =
     useState(1.15);
 
@@ -64,6 +61,16 @@ export default function PdfViewerPage({
       encodeURIComponent(id)
     );
   }, [id]);
+
+  const documentOptions = useMemo(
+    () => ({
+      withCredentials: true,
+      httpHeaders: {
+        "Cache-Control": "no-cache",
+      },
+    }),
+    []
+  );
 
   /*
     Admin / user rolini aniqlash.
@@ -287,10 +294,6 @@ export default function PdfViewerPage({
           numPages
         );
 
-        setCurrentPage(
-          1
-        );
-
         setLoadingError(
           ""
         );
@@ -320,25 +323,6 @@ export default function PdfViewerPage({
       "/talabalar/kazuslar";
   }
 
-  function previousPage() {
-    setCurrentPage(
-      (page) =>
-        Math.max(
-          1,
-          page - 1
-        )
-    );
-  }
-
-  function nextPage() {
-    setCurrentPage(
-      (page) =>
-        Math.min(
-          numPages || 1,
-          page + 1
-        )
-    );
-  }
 
   function zoomOut() {
     setScale(
@@ -526,75 +510,13 @@ export default function PdfViewerPage({
         </div>
 
         <div className="toolbar">
-          <button
-            type="button"
-            className="toolButton"
-            onClick={
-              previousPage
-            }
-            disabled={
-              currentPage <= 1
-            }
-          >
-            ←
-          </button>
-
-          <div className="pageCounter">
-            <input
-              value={
-                currentPage
-              }
-              onChange={(
-                event
-              ) => {
-                const value =
-                  Number(
-                    event
-                      .target
-                      .value
-                  );
-
-                if (
-                  Number.isFinite(
-                    value
-                  )
-                ) {
-                  setCurrentPage(
-                    Math.min(
-                      Math.max(
-                        1,
-                        value
-                      ),
-                      numPages ||
-                        1
-                    )
-                  );
-                }
-              }}
-              inputMode="numeric"
-              aria-label="Sahifa"
-            />
-
+          <div className="pageCounter pageCounterStatic">
             <span>
-              /{" "}
-              {numPages ||
-                "..."}
+              {numPages > 0
+                ? `${numPages} ta sahifa`
+                : "Sahifalar yuklanmoqda..."}
             </span>
           </div>
-
-          <button
-            type="button"
-            className="toolButton"
-            onClick={
-              nextPage
-            }
-            disabled={
-              currentPage >=
-              numPages
-            }
-          >
-            →
-          </button>
 
           <div className="divider" />
 
@@ -652,12 +574,7 @@ export default function PdfViewerPage({
           ) : (
             <Document
               file={pdfUrl}
-              options={{
-                withCredentials: true,
-                httpHeaders: {
-                  "Cache-Control": "no-cache",
-                },
-              }}
+              options={documentOptions}
               onLoadSuccess={
                 onDocumentLoadSuccess
               }
@@ -675,30 +592,49 @@ export default function PdfViewerPage({
                 </div>
               }
             >
-              <div className="pageWrapper">
-                <Page
-                  pageNumber={
-                    currentPage
-                  }
-                  scale={
-                    scale
-                  }
+              <div className="pagesColumn">
+                {Array.from(
+                  { length: numPages },
+                  (_, index) => {
+                    const pageNumber =
+                      index + 1;
 
-                  /*
-                    Text layerni o‘chirib qo‘yamiz:
-                    foydalanuvchi PDF matnini belgilay olmaydi.
-                  */
-                  renderTextLayer={
-                    role === "admin"
-                  }
+                    return (
+                      <div
+                        className="pageItem"
+                        key={pageNumber}
+                      >
+                        <div className="pageNumberLabel">
+                          {pageNumber}-sahifa
+                        </div>
 
-                  /*
-                    Annotation/link layer ham oddiy userda o‘chiq.
-                  */
-                  renderAnnotationLayer={
-                    role === "admin"
+                        <div className="pageWrapper">
+                          <Page
+                            pageNumber={
+                              pageNumber
+                            }
+                            scale={
+                              scale
+                            }
+
+                            /*
+                              Oddiy foydalanuvchi PDF matnini
+                              belgilay olmasligi uchun text layer
+                              faqat admin rejimida ishlaydi.
+                            */
+                            renderTextLayer={
+                              role === "admin"
+                            }
+
+                            renderAnnotationLayer={
+                              role === "admin"
+                            }
+                          />
+                        </div>
+                      </div>
+                    );
                   }
-                />
+                )}
               </div>
             </Document>
           )}
@@ -994,6 +930,14 @@ export default function PdfViewerPage({
           font-weight: 700;
         }
 
+        .pageCounterStatic {
+          min-height: 42px;
+          padding: 0 14px;
+          border: 2px solid #555;
+          border-radius: 8px;
+          background: #fff;
+        }
+
         .pageCounter input {
           width: 58px;
           height: 40px;
@@ -1048,9 +992,7 @@ export default function PdfViewerPage({
 
           overflow: auto;
 
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
+          display: block;
 
           border: 3px solid #454c50;
           border-radius: 16px;
@@ -1059,6 +1001,33 @@ export default function PdfViewerPage({
 
           box-shadow:
             inset 0 5px 10px rgba(0,0,0,.55);
+        }
+
+        .pagesColumn {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 34px;
+        }
+
+        .pageItem {
+          width: max-content;
+          max-width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .pageNumberLabel {
+          padding: 7px 16px;
+          border-radius: 18px;
+          background: #dceffd;
+          color: #073b68;
+          font-size: 15px;
+          font-weight: 700;
+          box-shadow: 0 3px 0 rgba(0,0,0,.25);
         }
 
         .pageWrapper {
@@ -1198,6 +1167,15 @@ export default function PdfViewerPage({
           .documentArea {
             min-height: 500px;
             padding: 15px 5px;
+          }
+
+          .pageItem {
+            width: 100%;
+            overflow-x: auto;
+          }
+
+          .pagesColumn {
+            gap: 24px;
           }
         }
       `}</style>
