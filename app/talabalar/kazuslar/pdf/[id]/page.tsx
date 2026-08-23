@@ -32,6 +32,16 @@ type PageProps = {
   }>;
 };
 
+type HighlightRect = {
+  id: string;
+  pageNumber: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+};
+
 export default function PdfViewerPage({
   params,
 }: PageProps) {
@@ -69,6 +79,9 @@ export default function PdfViewerPage({
 
   const [highlightMessage, setHighlightMessage] =
     useState("");
+
+  const [highlights, setHighlights] =
+    useState<HighlightRect[]>([]);
 
   const pdfUrl = useMemo(() => {
     return (
@@ -457,9 +470,9 @@ export default function PdfViewerPage({
     }
   }
 
-  function markerColorWithOpacity(
+  function colorWithOpacity(
     hexColor: string,
-    alpha = 0.42
+    alpha = 0.38
   ) {
     const hex =
       hexColor.replace(
@@ -494,72 +507,196 @@ export default function PdfViewerPage({
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  function wrapTextNodeRange(
-    node: Text,
-    startOffset: number,
-    endOffset: number,
-    color: string
+  function mergeLineRects(
+    rects: DOMRect[]
   ) {
     if (
-      startOffset < 0 ||
-      endOffset > node.length ||
-      startOffset >= endOffset
+      rects.length === 0
     ) {
-      return false;
+      return [];
     }
 
-    const selectedText =
-      node.data.slice(
-        startOffset,
-        endOffset
+    const sorted =
+      [...rects].sort(
+        (a, b) => {
+          const yDiff =
+            a.top - b.top;
+
+          if (
+            Math.abs(yDiff) > 4
+          ) {
+            return yDiff;
+          }
+
+          return (
+            a.left - b.left
+          );
+        }
       );
+
+    const lines:
+      DOMRect[][] = [];
+
+    for (
+      const rect of sorted
+    ) {
+      if (
+        rect.width <= 0 ||
+        rect.height <= 0
+      ) {
+        continue;
+      }
+
+      const lastLine =
+        lines[
+          lines.length - 1
+        ];
+
+      if (
+        !lastLine
+      ) {
+        lines.push([
+          rect,
+        ]);
+
+        continue;
+      }
+
+      const reference =
+        lastLine[0];
+
+      const sameLine =
+        Math.abs(
+          rect.top -
+            reference.top
+        ) <=
+          Math.max(
+            4,
+            reference.height *
+              0.35
+          );
+
+      if (
+        sameLine
+      ) {
+        lastLine.push(
+          rect
+        );
+      } else {
+        lines.push([
+          rect,
+        ]);
+      }
+    }
+
+    return lines.map(
+      (line) => {
+        const left =
+          Math.min(
+            ...line.map(
+              (rect) =>
+                rect.left
+            )
+          );
+
+        const right =
+          Math.max(
+            ...line.map(
+              (rect) =>
+                rect.right
+            )
+          );
+
+        const top =
+          Math.min(
+            ...line.map(
+              (rect) =>
+                rect.top
+            )
+          );
+
+        const bottom =
+          Math.max(
+            ...line.map(
+              (rect) =>
+                rect.bottom
+            )
+          );
+
+        return {
+          left,
+          top,
+          right,
+          bottom,
+          width:
+            right - left,
+          height:
+            bottom - top,
+        };
+      }
+    );
+  }
+
+  function rectsToHighlights(
+    rects: DOMRect[],
+    pageElement: Element,
+    pageNumber: number,
+    color: string
+  ): HighlightRect[] {
+    const pageRect =
+      pageElement.getBoundingClientRect();
 
     if (
-      !selectedText.trim()
+      pageRect.width <= 0 ||
+      pageRect.height <= 0
     ) {
-      return false;
+      return [];
     }
 
-    /*
-      Bir text node ichidagi qismni alohida mark bilan o‘raymiz.
-      Shu sabab tanlov bir nechta span, satr yoki paragrafdan
-      o‘tsa ham surroundContents xatosi chiqmaydi.
-    */
-    const localRange =
-      document.createRange();
+    return mergeLineRects(
+      rects
+    ).map(
+      (rect, index) => ({
+        id:
+          `${Date.now()}-${pageNumber}-${index}-${Math.random()
+            .toString(36)
+            .slice(2, 8)}`,
 
-    localRange.setStart(
-      node,
-      startOffset
+        pageNumber,
+
+        x:
+          ((rect.left -
+            pageRect.left) /
+            pageRect.width) *
+          100,
+
+        y:
+          ((rect.top -
+            pageRect.top) /
+            pageRect.height) *
+          100,
+
+        width:
+          (rect.width /
+            pageRect.width) *
+          100,
+
+        height:
+          (rect.height /
+            pageRect.height) *
+          100,
+
+        color,
+      })
     );
-
-    localRange.setEnd(
-      node,
-      endOffset
-    );
-
-    const mark =
-      document.createElement(
-        "mark"
-      );
-
-    mark.className =
-      "pdfHighlight";
-
-    mark.style.backgroundColor =
-      markerColorWithOpacity(
-        color
-      );
-
-    localRange.surroundContents(
-      mark
-    );
-
-    return true;
   }
 
   function applyHighlight() {
-    if (!highlightMode) return;
+    if (
+      !highlightMode
+    ) {
+      return;
+    }
 
     const selection =
       window.getSelection();
@@ -572,7 +709,7 @@ export default function PdfViewerPage({
       return;
     }
 
-    const sourceRange =
+    const range =
       selection.getRangeAt(0);
 
     const documentArea =
@@ -583,106 +720,115 @@ export default function PdfViewerPage({
     if (
       !documentArea ||
       !documentArea.contains(
-        sourceRange.commonAncestorContainer
+        range.commonAncestorContainer
       )
     ) {
       selection.removeAllRanges();
+
       return;
     }
 
     try {
-      /*
-        PDF.js matnni juda ko‘p span/text node'larga bo‘ladi.
-        Tanlov bilan kesishgan barcha text node'larni oldindan
-        yig‘ib olamiz, keyin ularning har bir qismini alohida
-        markerlaymiz.
-      */
-      const walker =
-        document.createTreeWalker(
-          documentArea,
-          NodeFilter.SHOW_TEXT
+      const pageItems =
+        Array.from(
+          documentArea.querySelectorAll(
+            ".pageItem"
+          )
         );
 
-      const segments: Array<{
-        node: Text;
-        start: number;
-        end: number;
-      }> = [];
+      const newHighlights:
+        HighlightRect[] = [];
 
-      let current =
-        walker.nextNode();
+      for (
+        const pageItem of pageItems
+      ) {
+        const pageNumber =
+          Number(
+            pageItem.getAttribute(
+              "data-page-number"
+            )
+          );
 
-      while (current) {
-        const node =
-          current as Text;
+        if (
+          !Number.isFinite(
+            pageNumber
+          )
+        ) {
+          continue;
+        }
 
-        const parent =
-          node.parentElement;
+        const pageWrapper =
+          pageItem.querySelector(
+            ".pageWrapper"
+          );
 
-        const insideTextLayer =
-          parent?.closest(
+        if (
+          !pageWrapper
+        ) {
+          continue;
+        }
+
+        const textLayer =
+          pageItem.querySelector(
             ".react-pdf__Page__textContent"
           );
 
         if (
-          insideTextLayer &&
-          node.data.length > 0
+          !textLayer
         ) {
-          let intersects =
-            false;
-
-          try {
-            intersects =
-              sourceRange.intersectsNode(
-                node
-              );
-          } catch {
-            intersects =
-              false;
-          }
-
-          if (intersects) {
-            let startOffset = 0;
-            let endOffset =
-              node.length;
-
-            if (
-              node ===
-              sourceRange.startContainer
-            ) {
-              startOffset =
-                sourceRange.startOffset;
-            }
-
-            if (
-              node ===
-              sourceRange.endContainer
-            ) {
-              endOffset =
-                sourceRange.endOffset;
-            }
-
-            if (
-              startOffset <
-              endOffset
-            ) {
-              segments.push({
-                node,
-                start:
-                  startOffset,
-                end:
-                  endOffset,
-              });
-            }
-          }
+          continue;
         }
 
-        current =
-          walker.nextNode();
+        const allRects =
+          Array.from(
+            range.getClientRects()
+          ).filter(
+            (rect) => {
+              const pageRect =
+                pageWrapper.getBoundingClientRect();
+
+              const horizontallyInside =
+                rect.right >
+                  pageRect.left &&
+                rect.left <
+                  pageRect.right;
+
+              const verticallyInside =
+                rect.bottom >
+                  pageRect.top &&
+                rect.top <
+                  pageRect.bottom;
+
+              return (
+                horizontallyInside &&
+                verticallyInside &&
+                rect.width > 0 &&
+                rect.height > 0
+              );
+            }
+          );
+
+        if (
+          allRects.length === 0
+        ) {
+          continue;
+        }
+
+        newHighlights.push(
+          ...rectsToHighlights(
+            allRects,
+            pageWrapper,
+            pageNumber,
+            highlightColor
+          )
+        );
       }
 
+      selection.removeAllRanges();
+
       if (
-        segments.length === 0
+        newHighlights.length ===
+        0
       ) {
         setHighlightMessage(
           "❌ Belgilangan matn topilmadi."
@@ -691,51 +837,23 @@ export default function PdfViewerPage({
         return;
       }
 
-      /*
-        DOM o‘zgarganda keyingi segmentlarning offsetlari buzilmasligi
-        uchun oxiridan boshiga qarab markerlaymiz.
-      */
-      let applied = 0;
+      setHighlights(
+        (old) => [
+          ...old,
+          ...newHighlights,
+        ]
+      );
 
-      for (
-        let index =
-          segments.length - 1;
-        index >= 0;
-        index -= 1
-      ) {
-        const segment =
-          segments[index];
-
-        if (
-          wrapTextNodeRange(
-            segment.node,
-            segment.start,
-            segment.end,
-            highlightColor
-          )
-        ) {
-          applied += 1;
-        }
-      }
-
-      selection.removeAllRanges();
-
-      if (applied > 0) {
-        setHighlightMessage(
-          "✅ Marker qo‘llandi."
-        );
-      } else {
-        setHighlightMessage(
-          "❌ Belgilangan qismda markerlanadigan matn topilmadi."
-        );
-      }
+      setHighlightMessage(
+        "✅ Marker qo‘llandi."
+      );
 
       window.setTimeout(() => {
         setHighlightMessage("");
       }, 1200);
     } catch (error) {
       console.error(
-        "HIGHLIGHT ERROR:",
+        "HIGHLIGHT OVERLAY ERROR:",
         error
       );
 
@@ -753,81 +871,97 @@ export default function PdfViewerPage({
         ".documentArea"
       );
 
-    if (!documentArea) return;
+    if (!documentArea) {
+      return;
+    }
 
     try {
-      const textNodes =
+      const pageItems =
         Array.from(
           documentArea.querySelectorAll(
-            ".react-pdf__Page__textContent span"
+            ".pageItem"
           )
         );
 
-      let applied = 0;
+      const newHighlights:
+        HighlightRect[] = [];
 
       for (
-        const span of textNodes
+        const pageItem of pageItems
       ) {
-        const walker =
-          document.createTreeWalker(
-            span,
-            NodeFilter.SHOW_TEXT
+        const pageNumber =
+          Number(
+            pageItem.getAttribute(
+              "data-page-number"
+            )
           );
 
-        const nodes: Text[] =
-          [];
-
-        let current =
-          walker.nextNode();
-
-        while (current) {
-          nodes.push(
-            current as Text
+        const pageWrapper =
+          pageItem.querySelector(
+            ".pageWrapper"
           );
 
-          current =
-            walker.nextNode();
-        }
+        const textLayer =
+          pageItem.querySelector(
+            ".react-pdf__Page__textContent"
+          );
 
-        /*
-          Shu span ichida ham oxiridan boshlaymiz.
-        */
-        for (
-          let index =
-            nodes.length - 1;
-          index >= 0;
-          index -= 1
+        if (
+          !Number.isFinite(
+            pageNumber
+          ) ||
+          !pageWrapper ||
+          !textLayer
         ) {
-          const node =
-            nodes[index];
-
-          if (
-            node.parentElement?.closest(
-              "mark.pdfHighlight"
-            )
-          ) {
-            continue;
-          }
-
-          if (
-            wrapTextNodeRange(
-              node,
-              0,
-              node.length,
-              highlightColor
-            )
-          ) {
-            applied += 1;
-          }
+          continue;
         }
+
+        const rects =
+          Array.from(
+            textLayer.querySelectorAll(
+              "span"
+            )
+          )
+            .map(
+              (span) =>
+                span.getBoundingClientRect()
+            )
+            .filter(
+              (rect) =>
+                rect.width >
+                  0 &&
+                rect.height >
+                  0
+            );
+
+        newHighlights.push(
+          ...rectsToHighlights(
+            rects,
+            pageWrapper,
+            pageNumber,
+            highlightColor
+          )
+        );
       }
 
-      setPaletteOpen(false);
-      setHighlightMode(true);
-      setEraseHighlightMode(false);
+      setHighlights(
+        newHighlights
+      );
+
+      setPaletteOpen(
+        false
+      );
+
+      setHighlightMode(
+        true
+      );
+
+      setEraseHighlightMode(
+        false
+      );
 
       setHighlightMessage(
-        applied > 0
+        newHighlights.length > 0
           ? "✅ Barcha matn markerlandi."
           : "❌ Markerlanadigan matn topilmadi."
       );
@@ -847,100 +981,41 @@ export default function PdfViewerPage({
     }
   }
 
-  function removeAllHighlights() {
-    const marks =
-      Array.from(
-        document.querySelectorAll(
-          ".documentArea mark.pdfHighlight"
-        )
-      );
-
-    for (
-      const mark of marks
+  function removeHighlightById(
+    id: string
+  ) {
+    if (
+      !eraseHighlightMode
     ) {
-      const parent =
-        mark.parentNode;
-
-      if (!parent) continue;
-
-      while (
-        mark.firstChild
-      ) {
-        parent.insertBefore(
-          mark.firstChild,
-          mark
-        );
-      }
-
-      parent.removeChild(
-        mark
-      );
-
-      parent.normalize();
+      return;
     }
+
+    setHighlights(
+      (old) =>
+        old.filter(
+          (item) =>
+            item.id !== id
+        )
+    );
+
+    setHighlightMessage(
+      "✅ Marker o‘chirildi."
+    );
+
+    window.setTimeout(() => {
+      setHighlightMessage("");
+    }, 1000);
+  }
+
+  function removeAllHighlights() {
+    setHighlights([]);
 
     setPaletteOpen(false);
     setEraseHighlightMode(false);
     setHighlightMode(false);
 
     setHighlightMessage(
-      marks.length > 0
-        ? "✅ Barcha markerlar o‘chirildi."
-        : "Marker topilmadi."
-    );
-
-    window.setTimeout(() => {
-      setHighlightMessage("");
-    }, 1500);
-  }
-
-  function removeHighlight(
-    target: EventTarget | null
-  ) {
-    if (
-      !eraseHighlightMode ||
-      !(target instanceof Element)
-    ) {
-      return;
-    }
-
-    const mark =
-      target.closest(
-        "mark.pdfHighlight"
-      );
-
-    if (
-      !mark
-    ) {
-      return;
-    }
-
-    const parent =
-      mark.parentNode;
-
-    if (
-      !parent
-    ) {
-      return;
-    }
-
-    while (
-      mark.firstChild
-    ) {
-      parent.insertBefore(
-        mark.firstChild,
-        mark
-      );
-    }
-
-    parent.removeChild(
-      mark
-    );
-
-    parent.normalize();
-
-    setHighlightMessage(
-      "✅ Marker o‘chirildi."
+      "✅ Barcha markerlar o‘chirildi."
     );
 
     window.setTimeout(() => {
@@ -1301,15 +1376,6 @@ export default function PdfViewerPage({
               applyHighlight();
             }
           }}
-          onClick={(event) => {
-            if (
-              eraseHighlightMode
-            ) {
-              removeHighlight(
-                event.target
-              );
-            }
-          }}
         >
           {loadingError ? (
             <div className="errorBox">
@@ -1347,6 +1413,9 @@ export default function PdfViewerPage({
                       <div
                         className="pageItem"
                         key={pageNumber}
+                        data-page-number={
+                          pageNumber
+                        }
                       >
                         <div className="pageNumberLabel">
                           {pageNumber}-sahifa
@@ -1360,18 +1429,55 @@ export default function PdfViewerPage({
                             scale={
                               scale
                             }
-
-                            /*
-                              Oddiy foydalanuvchi PDF matnini
-                              belgilay olmasligi uchun text layer
-                              faqat admin rejimida ishlaydi.
-                            */
                             renderTextLayer={true}
-
                             renderAnnotationLayer={
                               role === "admin"
                             }
                           />
+
+                          <div className="highlightOverlay">
+                            {highlights
+                              .filter(
+                                (item) =>
+                                  item.pageNumber ===
+                                  pageNumber
+                              )
+                              .map(
+                                (item) => (
+                                  <button
+                                    key={
+                                      item.id
+                                    }
+                                    type="button"
+                                    className={
+                                      eraseHighlightMode
+                                        ? "overlayHighlight erasable"
+                                        : "overlayHighlight"
+                                    }
+                                    style={{
+                                      left:
+                                        `${item.x}%`,
+                                      top:
+                                        `${item.y}%`,
+                                      width:
+                                        `${item.width}%`,
+                                      height:
+                                        `${item.height}%`,
+                                      background:
+                                        colorWithOpacity(
+                                          item.color
+                                        ),
+                                    }}
+                                    onClick={() =>
+                                      removeHighlightById(
+                                        item.id
+                                      )
+                                    }
+                                    aria-label="Marker"
+                                  />
+                                )
+                              )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1955,6 +2061,7 @@ export default function PdfViewerPage({
         }
 
         .pageWrapper {
+          position: relative;
           display: inline-block;
 
           background: white;
@@ -1966,6 +2073,36 @@ export default function PdfViewerPage({
         .react-pdf__Page__canvas {
           display: block;
           max-width: none !important;
+        }
+
+        .highlightOverlay {
+          position: absolute;
+          inset: 0;
+          z-index: 6;
+          pointer-events: none;
+          overflow: hidden;
+        }
+
+        .overlayHighlight {
+          position: absolute;
+          display: block;
+          padding: 0;
+          margin: 0;
+          border: 0;
+          border-radius: 2px;
+          pointer-events: none;
+          mix-blend-mode: multiply;
+        }
+
+        .overlayHighlight.erasable {
+          pointer-events: auto;
+          cursor: pointer;
+          outline: 2px dashed rgba(180, 40, 40, .45);
+          outline-offset: -1px;
+        }
+
+        .overlayHighlight.erasable:hover {
+          background: rgba(255, 80, 80, .38) !important;
         }
 
         /*
@@ -1991,6 +2128,12 @@ export default function PdfViewerPage({
           pointer-events: none;
           -webkit-user-select: none !important;
           user-select: none !important;
+          color: transparent !important;
+        }
+
+        .adminPage .react-pdf__Page__textContent,
+        .highlightMode .react-pdf__Page__textContent {
+          color: transparent !important;
         }
 
         .highlightMode .react-pdf__Page__textContent {
@@ -2006,32 +2149,6 @@ export default function PdfViewerPage({
           user-select: text !important;
         }
 
-        .pdfHighlight {
-          /*
-            PDF matnining o‘zi canvas ichida chizilgan.
-            Marker text layer ustida turadi, shuning uchun
-            fon yarim shaffof bo‘lishi kerak. Aks holda
-            sariq to‘rtburchak matnni yopib yuboradi.
-          */
-          color: transparent !important;
-          padding: 0 !important;
-          border-radius: 2px;
-
-          mix-blend-mode: multiply;
-
-          box-decoration-break: clone;
-          -webkit-box-decoration-break: clone;
-        }
-
-        .eraseHighlightMode .pdfHighlight {
-          cursor: pointer !important;
-          outline: 2px dashed rgba(180, 40, 40, .55);
-          outline-offset: 1px;
-        }
-
-        .eraseHighlightMode .pdfHighlight:hover {
-          background: rgba(255, 80, 80, .38) !important;
-        }
 
         .loadingBox,
         .errorBox {
