@@ -21,6 +21,22 @@ type PlatformCase = {
   updatedAt: string;
 };
 
+type PdfCase = {
+  id: string;
+  type: "pdf";
+  subject: string;
+  title: string;
+  originalFileName: string;
+  fileSize: number;
+  mimeType: string;
+  url: string;
+  pathname: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type AnyCase = PlatformCase | PdfCase;
+
 type Mode = "list" | "write" | "upload" | "view";
 
 export default function KazuslarPage() {
@@ -29,7 +45,7 @@ export default function KazuslarPage() {
   const [role, setRole] = useState<UserRole>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
-  const [cases, setCases] = useState<PlatformCase[]>([]);
+  const [cases, setCases] = useState<AnyCase[]>([]);
   const [casesLoading, setCasesLoading] = useState(true);
   const [casesError, setCasesError] = useState("");
 
@@ -226,6 +242,8 @@ export default function KazuslarPage() {
       setPdfSubject("");
       setPdfTitle("");
 
+      await loadCases();
+
       window.setTimeout(() => {
         setPdfMessage("");
         setMode("list");
@@ -360,7 +378,12 @@ export default function KazuslarPage() {
     }
   }
 
-  async function openCase(item: PlatformCase) {
+  async function openCase(item: AnyCase) {
+    if (item.type === "pdf") {
+      window.open(item.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     try {
       setSelectedCase(item);
       setMode("view");
@@ -375,7 +398,12 @@ export default function KazuslarPage() {
 
       const data = await response.json();
 
-      if (response.ok && data.success && data.case) {
+      if (
+        response.ok &&
+        data.success &&
+        data.case &&
+        data.case.type === "platform"
+      ) {
         setSelectedCase(data.case);
       }
     } catch (error) {
@@ -389,7 +417,12 @@ export default function KazuslarPage() {
     if (!q) return cases;
 
     return cases.filter((item) => {
-      const text = `${item.subject} ${item.title} ${item.caseText}`
+      const extraText =
+        item.type === "platform"
+          ? item.caseText
+          : item.originalFileName;
+
+      const text = `${item.subject} ${item.title} ${extraText}`
         .toLocaleLowerCase("uz");
 
       return text.includes(q);
@@ -463,29 +496,62 @@ export default function KazuslarPage() {
             ) : (
               <div className="cases">
                 {filteredCases.map((item) => (
-                  <article className="caseCard" key={item.id}>
-                    <div className="caseType">Platformada yozilgan</div>
+                  <article
+                    className={`caseCard ${
+                      item.type === "pdf" ? "pdfCaseCard" : ""
+                    }`}
+                    key={item.id}
+                  >
+                    <div
+                      className={
+                        item.type === "pdf"
+                          ? "caseType pdfCaseType"
+                          : "caseType"
+                      }
+                    >
+                      {item.type === "pdf"
+                        ? "📄 PDF kazus"
+                        : "✍ Platformada yozilgan"}
+                    </div>
 
                     <div className="subjectBadge">{item.subject}</div>
 
                     <h2>{item.title}</h2>
 
-                    <p className="casePreview">
-                      {item.caseText.length > 150
-                        ? `${item.caseText.slice(0, 150)}...`
-                        : item.caseText}
-                    </p>
+                    {item.type === "platform" ? (
+                      <>
+                        <p className="casePreview">
+                          {item.caseText.length > 150
+                            ? `${item.caseText.slice(0, 150)}...`
+                            : item.caseText}
+                        </p>
 
-                    <div className="questionCount">
-                      {item.questions.length} ta savol
-                    </div>
+                        <div className="questionCount">
+                          {item.questions.length} ta savol
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="pdfCardIcon">PDF</div>
+
+                        <p className="casePreview pdfFileName">
+                          {item.originalFileName || "PDF hujjat"}
+                        </p>
+
+                        <div className="questionCount pdfInfo">
+                          {item.fileSize > 0
+                            ? `${(item.fileSize / 1024 / 1024).toFixed(2)} MB`
+                            : "PDF fayl"}
+                        </div>
+                      </>
+                    )}
 
                     <button
                       className="openButton"
                       type="button"
                       onClick={() => openCase(item)}
                     >
-                      Ochish
+                      {item.type === "pdf" ? "PDFni ochish" : "Ochish"}
                     </button>
                   </article>
                 ))}
@@ -1033,6 +1099,40 @@ export default function KazuslarPage() {
         .caseType {
           background: #eaf6ff;
           color: #174461;
+        }
+
+        .pdfCaseCard {
+          border-color: #713232;
+        }
+
+        .pdfCaseType {
+          background: #f9dddd;
+          color: #8a1e1e;
+        }
+
+        .pdfCardIcon {
+          width: 64px;
+          height: 64px;
+          margin: 12px auto 2px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 11px;
+          background: #c92727;
+          color: white;
+          font-size: 17px;
+          font-weight: 700;
+          box-shadow: 0 4px 0 #771515;
+        }
+
+        .pdfFileName {
+          word-break: break-word;
+          font-weight: 700;
+        }
+
+        .pdfInfo {
+          background: #f1dede;
+          color: #6e2525;
         }
 
         .subjectBadge {
