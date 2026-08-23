@@ -1544,6 +1544,224 @@ function DiagramBuilder({
           }
         }
 
+
+        /* =====================================================
+           MOBILE LIST — universitet mobil sahifasiga yaqin tartib
+        ===================================================== */
+        @media (max-width: 760px) {
+          .mainBox {
+            background: #eeeeee;
+            border: 0;
+            box-shadow: none;
+            padding: 50px 12px 22px;
+          }
+
+          .mainBox .sectionTitle {
+            border-width: 1.5px;
+            border-radius: 10px;
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.8),
+              0 3px 0 #17415c;
+          }
+
+          .searchRow {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 9px;
+            margin-bottom: 16px;
+          }
+
+          .searchInput {
+            width: 100%;
+            min-width: 0;
+            height: 46px;
+            font-size: 14px;
+            border-radius: 11px;
+          }
+
+          .refreshButton {
+            width: 100%;
+            height: 44px;
+            border-radius: 10px;
+          }
+
+          .casesGrid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+
+          .caseCard {
+            min-height: 210px;
+            padding: 16px 10px 14px;
+            gap: 14px;
+            border: 0;
+            border-radius: 14px;
+            background: #fff;
+            box-shadow:
+              0 2px 7px rgba(0,0,0,.10);
+          }
+
+          .caseCard h2 {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.25;
+            text-align: center;
+          }
+
+          .subjectBadge {
+            max-width: 100%;
+            padding: 5px 9px;
+            border-width: 1.5px;
+            border-radius: 999px;
+            font-size: 11px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.15;
+            box-shadow:
+              inset 0 2px 2px rgba(255,255,255,.85),
+              0 2px 0 #17415c;
+          }
+
+          .caseAdminActions {
+            gap: 6px;
+          }
+
+          .cardEditButton,
+          .cardDeleteButton {
+            flex: 1 1 0;
+            min-width: 0;
+            height: 30px;
+            padding: 0 6px;
+            font-size: 10.5px;
+            border-radius: 7px;
+          }
+
+          .caseCardActions .openButton {
+            width: 100%;
+            max-width: none;
+            height: 38px;
+            font-size: 13px;
+            border-width: 2px;
+            border-radius: 9px;
+          }
+        }
+
+        @media (max-width: 390px) {
+          .casesGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .caseCard {
+            min-height: 190px;
+          }
+        }
+
+        /* =====================================================
+           MOBILE READER — elektron kutubxona/PDF ko‘rinishi
+        ===================================================== */
+        @media (max-width: 760px) {
+          .readingViewerBox {
+            width: 100%;
+            padding: 8px 0 12px;
+            margin: 0;
+            border: 0;
+            border-radius: 0;
+            background: #1f1f1f;
+            box-shadow: none;
+          }
+
+          .readingSectionTitle {
+            width: min(190px, 70%);
+            margin: 6px auto 10px;
+          }
+
+          .viewerHeader {
+            width: calc(100% - 16px);
+            margin: 0 auto 8px;
+            padding: 10px 12px;
+            border-radius: 11px;
+          }
+
+          .readerToolbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            width: 100%;
+            margin: 0;
+            padding: 6px 8px;
+            border-radius: 0;
+            border-left: 0;
+            border-right: 0;
+            background: linear-gradient(#fafafa,#d6d6d6);
+          }
+
+          .readerViewport {
+            width: 100%;
+            margin: 0;
+            padding: 7px 4px 20px;
+            border: 0;
+            border-radius: 0;
+            background: #1f1f1f;
+          }
+
+          .readerPaper {
+            width: calc(100% - 10px) !important;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 18px 14px 24px;
+            background: #fff;
+            box-shadow: 0 0 0 1px rgba(0,0,0,.18);
+          }
+
+          .readerCaseTextBox {
+            padding: 0;
+            border: 0;
+            background: #fff;
+          }
+
+          .readerPaper .richViewerContent,
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div,
+          .readerPaper .richViewerContent li,
+          .readerPaper .richViewerContent blockquote {
+            text-align: justify !important;
+            text-align-last: auto !important;
+            text-justify: inter-word;
+            letter-spacing: normal !important;
+            word-spacing: normal !important;
+          }
+
+          .readerPaper .richViewerContent {
+            font-size: 15px;
+            line-height: 1.42;
+            color: #111;
+          }
+
+          .readerPaper .richViewerContent p,
+          .readerPaper .richViewerContent div {
+            margin: 0 0 7px;
+          }
+
+          .viewerQuestion3D {
+            background: #f2f2f2;
+          }
+
+          .questionFlow,
+          .inlineQuestionContent,
+          .inlineQuestionContent p,
+          .inlineQuestionContent div,
+          .inlineQuestionContent span {
+            text-align: left !important;
+            word-spacing: normal !important;
+            letter-spacing: normal !important;
+          }
+
+          .viewerAnswer {
+            background: #eef7ff;
+          }
+        }
+
       `}</style>
     </div>
   );
@@ -4055,6 +4273,31 @@ export default function KazuslarPage() {
                     <h2>{item.title}</h2>
 
                     <div className="caseCardActions">
+                      {!roleLoading && role === "admin" && (
+                        <div className="caseAdminActions">
+                          {item.type === "platform" && (
+                            <button
+                              className="cardEditButton"
+                              type="button"
+                              onClick={() => openEditMode(item)}
+                            >
+                              Tahrirlash
+                            </button>
+                          )}
+
+                          <button
+                            className="cardDeleteButton"
+                            type="button"
+                            disabled={deletingCaseId === item.id}
+                            onClick={() => deleteCase(item)}
+                          >
+                            {deletingCaseId === item.id
+                              ? "O‘chirilmoqda..."
+                              : "O‘chirish"}
+                          </button>
+                        </div>
+                      )}
+
                       <button
                         className="openButton"
                         type="button"
@@ -4062,29 +4305,6 @@ export default function KazuslarPage() {
                       >
                         Ochish
                       </button>
-
-                      {!roleLoading && role === "admin" && item.type === "platform" && (
-                        <button
-                          className="cardEditButton"
-                          type="button"
-                          onClick={() => openEditMode(item)}
-                        >
-                          Tahrirlash
-                        </button>
-                      )}
-
-                      {!roleLoading && role === "admin" && (
-                        <button
-                          className="cardDeleteButton"
-                          type="button"
-                          disabled={deletingCaseId === item.id}
-                          onClick={() => deleteCase(item)}
-                        >
-                          {deletingCaseId === item.id
-                            ? "O‘chirilmoqda..."
-                            : "O‘chirish"}
-                        </button>
-                      )}
                     </div>
                   </article>
                 ))}
@@ -4865,25 +5085,30 @@ export default function KazuslarPage() {
         .caseCardActions {
           width: 100%;
           display: flex;
-          align-items: center;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 12px;
+        }
+
+        .caseAdminActions {
+          display: flex;
           justify-content: center;
-          flex-wrap: wrap;
-          gap: 10px;
+          gap: 8px;
         }
 
         .cardEditButton,
         .cardDeleteButton {
-          min-width: 120px;
-          height: 46px;
-          padding: 0 14px;
-          border-radius: 11px;
+          min-width: 92px;
+          height: 34px;
+          padding: 0 11px;
+          border-radius: 8px;
           cursor: pointer;
           font-family: inherit;
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 700;
           box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.8),
-            0 4px 0 rgba(0,0,0,.28);
+            inset 0 2px 2px rgba(255,255,255,.78),
+            0 3px 0 rgba(0,0,0,.25);
         }
 
         .cardEditButton {
@@ -4893,14 +5118,20 @@ export default function KazuslarPage() {
         }
 
         .cardDeleteButton {
-          color: #801d1d;
-          border: 2px solid #8c3434;
-          background: linear-gradient(#ffe6e6,#e7a8a8);
+          color: #000;
+          border: 2px solid #a22626;
+          background: linear-gradient(#ffd8d8,#ef8585);
         }
 
         .cardDeleteButton:disabled {
           opacity: .55;
           cursor: wait;
+        }
+
+        .caseCardActions .openButton {
+          width: 100%;
+          max-width: 230px;
+          margin: 0 auto;
         }
 
         .openButton {
