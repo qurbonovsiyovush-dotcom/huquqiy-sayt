@@ -122,6 +122,8 @@ function DiagramBuilder({
   const [selectedId, setSelectedId] =
     useState<string | null>("root");
 
+  const [diagramCaption, setDiagramCaption] = useState("");
+
   const [dragState, setDragState] =
     useState<{
       id: string;
@@ -288,7 +290,9 @@ function DiagramBuilder({
         node.id === selectedId
     ) ?? null;
 
-  function addNode() {
+  function addNode(
+    direction: "right" | "below" = "right"
+  ) {
     const parentId =
       selectedId ??
       "root";
@@ -299,6 +303,60 @@ function DiagramBuilder({
           node.id === parentId
       ) ?? nodes[0];
 
+    const siblings =
+      nodes.filter(
+        (node) =>
+          node.parentId === parent.id
+      );
+
+    const id =
+      `node-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 7)}`;
+
+    let x =
+      parent.x +
+      parent.width +
+      110;
+
+    let y =
+      parent.y +
+      siblings.length * 96;
+
+    if (direction === "below") {
+      x = parent.x;
+      y =
+        parent.y +
+        parent.height +
+        55 +
+        siblings.filter(
+          (node) =>
+            node.x === parent.x
+        ).length *
+          90;
+    }
+
+    setNodes((old) => [
+      ...old,
+      {
+        id,
+        text: "Yangi blok",
+        x,
+        y,
+        width: 240,
+        height: 76,
+        color: "#d9eaf7",
+        parentId:
+          parent.id,
+      },
+    ]);
+
+    setSelectedId(id);
+  }
+
+  function duplicateSelected() {
+    if (!selected) return;
+
     const id =
       `node-${Date.now()}-${Math.random()
         .toString(36)
@@ -307,20 +365,11 @@ function DiagramBuilder({
     setNodes((old) => [
       ...old,
       {
+        ...selected,
         id,
-        text: "Yangi blok",
-        x:
-          parent.x +
-          parent.width +
-          110,
-        y:
-          parent.y +
-          old.length * 18,
-        width: 240,
-        height: 76,
-        color: "#d9eaf7",
-        parentId:
-          parent.id,
+        x: selected.x + 35,
+        y: selected.y + 35,
+        text: `${selected.text}`,
       },
     ]);
 
@@ -473,7 +522,7 @@ function DiagramBuilder({
         .join("");
 
     return `
-      <div style="
+      <div data-editor-object="diagram" style="
         position:relative;
         width:100%;
         min-width:${Math.min(maxX, 1200)}px;
@@ -491,6 +540,14 @@ function DiagramBuilder({
 
         ${boxes}
       </div>
+      ${
+        diagramCaption.trim()
+          ? `<p style="margin:14px 0 0;text-align:justify;text-indent:2em;font-size:18px;line-height:1.6;">${diagramCaption
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")}</p>`
+          : ""
+      }
       <p><br></p>
     `;
   }
@@ -531,19 +588,24 @@ function DiagramBuilder({
         <div className="diagramToolbar">
           <button
             type="button"
-            onClick={addNode}
+            onClick={() => addNode("right")}
           >
-            + Yangi to‘rtburchak
+            + Yoniga blok
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              setSelectedId("root");
-              addNode();
-            }}
+            onClick={() => addNode("below")}
           >
-            + Qo‘shimcha shakl
+            + Pastiga blok
+          </button>
+
+          <button
+            type="button"
+            onClick={duplicateSelected}
+            disabled={!selected}
+          >
+            Nusxalash
           </button>
 
           <button
@@ -666,6 +728,17 @@ function DiagramBuilder({
                     />
                   </label>
                 </div>
+
+                <label className="captionLabel">
+                  Diagramma tagidagi matn
+                  <textarea
+                    value={diagramCaption}
+                    onChange={(e) =>
+                      setDiagramCaption(e.target.value)
+                    }
+                    placeholder="Diagrammadan keyin chiqadigan izoh yoki davomiy matn..."
+                  />
+                </label>
               </>
             ) : (
               <p>
@@ -966,6 +1039,16 @@ function DiagramBuilder({
           gap: 8px;
         }
 
+        .captionLabel {
+          margin-top: 14px;
+          padding-top: 12px;
+          border-top: 1px solid #aaa;
+        }
+
+        .captionLabel textarea {
+          min-height: 110px;
+        }
+
         .diagramCanvasWrap {
           overflow: auto;
           padding: 20px;
@@ -1129,12 +1212,72 @@ function RichEditor({
     syncValue();
   }
 
+  function getSelectedEditorObject() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+
+    if (
+      !editor ||
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return null;
+    }
+
+    let node: Node | null = selection.anchorNode;
+
+    if (node?.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      return null;
+    }
+
+    const object =
+      node.closest<HTMLElement>("[data-editor-object]");
+
+    if (!object || !editor.contains(object)) {
+      return null;
+    }
+
+    return object;
+  }
+
+  function deleteSelectedObject() {
+    const object = getSelectedEditorObject();
+
+    if (!object) {
+      alert("Avval jadval, shakl yoki diagramma ichini bosing.");
+      return;
+    }
+
+    object.remove();
+    syncValue();
+  }
+
+  function duplicateSelectedObject() {
+    const object = getSelectedEditorObject();
+
+    if (!object) {
+      alert("Avval jadval, shakl yoki diagramma ichini bosing.");
+      return;
+    }
+
+    const clone = object.cloneNode(true);
+    object.insertAdjacentElement(
+      "afterend",
+      clone as HTMLElement
+    );
+    syncValue();
+  }
+
   function insertTable() {
     const rows = Math.min(Math.max(Number(tableRows) || 1, 1), 20);
     const cols = Math.min(Math.max(Number(tableCols) || 1, 1), 10);
 
     let html = `
-      <div style="margin:16px 0;overflow-x:auto;">
+      <div data-editor-object="table" style="margin:16px 0;overflow:auto;resize:both;min-width:260px;min-height:90px;border:1px dashed #7a7a7a;padding:5px;">
         <table style="width:100%;border-collapse:collapse;background:#fff;">
     `;
 
@@ -1160,17 +1303,17 @@ function RichEditor({
 
   function insertShape(kind: string) {
     const common =
-      "display:inline-flex;align-items:center;justify-content:center;min-width:150px;min-height:70px;padding:14px 20px;margin:12px;border:2px solid #174461;font-weight:700;text-align:center;";
+      "display:inline-flex;align-items:center;justify-content:center;min-width:150px;min-height:70px;padding:14px 20px;margin:12px;border:2px solid #174461;font-weight:700;text-align:center;resize:both;overflow:auto;";
 
     const shapes: Record<string, string> = {
-      box: `<div style="${common}border-radius:14px;background:#dceffd;color:#073b68;">2D blok</div><p><br></p>`,
-      circle: `<div style="${common}width:130px;height:130px;min-width:130px;min-height:130px;border-radius:50%;background:#eaf6ff;color:#073b68;">Doira</div><p><br></p>`,
-      note: `<div style="${common}border-radius:10px;background:#fff4a8;color:#503f00;border-color:#9f8200;">Eslatma</div><p><br></p>`,
-      block3d: `<div style="${common}border-radius:14px;background:linear-gradient(145deg,#9bd9ff,#4e9ccc);color:#073b68;box-shadow:8px 8px 0 #17415c,14px 14px 18px rgba(0,0,0,.28);">3D blok</div><p><br></p>`,
-      card3d: `<div style="${common}border-radius:18px;background:linear-gradient(145deg,#eeeeee,#a7a7a7);color:#111;box-shadow:inset 0 5px 5px rgba(255,255,255,.8),0 8px 0 #555,0 14px 20px rgba(0,0,0,.3);">3D kartochka</div><p><br></p>`,
-      arrow: `<div style="${common}border:none;background:transparent;color:#174461;font-size:34px;min-width:210px;">BOSQICH 1&nbsp;&nbsp;➜&nbsp;&nbsp;BOSQICH 2</div><p><br></p>`,
-      timeline: `<div style="margin:18px 0;padding:18px;border-radius:14px;background:#eef6fb;border:2px solid #174461;"><b>1-bosqich</b> ━━━ ➜ <b>2-bosqich</b> ━━━ ➜ <b>3-bosqich</b></div><p><br></p>`,
-      four: `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0;">
+      box: `<div data-editor-object="shape" style="${common}border-radius:14px;background:#dceffd;color:#073b68;">2D blok</div><p><br></p>`,
+      circle: `<div data-editor-object="shape" style="${common}width:130px;height:130px;min-width:130px;min-height:130px;border-radius:50%;background:#eaf6ff;color:#073b68;">Doira</div><p><br></p>`,
+      note: `<div data-editor-object="shape" style="${common}border-radius:10px;background:#fff4a8;color:#503f00;border-color:#9f8200;">Eslatma</div><p><br></p>`,
+      block3d: `<div data-editor-object="shape" style="${common}border-radius:14px;background:linear-gradient(145deg,#9bd9ff,#4e9ccc);color:#073b68;box-shadow:8px 8px 0 #17415c,14px 14px 18px rgba(0,0,0,.28);">3D blok</div><p><br></p>`,
+      card3d: `<div data-editor-object="shape" style="${common}border-radius:18px;background:linear-gradient(145deg,#eeeeee,#a7a7a7);color:#111;box-shadow:inset 0 5px 5px rgba(255,255,255,.8),0 8px 0 #555,0 14px 20px rgba(0,0,0,.3);">3D kartochka</div><p><br></p>`,
+      arrow: `<div data-editor-object="shape" style="${common}border:none;background:transparent;color:#174461;font-size:34px;min-width:210px;">BOSQICH 1&nbsp;&nbsp;➜&nbsp;&nbsp;BOSQICH 2</div><p><br></p>`,
+      timeline: `<div data-editor-object="shape" style="margin:18px 0;padding:18px;border-radius:14px;background:#eef6fb;border:2px solid #174461;"><b>1-bosqich</b> ━━━ ➜ <b>2-bosqich</b> ━━━ ➜ <b>3-bosqich</b></div><p><br></p>`,
+      four: `<div data-editor-object="shape" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0;">
         <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>1. Subyekt</b><br>Matn</div>
         <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>2. Obyekt</b><br>Matn</div>
         <div style="padding:18px;border-radius:14px;background:#dceffd;border:2px solid #174461;box-shadow:5px 5px 0 #17415c;"><b>3. Subyektiv tomon</b><br>Matn</div>
@@ -1220,233 +1363,229 @@ function RichEditor({
       )}
 
       <div className="richToolbar">
-        <select
-          defaultValue="3"
-          title="Yozuv o‘lchami"
-          onChange={(e) => runCommand("fontSize", e.target.value)}
-        >
-          <option value="1">10</option>
-          <option value="2">12</option>
-          <option value="3">14</option>
-          <option value="4">18</option>
-          <option value="5">24</option>
-          <option value="6">32</option>
-          <option value="7">48</option>
-        </select>
+        <div className="toolGroup textGroup">
+          <span className="toolGroupTitle">Matn</span>
 
-        <select
-          defaultValue="Bell MT"
-          title="Shrift"
-          onChange={(e) => runCommand("fontName", e.target.value)}
-        >
-          <option>Bell MT</option>
-          <option>Times New Roman</option>
-          <option>Arial</option>
-          <option>Calibri</option>
-          <option>Georgia</option>
-          <option>Verdana</option>
-        </select>
-
-        <button type="button" title="Qalin" onMouseDown={(e) => { e.preventDefault(); runCommand("bold"); }}>
-          <b>B</b>
-        </button>
-
-        <button type="button" title="Kursiv" onMouseDown={(e) => { e.preventDefault(); runCommand("italic"); }}>
-          <i>I</i>
-        </button>
-
-        <button type="button" title="Tagiga chizish" onMouseDown={(e) => { e.preventDefault(); runCommand("underline"); }}>
-          <u>U</u>
-        </button>
-
-        <button type="button" title="Ustidan chizish" onMouseDown={(e) => { e.preventDefault(); runCommand("strikeThrough"); }}>
-          <s>S</s>
-        </button>
-
-        <button type="button" title="Chapga" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyLeft"); }}>
-          ≡←
-        </button>
-
-        <button type="button" title="Markazga" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyCenter"); }}>
-          ≡
-        </button>
-
-        <button type="button" title="O‘ngga" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyRight"); }}>
-          →≡
-        </button>
-
-        <button type="button" title="Ikki tomonga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyFull"); }}>
-          ☰
-        </button>
-
-        <button type="button" title="Raqamli ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertOrderedList"); }}>
-          1.
-        </button>
-
-        <button type="button" title="Belgili ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertUnorderedList"); }}>
-          •
-        </button>
-
-        <button type="button" title="Chapdan surish" onMouseDown={(e) => { e.preventDefault(); runCommand("outdent"); }}>
-          ⇤
-        </button>
-
-        <button type="button" title="Ichkariga surish" onMouseDown={(e) => { e.preventDefault(); runCommand("indent"); }}>
-          ⇥
-        </button>
-
-        <button type="button" title="Bekor qilish" onMouseDown={(e) => { e.preventDefault(); runCommand("undo"); }}>
-          ↶
-        </button>
-
-        <button type="button" title="Qaytarish" onMouseDown={(e) => { e.preventDefault(); runCommand("redo"); }}>
-          ↷
-        </button>
-
-        <div className="toolDrop">
-          <button
-            type="button"
-            title="Ranglar"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setShowColors((old) => !old)}
+          <select
+            defaultValue="Bell MT"
+            title="Shrift"
+            onChange={(e) => runCommand("fontName", e.target.value)}
           >
-            🎨 Rang
-          </button>
+            <option>Bell MT</option>
+            <option>Times New Roman</option>
+            <option>Arial</option>
+            <option>Calibri</option>
+            <option>Georgia</option>
+            <option>Verdana</option>
+          </select>
 
-          {showColors && (
-            <div className="colorPopup">
-              <div className="popupLabel">Matn rangi</div>
-              <div className="colorGrid">
-                {colors.map((color) => (
-                  <button
-                    key={`text-${color}`}
-                    type="button"
-                    className="colorSwatch"
-                    style={{ background: color }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      runCommand("foreColor", color);
-                      setShowColors(false);
-                    }}
-                  />
-                ))}
+          <select
+            defaultValue="3"
+            title="Yozuv o‘lchami"
+            onChange={(e) => runCommand("fontSize", e.target.value)}
+          >
+            <option value="1">10</option>
+            <option value="2">12</option>
+            <option value="3">14</option>
+            <option value="4">18</option>
+            <option value="5">24</option>
+            <option value="6">32</option>
+            <option value="7">48</option>
+          </select>
+
+          <button type="button" title="Qalin" onMouseDown={(e) => { e.preventDefault(); runCommand("bold"); }}><b>B</b></button>
+          <button type="button" title="Kursiv" onMouseDown={(e) => { e.preventDefault(); runCommand("italic"); }}><i>I</i></button>
+          <button type="button" title="Tagiga chizish" onMouseDown={(e) => { e.preventDefault(); runCommand("underline"); }}><u>U</u></button>
+          <button type="button" title="Ustidan chizish" onMouseDown={(e) => { e.preventDefault(); runCommand("strikeThrough"); }}><s>S</s></button>
+
+          <div className="toolDrop">
+            <button
+              type="button"
+              title="Matn va marker ranglari"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setShowColors((old) => !old)}
+            >
+              🎨 Rang / Marker
+            </button>
+
+            {showColors && (
+              <div className="colorPopup">
+                <div className="popupLabel">Matn rangi</div>
+                <div className="colorGrid">
+                  {colors.map((color) => (
+                    <button
+                      key={`text-${color}`}
+                      type="button"
+                      className="colorSwatch"
+                      style={{ background: color }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        runCommand("foreColor", color);
+                        setShowColors(false);
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div className="popupLabel">Marker</div>
+                <div className="colorGrid">
+                  {highlights.map((color) => (
+                    <button
+                      key={`hilite-${color}`}
+                      type="button"
+                      className="colorSwatch"
+                      style={{ background: color }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        runCommand("hiliteColor", color);
+                        setShowColors(false);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
+            )}
+          </div>
+        </div>
 
-              <div className="popupLabel">Marker</div>
-              <div className="colorGrid">
-                {highlights.map((color) => (
-                  <button
-                    key={`hilite-${color}`}
-                    type="button"
-                    className="colorSwatch"
-                    style={{ background: color }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      runCommand("hiliteColor", color);
-                      setShowColors(false);
-                    }}
+        <div className="toolGroup paragraphGroup">
+          <span className="toolGroupTitle">Abzas</span>
+          <button type="button" title="Chapga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyLeft"); }}>Chap</button>
+          <button type="button" title="Markazga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyCenter"); }}>Markaz</button>
+          <button type="button" title="O‘ngga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyRight"); }}>O‘ng</button>
+          <button type="button" title="Ikki tomonga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyFull"); }}>Justify</button>
+          <button type="button" title="Raqamli ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertOrderedList"); }}>1. Ro‘yxat</button>
+          <button type="button" title="Belgili ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertUnorderedList"); }}>• Ro‘yxat</button>
+          <button type="button" title="Abzasni kamaytirish" onMouseDown={(e) => { e.preventDefault(); runCommand("outdent"); }}>← Abzas</button>
+          <button type="button" title="Abzasni oshirish" onMouseDown={(e) => { e.preventDefault(); runCommand("indent"); }}>Abzas →</button>
+          <button type="button" title="Bekor qilish" onMouseDown={(e) => { e.preventDefault(); runCommand("undo"); }}>↶ Undo</button>
+          <button type="button" title="Qaytarish" onMouseDown={(e) => { e.preventDefault(); runCommand("redo"); }}>↷ Redo</button>
+        </div>
+
+        <div className="toolGroup insertGroup">
+          <span className="toolGroupTitle">Qo‘shish</span>
+
+          <div className="toolDrop">
+            <button
+              type="button"
+              className="insertToolButton"
+              title="Jadval qo‘shish"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setShowTable((old) => !old)}
+            >
+              ▦ Jadval
+            </button>
+
+            {showTable && (
+              <div className="tablePopup">
+                <label>
+                  Qator
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={tableRows}
+                    onChange={(e) => setTableRows(Number(e.target.value))}
                   />
-                ))}
+                </label>
+
+                <label>
+                  Ustun
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={tableCols}
+                    onChange={(e) => setTableCols(Number(e.target.value))}
+                  />
+                </label>
+
+                <button type="button" className="insertTableButton" onClick={insertTable}>
+                  Jadvalni qo‘shish
+                </button>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="toolDrop">
+          <div className="toolDrop">
+            <button
+              type="button"
+              className="insertToolButton"
+              title="Shakl yoki 3D element qo‘shish"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setShowShapes((old) => !old)}
+            >
+              ◈ Shakl / 3D
+            </button>
+
+            {showShapes && (
+              <div className="shapePopup">
+                <button type="button" onClick={() => insertShape("box")}>▭ 2D blok</button>
+                <button type="button" onClick={() => insertShape("circle")}>◯ Doira</button>
+                <button type="button" onClick={() => insertShape("note")}>▰ Eslatma</button>
+                <button type="button" onClick={() => insertShape("block3d")}>◈ 3D blok</button>
+                <button type="button" onClick={() => insertShape("card3d")}>▣ 3D kartochka</button>
+                <button type="button" onClick={() => insertShape("arrow")}>➜ Strelka</button>
+                <button type="button" onClick={() => insertShape("timeline")}>━━➜ Timeline</button>
+                <button type="button" onClick={() => insertShape("four")}>⊞ To‘rtburchak bloklar</button>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
-            title="Jadval qo‘shish"
+            className="insertToolButton"
+            title="Tarmoqlanuvchi diagramma"
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setShowTable((old) => !old)}
+            onClick={() => setShowDiagramBuilder(true)}
           >
-            ▦ Jadval
+            ⤴ Diagramma
           </button>
 
-          {showTable && (
-            <div className="tablePopup">
-              <label>
-                Qator
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={tableRows}
-                  onChange={(e) => setTableRows(Number(e.target.value))}
-                />
-              </label>
-
-              <label>
-                Ustun
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={tableCols}
-                  onChange={(e) => setTableCols(Number(e.target.value))}
-                />
-              </label>
-
-              <button type="button" className="insertTableButton" onClick={insertTable}>
-                Jadvalni qo‘shish
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="toolDrop">
           <button
             type="button"
-            title="Shakllar"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setShowShapes((old) => !old)}
+            className="insertToolButton"
+            title="Gorizontal chiziq"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              insertHtml('<hr style="margin:18px 0;border:none;border-top:2px solid #555;"><p><br></p>');
+            }}
           >
-            ◈ Shakl / 3D
+            ━ Chiziq
           </button>
-
-          {showShapes && (
-            <div className="shapePopup">
-              <button type="button" onClick={() => insertShape("box")}>▭ 2D blok</button>
-              <button type="button" onClick={() => insertShape("circle")}>◯ Doira</button>
-              <button type="button" onClick={() => insertShape("note")}>▰ Eslatma</button>
-              <button type="button" onClick={() => insertShape("block3d")}>◈ 3D blok</button>
-              <button type="button" onClick={() => insertShape("card3d")}>▣ 3D kartochka</button>
-              <button type="button" onClick={() => insertShape("arrow")}>➜ Strelka</button>
-              <button type="button" onClick={() => insertShape("timeline")}>━━➜ Timeline</button>
-              <button type="button" onClick={() => insertShape("four")}>⊞ To‘rtburchak bloklar</button>
-            </div>
-          )}
         </div>
 
-        <button
-          type="button"
-          title="Tarmoqlanuvchi diagramma yaratish"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => setShowDiagramBuilder(true)}
-        >
-          ⤴ Diagramma
-        </button>
+        <div className="toolGroup objectGroup">
+          <span className="toolGroupTitle">Obyekt</span>
 
-        <button
-          type="button"
-          title="Gorizontal chiziq"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            insertHtml('<hr style="margin:18px 0;border:none;border-top:2px solid #555;"><p><br></p>');
-          }}
-        >
-          ━
-        </button>
+          <button
+            type="button"
+            title="Tanlangan jadval/shakl/diagrammani nusxalash"
+            onClick={duplicateSelectedObject}
+          >
+            Nusxalash
+          </button>
 
-        <button
-          type="button"
-          title="Formatni tozalash"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            runCommand("removeFormat");
-          }}
-        >
-          Tx
-        </button>
+          <button
+            type="button"
+            className="dangerTool"
+            title="Tanlangan jadval/shakl/diagrammani o‘chirish"
+            onClick={deleteSelectedObject}
+          >
+            O‘chirish
+          </button>
+
+          <button
+            type="button"
+            title="Matn formatini tozalash"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              runCommand("removeFormat");
+            }}
+          >
+            Tx Tozalash
+          </button>
+        </div>
       </div>
 
       {showDiagramBuilder && (
@@ -1540,14 +1679,51 @@ function RichEditor({
           position: relative;
           padding: 10px;
           display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 7px;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 8px;
           border-bottom: 2px solid #777;
           background: linear-gradient(#f5f5f5,#c1c1c1);
         }
 
-        .richToolbar > button,
+        .toolGroup {
+          position: relative;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 7px;
+          padding: 8px 10px 8px 82px;
+          border: 1px solid rgba(70,70,70,.35);
+          border-radius: 10px;
+          background: rgba(255,255,255,.35);
+        }
+
+        .toolGroupTitle {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 62px;
+          color: #173e58;
+          font-size: 13px;
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .insertToolButton {
+          color: #073b68;
+          border-color: #174461 !important;
+          background: linear-gradient(#ccefff,#6fb9e4) !important;
+          box-shadow: 0 3px 0 #17415c;
+        }
+
+        .dangerTool {
+          color: #8a1f1f;
+          border-color: #8a3131 !important;
+          background: linear-gradient(#ffe4e4,#e9b1b1) !important;
+        }
+
+        .richToolbar button,
         .richToolbar select,
         .toolDrop > button {
           min-height: 38px;
@@ -1561,7 +1737,7 @@ function RichEditor({
           background: linear-gradient(#fff,#c9c9c9);
         }
 
-        .richToolbar > button:hover,
+        .richToolbar button:hover,
         .toolDrop > button:hover,
         .fullScreenButton:hover {
           filter: brightness(1.08);
@@ -1728,7 +1904,18 @@ function RichEditor({
           }
 
           .richToolbar {
-            gap: 5px;
+            gap: 6px;
+          }
+
+          .toolGroup {
+            padding: 34px 7px 7px;
+          }
+
+          .toolGroupTitle {
+            top: 8px;
+            left: 9px;
+            width: auto;
+            transform: none;
           }
 
           .richToolbar > button,
