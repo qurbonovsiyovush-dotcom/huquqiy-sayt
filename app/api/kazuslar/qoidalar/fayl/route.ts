@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { get } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,19 +18,20 @@ type RuleResource = {
   fileSize: number;
   mimeType?: string;
   fileType: "pdf" | "ppt" | "pptx";
-
-  // Yangi to'g'ri maydon
   pathname?: string;
-
-  // Eski test kodlarda bo'lishi mumkin
   blobPath?: string;
-
-  // Qo'shimcha fallback
   url?: string;
-
   createdAt: string;
   updatedAt?: string;
 };
+
+async function getRole(): Promise<"admin" | "user"> {
+  const cookieStore = await cookies();
+
+  return cookieStore.get("qurbonov_role")?.value === "admin"
+    ? "admin"
+    : "user";
+}
 
 async function readIndex(): Promise<RuleResource[]> {
   try {
@@ -59,11 +61,7 @@ async function readIndex(): Promise<RuleResource[]> {
       ? parsed
       : [];
   } catch (error) {
-    console.error(
-      "QOIDALAR INDEX READ ERROR:",
-      error
-    );
-
+    console.error("QOIDALAR INDEX READ ERROR:", error);
     return [];
   }
 }
@@ -103,6 +101,8 @@ export async function GET(
   request: NextRequest
 ) {
   try {
+    const role = await getRole();
+
     const url = new URL(request.url);
 
     const id =
@@ -110,15 +110,14 @@ export async function GET(
         .get("id")
         ?.trim() ?? "";
 
-    const forceDownload =
+    const wantsDownload =
       url.searchParams.get("download") === "1";
 
     if (!id) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Fayl ID ko‘rsatilmagan.",
+          error: "Fayl ID ko‘rsatilmagan.",
         },
         {
           status: 400,
@@ -126,21 +125,17 @@ export async function GET(
       );
     }
 
-    const resources =
-      await readIndex();
+    const resources = await readIndex();
 
-    const resource =
-      resources.find(
-        (item) =>
-          item.id === id
-      );
+    const resource = resources.find(
+      (item) => item.id === id
+    );
 
     if (!resource) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Material topilmadi.",
+          error: "Material topilmadi.",
         },
         {
           status: 404,
@@ -149,47 +144,50 @@ export async function GET(
     }
 
     /*
-      MUHIM TUZATISH:
-
-      qoidalar/route.ts fayl yuklaganda:
-          pathname: blob.pathname
-
-      deb saqlaydi.
-
-      Oldingi fayl ochish route esa xato qilib:
-          resource.blobPath
-
-      ni qidirayotgan edi.
-
-      Shu sabab:
-      "Material faylining manzili topilmadi"
-      chiqayotgan edi.
+      ODDIY FOYDALANUVCHI UCHUN:
+      - download=1 taqiqlanadi;
+      - PPT/PPTX raw fayl umuman berilmaydi;
+      - faqat PDF inline ko‘rish beriladi.
     */
+    if (role !== "admin") {
+      if (wantsDownload) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Faylni yuklab olishga ruxsat berilmagan.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      if (resource.fileType !== "pdf") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "PPT/PPTX foydalanuvchiga raw fayl sifatida berilmaydi. PDF nusxasidan foydalaning.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
+
     const pathname =
       resource.pathname ||
       resource.blobPath ||
       "";
 
     if (!pathname) {
-      console.error(
-        "RESOURCE PATH MISSING:",
-        resource
-      );
-
       return NextResponse.json(
         {
           success: false,
           error:
             "Material faylining manzili topilmadi.",
-          debug: {
-            id: resource.id,
-            fileName:
-              resource.fileName,
-            hasPathname:
-              Boolean(resource.pathname),
-            hasBlobPath:
-              Boolean(resource.blobPath),
-          },
         },
         {
           status: 404,
@@ -231,42 +229,51 @@ export async function GET(
       detectContentType(resource);
 
     const isPdf =
-      resource.fileType === "pdf" ||
-      fileName
-        .toLowerCase()
-        .endsWith(".pdf");
+      resource.fileType === "pdf";
 
     /*
-      PDF browser ichida ochiladi.
-      PPT/PPTX esa download bo'ladi.
+      ADMIN:
+      download=1 bo‘lsa yuklab oladi.
+      Aks holda PDF inline.
+
+      USER:
+      faqat PDF inline.
     */
     const disposition =
-      isPdf && !forceDownload
-        ? `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`
-        : `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+      role === "admin" && wantsDownload
+        ? `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`
+        : isPdf
+          ? `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`
+          : `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 
     return new NextResponse(
       blob.stream,
       {
         status: 200,
         headers: {
-          "Content-Type":
-            contentType,
+          "Content-Type": contentType,
+          "Content-Disposition": disposition,
 
-          "Content-Disposition":
-            disposition,
-
+          /*
+            Fayl brauzer/proxy cache'iga saqlanib qolmasin.
+          */
           "Cache-Control":
             "private, no-store, no-cache, must-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+          "X-Content-Type-Options": "nosniff",
 
-          Pragma:
-            "no-cache",
+          /*
+            Sahifani boshqa sayt iframe'iga qo‘yishni qiyinlashtiradi.
+          */
+          "Content-Security-Policy":
+            "default-src 'none'; frame-ancestors 'self';",
 
-          Expires:
-            "0",
-
-          "X-Content-Type-Options":
-            "nosniff",
+          /*
+            Qidiruv tizimlari raw fayl route'ini indekslamasin.
+          */
+          "X-Robots-Tag":
+            "noindex, nofollow, noarchive, nosnippet",
         },
       }
     );
