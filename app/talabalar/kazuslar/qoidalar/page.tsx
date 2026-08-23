@@ -321,18 +321,23 @@ export default function QoidalarPage() {
 
   function openResource(item: RuleResource) {
     if (item.fileType === "pdf") {
+      window.location.href =
+        `/talabalar/kazuslar/qoidalar/korish/${encodeURIComponent(item.id)}`;
+      return;
+    }
+
+    if (role === "admin") {
       window.open(
-        `/api/kazuslar/qoidalar/fayl?id=${encodeURIComponent(item.id)}`,
+        `/api/kazuslar/qoidalar/fayl?id=${encodeURIComponent(item.id)}&download=1`,
         "_blank",
         "noopener,noreferrer"
       );
       return;
     }
 
-    window.open(
-      `/api/kazuslar/qoidalar/fayl?id=${encodeURIComponent(item.id)}&download=1`,
-      "_blank",
-      "noopener,noreferrer"
+    alert(
+      "PPT/PPTX faylini brauzerda yuklab olmasdan ko‘rsatish ishonchli ishlamaydi. " +
+      "Foydalanuvchilar uchun shu taqdimotning PDF nusxasini ham yuklash tavsiya etiladi."
     );
   }
 
@@ -358,7 +363,31 @@ export default function QoidalarPage() {
   }, [resources, search, categoryFilter]);
 
   return (
-    <main className="page">
+    <main
+      className="page"
+      onContextMenu={(event) => {
+        if (role !== "admin") {
+          event.preventDefault();
+        }
+      }}
+      onDragStart={(event) => {
+        if (role !== "admin") {
+          event.preventDefault();
+        }
+      }}
+      onKeyDown={(event) => {
+        if (role === "admin") return;
+
+        const key = event.key.toLowerCase();
+
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          ["s", "p", "u"].includes(key)
+        ) {
+          event.preventDefault();
+        }
+      }}
+    >
       <header className="topPanel">
         <div className="titlePlate">
           Kazusga javob yozish qoidalari
@@ -591,8 +620,10 @@ export default function QoidalarPage() {
                   onClick={() => openResource(item)}
                 >
                   {item.fileType === "pdf"
-                    ? "Ochish"
-                    : "PPT/PPTX ni ochish"}
+                    ? "Ko‘rish"
+                    : role === "admin"
+                      ? "PPT/PPTX ni yuklab olish"
+                      : "PDF nusxasi kerak"}
                 </button>
               </article>
             ))}
