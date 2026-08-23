@@ -5,7 +5,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const INDEX_PATH = "huquqiy-sayt/kazuslar/qoidalar/index.json";
+const INDEX_PATH =
+  "huquqiy-sayt/kazuslar/qoidalar/index.json";
 
 type RuleResource = {
   id: string;
@@ -14,8 +15,18 @@ type RuleResource = {
   category: string;
   fileName: string;
   fileSize: number;
-  fileType: string;
-  blobPath: string;
+  mimeType?: string;
+  fileType: "pdf" | "ppt" | "pptx";
+
+  // Yangi to'g'ri maydon
+  pathname?: string;
+
+  // Eski test kodlarda bo'lishi mumkin
+  blobPath?: string;
+
+  // Qo'shimcha fallback
+  url?: string;
+
   createdAt: string;
   updatedAt?: string;
 };
@@ -26,21 +37,33 @@ async function readIndex(): Promise<RuleResource[]> {
       access: "private",
     });
 
-    if (!result) {
+    if (
+      !result ||
+      result.statusCode !== 200 ||
+      !result.stream
+    ) {
       return [];
     }
 
-    const text = await new Response(result.stream).text();
+    const raw = await new Response(
+      result.stream
+    ).text();
 
-    if (!text.trim()) {
+    if (!raw.trim()) {
       return [];
     }
 
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(raw);
 
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
   } catch (error) {
-    console.error("Qoidalar index o‘qishda xato:", error);
+    console.error(
+      "QOIDALAR INDEX READ ERROR:",
+      error
+    );
+
     return [];
   }
 }
@@ -51,16 +74,51 @@ function safeFileName(name: string) {
     .replace(/[^\p{L}\p{N}._()\- ]/gu, "_");
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
+function detectContentType(resource: RuleResource) {
+  const extension =
+    resource.fileName
+      ?.split(".")
+      .pop()
+      ?.toLowerCase() ?? "";
 
-    const id = searchParams.get("id");
+  if (extension === "pdf") {
+    return "application/pdf";
+  }
+
+  if (extension === "ppt") {
+    return "application/vnd.ms-powerpoint";
+  }
+
+  if (extension === "pptx") {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+
+  return (
+    resource.mimeType ||
+    "application/octet-stream"
+  );
+}
+
+export async function GET(
+  request: NextRequest
+) {
+  try {
+    const url = new URL(request.url);
+
+    const id =
+      url.searchParams
+        .get("id")
+        ?.trim() ?? "";
+
+    const forceDownload =
+      url.searchParams.get("download") === "1";
 
     if (!id) {
       return NextResponse.json(
         {
-          error: "Fayl ID ko‘rsatilmagan.",
+          success: false,
+          error:
+            "Fayl ID ko‘rsatilmagan.",
         },
         {
           status: 400,
@@ -68,112 +126,163 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Barcha materiallarni olamiz
-    const resources = await readIndex();
+    const resources =
+      await readIndex();
 
-    // ID bo‘yicha kerakli material
-    const resource = resources.find((item) => item.id === id);
+    const resource =
+      resources.find(
+        (item) =>
+          item.id === id
+      );
 
     if (!resource) {
       return NextResponse.json(
         {
-          error: "Material topilmadi.",
+          success: false,
+          error:
+            "Material topilmadi.",
         },
         {
           status: 404,
         }
       );
-    }
-
-    if (!resource.blobPath) {
-      return NextResponse.json(
-        {
-          error: "Material faylining manzili topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    // Vercel Blob'dan haqiqiy faylni olamiz
-    const blob = await get(resource.blobPath, {
-      access: "private",
-    });
-
-    if (!blob) {
-      return NextResponse.json(
-        {
-          error: "Fayl Vercel Blob ichidan topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const fileName = safeFileName(
-      resource.fileName || `${resource.title}.pdf`
-    );
-
-    const extension =
-      fileName.split(".").pop()?.toLowerCase() || "";
-
-    let contentType =
-      resource.fileType || "application/octet-stream";
-
-    // MIME type noto‘g‘ri saqlangan bo‘lsa ham tuzatamiz
-    if (extension === "pdf") {
-      contentType = "application/pdf";
-    }
-
-    if (extension === "ppt") {
-      contentType = "application/vnd.ms-powerpoint";
-    }
-
-    if (extension === "pptx") {
-      contentType =
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation";
     }
 
     /*
-      PDF:
-      brauzer ichida ochiladi.
+      MUHIM TUZATISH:
 
-      PPT/PPTX:
-      brauzer qo‘llab-quvvatlashiga qarab
-      ochiladi yoki yuklab olinadi.
+      qoidalar/route.ts fayl yuklaganda:
+          pathname: blob.pathname
+
+      deb saqlaydi.
+
+      Oldingi fayl ochish route esa xato qilib:
+          resource.blobPath
+
+      ni qidirayotgan edi.
+
+      Shu sabab:
+      "Material faylining manzili topilmadi"
+      chiqayotgan edi.
     */
-    const isPdf = extension === "pdf";
+    const pathname =
+      resource.pathname ||
+      resource.blobPath ||
+      "";
 
-    const disposition = isPdf
-      ? `inline; filename="${fileName}"`
-      : `attachment; filename="${fileName}"`;
+    if (!pathname) {
+      console.error(
+        "RESOURCE PATH MISSING:",
+        resource
+      );
 
-    return new NextResponse(blob.stream, {
-      status: 200,
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Material faylining manzili topilmadi.",
+          debug: {
+            id: resource.id,
+            fileName:
+              resource.fileName,
+            hasPathname:
+              Boolean(resource.pathname),
+            hasBlobPath:
+              Boolean(resource.blobPath),
+          },
+        },
+        {
+          status: 404,
+        }
+      );
+    }
 
-      headers: {
-        "Content-Type": contentType,
+    const blob = await get(
+      pathname,
+      {
+        access: "private",
+      }
+    );
 
-        "Content-Disposition": disposition,
+    if (
+      !blob ||
+      blob.statusCode !== 200 ||
+      !blob.stream
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Fayl Vercel Blob ichidan topilmadi.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
 
-        "Cache-Control":
-          "private, no-store, no-cache, must-revalidate, max-age=0",
+    const fileName =
+      safeFileName(
+        resource.fileName ||
+          `${resource.title}.${resource.fileType}`
+      );
 
-        Pragma: "no-cache",
+    const contentType =
+      detectContentType(resource);
 
-        Expires: "0",
+    const isPdf =
+      resource.fileType === "pdf" ||
+      fileName
+        .toLowerCase()
+        .endsWith(".pdf");
 
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    /*
+      PDF browser ichida ochiladi.
+      PPT/PPTX esa download bo'ladi.
+    */
+    const disposition =
+      isPdf && !forceDownload
+        ? `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`
+        : `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+
+    return new NextResponse(
+      blob.stream,
+      {
+        status: 200,
+        headers: {
+          "Content-Type":
+            contentType,
+
+          "Content-Disposition":
+            disposition,
+
+          "Cache-Control":
+            "private, no-store, no-cache, must-revalidate, max-age=0",
+
+          Pragma:
+            "no-cache",
+
+          Expires:
+            "0",
+
+          "X-Content-Type-Options":
+            "nosniff",
+        },
+      }
+    );
   } catch (error) {
-    console.error("Qoidalar faylini ochishda xato:", error);
+    console.error(
+      "QOIDALAR FILE GET ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
-        error: "Faylni ochishda server xatosi yuz berdi.",
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Faylni ochishda server xatosi yuz berdi.",
       },
       {
         status: 500,
