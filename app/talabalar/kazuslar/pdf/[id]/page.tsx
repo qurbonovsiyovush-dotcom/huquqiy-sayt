@@ -55,6 +55,12 @@ export default function PdfViewerPage({
   const [downloading, setDownloading] =
     useState(false);
 
+  const [highlightMode, setHighlightMode] =
+    useState(false);
+
+  const [highlightMessage, setHighlightMessage] =
+    useState("");
+
   const pdfUrl = useMemo(() => {
     return (
       `/api/kazuslar/pdf?id=` +
@@ -442,12 +448,83 @@ export default function PdfViewerPage({
     }
   }
 
+  function applyYellowHighlight() {
+    if (!highlightMode) return;
+
+    const selection =
+      window.getSelection();
+
+    if (
+      !selection ||
+      selection.rangeCount === 0 ||
+      selection.isCollapsed
+    ) {
+      return;
+    }
+
+    const range =
+      selection.getRangeAt(0);
+
+    const commonContainer =
+      range.commonAncestorContainer;
+
+    const element =
+      commonContainer.nodeType === Node.ELEMENT_NODE
+        ? (commonContainer as Element)
+        : commonContainer.parentElement;
+
+    if (
+      !element ||
+      !element.closest(
+        ".documentArea"
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const mark =
+        document.createElement(
+          "mark"
+        );
+
+      mark.className =
+        "pdfHighlight";
+
+      range.surroundContents(
+        mark
+      );
+
+      selection.removeAllRanges();
+
+      setHighlightMessage(
+        "✅ Sariq marker qo‘llandi."
+      );
+
+      window.setTimeout(() => {
+        setHighlightMessage("");
+      }, 1200);
+    } catch (error) {
+      console.error(
+        "HIGHLIGHT ERROR:",
+        error
+      );
+
+      setHighlightMessage(
+        "❌ Ushbu joyni belgilashda xatolik bo‘ldi. Matnning kichikroq qismini belgilang."
+      );
+    }
+  }
+
+
   return (
     <main
       className={
         role === "admin"
           ? "page adminPage"
-          : "page protectedPage"
+          : highlightMode
+            ? "page protectedPage highlightMode"
+            : "page protectedPage"
       }
       onContextMenu={(
         event
@@ -548,12 +625,45 @@ export default function PdfViewerPage({
             +
           </button>
 
+          <button
+            type="button"
+            className={
+              highlightMode
+                ? "highlightButton active"
+                : "highlightButton"
+            }
+            onClick={() => {
+              setHighlightMode(
+                (value) => !value
+              );
+
+              setHighlightMessage("");
+            }}
+            title="Matnni sariq rang bilan belgilash"
+          >
+            🖍 Sariq marker
+          </button>
+
           <div className="toolbarInfo">
             {role === "admin"
               ? "Administrator rejimi"
-              : "Faqat o‘qish rejimi"}
+              : highlightMode
+                ? "Marker rejimi"
+                : "Faqat o‘qish rejimi"}
           </div>
         </div>
+
+        {highlightMessage && (
+          <div
+            className={
+              highlightMessage.startsWith("✅")
+                ? "highlightSuccess"
+                : "highlightError"
+            }
+          >
+            {highlightMessage}
+          </div>
+        )}
 
         <div
           className="documentArea"
@@ -561,9 +671,17 @@ export default function PdfViewerPage({
             event
           ) => {
             if (
-              role !== "admin"
+              role !== "admin" &&
+              !highlightMode
             ) {
               event.preventDefault();
+            }
+          }}
+          onMouseUp={() => {
+            if (
+              highlightMode
+            ) {
+              applyYellowHighlight();
             }
           }}
         >
@@ -622,9 +740,7 @@ export default function PdfViewerPage({
                               belgilay olmasligi uchun text layer
                               faqat admin rejimida ishlaydi.
                             */
-                            renderTextLayer={
-                              role === "admin"
-                            }
+                            renderTextLayer={true}
 
                             renderAnnotationLayer={
                               role === "admin"
@@ -969,6 +1085,60 @@ export default function PdfViewerPage({
           margin: 0 4px;
         }
 
+        .highlightButton {
+          min-height: 42px;
+          padding: 0 16px;
+          border: 2px solid #8a6d00;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 700;
+          background:
+            linear-gradient(
+              #fff9a8,
+              #f4d94e
+            );
+          box-shadow:
+            inset 0 3px 4px rgba(255,255,255,.85),
+            0 3px 0 #7d6b18;
+        }
+
+        .highlightButton.active {
+          background:
+            linear-gradient(
+              #ffe45c,
+              #e7bf00
+            );
+          transform: translateY(1px);
+          box-shadow:
+            inset 0 3px 5px rgba(0,0,0,.12),
+            0 2px 0 #7d6b18;
+        }
+
+        .highlightSuccess,
+        .highlightError {
+          max-width: 900px;
+          margin: 0 auto 16px;
+          padding: 12px 16px;
+          border-radius: 10px;
+          text-align: center;
+          font-size: 15px;
+          font-weight: 700;
+        }
+
+        .highlightSuccess {
+          color: #165f31;
+          border: 2px solid #2f8650;
+          background: #dff4e5;
+        }
+
+        .highlightError {
+          color: #8a1e1e;
+          border: 2px solid #a63a3a;
+          background: #f9dddd;
+        }
+
         .toolbarInfo {
           margin-left: auto;
 
@@ -1059,9 +1229,34 @@ export default function PdfViewerPage({
           cursor: default;
         }
 
-        .protectedPage .react-pdf__Page__textContent,
         .protectedPage .react-pdf__Page__annotations {
           display: none !important;
+        }
+
+        .protectedPage .react-pdf__Page__textContent {
+          pointer-events: none;
+          -webkit-user-select: none !important;
+          user-select: none !important;
+        }
+
+        .highlightMode .react-pdf__Page__textContent {
+          pointer-events: auto !important;
+          -webkit-user-select: text !important;
+          user-select: text !important;
+          cursor: text;
+        }
+
+        .highlightMode .react-pdf__Page,
+        .highlightMode .documentArea {
+          -webkit-user-select: text !important;
+          user-select: text !important;
+        }
+
+        .pdfHighlight {
+          background: #fff176 !important;
+          color: inherit !important;
+          padding: 0 !important;
+          border-radius: 2px;
         }
 
         .loadingBox,
