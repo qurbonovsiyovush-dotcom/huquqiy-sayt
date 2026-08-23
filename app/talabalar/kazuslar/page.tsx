@@ -2452,7 +2452,7 @@ export default function KazuslarPage() {
               <div className="questionEditor3D">
                 <div className="questionInlineRow">
                   <div className="questionNumberInline3D">
-                    {index + 1}-savol.
+                    {index + 1}-savol
                   </div>
 
                   <div className="questionInlineEditorWrap">
@@ -2643,7 +2643,7 @@ export default function KazuslarPage() {
 
       {mode === "view" && selectedCase && (
         <section className="viewerBox readingViewerBox">
-          <div className="sectionTitle">Kazusni o‘qish</div>
+          <div className="readingSectionTitle">Kazusni o‘qish</div>
 
           <div className="viewerHeader">
             <div>
@@ -2778,12 +2778,12 @@ export default function KazuslarPage() {
                   <div className="viewerQuestionCard" key={item.id}>
                     <div className="viewerQuestion">
                       <div className="viewerQuestion3D">
-                        <div className="questionInlineRow viewerInlineRow">
-                          <div className="questionNumberInline3D">
-                            {index + 1}-savol.
-                          </div>
+                        <div className="questionFlow">
+                          <span className="questionNumberInline3D">
+                            {index + 1}-savol
+                          </span>
 
-                          <div
+                          <span
                             className="richViewerContent inlineQuestionContent"
                             dangerouslySetInnerHTML={{ __html: item.question }}
                           />
@@ -3261,23 +3261,23 @@ export default function KazuslarPage() {
         }
 
         .questionNumberInline3D {
-          flex: 0 0 auto;
-          width: fit-content;
-          min-width: 116px;
-          padding: 10px 18px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          min-width: 108px;
+          padding: 8px 15px;
+          margin: 0 14px 7px 0;
+          vertical-align: middle;
           color: #073b68;
-          font-size: 18px;
+          font-size: 17px;
           font-weight: 700;
           white-space: nowrap;
           border: 2px solid #174461;
-          border-radius: 9px;
+          border-radius: 8px;
           background: linear-gradient(
             180deg,
             #c6edff 0%,
-            #85ccef 48%,
+            #82c9ef 48%,
             #4f9fcf 100%
           );
           box-shadow:
@@ -3505,9 +3505,34 @@ export default function KazuslarPage() {
         }
 
         .readingViewerBox {
-          padding-left: 20px;
-          padding-right: 20px;
+          padding: 34px 20px 40px;
           overflow-x: hidden;
+        }
+
+        .readingSectionTitle {
+          position: static;
+          width: fit-content;
+          min-width: 260px;
+          margin: 0 auto 34px;
+          padding: 12px 28px;
+          text-align: center;
+          color: #073b68;
+          font-size: 24px;
+          font-weight: 700;
+          border: 2px solid #174461;
+          border-radius: 12px;
+          background: linear-gradient(
+            180deg,
+            #c8edff 0%,
+            #8bcff0 46%,
+            #50a0cf 100%
+          );
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.92),
+            inset 0 -3px 4px rgba(0,0,0,.12),
+            0 5px 0 #17415c,
+            0 9px 14px rgba(0,0,0,.22);
+          text-shadow: 0 1px 0 rgba(255,255,255,.85);
         }
 
         .readerToolbar {
@@ -3753,7 +3778,7 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion {
-          padding: 18px;
+          padding: 0;
           border-radius: 14px;
           background: transparent;
           font-size: 19px;
@@ -3761,42 +3786,55 @@ export default function KazuslarPage() {
         }
 
         .viewerQuestion3D {
-          padding: 27px 30px;
+          padding: 20px 24px;
           border: 2px solid #62686c;
-          border-radius: 15px;
-          background: linear-gradient(145deg, #ffffff, #e1e1e1);
+          border-radius: 18px;
+          background: linear-gradient(
+            145deg,
+            #f6f6f6 0%,
+            #dddddd 62%,
+            #c8c8c8 100%
+          );
           box-shadow:
             inset 0 5px 5px rgba(255,255,255,.95),
             inset 0 -4px 5px rgba(0,0,0,.08),
             0 5px 0 #666d71,
             0 10px 16px rgba(0,0,0,.18);
-          text-align: justify;
-          text-justify: inter-word;
         }
 
-        .viewerInlineRow {
-          align-items: flex-start;
+        .questionFlow {
+          display: block;
+          width: 100%;
+          color: #111;
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 1.72;
+          text-align: justify;
+          text-justify: inter-word;
+          word-spacing: normal;
         }
 
         .inlineQuestionContent {
-          flex: 1 1 auto;
-          min-width: 0;
-          display: block;
+          display: inline;
+          color: #111;
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 1.72;
           text-align: justify;
           text-justify: inter-word;
-          font-size: 20px;
-          line-height: 1.7;
         }
 
         .inlineQuestionContent :global(p),
         .inlineQuestionContent :global(div) {
+          display: inline;
           margin: 0;
-          text-align: justify;
           text-indent: 0;
+          text-align: justify;
         }
 
         .inlineQuestionContent :global(p + p),
         .inlineQuestionContent :global(div + div) {
+          display: block;
           margin-top: 12px;
           text-indent: 2em;
         }
@@ -3890,14 +3928,26 @@ export default function KazuslarPage() {
           }
 
           .questionNumberInline3D {
-            min-width: 96px;
-            padding: 8px 12px;
-            font-size: 16px;
+            min-width: 90px;
+            padding: 7px 11px;
+            margin-right: 10px;
+            font-size: 15px;
           }
 
           .viewerQuestion3D,
           .questionEditor3D {
-            padding: 18px;
+            padding: 16px;
+          }
+
+          .readingSectionTitle {
+            min-width: 210px;
+            margin-bottom: 24px;
+            font-size: 20px;
+          }
+
+          .questionFlow,
+          .inlineQuestionContent {
+            font-size: 18px;
           }
 
           .viewerHeader {
