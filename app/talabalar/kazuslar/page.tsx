@@ -55,6 +55,1021 @@ function stripHtml(value: string) {
     .trim();
 }
 
+
+type DiagramNode = {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  parentId: string | null;
+};
+
+type DiagramBuilderProps = {
+  onInsert: (html: string) => void;
+  onClose: () => void;
+};
+
+function DiagramBuilder({
+  onInsert,
+  onClose,
+}: DiagramBuilderProps) {
+  const [nodes, setNodes] = useState<DiagramNode[]>([
+    {
+      id: "root",
+      text: "Fuqarolik huquqiy\nmunosabat elementlari",
+      x: 30,
+      y: 150,
+      width: 250,
+      height: 100,
+      color: "#ef1b13",
+      parentId: null,
+    },
+    {
+      id: "n1",
+      text: "Sub’yektlar",
+      x: 390,
+      y: 30,
+      width: 330,
+      height: 86,
+      color: "#b7b7b7",
+      parentId: "root",
+    },
+    {
+      id: "n2",
+      text: "Ob’yektlar",
+      x: 390,
+      y: 140,
+      width: 330,
+      height: 86,
+      color: "#5b9bd5",
+      parentId: "root",
+    },
+    {
+      id: "n3",
+      text: "Mazmuni",
+      x: 390,
+      y: 250,
+      width: 330,
+      height: 86,
+      color: "#ffc000",
+      parentId: "root",
+    },
+  ]);
+
+  const [selectedId, setSelectedId] =
+    useState<string | null>("root");
+
+  const [dragState, setDragState] =
+    useState<{
+      id: string;
+      startX: number;
+      startY: number;
+      nodeX: number;
+      nodeY: number;
+    } | null>(null);
+
+  const [resizeState, setResizeState] =
+    useState<{
+      id: string;
+      handle: string;
+      startX: number;
+      startY: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    } | null>(null);
+
+  useEffect(() => {
+    function onMove(event: MouseEvent) {
+      if (dragState) {
+        const dx =
+          event.clientX -
+          dragState.startX;
+
+        const dy =
+          event.clientY -
+          dragState.startY;
+
+        setNodes((old) =>
+          old.map((node) =>
+            node.id === dragState.id
+              ? {
+                  ...node,
+                  x: Math.max(
+                    0,
+                    dragState.nodeX + dx
+                  ),
+                  y: Math.max(
+                    0,
+                    dragState.nodeY + dy
+                  ),
+                }
+              : node
+          )
+        );
+      }
+
+      if (resizeState) {
+        const dx =
+          event.clientX -
+          resizeState.startX;
+
+        const dy =
+          event.clientY -
+          resizeState.startY;
+
+        let {
+          x,
+          y,
+          width,
+          height,
+        } = resizeState;
+
+        const minW = 90;
+        const minH = 50;
+
+        if (
+          resizeState.handle.includes("e")
+        ) {
+          width =
+            Math.max(
+              minW,
+              resizeState.width + dx
+            );
+        }
+
+        if (
+          resizeState.handle.includes("s")
+        ) {
+          height =
+            Math.max(
+              minH,
+              resizeState.height + dy
+            );
+        }
+
+        if (
+          resizeState.handle.includes("w")
+        ) {
+          const nextWidth =
+            resizeState.width - dx;
+
+          if (nextWidth >= minW) {
+            width = nextWidth;
+            x =
+              resizeState.x + dx;
+          }
+        }
+
+        if (
+          resizeState.handle.includes("n")
+        ) {
+          const nextHeight =
+            resizeState.height - dy;
+
+          if (nextHeight >= minH) {
+            height = nextHeight;
+            y =
+              resizeState.y + dy;
+          }
+        }
+
+        setNodes((old) =>
+          old.map((node) =>
+            node.id === resizeState.id
+              ? {
+                  ...node,
+                  x,
+                  y,
+                  width,
+                  height,
+                }
+              : node
+          )
+        );
+      }
+    }
+
+    function onUp() {
+      setDragState(null);
+      setResizeState(null);
+    }
+
+    window.addEventListener(
+      "mousemove",
+      onMove
+    );
+
+    window.addEventListener(
+      "mouseup",
+      onUp
+    );
+
+    return () => {
+      window.removeEventListener(
+        "mousemove",
+        onMove
+      );
+
+      window.removeEventListener(
+        "mouseup",
+        onUp
+      );
+    };
+  }, [dragState, resizeState]);
+
+  const selected =
+    nodes.find(
+      (node) =>
+        node.id === selectedId
+    ) ?? null;
+
+  function addNode() {
+    const parentId =
+      selectedId ??
+      "root";
+
+    const parent =
+      nodes.find(
+        (node) =>
+          node.id === parentId
+      ) ?? nodes[0];
+
+    const id =
+      `node-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 7)}`;
+
+    setNodes((old) => [
+      ...old,
+      {
+        id,
+        text: "Yangi blok",
+        x:
+          parent.x +
+          parent.width +
+          110,
+        y:
+          parent.y +
+          old.length * 18,
+        width: 240,
+        height: 76,
+        color: "#d9eaf7",
+        parentId:
+          parent.id,
+      },
+    ]);
+
+    setSelectedId(id);
+  }
+
+  function removeSelected() {
+    if (
+      !selectedId ||
+      selectedId === "root"
+    ) {
+      return;
+    }
+
+    setNodes((old) =>
+      old
+        .filter(
+          (node) =>
+            node.id !==
+            selectedId
+        )
+        .map((node) =>
+          node.parentId ===
+          selectedId
+            ? {
+                ...node,
+                parentId:
+                  "root",
+              }
+            : node
+        )
+    );
+
+    setSelectedId("root");
+  }
+
+  function updateSelected(
+    patch: Partial<DiagramNode>
+  ) {
+    if (!selectedId) return;
+
+    setNodes((old) =>
+      old.map((node) =>
+        node.id === selectedId
+          ? {
+              ...node,
+              ...patch,
+            }
+          : node
+      )
+    );
+  }
+
+  function makeDiagramHtml() {
+    const maxX =
+      Math.max(
+        ...nodes.map(
+          (node) =>
+            node.x +
+            node.width
+        ),
+        900
+      ) + 40;
+
+    const maxY =
+      Math.max(
+        ...nodes.map(
+          (node) =>
+            node.y +
+            node.height
+        ),
+        420
+      ) + 40;
+
+    const lineSvg =
+      nodes
+        .filter(
+          (node) =>
+            node.parentId
+        )
+        .map((node) => {
+          const parent =
+            nodes.find(
+              (item) =>
+                item.id ===
+                node.parentId
+            );
+
+          if (!parent) {
+            return "";
+          }
+
+          const x1 =
+            parent.x +
+            parent.width;
+
+          const y1 =
+            parent.y +
+            parent.height / 2;
+
+          const x2 =
+            node.x;
+
+          const y2 =
+            node.y +
+            node.height / 2;
+
+          return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#5b9bd5" stroke-width="3"/>`;
+        })
+        .join("");
+
+    const boxes =
+      nodes
+        .map((node) => {
+          const safeText =
+            node.text
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;");
+
+          return `
+            <div style="
+              position:absolute;
+              left:${node.x}px;
+              top:${node.y}px;
+              width:${node.width}px;
+              height:${node.height}px;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              padding:10px;
+              box-sizing:border-box;
+              border:3px solid rgba(80,80,80,.75);
+              border-radius:14px;
+              background:${node.color};
+              color:#111;
+              font-weight:700;
+              text-align:center;
+              white-space:pre-wrap;
+              box-shadow:
+                inset 5px 0 4px rgba(255,255,255,.75),
+                inset -5px 0 4px rgba(0,0,0,.13),
+                0 5px 0 rgba(70,70,70,.7),
+                0 8px 12px rgba(0,0,0,.20);
+            ">
+              ${safeText}
+            </div>
+          `;
+        })
+        .join("");
+
+    return `
+      <div style="
+        position:relative;
+        width:100%;
+        min-width:${Math.min(maxX, 1200)}px;
+        height:${maxY}px;
+        margin:18px 0;
+        overflow:auto;
+        background:#fff;
+      ">
+        <svg
+          viewBox="0 0 ${maxX} ${maxY}"
+          style="position:absolute;inset:0;width:${maxX}px;height:${maxY}px;overflow:visible;"
+        >
+          ${lineSvg}
+        </svg>
+
+        ${boxes}
+      </div>
+      <p><br></p>
+    `;
+  }
+
+  const handles = [
+    ["nw", "0%", "0%"],
+    ["n", "50%", "0%"],
+    ["ne", "100%", "0%"],
+    ["e", "100%", "50%"],
+    ["se", "100%", "100%"],
+    ["s", "50%", "100%"],
+    ["sw", "0%", "100%"],
+    ["w", "0%", "50%"],
+  ];
+
+  return (
+    <div className="diagramModal">
+      <div className="diagramWindow">
+        <div className="diagramHeader">
+          <div>
+            <strong>
+              Diagramma / shakl muharriri
+            </strong>
+            <div className="diagramSub">
+              Tugunni sudrang. 8 ta nuqtadan tortib razmerini o‘zgartiring.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="diagramClose"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="diagramToolbar">
+          <button
+            type="button"
+            onClick={addNode}
+          >
+            + Yangi to‘rtburchak
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedId("root");
+              addNode();
+            }}
+          >
+            + Qo‘shimcha shakl
+          </button>
+
+          <button
+            type="button"
+            className="danger"
+            onClick={removeSelected}
+            disabled={
+              !selectedId ||
+              selectedId === "root"
+            }
+          >
+            O‘chirish
+          </button>
+
+          <button
+            type="button"
+            className="insertDiagram"
+            onClick={() => {
+              onInsert(
+                makeDiagramHtml()
+              );
+              onClose();
+            }}
+          >
+            Diagrammani qo‘shish
+          </button>
+        </div>
+
+        <div className="diagramBody">
+          <div className="diagramInspector">
+            <h4>
+              Tanlangan shakl
+            </h4>
+
+            {selected ? (
+              <>
+                <label>
+                  Matn
+                  <textarea
+                    value={
+                      selected.text
+                    }
+                    onChange={(e) =>
+                      updateSelected({
+                        text:
+                          e.target
+                            .value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label>
+                  Rang
+                  <input
+                    type="color"
+                    value={
+                      selected.color
+                    }
+                    onChange={(e) =>
+                      updateSelected({
+                        color:
+                          e.target
+                            .value,
+                      })
+                    }
+                  />
+                </label>
+
+                <div className="sizeGrid">
+                  <label>
+                    Kenglik
+                    <input
+                      type="number"
+                      min={90}
+                      value={
+                        Math.round(
+                          selected.width
+                        )
+                      }
+                      onChange={(e) =>
+                        updateSelected({
+                          width:
+                            Math.max(
+                              90,
+                              Number(
+                                e.target
+                                  .value
+                              ) ||
+                                90
+                            ),
+                        })
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Balandlik
+                    <input
+                      type="number"
+                      min={50}
+                      value={
+                        Math.round(
+                          selected.height
+                        )
+                      }
+                      onChange={(e) =>
+                        updateSelected({
+                          height:
+                            Math.max(
+                              50,
+                              Number(
+                                e.target
+                                  .value
+                              ) ||
+                                50
+                            ),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <p>
+                Shaklni tanlang.
+              </p>
+            )}
+          </div>
+
+          <div className="diagramCanvasWrap">
+            <div
+              className="diagramCanvas"
+              style={{
+                width: 960,
+                height: 520,
+              }}
+            >
+              <svg className="diagramLines">
+                {nodes
+                  .filter(
+                    (node) =>
+                      node.parentId
+                  )
+                  .map((node) => {
+                    const parent =
+                      nodes.find(
+                        (item) =>
+                          item.id ===
+                          node.parentId
+                      );
+
+                    if (!parent) {
+                      return null;
+                    }
+
+                    return (
+                      <line
+                        key={`line-${node.id}`}
+                        x1={
+                          parent.x +
+                          parent.width
+                        }
+                        y1={
+                          parent.y +
+                          parent.height /
+                            2
+                        }
+                        x2={node.x}
+                        y2={
+                          node.y +
+                          node.height /
+                            2
+                        }
+                        stroke="#5b9bd5"
+                        strokeWidth="3"
+                      />
+                    );
+                  })}
+              </svg>
+
+              {nodes.map(
+                (node) => {
+                  const active =
+                    node.id ===
+                    selectedId;
+
+                  return (
+                    <div
+                      key={
+                        node.id
+                      }
+                      className={
+                        active
+                          ? "diagramNode active"
+                          : "diagramNode"
+                      }
+                      style={{
+                        left:
+                          node.x,
+                        top:
+                          node.y,
+                        width:
+                          node.width,
+                        height:
+                          node.height,
+                        background:
+                          node.color,
+                      }}
+                      onMouseDown={(
+                        event
+                      ) => {
+                        if (
+                          (
+                            event
+                              .target as HTMLElement
+                          ).classList.contains(
+                            "resizeHandle"
+                          )
+                        ) {
+                          return;
+                        }
+
+                        setSelectedId(
+                          node.id
+                        );
+
+                        setDragState({
+                          id:
+                            node.id,
+                          startX:
+                            event.clientX,
+                          startY:
+                            event.clientY,
+                          nodeX:
+                            node.x,
+                          nodeY:
+                            node.y,
+                        });
+                      }}
+                    >
+                      <div className="diagramNodeText">
+                        {node.text}
+                      </div>
+
+                      {active &&
+                        handles.map(
+                          ([
+                            handle,
+                            left,
+                            top,
+                          ]) => (
+                            <span
+                              key={
+                                handle
+                              }
+                              className={`resizeHandle h-${handle}`}
+                              style={{
+                                left,
+                                top,
+                              }}
+                              onMouseDown={(
+                                event
+                              ) => {
+                                event.stopPropagation();
+
+                                setResizeState({
+                                  id:
+                                    node.id,
+                                  handle,
+                                  startX:
+                                    event.clientX,
+                                  startY:
+                                    event.clientY,
+                                  x:
+                                    node.x,
+                                  y:
+                                    node.y,
+                                  width:
+                                    node.width,
+                                  height:
+                                    node.height,
+                                });
+                              }}
+                            />
+                          )
+                        )}
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .diagramModal {
+          position: fixed;
+          z-index: 12000;
+          inset: 0;
+          padding: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0,0,0,.55);
+        }
+
+        .diagramWindow {
+          width: min(1250px, 98vw);
+          max-height: 94vh;
+          overflow: auto;
+          border: 3px solid #173e58;
+          border-radius: 18px;
+          background: #e9e9e9;
+          box-shadow: 0 18px 50px rgba(0,0,0,.45);
+        }
+
+        .diagramHeader {
+          padding: 16px 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          background: linear-gradient(#9bd9ff,#4e9ccc);
+          color: #073b68;
+          font-size: 20px;
+        }
+
+        .diagramSub {
+          margin-top: 4px;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .diagramClose {
+          width: 42px;
+          height: 42px;
+          border: 2px solid #555;
+          border-radius: 9px;
+          cursor: pointer;
+          font-size: 18px;
+          font-weight: 700;
+          background: #fff;
+        }
+
+        .diagramToolbar {
+          padding: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          border-bottom: 2px solid #777;
+          background: #d7d7d7;
+        }
+
+        .diagramToolbar button {
+          min-height: 42px;
+          padding: 8px 14px;
+          border: 2px solid #555;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+          background: linear-gradient(#fff,#c9c9c9);
+        }
+
+        .diagramToolbar .danger {
+          color: #7f1616;
+        }
+
+        .diagramToolbar .insertDiagram {
+          margin-left: auto;
+          border-color: #174461;
+          color: #073b68;
+          background: linear-gradient(#a8e1ff,#54a8db);
+        }
+
+        .diagramBody {
+          display: grid;
+          grid-template-columns: 230px 1fr;
+          min-height: 560px;
+        }
+
+        .diagramInspector {
+          padding: 16px;
+          border-right: 2px solid #777;
+          background: #efefef;
+        }
+
+        .diagramInspector h4 {
+          margin: 0 0 14px;
+          color: #073b68;
+        }
+
+        .diagramInspector label {
+          display: block;
+          margin-bottom: 12px;
+          color: #173e58;
+          font-size: 14px;
+        }
+
+        .diagramInspector textarea,
+        .diagramInspector input {
+          width: 100%;
+          margin-top: 5px;
+          padding: 8px;
+          border: 2px solid #666;
+          border-radius: 7px;
+          font-family: inherit;
+        }
+
+        .diagramInspector textarea {
+          min-height: 90px;
+          resize: vertical;
+        }
+
+        .sizeGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .diagramCanvasWrap {
+          overflow: auto;
+          padding: 20px;
+          background:
+            linear-gradient(#f7f7f7 1px,transparent 1px),
+            linear-gradient(90deg,#f7f7f7 1px,transparent 1px),
+            #fff;
+          background-size: 20px 20px;
+        }
+
+        .diagramCanvas {
+          position: relative;
+          margin: 0 auto;
+          border: 1px dashed #b7b7b7;
+        }
+
+        .diagramLines {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          overflow: visible;
+        }
+
+        .diagramNode {
+          position: absolute;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px;
+          box-sizing: border-box;
+          border: 3px solid rgba(80,80,80,.75);
+          border-radius: 14px;
+          cursor: move;
+          user-select: none;
+          box-shadow:
+            inset 5px 0 4px rgba(255,255,255,.75),
+            inset -5px 0 4px rgba(0,0,0,.13),
+            0 5px 0 rgba(70,70,70,.7),
+            0 8px 12px rgba(0,0,0,.20);
+        }
+
+        .diagramNode.active {
+          outline: 2px solid #1e88e5;
+          outline-offset: 3px;
+        }
+
+        .diagramNodeText {
+          width: 100%;
+          white-space: pre-wrap;
+          text-align: center;
+          color: #111;
+          font-size: 18px;
+          font-weight: 700;
+          pointer-events: none;
+        }
+
+        .resizeHandle {
+          position: absolute;
+          width: 12px;
+          height: 12px;
+          border: 2px solid #1976d2;
+          border-radius: 50%;
+          background: #fff;
+          transform: translate(-50%,-50%);
+          z-index: 5;
+        }
+
+        .h-nw,
+        .h-se {
+          cursor: nwse-resize;
+        }
+
+        .h-ne,
+        .h-sw {
+          cursor: nesw-resize;
+        }
+
+        .h-n,
+        .h-s {
+          cursor: ns-resize;
+        }
+
+        .h-e,
+        .h-w {
+          cursor: ew-resize;
+        }
+
+        @media (max-width: 850px) {
+          .diagramBody {
+            grid-template-columns: 1fr;
+          }
+
+          .diagramInspector {
+            border-right: 0;
+            border-bottom: 2px solid #777;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 type RichEditorProps = {
   value: string;
   onChange: (value: string) => void;
@@ -75,6 +1090,7 @@ function RichEditor({
   const [showColors, setShowColors] = useState(false);
   const [showShapes, setShowShapes] = useState(false);
   const [showTable, setShowTable] = useState(false);
+  const [showDiagramBuilder, setShowDiagramBuilder] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
 
@@ -392,10 +1408,19 @@ function RichEditor({
               <button type="button" onClick={() => insertShape("card3d")}>▣ 3D kartochka</button>
               <button type="button" onClick={() => insertShape("arrow")}>➜ Strelka</button>
               <button type="button" onClick={() => insertShape("timeline")}>━━➜ Timeline</button>
-              <button type="button" onClick={() => insertShape("four")}>⊞ 4 tarkib bloki</button>
+              <button type="button" onClick={() => insertShape("four")}>⊞ To‘rtburchak bloklar</button>
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          title="Tarmoqlanuvchi diagramma yaratish"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setShowDiagramBuilder(true)}
+        >
+          ⤴ Diagramma
+        </button>
 
         <button
           type="button"
@@ -419,6 +1444,18 @@ function RichEditor({
           Tx
         </button>
       </div>
+
+      {showDiagramBuilder && (
+        <DiagramBuilder
+          onClose={() =>
+            setShowDiagramBuilder(false)
+          }
+          onInsert={(html) => {
+            insertHtml(html);
+            setShowDiagramBuilder(false);
+          }}
+        />
+      )}
 
       <div
         ref={editorRef}
