@@ -1203,6 +1203,326 @@ function RichEditor({
     syncValue();
   }
 
+  function getCurrentBlock(): HTMLElement | null {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+
+    if (
+      !editor ||
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return null;
+    }
+
+    let node: Node | null = selection.anchorNode;
+
+    if (node?.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      return null;
+    }
+
+    let block =
+      node.closest<HTMLElement>(
+        "p, div, li, blockquote"
+      );
+
+    if (
+      !block ||
+      !editor.contains(block) ||
+      block === editor
+    ) {
+      document.execCommand(
+        "formatBlock",
+        false,
+        "p"
+      );
+
+      const nextSelection =
+        window.getSelection();
+
+      let nextNode =
+        nextSelection?.anchorNode ??
+        null;
+
+      if (
+        nextNode?.nodeType ===
+        Node.TEXT_NODE
+      ) {
+        nextNode =
+          nextNode.parentNode;
+      }
+
+      if (
+        nextNode instanceof
+        HTMLElement
+      ) {
+        block =
+          nextNode.closest<HTMLElement>(
+            "p, div, li, blockquote"
+          );
+      }
+    }
+
+    return block &&
+      editor.contains(block)
+      ? block
+      : null;
+  }
+
+  function changeFirstLineIndent(
+    direction: "increase" | "decrease"
+  ) {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+
+    const block =
+      getCurrentBlock();
+
+    if (!block) return;
+
+    const current =
+      parseFloat(
+        block.style.textIndent ||
+          "0"
+      ) || 0;
+
+    const next =
+      direction === "increase"
+        ? Math.min(
+            current + 2,
+            8
+          )
+        : Math.max(
+            current - 2,
+            0
+          );
+
+    block.style.textIndent =
+      `${next}em`;
+
+    syncValue();
+  }
+
+  function cleanPastedHtml(
+    rawHtml: string
+  ) {
+    const parser =
+      new DOMParser();
+
+    const doc =
+      parser.parseFromString(
+        rawHtml,
+        "text/html"
+      );
+
+    const allowed = new Set([
+      "P",
+      "DIV",
+      "BR",
+      "B",
+      "STRONG",
+      "I",
+      "EM",
+      "U",
+      "S",
+      "STRIKE",
+      "SPAN",
+      "UL",
+      "OL",
+      "LI",
+      "BLOCKQUOTE",
+      "SUB",
+      "SUP",
+    ]);
+
+    const all =
+      Array.from(
+        doc.body.querySelectorAll("*")
+      );
+
+    for (const el of all) {
+      if (!allowed.has(el.tagName)) {
+        el.replaceWith(
+          ...Array.from(
+            el.childNodes
+          )
+        );
+        continue;
+      }
+
+      const element =
+        el as HTMLElement;
+
+      const color =
+        element.style.color;
+
+      const fontWeight =
+        element.style.fontWeight;
+
+      const fontStyle =
+        element.style.fontStyle;
+
+      const textDecoration =
+        element.style.textDecoration;
+
+      const textAlign =
+        element.style.textAlign;
+
+      element.removeAttribute(
+        "class"
+      );
+      element.removeAttribute(
+        "id"
+      );
+      element.removeAttribute(
+        "dir"
+      );
+
+      element.removeAttribute(
+        "style"
+      );
+
+      if (color) {
+        element.style.color =
+          color;
+      }
+
+      if (
+        fontWeight &&
+        (
+          fontWeight === "bold" ||
+          Number(fontWeight) >= 600
+        )
+      ) {
+        element.style.fontWeight =
+          "700";
+      }
+
+      if (
+        fontStyle === "italic"
+      ) {
+        element.style.fontStyle =
+          "italic";
+      }
+
+      if (
+        textDecoration.includes(
+          "underline"
+        )
+      ) {
+        element.style.textDecoration =
+          "underline";
+      }
+
+      if (
+        textDecoration.includes(
+          "line-through"
+        )
+      ) {
+        element.style.textDecoration =
+          element.style.textDecoration
+            ? `${element.style.textDecoration} line-through`
+            : "line-through";
+      }
+
+      if (
+        ["left", "center", "right", "justify"].includes(
+          textAlign
+        )
+      ) {
+        element.style.textAlign =
+          textAlign;
+      }
+    }
+
+    return doc.body.innerHTML;
+  }
+
+  function plainTextToParagraphs(
+    rawText: string
+  ) {
+    const normalized =
+      rawText
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\u00A0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .trim();
+
+    if (!normalized) {
+      return "";
+    }
+
+    const blocks =
+      normalized
+        .split(/\n{2,}/)
+        .map((part) =>
+          part.trim()
+        )
+        .filter(Boolean);
+
+    return blocks
+      .map((block) => {
+        const joined =
+          block
+            .split("\n")
+            .map((line) =>
+              line.trim()
+            )
+            .filter(Boolean)
+            .join(" ")
+            .replace(/\s{2,}/g, " ");
+
+        const safe =
+          joined
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        return `<p>${safe}</p>`;
+      })
+      .join("");
+  }
+
+  function handleSmartPaste(
+    event: React.ClipboardEvent<HTMLDivElement>
+  ) {
+    event.preventDefault();
+
+    const html =
+      event.clipboardData.getData(
+        "text/html"
+      );
+
+    const plain =
+      event.clipboardData.getData(
+        "text/plain"
+      );
+
+    const cleaned =
+      html
+        ? cleanPastedHtml(html)
+        : plainTextToParagraphs(
+            plain
+          );
+
+    if (!cleaned) return;
+
+    document.execCommand(
+      "insertHTML",
+      false,
+      cleaned
+    );
+
+    syncValue();
+  }
+
   function insertHtml(html: string) {
     const editor = editorRef.current;
     if (!editor) return;
@@ -1456,8 +1776,27 @@ function RichEditor({
           <button type="button" title="Ikki tomonga tekislash" onMouseDown={(e) => { e.preventDefault(); runCommand("justifyFull"); }}>Justify</button>
           <button type="button" title="Raqamli ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertOrderedList"); }}>1. Ro‘yxat</button>
           <button type="button" title="Belgili ro‘yxat" onMouseDown={(e) => { e.preventDefault(); runCommand("insertUnorderedList"); }}>• Ro‘yxat</button>
-          <button type="button" title="Abzasni kamaytirish" onMouseDown={(e) => { e.preventDefault(); runCommand("outdent"); }}>← Abzas</button>
-          <button type="button" title="Abzasni oshirish" onMouseDown={(e) => { e.preventDefault(); runCommand("indent"); }}>Abzas →</button>
+          <button
+            type="button"
+            title="Faqat birinchi qator abzasini kamaytirish"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              changeFirstLineIndent("decrease");
+            }}
+          >
+            ← 1-qator
+          </button>
+
+          <button
+            type="button"
+            title="Faqat birinchi qatorni ichkariga surish"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              changeFirstLineIndent("increase");
+            }}
+          >
+            1-qator →
+          </button>
           <button type="button" title="Bekor qilish" onMouseDown={(e) => { e.preventDefault(); runCommand("undo"); }}>↶ Undo</button>
           <button type="button" title="Qaytarish" onMouseDown={(e) => { e.preventDefault(); runCommand("redo"); }}>↷ Redo</button>
         </div>
@@ -1613,6 +1952,7 @@ function RichEditor({
         style={{ minHeight }}
         onInput={syncValue}
         onBlur={syncValue}
+        onPaste={handleSmartPaste}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -1624,7 +1964,7 @@ function RichEditor({
       />
 
       <div className="richEditorHint">
-        Word uslubidagi muharrir: matn o‘lchami, rang, marker, jadval, 2D/3D shakllar, ro‘yxatlar va tekislash.
+        Matn qo‘yilganda ortiqcha PDF/Word formatlari avtomatik tozalanadi; qalin, kursiv, tagiga chizish va ranglar imkon qadar saqlanadi. “1-qator →” faqat abzasning birinchi qatorini suradi.
       </div>
 
       <style jsx>{`
@@ -1838,7 +2178,9 @@ function RichEditor({
           color: #111;
           font-family: "Bell MT","Times New Roman",serif;
           font-size: 18px;
-          line-height: 1.55;
+          line-height: 1.6;
+          letter-spacing: normal;
+          word-spacing: normal;
           background: #fff;
         }
 
@@ -1854,17 +2196,17 @@ function RichEditor({
         }
 
         .normalParagraphMode {
-          text-align: justify;
-          text-justify: inter-word;
+          text-align: left;
           overflow-wrap: break-word;
           word-break: normal;
+          white-space: normal;
         }
 
         .normalParagraphMode :global(p),
         .normalParagraphMode :global(div) {
           margin: 0 0 12px;
-          text-align: justify;
-          text-indent: 2em;
+          text-align: inherit;
+          text-indent: 0;
         }
 
         .questionParagraphMode {
@@ -3916,12 +4258,13 @@ export default function KazuslarPage() {
 
         .richViewerContent {
           white-space: normal;
-          line-height: 1.75;
+          line-height: 1.7;
           font-size: 18px;
-          text-align: justify;
-          text-justify: inter-word;
+          text-align: left;
           overflow-wrap: break-word;
           word-break: normal;
+          letter-spacing: normal;
+          word-spacing: normal;
         }
 
         .richViewerContent :global(table) {
@@ -3930,12 +4273,11 @@ export default function KazuslarPage() {
 
         .richViewerContent :global(p) {
           margin: 0 0 12px;
-          text-align: justify;
-          text-indent: 2em;
+          text-align: inherit;
         }
 
         .richViewerContent :global(div) {
-          text-align: justify;
+          text-align: inherit;
         }
 
         .inlineRich {
