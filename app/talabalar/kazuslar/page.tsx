@@ -4852,6 +4852,16 @@ export default function KazuslarPage() {
             >
               Oraliq nazorat kazuslari
             </button>
+
+            <button
+              className="mainActionButton examActionButton"
+              type="button"
+              onClick={() => {
+                window.location.href = "/talabalar/kazuslar/qoidalar";
+              }}
+            >
+              Kazusga javob yozish qoidalari
+            </button>
           </section>
 
           <section className="mainBox hierarchyBox">
@@ -7124,8 +7134,8 @@ export default function KazuslarPage() {
            KURS → SEMESTR → FAN → KAZUSLAR
         ===================================================== */
         .examLinksOnly {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          max-width: 980px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          max-width: 1320px;
         }
 
         .hierarchyBox {
@@ -7133,33 +7143,59 @@ export default function KazuslarPage() {
         }
 
         .breadcrumbRow {
-          max-width: 1180px;
-          margin: 0 auto 24px;
-          padding: 10px 14px;
+          width: min(1180px, 100%);
+          margin: 0 auto 28px;
+          padding: 10px 12px;
           display: flex;
           align-items: center;
           flex-wrap: wrap;
-          gap: 8px;
-          border-radius: 11px;
-          background: rgba(255,255,255,.82);
-          border: 1px solid #949da3;
+          gap: 7px;
+          border: 1px solid #aab2b7;
+          border-radius: 14px;
+          background: linear-gradient(180deg,#fbfbfb 0%,#e7e7e7 100%);
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.92),
+            0 4px 0 #676e72,
+            0 8px 13px rgba(0,0,0,.12);
+        }
+
+        .breadcrumbRow > span:not(.crumb) {
+          color: #49748e;
+          font-size: 18px;
+          font-weight: 700;
+          line-height: 1;
         }
 
         .crumb {
-          border: 0;
-          padding: 5px 9px;
-          border-radius: 7px;
+          min-height: 34px;
+          padding: 6px 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1.5px solid transparent;
+          border-radius: 999px;
           cursor: pointer;
           font-family: inherit;
-          color: #24536e;
+          color: #164d70;
           background: transparent;
+          font-size: 14px;
           font-weight: 700;
+          white-space: nowrap;
         }
 
-        .crumb:hover,
-        .crumb.active {
-          background: #d9effc;
+        button.crumb:hover {
+          border-color: #8abfdc;
+          background: #e8f6ff;
           color: #073b68;
+        }
+
+        .crumb.active {
+          color: #073b68;
+          border-color: #99cce7;
+          background: linear-gradient(180deg,#e5f7ff,#c8eaff);
+          box-shadow:
+            inset 0 2px 2px rgba(255,255,255,.9),
+            0 2px 0 #88aebe;
         }
 
         .courseGrid,
@@ -7411,14 +7447,27 @@ export default function KazuslarPage() {
 
           .breadcrumbRow {
             margin-bottom: 14px;
-            padding: 7px 8px;
+            padding: 7px;
             gap: 4px;
-            font-size: 11px;
+            border-radius: 10px;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            scrollbar-width: none;
+          }
+
+          .breadcrumbRow::-webkit-scrollbar {
+            display: none;
+          }
+
+          .breadcrumbRow > span:not(.crumb) {
+            font-size: 13px;
           }
 
           .crumb {
-            padding: 4px 5px;
-            font-size: 11px;
+            flex: 0 0 auto;
+            min-height: 28px;
+            padding: 4px 8px;
+            font-size: 10.5px;
           }
 
           .courseGrid {
