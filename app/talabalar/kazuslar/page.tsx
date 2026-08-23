@@ -37,6 +37,18 @@ type PdfCase = {
 
 type AnyCase = PlatformCase | PdfCase;
 
+type CourseNumber = 1 | 2 | 3 | 4;
+type SemesterNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+type SubjectFolder = {
+  id: string;
+  name: string;
+  course: CourseNumber;
+  semester: SemesterNumber;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type Mode = "list" | "write" | "upload" | "view";
 
 
@@ -2091,6 +2103,364 @@ function DiagramBuilder({
           }
         }
 
+
+        /* =====================================================
+           KURS → SEMESTR → FAN → KAZUSLAR
+        ===================================================== */
+        .examLinksOnly {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          max-width: 980px;
+        }
+
+        .hierarchyBox {
+          min-height: 500px;
+        }
+
+        .breadcrumbRow {
+          max-width: 1180px;
+          margin: 0 auto 24px;
+          padding: 10px 14px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+          border-radius: 11px;
+          background: rgba(255,255,255,.82);
+          border: 1px solid #949da3;
+        }
+
+        .crumb {
+          border: 0;
+          padding: 5px 9px;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          color: #24536e;
+          background: transparent;
+          font-weight: 700;
+        }
+
+        .crumb:hover,
+        .crumb.active {
+          background: #d9effc;
+          color: #073b68;
+        }
+
+        .courseGrid,
+        .semesterGrid,
+        .subjectsGrid {
+          max-width: 1180px;
+          margin: 0 auto;
+          display: grid;
+          gap: 22px;
+        }
+
+        .courseGrid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .semesterGrid {
+          max-width: 760px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .hierarchyCard {
+          min-height: 180px;
+          padding: 22px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          cursor: pointer;
+          font-family: inherit;
+          border: 2px solid #174461;
+          border-radius: 18px;
+          color: #073b68;
+          background: linear-gradient(180deg,#c9efff,#79c5ed 52%,#4b9ccc);
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.85),
+            inset 0 -5px 5px rgba(0,0,0,.12),
+            0 6px 0 #17415c,
+            0 11px 17px rgba(0,0,0,.19);
+        }
+
+        .hierarchyCard:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+        }
+
+        .hierarchyBig {
+          font-size: 28px;
+          font-weight: 700;
+        }
+
+        .hierarchySmall {
+          font-size: 15px;
+          opacity: .82;
+        }
+
+        .subjectAdminBar,
+        .subjectMaterialActions {
+          max-width: 1180px;
+          margin: 0 auto 22px;
+          display: grid;
+          grid-template-columns: repeat(2,minmax(0,1fr));
+          gap: 14px;
+        }
+
+        .addSubjectButton {
+          min-height: 54px;
+          border: 2px solid #174461;
+          border-radius: 12px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 17px;
+          font-weight: 700;
+          color: #073b68;
+          background: linear-gradient(#c9efff,#68b9e4);
+          box-shadow: 0 4px 0 #17415c;
+        }
+
+        .subjectForm3D {
+          max-width: 760px;
+          margin: 0 auto 24px;
+          padding: 20px;
+          border: 2px solid #555d62;
+          border-radius: 15px;
+          background: linear-gradient(#f8f8f8,#d9d9d9);
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.85),
+            0 5px 0 #5d6468,
+            0 9px 14px rgba(0,0,0,.15);
+        }
+
+        .subjectForm3D label {
+          display: block;
+          color: #173e58;
+          font-weight: 700;
+        }
+
+        .subjectForm3D input {
+          width: 100%;
+          margin-top: 7px;
+          padding: 12px 13px;
+          border: 2px solid #697176;
+          border-radius: 9px;
+          font-family: inherit;
+          font-size: 17px;
+        }
+
+        .subjectFormActions {
+          margin-top: 13px;
+          display: flex;
+          gap: 10px;
+        }
+
+        .saveSubjectButton,
+        .cancelSubjectButton {
+          flex: 1 1 0;
+          min-height: 44px;
+          border-radius: 9px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .saveSubjectButton {
+          color: #073b68;
+          border: 2px solid #174461;
+          background: #9edcff;
+        }
+
+        .cancelSubjectButton {
+          border: 2px solid #666;
+          background: #e7e7e7;
+        }
+
+        .subjectMessage {
+          margin-top: 12px;
+          font-weight: 700;
+        }
+
+        .subjectsGrid {
+          grid-template-columns: repeat(3,minmax(0,1fr));
+        }
+
+        .subjectFolderCard {
+          position: relative;
+          min-height: 185px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 14px;
+          border: 1px solid #8a9398;
+          border-radius: 17px;
+          background: linear-gradient(#f8f8f8,#dedede);
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.9),
+            0 5px 0 #6b7276,
+            0 9px 14px rgba(0,0,0,.14);
+        }
+
+        .subjectFolderOpen {
+          flex: 1 1 auto;
+          border: 0;
+          cursor: pointer;
+          background: transparent;
+          font-family: inherit;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+        }
+
+        .folderName3D {
+          max-width: 100%;
+          padding: 8px 14px;
+          color: #073b68;
+          font-size: 18px;
+          font-weight: 700;
+          text-align: center;
+          border: 2px solid #174461;
+          border-radius: 999px;
+          background: linear-gradient(#d7f2ff,#76c2eb);
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.9),
+            0 4px 0 #17415c;
+        }
+
+        .materialCount {
+          font-size: 14px;
+          color: #5c666c;
+          font-weight: 700;
+        }
+
+        .subjectFolderAdmin {
+          display: flex;
+          gap: 8px;
+        }
+
+        .miniEditButton,
+        .miniDeleteButton {
+          flex: 1 1 0;
+          min-height: 32px;
+          border-radius: 7px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .miniEditButton {
+          color: #073b68;
+          border: 1.5px solid #174461;
+          background: #b9e6ff;
+        }
+
+        .miniDeleteButton {
+          color: #000;
+          border: 1.5px solid #9a2424;
+          background: #f08c8c;
+        }
+
+        .lockedSubjectInput {
+          background: #e8eef2 !important;
+          color: #173e58 !important;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 900px) {
+          .courseGrid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+          }
+
+          .subjectsGrid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+          }
+        }
+
+        @media (max-width: 600px) {
+          .examLinksOnly {
+            grid-template-columns: 1fr;
+            width: calc(100% - 18px);
+          }
+
+          .hierarchyBox {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+
+          .breadcrumbRow {
+            margin-bottom: 14px;
+            padding: 7px 8px;
+            gap: 4px;
+            font-size: 11px;
+          }
+
+          .crumb {
+            padding: 4px 5px;
+            font-size: 11px;
+          }
+
+          .courseGrid {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+            gap: 10px;
+          }
+
+          .semesterGrid,
+          .subjectsGrid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .hierarchyCard {
+            min-height: 112px;
+            padding: 12px 8px;
+            border-radius: 12px;
+            box-shadow:
+              inset 0 3px 3px rgba(255,255,255,.8),
+              0 4px 0 #17415c;
+          }
+
+          .hierarchyBig {
+            font-size: 19px;
+          }
+
+          .hierarchySmall {
+            font-size: 11px;
+          }
+
+          .subjectAdminBar,
+          .subjectMaterialActions {
+            grid-template-columns: 1fr;
+            gap: 9px;
+            margin-bottom: 14px;
+          }
+
+          .addSubjectButton {
+            min-height: 46px;
+            font-size: 14px;
+          }
+
+          .subjectFolderCard {
+            min-height: 135px;
+            padding: 11px;
+            border-radius: 12px;
+          }
+
+          .folderName3D {
+            padding: 6px 10px;
+            font-size: 14px;
+          }
+
+          .materialCount {
+            font-size: 11px;
+          }
+        }
+
       `}</style>
     </div>
   );
@@ -3829,6 +4199,24 @@ export default function KazuslarPage() {
   const [casesLoading, setCasesLoading] = useState(true);
   const [casesError, setCasesError] = useState("");
 
+  const [subjects, setSubjects] = useState<SubjectFolder[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [subjectsError, setSubjectsError] = useState("");
+
+  const [selectedCourse, setSelectedCourse] =
+    useState<CourseNumber | null>(null);
+  const [selectedSemester, setSelectedSemester] =
+    useState<SemesterNumber | null>(null);
+  const [selectedSubject, setSelectedSubject] =
+    useState<SubjectFolder | null>(null);
+
+  const [showSubjectForm, setShowSubjectForm] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [editingSubjectId, setEditingSubjectId] =
+    useState<string | null>(null);
+  const [subjectSaving, setSubjectSaving] = useState(false);
+  const [subjectMessage, setSubjectMessage] = useState("");
+
   const [selectedCase, setSelectedCase] = useState<PlatformCase | null>(null);
   const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
   const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
@@ -3865,6 +4253,7 @@ export default function KazuslarPage() {
   useEffect(() => {
     loadRole();
     loadCases();
+    loadSubjects();
   }, []);
 
   async function loadRole() {
@@ -3929,15 +4318,262 @@ export default function KazuslarPage() {
     }
   }
 
+  async function loadSubjects() {
+    try {
+      setSubjectsLoading(true);
+      setSubjectsError("");
+
+      const response = await fetch("/api/kazuslar/fanlar", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            "Fanlarni yuklab bo‘lmadi."
+        );
+      }
+
+      setSubjects(
+        Array.isArray(data.subjects)
+          ? data.subjects
+          : []
+      );
+    } catch (error) {
+      console.error("SUBJECTS LOAD ERROR:", error);
+
+      setSubjectsError(
+        error instanceof Error
+          ? error.message
+          : "Fanlarni yuklashda xatolik."
+      );
+    } finally {
+      setSubjectsLoading(false);
+    }
+  }
+
+
   function goBack() {
     if (mode !== "list") {
       setMode("list");
       setSelectedCase(null);
       setSaveMessage("");
+      setPdfMessage("");
+      return;
+    }
+
+    if (selectedSubject) {
+      setSelectedSubject(null);
+      setSearch("");
+      return;
+    }
+
+    if (selectedSemester) {
+      setSelectedSemester(null);
+      return;
+    }
+
+    if (selectedCourse) {
+      setSelectedCourse(null);
       return;
     }
 
     window.location.href = "/";
+  }
+
+  function semestersForCourse(course: CourseNumber) {
+    const first = ((course - 1) * 2 + 1) as SemesterNumber;
+    const second = (first + 1) as SemesterNumber;
+    return [first, second];
+  }
+
+  function normalizeSubjectName(value: string) {
+    return value
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("uz");
+  }
+
+  function resetSubjectForm() {
+    setNewSubjectName("");
+    setEditingSubjectId(null);
+    setSubjectMessage("");
+    setShowSubjectForm(false);
+  }
+
+  function openAddSubjectForm() {
+    if (
+      role !== "admin" ||
+      !selectedCourse ||
+      !selectedSemester
+    ) {
+      return;
+    }
+
+    setNewSubjectName("");
+    setEditingSubjectId(null);
+    setSubjectMessage("");
+    setShowSubjectForm(true);
+  }
+
+  function openEditSubjectForm(item: SubjectFolder) {
+    if (role !== "admin") return;
+
+    setNewSubjectName(item.name);
+    setEditingSubjectId(item.id);
+    setSubjectMessage("");
+    setShowSubjectForm(true);
+  }
+
+  async function saveSubject() {
+    if (
+      role !== "admin" ||
+      !selectedCourse ||
+      !selectedSemester
+    ) {
+      setSubjectMessage("Fan qo‘shish faqat administrator uchun.");
+      return;
+    }
+
+    const cleanName = newSubjectName
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (!cleanName) {
+      setSubjectMessage("Fan nomini kiriting.");
+      return;
+    }
+
+    const duplicate = subjects.some(
+      (item) =>
+        item.course === selectedCourse &&
+        item.semester === selectedSemester &&
+        item.id !== editingSubjectId &&
+        normalizeSubjectName(item.name) ===
+          normalizeSubjectName(cleanName)
+    );
+
+    if (duplicate) {
+      setSubjectMessage("Bu fan ushbu semestrda allaqachon mavjud.");
+      return;
+    }
+
+    try {
+      setSubjectSaving(true);
+      setSubjectMessage("");
+
+      const response = await fetch("/api/kazuslar/fanlar", {
+        method: editingSubjectId ? "PATCH" : "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...(editingSubjectId
+            ? { id: editingSubjectId }
+            : {}),
+          name: cleanName,
+          course: selectedCourse,
+          semester: selectedSemester,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            "Fanni saqlab bo‘lmadi."
+        );
+      }
+
+      await loadSubjects();
+
+      setSubjectMessage(
+        editingSubjectId
+          ? "✅ Fan nomi yangilandi."
+          : "✅ Fan qo‘shildi."
+      );
+
+      window.setTimeout(() => {
+        resetSubjectForm();
+      }, 650);
+    } catch (error) {
+      console.error("SUBJECT SAVE ERROR:", error);
+
+      setSubjectMessage(
+        error instanceof Error
+          ? `❌ ${error.message}`
+          : "❌ Fanni saqlashda xatolik."
+      );
+    } finally {
+      setSubjectSaving(false);
+    }
+  }
+
+  async function deleteSubject(item: SubjectFolder) {
+    if (role !== "admin") return;
+
+    const insideCount = cases.filter(
+      (caseItem) =>
+        normalizeSubjectName(caseItem.subject) ===
+        normalizeSubjectName(item.name)
+    ).length;
+
+    const confirmed = window.confirm(
+      insideCount > 0
+        ? `“${item.name}” fanida ${insideCount} ta kazus/PDF bor.\n\nAvval ichidagi materiallarni o‘chirish tavsiya qilinadi.\n\nBaribir fanni o‘chirmoqchimisiz?`
+        : `“${item.name}” fanini o‘chirmoqchimisiz?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `/api/kazuslar/fanlar?id=${encodeURIComponent(item.id)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: item.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            "Fanni o‘chirib bo‘lmadi."
+        );
+      }
+
+      setSubjects((old) =>
+        old.filter((subjectItem) => subjectItem.id !== item.id)
+      );
+
+      if (selectedSubject?.id === item.id) {
+        setSelectedSubject(null);
+      }
+    } catch (error) {
+      console.error("SUBJECT DELETE ERROR:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Fanni o‘chirishda xatolik."
+      );
+    }
   }
 
   function resetForm() {
@@ -3982,14 +4618,25 @@ export default function KazuslarPage() {
   }
 
   function openWriteMode() {
+    if (!selectedSubject) {
+      alert("Avval fan ichiga kiring.");
+      return;
+    }
+
     resetForm();
+    setSubject(selectedSubject.name);
     setMode("write");
   }
 
   function openUploadMode() {
+    if (!selectedSubject) {
+      alert("Avval fan ichiga kiring.");
+      return;
+    }
+
     setSaveMessage("");
     setPdfFile(null);
-    setPdfSubject("");
+    setPdfSubject(selectedSubject.name);
     setPdfTitle("");
     setPdfMessage("");
     setMode("upload");
@@ -4446,22 +5093,51 @@ export default function KazuslarPage() {
   }
 
   const filteredCases = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase("uz");
+    if (!selectedSubject) {
+      return [];
+    }
 
-    if (!q) return cases;
+    const q = search.trim().toLocaleLowerCase("uz");
+    const selectedName =
+      normalizeSubjectName(selectedSubject.name);
 
     return cases.filter((item) => {
+      if (
+        normalizeSubjectName(item.subject) !== selectedName
+      ) {
+        return false;
+      }
+
+      if (!q) return true;
+
       const extraText =
         item.type === "platform"
           ? item.caseText
           : item.originalFileName;
 
-      const text = `${item.subject} ${item.title} ${extraText}`
-        .toLocaleLowerCase("uz");
+      const searchable =
+        `${item.title} ${extraText}`
+          .toLocaleLowerCase("uz");
 
-      return text.includes(q);
+      return searchable.includes(q);
     });
-  }, [cases, search]);
+  }, [cases, search, selectedSubject]);
+
+  const subjectsForSelectedSemester = useMemo(() => {
+    if (!selectedCourse || !selectedSemester) {
+      return [];
+    }
+
+    return subjects
+      .filter(
+        (item) =>
+          item.course === selectedCourse &&
+          item.semester === selectedSemester
+      )
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, "uz")
+      );
+  }, [subjects, selectedCourse, selectedSemester]);
 
   return (
     <main
@@ -4513,27 +5189,7 @@ export default function KazuslarPage() {
 
       {mode === "list" && (
         <>
-          <section className="controlBox">
-            {!roleLoading && role === "admin" && (
-              <>
-                <button
-                  className="mainActionButton"
-                  type="button"
-                  onClick={openWriteMode}
-                >
-                  Kazusga javob yozish
-                </button>
-
-                <button
-                  className="mainActionButton"
-                  type="button"
-                  onClick={openUploadMode}
-                >
-                  Kazus yuklash
-                </button>
-              </>
-            )}
-
+          <section className="controlBox examLinksOnly">
             <button
               className="mainActionButton examActionButton"
               type="button"
@@ -4555,89 +5211,353 @@ export default function KazuslarPage() {
             </button>
           </section>
 
-          <section className="mainBox">
-            <div className="sectionTitle">Kazuslar</div>
-
-            <div className="searchRow">
-              <input
-                className="searchInput"
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Kazus yoki fan bo‘yicha qidirish..."
-              />
-
-              <button
-                className="refreshButton"
-                type="button"
-                onClick={loadCases}
-                disabled={casesLoading}
-              >
-                {casesLoading ? "Yuklanmoqda..." : "Yangilash"}
-              </button>
+          <section className="mainBox hierarchyBox">
+            <div className="sectionTitle">
+              {selectedSubject
+                ? selectedSubject.name
+                : selectedSemester
+                  ? `${selectedSemester}-semestr fanlari`
+                  : selectedCourse
+                    ? `${selectedCourse}-kurs semestrlari`
+                    : "Kursni tanlang"}
             </div>
 
-            {casesError && <div className="errorBox">{casesError}</div>}
+            <div className="breadcrumbRow">
+              <button
+                type="button"
+                className={!selectedCourse ? "crumb active" : "crumb"}
+                onClick={() => {
+                  setSelectedCourse(null);
+                  setSelectedSemester(null);
+                  setSelectedSubject(null);
+                  setSearch("");
+                }}
+              >
+                Kazuslar
+              </button>
 
-            {casesLoading ? (
-              <div className="emptyState">Kazuslar yuklanmoqda...</div>
-            ) : filteredCases.length === 0 ? (
-              <div className="emptyState">
-                {cases.length === 0
-                  ? "Hozircha kazus qo‘shilmagan."
-                  : "Qidiruv bo‘yicha kazus topilmadi."}
-              </div>
-            ) : (
-              <div className="cases">
-                {filteredCases.map((item) => (
-                  <article
-                    className={`caseCard ${
-                      item.type === "pdf" ? "pdfCaseCard" : ""
-                    }`}
-                    key={item.id}
+              {selectedCourse && (
+                <>
+                  <span>›</span>
+                  <button
+                    type="button"
+                    className={!selectedSemester ? "crumb active" : "crumb"}
+                    onClick={() => {
+                      setSelectedSemester(null);
+                      setSelectedSubject(null);
+                      setSearch("");
+                    }}
                   >
+                    {selectedCourse}-kurs
+                  </button>
+                </>
+              )}
 
-                    <div className="subjectBadge">{item.subject}</div>
+              {selectedSemester && (
+                <>
+                  <span>›</span>
+                  <button
+                    type="button"
+                    className={!selectedSubject ? "crumb active" : "crumb"}
+                    onClick={() => {
+                      setSelectedSubject(null);
+                      setSearch("");
+                    }}
+                  >
+                    {selectedSemester}-semestr
+                  </button>
+                </>
+              )}
 
-                    <h2>{item.title}</h2>
+              {selectedSubject && (
+                <>
+                  <span>›</span>
+                  <span className="crumb active">
+                    {selectedSubject.name}
+                  </span>
+                </>
+              )}
+            </div>
 
-                    <div className="caseCardActions">
-                      {!roleLoading && role === "admin" && (
-                        <div className="caseAdminActions">
-                          {item.type === "platform" && (
-                            <button
-                              className="cardEditButton"
-                              type="button"
-                              onClick={() => openEditMode(item)}
-                            >
-                              Tahrirlash
-                            </button>
+            {!selectedCourse && (
+              <div className="courseGrid">
+                {([1, 2, 3, 4] as CourseNumber[]).map((course) => (
+                  <button
+                    key={course}
+                    type="button"
+                    className="hierarchyCard courseCard3D"
+                    onClick={() => {
+                      setSelectedCourse(course);
+                      setSelectedSemester(null);
+                      setSelectedSubject(null);
+                    }}
+                  >
+                    <span className="hierarchyBig">{course}-kurs</span>
+                    <span className="hierarchySmall">
+                      {course === 1
+                        ? "1–2-semestr"
+                        : course === 2
+                          ? "3–4-semestr"
+                          : course === 3
+                            ? "5–6-semestr"
+                            : "7–8-semestr"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedCourse && !selectedSemester && (
+              <div className="semesterGrid">
+                {semestersForCourse(selectedCourse).map((semester) => (
+                  <button
+                    key={semester}
+                    type="button"
+                    className="hierarchyCard semesterCard3D"
+                    onClick={() => {
+                      setSelectedSemester(semester);
+                      setSelectedSubject(null);
+                    }}
+                  >
+                    <span className="hierarchyBig">{semester}-semestr</span>
+                    <span className="hierarchySmall">
+                      Fanlarni ko‘rish
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedCourse && selectedSemester && !selectedSubject && (
+              <>
+                {!roleLoading && role === "admin" && (
+                  <div className="subjectAdminBar">
+                    <button
+                      type="button"
+                      className="addSubjectButton"
+                      onClick={openAddSubjectForm}
+                    >
+                      + Fan qo‘shish
+                    </button>
+
+                    <button
+                      type="button"
+                      className="refreshButton"
+                      onClick={loadSubjects}
+                      disabled={subjectsLoading}
+                    >
+                      {subjectsLoading ? "Yuklanmoqda..." : "Yangilash"}
+                    </button>
+                  </div>
+                )}
+
+                {showSubjectForm && role === "admin" && (
+                  <div className="subjectForm3D">
+                    <label>
+                      Fan nomi
+                      <input
+                        type="text"
+                        value={newSubjectName}
+                        onChange={(e) => setNewSubjectName(e.target.value)}
+                        placeholder="Masalan: Fuqarolik huquqi"
+                        autoFocus
+                      />
+                    </label>
+
+                    <div className="subjectFormActions">
+                      <button
+                        type="button"
+                        className="saveSubjectButton"
+                        onClick={saveSubject}
+                        disabled={subjectSaving}
+                      >
+                        {subjectSaving
+                          ? "Saqlanmoqda..."
+                          : editingSubjectId
+                            ? "Fan nomini saqlash"
+                            : "Fanni qo‘shish"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="cancelSubjectButton"
+                        onClick={resetSubjectForm}
+                      >
+                        Bekor qilish
+                      </button>
+                    </div>
+
+                    {subjectMessage && (
+                      <div className="subjectMessage">{subjectMessage}</div>
+                    )}
+                  </div>
+                )}
+
+                {subjectsError && (
+                  <div className="errorBox">{subjectsError}</div>
+                )}
+
+                {subjectsLoading ? (
+                  <div className="emptyState">Fanlar yuklanmoqda...</div>
+                ) : subjectsForSelectedSemester.length === 0 ? (
+                  <div className="emptyState">
+                    Hozircha bu semestrga fan qo‘shilmagan.
+                  </div>
+                ) : (
+                  <div className="subjectsGrid">
+                    {subjectsForSelectedSemester.map((item) => {
+                      const materialCount = cases.filter(
+                        (caseItem) =>
+                          normalizeSubjectName(caseItem.subject) ===
+                          normalizeSubjectName(item.name)
+                      ).length;
+
+                      return (
+                        <article className="subjectFolderCard" key={item.id}>
+                          <button
+                            type="button"
+                            className="subjectFolderOpen"
+                            onClick={() => {
+                              setSelectedSubject(item);
+                              setSearch("");
+                            }}
+                          >
+                            <span className="folderName3D">{item.name}</span>
+                            <span className="materialCount">
+                              {materialCount} ta material
+                            </span>
+                          </button>
+
+                          {!roleLoading && role === "admin" && (
+                            <div className="subjectFolderAdmin">
+                              <button
+                                type="button"
+                                className="miniEditButton"
+                                onClick={() => openEditSubjectForm(item)}
+                              >
+                                Tahrirlash
+                              </button>
+
+                              <button
+                                type="button"
+                                className="miniDeleteButton"
+                                onClick={() => deleteSubject(item)}
+                              >
+                                O‘chirish
+                              </button>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {selectedSubject && (
+              <>
+                {!roleLoading && role === "admin" && (
+                  <section className="subjectMaterialActions">
+                    <button
+                      className="mainActionButton"
+                      type="button"
+                      onClick={openWriteMode}
+                    >
+                      Kazus yozish
+                    </button>
+
+                    <button
+                      className="mainActionButton"
+                      type="button"
+                      onClick={openUploadMode}
+                    >
+                      PDF yuklash
+                    </button>
+                  </section>
+                )}
+
+                <div className="searchRow">
+                  <input
+                    className="searchInput"
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={`${selectedSubject.name} ichidan qidirish...`}
+                  />
+
+                  <button
+                    className="refreshButton"
+                    type="button"
+                    onClick={loadCases}
+                    disabled={casesLoading}
+                  >
+                    {casesLoading ? "Yuklanmoqda..." : "Yangilash"}
+                  </button>
+                </div>
+
+                {casesError && <div className="errorBox">{casesError}</div>}
+
+                {casesLoading ? (
+                  <div className="emptyState">Kazuslar yuklanmoqda...</div>
+                ) : filteredCases.length === 0 ? (
+                  <div className="emptyState">
+                    {search.trim()
+                      ? "Qidiruv bo‘yicha material topilmadi."
+                      : "Hozircha bu fan ichiga kazus yoki PDF joylanmagan."}
+                  </div>
+                ) : (
+                  <div className="cases">
+                    {filteredCases.map((item) => (
+                      <article
+                        className={`caseCard ${
+                          item.type === "pdf" ? "pdfCaseCard" : ""
+                        }`}
+                        key={item.id}
+                      >
+                        <div className="subjectBadge">{selectedSubject.name}</div>
+
+                        <h2>{item.title}</h2>
+
+                        <div className="caseCardActions">
+                          {!roleLoading && role === "admin" && (
+                            <div className="caseAdminActions">
+                              {item.type === "platform" && (
+                                <button
+                                  className="cardEditButton"
+                                  type="button"
+                                  onClick={() => openEditMode(item)}
+                                >
+                                  Tahrirlash
+                                </button>
+                              )}
+
+                              <button
+                                className="cardDeleteButton"
+                                type="button"
+                                disabled={deletingCaseId === item.id}
+                                onClick={() => deleteCase(item)}
+                              >
+                                {deletingCaseId === item.id
+                                  ? "O‘chirilmoqda..."
+                                  : "O‘chirish"}
+                              </button>
+                            </div>
                           )}
 
                           <button
-                            className="cardDeleteButton"
+                            className="openButton"
                             type="button"
-                            disabled={deletingCaseId === item.id}
-                            onClick={() => deleteCase(item)}
+                            onClick={() => openCase(item)}
                           >
-                            {deletingCaseId === item.id
-                              ? "O‘chirilmoqda..."
-                              : "O‘chirish"}
+                            Ochish
                           </button>
                         </div>
-                      )}
-
-                      <button
-                        className="openButton"
-                        type="button"
-                        onClick={() => openCase(item)}
-                      >
-                        Ochish
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </section>
         </>
@@ -4655,8 +5575,8 @@ export default function KazuslarPage() {
             <input
               type="text"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Masalan: Jinoyat huquqi"
+              readOnly
+              className="lockedSubjectInput"
             />
           </div>
 
@@ -4811,11 +5731,8 @@ export default function KazuslarPage() {
                 <input
                   type="text"
                   value={pdfSubject}
-                  onChange={(e) => {
-                    setPdfSubject(e.target.value);
-                    setPdfMessage("");
-                  }}
-                  placeholder="Masalan: Jinoyat huquqi"
+                  readOnly
+                  className="lockedSubjectInput"
                   disabled={pdfUploading}
                 />
               </div>
