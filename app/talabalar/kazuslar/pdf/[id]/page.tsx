@@ -457,6 +457,43 @@ export default function PdfViewerPage({
     }
   }
 
+  function markerColorWithOpacity(
+    hexColor: string,
+    alpha = 0.42
+  ) {
+    const hex =
+      hexColor.replace(
+        "#",
+        ""
+      );
+
+    if (
+      hex.length !== 6
+    ) {
+      return `rgba(255, 241, 118, ${alpha})`;
+    }
+
+    const r =
+      parseInt(
+        hex.slice(0, 2),
+        16
+      );
+
+    const g =
+      parseInt(
+        hex.slice(2, 4),
+        16
+      );
+
+    const b =
+      parseInt(
+        hex.slice(4, 6),
+        16
+      );
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
   function wrapTextNodeRange(
     node: Text,
     startOffset: number,
@@ -510,7 +547,9 @@ export default function PdfViewerPage({
       "pdfHighlight";
 
     mark.style.backgroundColor =
-      color;
+      markerColorWithOpacity(
+        color
+      );
 
     localRange.surroundContents(
       mark
@@ -1968,9 +2007,20 @@ export default function PdfViewerPage({
         }
 
         .pdfHighlight {
-          color: inherit !important;
+          /*
+            PDF matnining o‘zi canvas ichida chizilgan.
+            Marker text layer ustida turadi, shuning uchun
+            fon yarim shaffof bo‘lishi kerak. Aks holda
+            sariq to‘rtburchak matnni yopib yuboradi.
+          */
+          color: transparent !important;
           padding: 0 !important;
           border-radius: 2px;
+
+          mix-blend-mode: multiply;
+
+          box-decoration-break: clone;
+          -webkit-box-decoration-break: clone;
         }
 
         .eraseHighlightMode .pdfHighlight {
@@ -1980,7 +2030,7 @@ export default function PdfViewerPage({
         }
 
         .eraseHighlightMode .pdfHighlight:hover {
-          background: #ffb3b3 !important;
+          background: rgba(255, 80, 80, .38) !important;
         }
 
         .loadingBox,
