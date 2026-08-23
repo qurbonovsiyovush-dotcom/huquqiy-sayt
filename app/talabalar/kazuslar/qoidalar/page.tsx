@@ -587,8 +587,6 @@ export default function QoidalarPage() {
                   </p>
                 )}
 
-              {item.fileName} · {formatFileSize(item.fileSize)}
-
                 {!roleLoading && role === "admin" && (
                   <div className="adminCardActions">
                     <button
