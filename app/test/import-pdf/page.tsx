@@ -43,6 +43,14 @@ type EditorShape = {
   matchingKey?: string;
 };
 
+type PdfCrop = {
+  pageNumber: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type ImportedQuestion = {
   id: string;
   number: number;
@@ -50,6 +58,7 @@ type ImportedQuestion = {
   options: ImportedOption[];
   imageSrc?: string;
   shapes?: EditorShape[];
+  pdfCrop?: PdfCrop;
   warning?: string;
 };
 
@@ -774,6 +783,453 @@ function RichTextEditor({
   );
 }
 
+async function renderPdfCropInBrowser(
+  file: File,
+  crop: PdfCrop
+): Promise<string | undefined> {
+  try {
+    const pdfjs = await import(
+      "pdfjs-dist/legacy/build/pdf.mjs"
+    );
+
+    /*
+      Worker shu npm paketning o‘zidan bundle qilinadi.
+      Alohida public fayl yaratish shart emas.
+    */
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      new URL(
+        "pdfjs-dist/legacy/build/pdf.worker.mjs",
+        import.meta.url
+      ).toString();
+
+    const bytes =
+      new Uint8Array(
+        await file.arrayBuffer()
+      );
+
+    const pdf =
+      await pdfjs
+        .getDocument({
+          data: bytes,
+          useSystemFonts: true,
+        })
+        .promise;
+
+    if (
+      crop.pageNumber < 1 ||
+      crop.pageNumber > pdf.numPages
+    ) {
+      await pdf.destroy();
+      return undefined;
+    }
+
+    const pdfPage =
+      await pdf.getPage(
+        crop.pageNumber
+      );
+
+    /*
+      2.4x — jadval va kichik diagramma matnlari uchun tiniq.
+    */
+    const scale = 2.4;
+
+    const viewport =
+      pdfPage.getViewport({
+        scale,
+      });
+
+    const pageCanvas =
+      document.createElement(
+        "canvas"
+      );
+
+    pageCanvas.width =
+      Math.ceil(
+        viewport.width
+      );
+
+    pageCanvas.height =
+      Math.ceil(
+        viewport.height
+      );
+
+    const pageContext =
+      pageCanvas.getContext(
+        "2d",
+        {
+          alpha: false,
+        }
+      );
+
+    if (!pageContext) {
+      await pdf.destroy();
+      return undefined;
+    }
+
+    pageContext.fillStyle =
+      "#ffffff";
+
+    pageContext.fillRect(
+      0,
+      0,
+      pageCanvas.width,
+      pageCanvas.height
+    );
+
+    await pdfPage
+      .render({
+        canvasContext:
+          pageContext,
+        viewport,
+        canvas:
+          pageCanvas,
+      })
+      .promise;
+
+    /*
+      Server pdfCrop'ni PDF koordinatasida beradi:
+        x: chapdan
+        y: pastdan
+      Browser canvas esa:
+        x: chapdan
+        y: yuqoridan
+
+      Shu yerda koordinatani o‘giramiz.
+    */
+    const rawX =
+      crop.x * scale;
+
+    const rawY =
+      viewport.height -
+      (crop.y +
+        crop.height) *
+        scale;
+
+    const rawWidth =
+      crop.width * scale;
+
+    const rawHeight =
+      crop.height * scale;
+
+    const sourceX =
+      Math.max(
+        0,
+        Math.floor(rawX)
+      );
+
+    const sourceY =
+      Math.max(
+        0,
+        Math.floor(rawY)
+      );
+
+    const sourceWidth =
+      Math.max(
+        1,
+        Math.min(
+          pageCanvas.width -
+            sourceX,
+          Math.ceil(
+            rawWidth
+          )
+        )
+      );
+
+    const sourceHeight =
+      Math.max(
+        1,
+        Math.min(
+          pageCanvas.height -
+            sourceY,
+          Math.ceil(
+            rawHeight
+          )
+        )
+      );
+
+    if (
+      sourceWidth < 20 ||
+      sourceHeight < 20
+    ) {
+      await pdf.destroy();
+      return undefined;
+    }
+
+    const cropCanvas =
+      document.createElement(
+        "canvas"
+      );
+
+    cropCanvas.width =
+      sourceWidth;
+
+    cropCanvas.height =
+      sourceHeight;
+
+    const cropContext =
+      cropCanvas.getContext(
+        "2d",
+        {
+          alpha: false,
+        }
+      );
+
+    if (!cropContext) {
+      await pdf.destroy();
+      return undefined;
+    }
+
+    cropContext.fillStyle =
+      "#ffffff";
+
+    cropContext.fillRect(
+      0,
+      0,
+      cropCanvas.width,
+      cropCanvas.height
+    );
+
+    cropContext.drawImage(
+      pageCanvas,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      sourceWidth,
+      sourceHeight
+    );
+
+    /*
+      PNG haddan tashqari katta bo‘lmasin.
+    */
+    const maxWidth = 1500;
+    let finalCanvas =
+      cropCanvas;
+
+    if (
+      cropCanvas.width >
+      maxWidth
+    ) {
+      const ratio =
+        maxWidth /
+        cropCanvas.width;
+
+      const resized =
+        document.createElement(
+          "canvas"
+        );
+
+      resized.width =
+        maxWidth;
+
+      resized.height =
+        Math.max(
+          1,
+          Math.round(
+            cropCanvas.height *
+              ratio
+          )
+        );
+
+      const resizedContext =
+        resized.getContext(
+          "2d",
+          {
+            alpha: false,
+          }
+        );
+
+      if (resizedContext) {
+        resizedContext.fillStyle =
+          "#ffffff";
+
+        resizedContext.fillRect(
+          0,
+          0,
+          resized.width,
+          resized.height
+        );
+
+        resizedContext.drawImage(
+          cropCanvas,
+          0,
+          0,
+          cropCanvas.width,
+          cropCanvas.height,
+          0,
+          0,
+          resized.width,
+          resized.height
+        );
+
+        finalCanvas =
+          resized;
+      }
+    }
+
+    const dataUrl =
+      finalCanvas.toDataURL(
+        "image/png"
+      );
+
+    try {
+      pdfPage.cleanup();
+    } catch {
+      // ignore
+    }
+
+    await pdf.destroy();
+
+    return dataUrl;
+  } catch (error) {
+    console.error(
+      "BROWSER PDF CROP ERROR:",
+      error
+    );
+
+    return undefined;
+  }
+}
+
+async function attachBrowserPdfImages(
+  file: File,
+  questions: ImportedQuestion[]
+): Promise<ImportedQuestion[]> {
+  const result:
+    ImportedQuestion[] = [];
+
+  for (const question of questions) {
+    if (!question.pdfCrop) {
+      result.push({
+        ...question,
+        imageSrc: undefined,
+        shapes:
+          Array.isArray(
+            question.shapes
+          )
+            ? question.shapes
+            : [],
+      });
+
+      continue;
+    }
+
+    const imageSrc =
+      await renderPdfCropInBrowser(
+        file,
+        question.pdfCrop
+      );
+
+    if (!imageSrc) {
+      result.push({
+        ...question,
+        imageSrc: undefined,
+        shapes:
+          Array.isArray(
+            question.shapes
+          )
+            ? question.shapes
+            : [],
+      });
+
+      continue;
+    }
+
+    const visualRatio =
+      question.pdfCrop.width /
+      Math.max(
+        1,
+        question.pdfCrop.height
+      );
+
+    let displayWidth = 680;
+    let displayHeight =
+      displayWidth /
+      visualRatio;
+
+    if (
+      displayHeight >
+      430
+    ) {
+      displayHeight = 430;
+      displayWidth =
+        displayHeight *
+        visualRatio;
+    }
+
+    const pdfImageShape:
+      EditorShape = {
+      id:
+        `pdf-browser-img-${question.id}`,
+      type: "image",
+      x: Math.max(
+        20,
+        Math.round(
+          (900 -
+            displayWidth) /
+            2
+        )
+      ),
+      y: 45,
+      width:
+        Math.max(
+          120,
+          Math.round(
+            displayWidth
+          )
+        ),
+      height:
+        Math.max(
+          90,
+          Math.round(
+            displayHeight
+          )
+        ),
+      imageSrc,
+      objectFit:
+        "contain",
+      borderWidth: 0,
+      borderRadius: 4,
+      opacity: 1,
+      zIndex: 1,
+    };
+
+    const existingShapes =
+      Array.isArray(
+        question.shapes
+      )
+        ? question.shapes.filter(
+            (shape) =>
+              !(
+                shape.type ===
+                  "image" &&
+                (
+                  shape.id.startsWith(
+                    "pdf-img-"
+                  ) ||
+                  shape.id.startsWith(
+                    "pdf-browser-img-"
+                  )
+                )
+              )
+          )
+        : [];
+
+    result.push({
+      ...question,
+      imageSrc: undefined,
+      shapes: [
+        ...existingShapes,
+        pdfImageShape,
+      ],
+    });
+  }
+
+  return result;
+}
+
 export default function ImportPdfTestPage() {
   const router = useRouter();
 
@@ -951,45 +1407,46 @@ export default function ImportPdfTestPage() {
         );
       }
 
-      const imported:
+      const serverQuestions:
         ImportedQuestion[] =
         Array.isArray(
           data.questions
         )
           ? data.questions.map(
-              (question: ImportedQuestion) => {
-                const legacyImageShape: EditorShape[] =
-                  question.imageSrc
-                    ? [
-                        {
-                          id: `pdf-img-${question.id}`,
-                          type: "image",
-                          x: 110,
-                          y: 40,
-                          width: 620,
-                          height: 300,
-                          imageSrc: question.imageSrc,
-                          objectFit: "contain",
-                          borderWidth: 0,
-                          borderRadius: 6,
-                          zIndex: 1,
-                        },
-                      ]
-                    : [];
+              (
+                question:
+                  ImportedQuestion
+              ) => ({
+                ...question,
 
-                return {
-                  ...question,
-                  imageSrc: undefined,
-                  shapes:
-                    Array.isArray(question.shapes) &&
-                    question.shapes.length > 0
-                      ? question.shapes
-                      : legacyImageShape,
-                };
-              }
+                /*
+                  Server endi rasm chizmaydi.
+                  U faqat pdfCrop koordinatasini qaytaradi.
+                */
+                imageSrc:
+                  undefined,
+
+                shapes:
+                  Array.isArray(
+                    question.shapes
+                  )
+                    ? question.shapes
+                    : [],
+              })
             )
           : [];
 
+      /*
+        ENG MUHIM QISM:
+        original PDF Chrome/PDF.js ichida render qilinadi.
+        Jadval, Venn, moslashtirish va ularning matnlari
+        birgalikda PNG bo‘lib savolga biriktiriladi.
+      */
+      const imported =
+        await attachBrowserPdfImages(
+          pdfFile,
+          serverQuestions
+        );
       try {
         const keysToRemove: string[] = [];
 
