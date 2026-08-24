@@ -1,7 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+
+type TestCategory =
+  | "legislation"
+  | "thematic"
+  | "block"
+  | "national-certificate"
+  | "thirty"
+  | "custom";
+
+const TEST_CATEGORY_LABELS: Record<TestCategory, string> = {
+  legislation: "Qonunchilik hujjatlaridan test",
+  thematic: "Mavzulashtirilgan test",
+  block: "Blok test",
+  "national-certificate": "Milliy sertifikat testi",
+  thirty: "30 talik test",
+  custom: "Boshqa test",
+};
+
+function normalizeTestCategory(value: unknown): TestCategory {
+  return value === "legislation" ||
+    value === "thematic" ||
+    value === "block" ||
+    value === "national-certificate" ||
+    value === "thirty" ||
+    value === "custom"
+    ? value
+    : "legislation";
+}
 
 type ImportedOption = {
   id: string;
@@ -776,11 +804,19 @@ function RichTextEditor({
 
 export default function ImportPdfTestPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [duration, setDuration] = useState(60);
   const [description, setDescription] = useState("");
+
+  const [testType, setTestType] =
+    useState<TestCategory>("legislation");
+
+  const [customTestTypeName, setCustomTestTypeName] =
+    useState("");
+
   const [attemptLimitEnabled, setAttemptLimitEnabled] = useState(true);
   const [attemptLimit, setAttemptLimit] = useState(1);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -826,6 +862,30 @@ export default function ImportPdfTestPage() {
     startHeight: number;
     handle?: "nw" | "ne" | "sw" | "se";
   } | null>(null);
+
+  useEffect(() => {
+    const urlType =
+      searchParams.get("testType");
+
+    if (urlType) {
+      setTestType(
+        normalizeTestCategory(
+          urlType
+        )
+      );
+    }
+
+    const customName =
+      searchParams.get(
+        "customTestTypeName"
+      );
+
+    if (customName) {
+      setCustomTestTypeName(
+        customName
+      );
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -2584,6 +2644,16 @@ export default function ImportPdfTestPage() {
 
   async function saveDraft() {
     if (
+      testType === "custom" &&
+      !customTestTypeName.trim()
+    ) {
+      setMessage(
+        "Boshqa test turi uchun test turining nomini kiriting."
+      );
+      return;
+    }
+
+    if (
       questions.length === 0
     ) {
       setMessage(
@@ -2638,6 +2708,14 @@ export default function ImportPdfTestPage() {
           60,
         description:
           description.trim(),
+
+        testType,
+
+        customTestTypeName:
+          testType === "custom"
+            ? customTestTypeName.trim()
+            : "",
+
         status: "draft",
         attemptLimit:
           attemptLimitEnabled
@@ -2884,11 +2962,26 @@ export default function ImportPdfTestPage() {
           <button
             type="button"
             className="blueButton"
-            onClick={() =>
+            onClick={() => {
+              const params =
+                new URLSearchParams({
+                  testType,
+                });
+
+              if (
+                testType === "custom" &&
+                customTestTypeName.trim()
+              ) {
+                params.set(
+                  "customTestTypeName",
+                  customTestTypeName.trim()
+                );
+              }
+
               router.push(
-                "/test/editor"
-              )
-            }
+                `/test/editor?${params.toString()}`
+              );
+            }}
           >
             Oddiy test yaratish
           </button>
@@ -2911,6 +3004,75 @@ export default function ImportPdfTestPage() {
         </div>
 
         <div className="metaGrid">
+          <label className="categoryField">
+            <span>
+              Test turi
+            </span>
+
+            <select
+              value={testType}
+              onChange={(event) =>
+                setTestType(
+                  normalizeTestCategory(
+                    event.target.value
+                  )
+                )
+              }
+            >
+              <option value="legislation">
+                Qonunchilik hujjatlaridan test
+              </option>
+              <option value="thematic">
+                Mavzulashtirilgan test
+              </option>
+              <option value="block">
+                Blok test
+              </option>
+              <option value="national-certificate">
+                Milliy sertifikat testi
+              </option>
+              <option value="thirty">
+                30 talik test
+              </option>
+              <option value="custom">
+                Boshqa test
+              </option>
+            </select>
+          </label>
+
+          {testType === "custom" && (
+            <label className="customCategoryField">
+              <span>
+                Test turining nomi
+              </span>
+
+              <input
+                value={customTestTypeName}
+                onChange={(event) =>
+                  setCustomTestTypeName(
+                    event.target.value
+                  )
+                }
+                placeholder="Masalan: Final nazorat testi"
+              />
+            </label>
+          )}
+
+          <div className="selectedTypeBanner">
+            <span>
+              TANLANGAN BO‘LIM
+            </span>
+
+            <strong>
+              {testType === "custom"
+                ? customTestTypeName.trim() ||
+                  "Boshqa test"
+                : TEST_CATEGORY_LABELS[
+                    testType
+                  ]}
+            </strong>
+          </div>
+
           <label>
             <span>
               Test nomi
@@ -4420,6 +4582,80 @@ export default function ImportPdfTestPage() {
           border-radius: 999px;
         }
 
+
+
+        .categoryField select {
+          width: 100%;
+          min-height: 47px;
+          padding: 8px 12px;
+          border: 2px solid #65747d;
+          border-radius: 10px;
+          color: #123548;
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #e5ecef 100%
+            );
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.95),
+            0 3px 0 #68757c;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          outline: none;
+          cursor: pointer;
+        }
+
+        .categoryField select:focus {
+          border-color: #168fc8;
+          box-shadow:
+            0 0 0 3px rgba(22,143,200,.15),
+            0 3px 0 #477a92;
+        }
+
+        .customCategoryField input {
+          border-color: #b98729 !important;
+          background:
+            linear-gradient(
+              180deg,
+              #fffef8 0%,
+              #fff0c0 100%
+            ) !important;
+        }
+
+        .selectedTypeBanner {
+          min-height: 72px;
+          padding: 10px 14px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 4px;
+          border: 2px solid #174d6d;
+          border-radius: 11px;
+          color: #073b68;
+          background:
+            linear-gradient(
+              180deg,
+              #dff8ff 0%,
+              #83cae9 100%
+            );
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.9),
+            0 4px 0 #174760;
+        }
+
+        .selectedTypeBanner span {
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: .8px;
+          opacity: .76;
+        }
+
+        .selectedTypeBanner strong {
+          font-size: 16px;
+          line-height: 1.15;
+        }
 
         .metaGrid input,
         .metaGrid textarea,
