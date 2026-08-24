@@ -59,6 +59,7 @@ export default function AdminTestsPage() {
   const [exportTest, setExportTest] = useState<TestData | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<"pdf" | "word" | null>(null);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
 
   /* =========================================================
      JSON O'QISH
@@ -1276,12 +1277,85 @@ margin: 10px auto 12px;
           <button
             type="button"
             className="blueButton"
-            onClick={() => router.push("/test/editor")}
+            onClick={() => setCreateMenuOpen(true)}
           >
             <span className="buttonMain">Yangi test yaratish</span>
           </button>
         </div>
       </header>
+
+      {createMenuOpen && (
+        <div
+          className="createOverlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setCreateMenuOpen(false);
+            }
+          }}
+        >
+          <div
+            className="createModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="createTestTitle"
+          >
+            <button
+              type="button"
+              className="createClose"
+              onClick={() => setCreateMenuOpen(false)}
+              aria-label="Yopish"
+            >
+              ×
+            </button>
+
+            <div className="createModalBadge">
+              TEST YARATISH
+            </div>
+
+            <h2 id="createTestTitle">
+              Yangi test yaratish usulini tanlang
+            </h2>
+
+            <p className="createModalText">
+              Testni oddiy editor orqali qo‘lda yarating yoki PDF fayldan
+              savol va variantlarni avtomatik ajrating.
+            </p>
+
+            <div className="createChoiceGrid">
+              <button
+                type="button"
+                className="createChoice createChoiceManual"
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  router.push("/test/editor");
+                }}
+              >
+                <span className="createChoiceIcon">✎</span>
+                <strong>Oddiy test yaratish</strong>
+                <small>
+                  Savol va variantlarni qo‘lda kiritish
+                </small>
+              </button>
+
+              <button
+                type="button"
+                className="createChoice createChoicePdf"
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  router.push("/test/import-pdf");
+                }}
+              >
+                <span className="createChoiceIcon">PDF</span>
+                <strong>PDF dan test yaratish</strong>
+                <small>
+                  PDFdan savol va A/B/C/D variantlarni ajratish
+                </small>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           STATISTIKA
@@ -1936,6 +2010,362 @@ margin: 10px auto 12px;
             0 4px 0 #17415c;
 
           font-weight: 700;
+        }
+
+
+        /* ================================================
+           YANGI TEST TANLOVI
+        ================================================ */
+
+        .createOverlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          padding: 24px;
+
+          background:
+            rgba(18, 25, 29, 0.58);
+
+          backdrop-filter:
+            blur(5px);
+        }
+
+        .createModal {
+          position: relative;
+
+          width:
+            min(720px, 96vw);
+
+          padding:
+            54px 34px 34px;
+
+          border:
+            3px solid #303538;
+
+          border-radius:
+            24px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #74797c,
+              #555b5e 52%,
+              #3a3f42
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(255,255,255,.25),
+            inset 0 -8px 10px
+              rgba(0,0,0,.32),
+            0 9px 0 #252a2d,
+            0 24px 44px
+              rgba(0,0,0,.34);
+
+          text-align:
+            center;
+        }
+
+        .createModalBadge {
+          position:
+            absolute;
+
+          top:
+            -25px;
+
+          left:
+            50%;
+
+          transform:
+            translateX(-50%);
+
+          min-width:
+            220px;
+
+          padding:
+            11px 24px;
+
+          border:
+            2px solid #174461;
+
+          border-radius:
+            12px;
+
+          color:
+            #073b68;
+
+          background:
+            linear-gradient(
+              #c8f1ff,
+              #66b8e4
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(255,255,255,.75),
+            0 5px 0 #17415c;
+
+          font-weight:
+            800;
+
+          letter-spacing:
+            1.2px;
+        }
+
+        .createClose {
+          position:
+            absolute;
+
+          top:
+            14px;
+
+          right:
+            16px;
+
+          width:
+            40px;
+
+          height:
+            40px;
+
+          display:
+            grid;
+
+          place-items:
+            center;
+
+          border:
+            2px solid #8c1f1f;
+
+          border-radius:
+            50%;
+
+          color:
+            white;
+
+          background:
+            linear-gradient(
+              #ff7777,
+              #dc3030
+            );
+
+          box-shadow:
+            0 4px 0 #8e2020;
+
+          font-size:
+            25px;
+
+          font-weight:
+            900;
+
+          line-height:
+            1;
+        }
+
+        .createModal h2 {
+          margin:
+            5px 0 8px;
+
+          color:
+            white;
+
+          font-size:
+            28px;
+
+          text-shadow:
+            0 2px 2px
+              rgba(0,0,0,.45);
+        }
+
+        .createModalText {
+          max-width:
+            580px;
+
+          margin:
+            0 auto 26px;
+
+          color:
+            #f2f7f9;
+
+          font-size:
+            16px;
+
+          line-height:
+            1.5;
+        }
+
+        .createChoiceGrid {
+          display:
+            grid;
+
+          grid-template-columns:
+            repeat(2, minmax(0,1fr));
+
+          gap:
+            20px;
+        }
+
+        .createChoice {
+          min-height:
+            190px;
+
+          padding:
+            24px 20px;
+
+          display:
+            flex;
+
+          flex-direction:
+            column;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          gap:
+            10px;
+
+          border-radius:
+            18px;
+
+          transition:
+            transform .12s ease,
+            filter .12s ease,
+            box-shadow .12s ease;
+
+          font-family:
+            inherit;
+        }
+
+        .createChoice:hover {
+          transform:
+            translateY(-3px);
+
+          filter:
+            brightness(1.04);
+        }
+
+        .createChoice:active {
+          transform:
+            translateY(4px);
+        }
+
+        .createChoice strong {
+          font-size:
+            21px;
+        }
+
+        .createChoice small {
+          max-width:
+            250px;
+
+          font-size:
+            14px;
+
+          line-height:
+            1.35;
+        }
+
+        .createChoiceIcon {
+          min-width:
+            62px;
+
+          min-height:
+            52px;
+
+          display:
+            grid;
+
+          place-items:
+            center;
+
+          padding:
+            8px 12px;
+
+          border-radius:
+            10px;
+
+          font-size:
+            22px;
+
+          font-weight:
+            900;
+
+          box-shadow:
+            inset 0 3px 3px
+              rgba(255,255,255,.65),
+            0 3px 0
+              rgba(0,0,0,.28);
+        }
+
+        .createChoiceManual {
+          color:
+            #263238;
+
+          border:
+            2px solid #656d72;
+
+          background:
+            linear-gradient(
+              #ffffff,
+              #c7cbce
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(255,255,255,.8),
+            0 6px 0 #555d61;
+        }
+
+        .createChoiceManual .createChoiceIcon {
+          border:
+            2px solid #60686c;
+
+          background:
+            linear-gradient(
+              #ffffff,
+              #d8dbdd
+            );
+        }
+
+        .createChoicePdf {
+          color:
+            #073b68;
+
+          border:
+            2px solid #174461;
+
+          background:
+            linear-gradient(
+              #c9f2ff,
+              #67b7e1
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(255,255,255,.8),
+            0 6px 0 #17415c;
+        }
+
+        .createChoicePdf .createChoiceIcon {
+          color:
+            white;
+
+          border:
+            2px solid #8b2424;
+
+          background:
+            linear-gradient(
+              #ef6969,
+              #bf2f2f
+            );
         }
 
         /* ================================================
