@@ -1318,6 +1318,27 @@ export default function ImportPdfTestPage() {
     );
   }
 
+  function removeAllShapes(questionId: string) {
+    if (
+      !window.confirm(
+        "Ushbu savoldagi barcha rasm va shakllarni o‘chirasizmi?"
+      )
+    ) {
+      return;
+    }
+
+    updateQuestionShapes(
+      questionId,
+      () => []
+    );
+
+    setSelectedShape((current) =>
+      current?.questionId === questionId
+        ? null
+        : current
+    );
+  }
+
   function removeShape(
     questionId: string,
     shapeId: string
@@ -1991,6 +2012,20 @@ export default function ImportPdfTestPage() {
             >
               + O‘ng
             </button>
+
+            {(question.shapes || []).length > 0 && (
+              <button
+                type="button"
+                className="visualTool clearAllShapesTool"
+                onClick={() =>
+                  removeAllShapes(
+                    question.id
+                  )
+                }
+              >
+                Hammasini o‘chirish
+              </button>
+            )}
           </div>
 
           <span className="clipboardHint">
@@ -2124,11 +2159,37 @@ export default function ImportPdfTestPage() {
                           : "matchingItem matchingRight"
                       }
                     >
-                      <div className="matchingKeyCircle">
+                      <div
+                        className="matchingKeyCircle"
+                        style={{
+                          background:
+                            shape.backgroundColor ||
+                            "#ffffff",
+                          borderColor:
+                            shape.borderColor ||
+                            "#111111",
+                          color:
+                            shape.textColor ||
+                            "#111111",
+                        }}
+                      >
                         {shape.matchingKey}
                       </div>
 
-                      <div className="matchingTextBox">
+                      <div
+                        className="matchingTextBox"
+                        style={{
+                          background:
+                            shape.backgroundColor ||
+                            "#ffffff",
+                          borderColor:
+                            shape.borderColor ||
+                            "#111111",
+                          color:
+                            shape.textColor ||
+                            "#111111",
+                        }}
+                      >
                         <span
                           style={{
                             fontSize: `${shape.fontSize ?? 20}px`,
@@ -2258,6 +2319,75 @@ export default function ImportPdfTestPage() {
                 }
               />
             </label>
+
+            {selected.type !== "image" && (
+              <>
+                <label className="shapeColorControl">
+                  Fon
+                  <input
+                    type="color"
+                    value={
+                      selected.backgroundColor &&
+                      selected.backgroundColor !== "transparent"
+                        ? selected.backgroundColor
+                        : "#ffffff"
+                    }
+                    onChange={(event) =>
+                      updateShape(
+                        question.id,
+                        selected.id,
+                        {
+                          backgroundColor:
+                            event.target.value,
+                        }
+                      )
+                    }
+                  />
+                </label>
+
+                <label className="shapeColorControl">
+                  Chegara
+                  <input
+                    type="color"
+                    value={
+                      selected.borderColor ||
+                      "#1f2a30"
+                    }
+                    onChange={(event) =>
+                      updateShape(
+                        question.id,
+                        selected.id,
+                        {
+                          borderColor:
+                            event.target.value,
+                        }
+                      )
+                    }
+                  />
+                </label>
+
+                <label className="shapeColorControl">
+                  Matn
+                  <input
+                    type="color"
+                    value={
+                      selected.textColor ||
+                      "#111111"
+                    }
+                    onChange={(event) =>
+                      updateShape(
+                        question.id,
+                        selected.id,
+                        {
+                          textColor:
+                            event.target.value,
+                        }
+                      )
+                    }
+                  />
+                </label>
+              </>
+            )}
 
             <button
               type="button"
@@ -3870,6 +4000,33 @@ export default function ImportPdfTestPage() {
           color: #073b68;
           border-color: #174461;
           background: linear-gradient(#e3f6ff,#9bd9f2);
+        }
+
+        .clearAllShapesTool {
+          color: #821818;
+          border-color: #a32828;
+          background: linear-gradient(#ffe6e6,#f39a9a);
+        }
+
+        .shapeColorControl {
+          min-width: 86px;
+          display: flex !important;
+          align-items: center;
+          justify-content: space-between;
+          gap: 7px;
+          padding: 4px 7px;
+          border: 1px solid #8c989e;
+          border-radius: 6px;
+          background: #fff;
+        }
+
+        .shapeColorControl input[type="color"] {
+          width: 34px;
+          height: 28px;
+          padding: 1px;
+          border: 1px solid #8c989e;
+          border-radius: 4px;
+          cursor: pointer;
         }
 
         .resizeHandle {
