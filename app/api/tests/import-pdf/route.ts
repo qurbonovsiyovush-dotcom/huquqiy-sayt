@@ -1368,46 +1368,57 @@ function getQuestionPdfCrop(
 
   /*
     =========================================================
-    DYNAMIC VISUAL CROP
+    COLUMN-AWARE DYNAMIC CROP
     =========================================================
 
-    Endi bir xil fixed razmer ishlatilmaydi.
-
-    Qoida:
-      1) Savol matnining OXIRIDAN keyin boshlanadi.
-      2) A/B/C/D variantining BOSHLANISHIDAN oldin tugaydi.
-      3) Shu oraliqdagi real PDF text obyektlari bo‘yicha chap/o‘ng
-         chegarani o‘zi topadi.
-      4) Sahifa/ustun chetidagi uzun vertikal chiziqlar cropga kirmaydi.
-
-    Ya'ni har bir jadval, Venn, moslashtirish uchun o‘z razmeri chiqadi.
+    QOIDA:
+      1) Savol matni tugagan joydan KEYIN boshlanadi.
+      2) A/B/C/D variantlari boshlanishidan OLDIN tugaydi.
+      3) Faqat SAVOLNING O'Z USTUNI ichidagi kontent olinadi.
+      4) Chap/o'ng ustun orasidagi uzun vertikal chiziq cropga kirmaydi.
+      5) Crop razmeri fixed emas — real kontent chegarasidan hisoblanadi.
   */
 
+  const targetColumn: "left" | "right" | "full" =
+    promptEndLine.column !== "full"
+      ? promptEndLine.column
+      : firstOptionLine.column !== "full"
+      ? firstOptionLine.column
+      : "full";
+
+  const middle =
+    pageInfo.width / 2;
+
+  /*
+    Savol prompti va variantlar orasidagi vertikal "koridor".
+    Juda katta fixed padding ishlatmaymiz.
+  */
   const rawTopY =
     promptEndLine.y -
     Math.max(
-      6,
-      promptEndLine.height * 0.45
+      5,
+      promptEndLine.height * 0.35
     );
 
   const rawBottomY =
     firstOptionLine.y +
     Math.max(
-      6,
-      firstOptionLine.height * 0.45
+      5,
+      firstOptionLine.height * 0.35
     );
 
   if (
     rawTopY -
       rawBottomY <
-    24
+    22
   ) {
     return undefined;
   }
 
   /*
-    Faqat savoldan keyin va variantdan oldin turgan textlarni olamiz.
-    Promptning o‘zi va A/B/C/D variantlari bu filtrga kirmaydi.
+    Faqat shu savolning USTUNI va vertikal oralig'idagi textlarni olamiz.
+    Bu eng muhim fix: chapdagi 13/14/15 savollar o'ng Venn cropiga
+    endi tushmaydi va aksincha.
   */
   const insideLines =
     (pageInfo.lines || [])
@@ -1419,53 +1430,80 @@ function getQuestionPdfCrop(
           return false;
         }
 
+        if (
+          targetColumn !== "full" &&
+          line.column !== targetColumn
+        ) {
+          return false;
+        }
+
         const lineTop =
           line.y +
-          line.height *
-            0.75;
+          line.height * 0.8;
 
         const lineBottom =
           line.y -
-          line.height *
-            0.35;
+          line.height * 0.4;
 
         return (
-          lineTop <
-            rawTopY &&
-          lineBottom >
-            rawBottomY
+          lineTop < rawTopY &&
+          lineBottom > rawBottomY
         );
       });
 
   /*
-    Agar text layer topilmasa ham eski prinsip bo‘yicha
-    vertikal crop qaytaramiz, lekin sahifa chetlarini olmaymiz.
+    USTUNNING xavfsiz gorizontal chegaralari.
+    Separator chiziq ko'rinmasligi uchun markazdan ancha ichkariga kiramiz.
+  */
+  const separatorGap =
+    Math.max(
+      10,
+      pageInfo.width * 0.018
+    );
+
+  let hardLeft =
+    pageInfo.width * 0.035;
+
+  let hardRight =
+    pageInfo.width * 0.965;
+
+  if (targetColumn === "left") {
+    hardRight =
+      middle - separatorGap;
+  } else if (
+    targetColumn === "right"
+  ) {
+    hardLeft =
+      middle + separatorGap;
+  }
+
+  /*
+    Agar text layer topilmasa ham ustundan tashqariga chiqmaymiz.
   */
   if (
     insideLines.length === 0
   ) {
-    const fallbackX =
-      pageInfo.width * 0.08;
-
     const fallbackWidth =
-      pageInfo.width * 0.84;
+      hardRight - hardLeft;
+
+    if (
+      fallbackWidth < 80
+    ) {
+      return undefined;
+    }
 
     return {
       pageNumber:
         firstOptionLine.pageNumber,
       x:
-        fallbackX,
+        hardLeft,
       y:
         Math.max(
           0,
           rawBottomY
         ),
       width:
-        Math.min(
-          fallbackWidth,
-          pageInfo.width -
-            fallbackX
-        ),
+        fallbackWidth,
       height:
         Math.max(
           30,
@@ -1477,13 +1515,8 @@ function getQuestionPdfCrop(
 
   /*
     REAL CONTENT BOUNDING BOX.
-
-    Textlarning o‘zidan min/max X/Y olamiz.
-    Bu ayniqsa:
-      - jadval
-      - moslashtirish
-      - Eyler-Venn
-    uchun yaxshi ishlaydi.
+    Jadval / Venn / moslashtirish ichidagi matnlar qayerda bo'lsa,
+    crop gorizontal razmeri shunga qarab moslashadi.
   */
   const minTextX =
     Math.min(
@@ -1506,8 +1539,7 @@ function getQuestionPdfCrop(
       ...insideLines.map(
         (line) =>
           line.y +
-          line.height *
-            1.0
+          line.height
       )
     );
 
@@ -1516,15 +1548,10 @@ function getQuestionPdfCrop(
       ...insideLines.map(
         (line) =>
           line.y -
-          line.height *
-            0.45
+          line.height * 0.45
       )
     );
 
-  /*
-    Diagramma/table chiziqlari matndan biroz tashqarida bo‘lishi mumkin,
-    shuning uchun dinamik padding.
-  */
   const averageHeight =
     insideLines.reduce(
       (sum, line) =>
@@ -1536,23 +1563,25 @@ function getQuestionPdfCrop(
       insideLines.length
     );
 
+  /*
+    Shakl chiziqlari matndan biroz tashqarida bo'lishi mumkin.
+    Padding dinamik, ammo ustun chegarasidan oshmaydi.
+  */
   const horizontalPadding =
     Math.max(
-      16,
+      14,
       Math.min(
-        34,
-        averageHeight *
-          2.2
+        30,
+        averageHeight * 2
       )
     );
 
   const verticalPadding =
     Math.max(
-      8,
+      7,
       Math.min(
-        18,
-        averageHeight *
-          1.15
+        16,
+        averageHeight * 1.05
       )
     );
 
@@ -1565,81 +1594,67 @@ function getQuestionPdfCrop(
     horizontalPadding;
 
   /*
-    Muhim:
-    PDF sahifasining chetidagi uzun separator chiziqlarni
-    umuman cropga kiritmaymiz.
-
-    Chap/o‘ngdan kamida 4% ichkarida bo‘lamiz.
+    Ustun separatorini qat'iy kesib tashlaymiz.
   */
-  const safePageLeft =
-    pageInfo.width *
-    0.04;
-
-  const safePageRight =
-    pageInfo.width *
-    0.96;
-
   x1 =
     Math.max(
-      safePageLeft,
+      hardLeft,
       x1
     );
 
   x2 =
     Math.min(
-      safePageRight,
+      hardRight,
       x2
     );
 
   /*
-    Vizual text juda tor bo‘lsa (masalan Venn ichida I/II/III),
-    diagrammaning ellipslari kesilib qolmasligi uchun
-    savol joylashgan markaz atrofida minimal kenglik beramiz.
-
-    Bu FIXED crop emas — faqat minimum xavfsizlik kengligi.
+    Venn ichidagi I/II/III kabi text juda tor bo'lishi mumkin.
+    Shuning uchun faqat shu USTUN ichida minimal vizual kenglik.
+    Bu boshqa ustunga o'tmaydi.
   */
-  const currentWidth =
-    x2 - x1;
+  const availableColumnWidth =
+    hardRight - hardLeft;
 
   const minimumVisualWidth =
     Math.min(
-      pageInfo.width * 0.62,
-      430
+      availableColumnWidth,
+      Math.max(
+        250,
+        availableColumnWidth * 0.72
+      )
     );
 
   if (
-    currentWidth <
+    x2 - x1 <
     minimumVisualWidth
   ) {
-    const center =
+    const contentCenter =
       (x1 + x2) / 2;
 
     x1 =
-      center -
+      contentCenter -
       minimumVisualWidth / 2;
 
     x2 =
-      center +
+      contentCenter +
       minimumVisualWidth / 2;
 
     if (
-      x1 <
-      safePageLeft
+      x1 < hardLeft
     ) {
       const shift =
-        safePageLeft - x1;
+        hardLeft - x1;
 
       x1 += shift;
       x2 += shift;
     }
 
     if (
-      x2 >
-      safePageRight
+      x2 > hardRight
     ) {
       const shift =
-        x2 -
-        safePageRight;
+        x2 - hardRight;
 
       x1 -= shift;
       x2 -= shift;
@@ -1647,8 +1662,9 @@ function getQuestionPdfCrop(
   }
 
   /*
-    Vertikal chegara ham real contentdan olinadi,
-    lekin hech qachon savol matniga yoki variantga chiqib ketmaydi.
+    Vertikal crop ham real kontent bo'yicha, ammo:
+      - savol matniga chiqmaydi
+      - A/B/C/D variantiga tushmaydi
   */
   const top =
     Math.min(
@@ -1672,7 +1688,7 @@ function getQuestionPdfCrop(
 
   if (
     width < 80 ||
-    height < 30
+    height < 28
   ) {
     return undefined;
   }
@@ -1682,7 +1698,7 @@ function getQuestionPdfCrop(
       firstOptionLine.pageNumber,
     x:
       Math.max(
-        0,
+        hardLeft,
         x1
       ),
     y:
@@ -1693,9 +1709,9 @@ function getQuestionPdfCrop(
     width:
       Math.min(
         width,
-        pageInfo.width -
+        hardRight -
           Math.max(
-            0,
+            hardLeft,
             x1
           )
       ),
