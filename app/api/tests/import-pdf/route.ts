@@ -1405,11 +1405,17 @@ function getQuestionPdfCrop(
     Oldingi 0.35 koeffitsiyent A) satrining yuqori qismini cropga
     kiritib yuborayotgan edi.
   */
+  /*
+    FINAL BOTTOM TUNE:
+    Pastki chegara ozgina pastga tushirildi.
+    Maqsad: Venn/jadvalning oxirgi qatori to‘liq ko‘rinsin,
+    lekin A/B/C/D variantlari rasmga kirmasin.
+  */
   const rawBottomY =
     firstOptionLine.y +
     Math.max(
-      10,
-      firstOptionLine.height * 1.15
+      7,
+      firstOptionLine.height * 0.88
     );
 
   if (
