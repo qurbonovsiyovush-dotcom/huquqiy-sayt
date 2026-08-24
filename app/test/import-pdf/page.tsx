@@ -43,14 +43,6 @@ type EditorShape = {
   matchingKey?: string;
 };
 
-type PdfCrop = {
-  pageNumber: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 type ImportedQuestion = {
   id: string;
   number: number;
@@ -58,7 +50,6 @@ type ImportedQuestion = {
   options: ImportedOption[];
   imageSrc?: string;
   shapes?: EditorShape[];
-  pdfCrop?: PdfCrop;
   warning?: string;
 };
 
@@ -783,453 +774,6 @@ function RichTextEditor({
   );
 }
 
-async function renderPdfCropInBrowser(
-  file: File,
-  crop: PdfCrop
-): Promise<string | undefined> {
-  try {
-    const pdfjs = await import(
-      "pdfjs-dist/legacy/build/pdf.mjs"
-    );
-
-    /*
-      Worker shu npm paketning o‘zidan bundle qilinadi.
-      Alohida public fayl yaratish shart emas.
-    */
-    pdfjs.GlobalWorkerOptions.workerSrc =
-      new URL(
-        "pdfjs-dist/legacy/build/pdf.worker.mjs",
-        import.meta.url
-      ).toString();
-
-    const bytes =
-      new Uint8Array(
-        await file.arrayBuffer()
-      );
-
-    const pdf =
-      await pdfjs
-        .getDocument({
-          data: bytes,
-          useSystemFonts: true,
-        })
-        .promise;
-
-    if (
-      crop.pageNumber < 1 ||
-      crop.pageNumber > pdf.numPages
-    ) {
-      await pdf.destroy();
-      return undefined;
-    }
-
-    const pdfPage =
-      await pdf.getPage(
-        crop.pageNumber
-      );
-
-    /*
-      2.4x — jadval va kichik diagramma matnlari uchun tiniq.
-    */
-    const scale = 2.4;
-
-    const viewport =
-      pdfPage.getViewport({
-        scale,
-      });
-
-    const pageCanvas =
-      document.createElement(
-        "canvas"
-      );
-
-    pageCanvas.width =
-      Math.ceil(
-        viewport.width
-      );
-
-    pageCanvas.height =
-      Math.ceil(
-        viewport.height
-      );
-
-    const pageContext =
-      pageCanvas.getContext(
-        "2d",
-        {
-          alpha: false,
-        }
-      );
-
-    if (!pageContext) {
-      await pdf.destroy();
-      return undefined;
-    }
-
-    pageContext.fillStyle =
-      "#ffffff";
-
-    pageContext.fillRect(
-      0,
-      0,
-      pageCanvas.width,
-      pageCanvas.height
-    );
-
-    await pdfPage
-      .render({
-        canvasContext:
-          pageContext,
-        viewport,
-        canvas:
-          pageCanvas,
-      })
-      .promise;
-
-    /*
-      Server pdfCrop'ni PDF koordinatasida beradi:
-        x: chapdan
-        y: pastdan
-      Browser canvas esa:
-        x: chapdan
-        y: yuqoridan
-
-      Shu yerda koordinatani o‘giramiz.
-    */
-    const rawX =
-      crop.x * scale;
-
-    const rawY =
-      viewport.height -
-      (crop.y +
-        crop.height) *
-        scale;
-
-    const rawWidth =
-      crop.width * scale;
-
-    const rawHeight =
-      crop.height * scale;
-
-    const sourceX =
-      Math.max(
-        0,
-        Math.floor(rawX)
-      );
-
-    const sourceY =
-      Math.max(
-        0,
-        Math.floor(rawY)
-      );
-
-    const sourceWidth =
-      Math.max(
-        1,
-        Math.min(
-          pageCanvas.width -
-            sourceX,
-          Math.ceil(
-            rawWidth
-          )
-        )
-      );
-
-    const sourceHeight =
-      Math.max(
-        1,
-        Math.min(
-          pageCanvas.height -
-            sourceY,
-          Math.ceil(
-            rawHeight
-          )
-        )
-      );
-
-    if (
-      sourceWidth < 20 ||
-      sourceHeight < 20
-    ) {
-      await pdf.destroy();
-      return undefined;
-    }
-
-    const cropCanvas =
-      document.createElement(
-        "canvas"
-      );
-
-    cropCanvas.width =
-      sourceWidth;
-
-    cropCanvas.height =
-      sourceHeight;
-
-    const cropContext =
-      cropCanvas.getContext(
-        "2d",
-        {
-          alpha: false,
-        }
-      );
-
-    if (!cropContext) {
-      await pdf.destroy();
-      return undefined;
-    }
-
-    cropContext.fillStyle =
-      "#ffffff";
-
-    cropContext.fillRect(
-      0,
-      0,
-      cropCanvas.width,
-      cropCanvas.height
-    );
-
-    cropContext.drawImage(
-      pageCanvas,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      0,
-      0,
-      sourceWidth,
-      sourceHeight
-    );
-
-    /*
-      PNG haddan tashqari katta bo‘lmasin.
-    */
-    const maxWidth = 1500;
-    let finalCanvas =
-      cropCanvas;
-
-    if (
-      cropCanvas.width >
-      maxWidth
-    ) {
-      const ratio =
-        maxWidth /
-        cropCanvas.width;
-
-      const resized =
-        document.createElement(
-          "canvas"
-        );
-
-      resized.width =
-        maxWidth;
-
-      resized.height =
-        Math.max(
-          1,
-          Math.round(
-            cropCanvas.height *
-              ratio
-          )
-        );
-
-      const resizedContext =
-        resized.getContext(
-          "2d",
-          {
-            alpha: false,
-          }
-        );
-
-      if (resizedContext) {
-        resizedContext.fillStyle =
-          "#ffffff";
-
-        resizedContext.fillRect(
-          0,
-          0,
-          resized.width,
-          resized.height
-        );
-
-        resizedContext.drawImage(
-          cropCanvas,
-          0,
-          0,
-          cropCanvas.width,
-          cropCanvas.height,
-          0,
-          0,
-          resized.width,
-          resized.height
-        );
-
-        finalCanvas =
-          resized;
-      }
-    }
-
-    const dataUrl =
-      finalCanvas.toDataURL(
-        "image/png"
-      );
-
-    try {
-      pdfPage.cleanup();
-    } catch {
-      // ignore
-    }
-
-    await pdf.destroy();
-
-    return dataUrl;
-  } catch (error) {
-    console.error(
-      "BROWSER PDF CROP ERROR:",
-      error
-    );
-
-    return undefined;
-  }
-}
-
-async function attachBrowserPdfImages(
-  file: File,
-  questions: ImportedQuestion[]
-): Promise<ImportedQuestion[]> {
-  const result:
-    ImportedQuestion[] = [];
-
-  for (const question of questions) {
-    if (!question.pdfCrop) {
-      result.push({
-        ...question,
-        imageSrc: undefined,
-        shapes:
-          Array.isArray(
-            question.shapes
-          )
-            ? question.shapes
-            : [],
-      });
-
-      continue;
-    }
-
-    const imageSrc =
-      await renderPdfCropInBrowser(
-        file,
-        question.pdfCrop
-      );
-
-    if (!imageSrc) {
-      result.push({
-        ...question,
-        imageSrc: undefined,
-        shapes:
-          Array.isArray(
-            question.shapes
-          )
-            ? question.shapes
-            : [],
-      });
-
-      continue;
-    }
-
-    const visualRatio =
-      question.pdfCrop.width /
-      Math.max(
-        1,
-        question.pdfCrop.height
-      );
-
-    let displayWidth = 680;
-    let displayHeight =
-      displayWidth /
-      visualRatio;
-
-    if (
-      displayHeight >
-      430
-    ) {
-      displayHeight = 430;
-      displayWidth =
-        displayHeight *
-        visualRatio;
-    }
-
-    const pdfImageShape:
-      EditorShape = {
-      id:
-        `pdf-browser-img-${question.id}`,
-      type: "image",
-      x: Math.max(
-        20,
-        Math.round(
-          (900 -
-            displayWidth) /
-            2
-        )
-      ),
-      y: 45,
-      width:
-        Math.max(
-          120,
-          Math.round(
-            displayWidth
-          )
-        ),
-      height:
-        Math.max(
-          90,
-          Math.round(
-            displayHeight
-          )
-        ),
-      imageSrc,
-      objectFit:
-        "contain",
-      borderWidth: 0,
-      borderRadius: 4,
-      opacity: 1,
-      zIndex: 1,
-    };
-
-    const existingShapes =
-      Array.isArray(
-        question.shapes
-      )
-        ? question.shapes.filter(
-            (shape) =>
-              !(
-                shape.type ===
-                  "image" &&
-                (
-                  shape.id.startsWith(
-                    "pdf-img-"
-                  ) ||
-                  shape.id.startsWith(
-                    "pdf-browser-img-"
-                  )
-                )
-              )
-          )
-        : [];
-
-    result.push({
-      ...question,
-      imageSrc: undefined,
-      shapes: [
-        ...existingShapes,
-        pdfImageShape,
-      ],
-    });
-  }
-
-  return result;
-}
-
 export default function ImportPdfTestPage() {
   const router = useRouter();
 
@@ -1407,46 +951,45 @@ export default function ImportPdfTestPage() {
         );
       }
 
-      const serverQuestions:
+      const imported:
         ImportedQuestion[] =
         Array.isArray(
           data.questions
         )
           ? data.questions.map(
-              (
-                question:
-                  ImportedQuestion
-              ) => ({
-                ...question,
+              (question: ImportedQuestion) => {
+                const legacyImageShape: EditorShape[] =
+                  question.imageSrc
+                    ? [
+                        {
+                          id: `pdf-img-${question.id}`,
+                          type: "image",
+                          x: 110,
+                          y: 40,
+                          width: 620,
+                          height: 300,
+                          imageSrc: question.imageSrc,
+                          objectFit: "contain",
+                          borderWidth: 0,
+                          borderRadius: 6,
+                          zIndex: 1,
+                        },
+                      ]
+                    : [];
 
-                /*
-                  Server endi rasm chizmaydi.
-                  U faqat pdfCrop koordinatasini qaytaradi.
-                */
-                imageSrc:
-                  undefined,
-
-                shapes:
-                  Array.isArray(
-                    question.shapes
-                  )
-                    ? question.shapes
-                    : [],
-              })
+                return {
+                  ...question,
+                  imageSrc: undefined,
+                  shapes:
+                    Array.isArray(question.shapes) &&
+                    question.shapes.length > 0
+                      ? question.shapes
+                      : legacyImageShape,
+                };
+              }
             )
           : [];
 
-      /*
-        ENG MUHIM QISM:
-        original PDF Chrome/PDF.js ichida render qilinadi.
-        Jadval, Venn, moslashtirish va ularning matnlari
-        birgalikda PNG bo‘lib savolga biriktiriladi.
-      */
-      const imported =
-        await attachBrowserPdfImages(
-          pdfFile,
-          serverQuestions
-        );
       try {
         const keysToRemove: string[] = [];
 
@@ -3318,6 +2861,16 @@ export default function ImportPdfTestPage() {
         <div className="headerActions">
           <button
             type="button"
+            className="homeButton"
+            onClick={() =>
+              router.push("/")
+            }
+          >
+            Bosh sahifa
+          </button>
+
+          <button
+            type="button"
             className="grayButton"
             onClick={() =>
               router.push(
@@ -3353,7 +2906,7 @@ export default function ImportPdfTestPage() {
           </strong>
 
           <p>
-            Savol matni, A/B/C/D variantlar, + belgisi bilan ko‘rsatilgan to‘g‘ri javob va savol ichidagi diagramma/rasmlar avtomatik ajratiladi. Tahlildan keyin savolni tahrirlash, rasm qo‘shish, savol qo‘shish, nusxalash va tartibini o‘zgartirish mumkin.
+            PDFdan savol matni, A/B/C/D variantlar va + belgisi bilan ko‘rsatilgan to‘g‘ri javob avtomatik ajratiladi. Jadval, diagramma yoki boshqa rasmlarni kerakli savolga “Rasm / shakl” orqali o‘zingiz joylaysiz. Tahlildan keyin savolni tahrirlash, rasm qo‘shish, savol qo‘shish, nusxalash va tartibini o‘zgartirish mumkin.
           </p>
         </div>
 
@@ -3865,116 +3418,210 @@ export default function ImportPdfTestPage() {
 
         .page {
           min-height: 100vh;
-          padding-bottom: 70px;
-          background: #e5eaed;
+          padding: 26px 0 80px;
           color: #101820;
           font-family: "Bell MT", "Times New Roman", serif;
+          background:
+            radial-gradient(circle at 50% 0%, rgba(115,191,232,.23), transparent 30%),
+            linear-gradient(180deg,#eef4f7 0%,#dde5e9 46%,#edf2f4 100%);
         }
 
         .header {
+          position: relative;
           width: min(1480px, 96%);
-          margin: 24px auto 0;
-          padding: 20px 24px;
+          margin: 0 auto;
+          padding: 19px 22px 23px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
-          border: 3px solid #30383d;
-          border-radius: 24px;
-          background: linear-gradient(145deg,#697176,#42494d);
-          box-shadow: inset 0 6px 6px rgba(255,255,255,.24),0 9px 20px rgba(0,0,0,.18);
+          gap: 22px;
+          border: 2px solid #28343b;
+          border-radius: 22px;
+          background:
+            linear-gradient(145deg,#747d82 0%,#586167 42%,#3d454a 100%);
+          box-shadow:
+            0 10px 0 #293238,
+            0 17px 30px rgba(23,34,40,.22),
+            inset 0 2px 0 rgba(255,255,255,.48),
+            inset 0 -4px 8px rgba(0,0,0,.22);
+        }
+
+        .header::after {
+          content: "";
+          position: absolute;
+          left: 24px;
+          right: 24px;
+          bottom: 8px;
+          height: 2px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.13);
+          pointer-events: none;
         }
 
         .headerTitle {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 3px;
           color: #fff;
+          text-shadow: 0 2px 2px rgba(0,0,0,.42);
         }
 
         .headerTitle span {
           font-size: 12px;
-          letter-spacing: 2px;
+          font-weight: 800;
+          letter-spacing: 2.2px;
+          opacity: .92;
         }
 
         .headerTitle strong {
-          font-size: 28px;
+          font-size: 29px;
+          letter-spacing: .2px;
         }
 
         .headerActions {
           display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          justify-content: flex-end;
           gap: 12px;
         }
 
+        .homeButton,
         .grayButton,
         .blueButton {
-          min-height: 52px;
-          padding: 10px 18px;
-          border-radius: 12px;
+          position: relative;
+          min-height: 50px;
+          padding: 9px 18px;
+          border-radius: 11px;
           cursor: pointer;
           font-family: inherit;
-          font-weight: 700;
+          font-weight: 800;
+          letter-spacing: .15px;
+          transition:
+            transform .12s ease,
+            box-shadow .12s ease,
+            filter .12s ease;
+        }
+
+        .homeButton:hover,
+        .grayButton:hover,
+        .blueButton:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+        }
+
+        .homeButton:active,
+        .grayButton:active,
+        .blueButton:active {
+          transform: translateY(4px);
+          box-shadow: 0 1px 0 rgba(0,0,0,.55) !important;
+        }
+
+        .homeButton {
+          color: #17482f;
+          border: 2px solid #236743;
+          background: linear-gradient(180deg,#dcffe9 0%,#78d99d 56%,#53bd7a 100%);
+          box-shadow:
+            0 6px 0 #235d3e,
+            0 10px 16px rgba(0,0,0,.14),
+            inset 0 2px 0 rgba(255,255,255,.78);
         }
 
         .grayButton {
-          border: 2px solid #535a5e;
-          background: linear-gradient(#fafafa,#b6b6b6);
-          box-shadow: 0 5px 0 #4b5256;
+          color: #253039;
+          border: 2px solid #626b70;
+          background: linear-gradient(180deg,#ffffff 0%,#d6d8da 54%,#afb4b7 100%);
+          box-shadow:
+            0 6px 0 #515b61,
+            0 10px 16px rgba(0,0,0,.14),
+            inset 0 2px 0 rgba(255,255,255,.82);
         }
 
         .blueButton {
           color: #073b68;
-          border: 2px solid #174461;
-          background: linear-gradient(#caefff,#63b3df);
-          box-shadow: 0 5px 0 #17415c;
+          border: 2px solid #174b69;
+          background: linear-gradient(180deg,#d9f5ff 0%,#84cff1 53%,#55abd7 100%);
+          box-shadow:
+            0 6px 0 #174760,
+            0 10px 16px rgba(0,0,0,.15),
+            inset 0 2px 0 rgba(255,255,255,.8);
         }
 
         .mainBox,
         .previewBox {
           position: relative;
-          width: min(1300px,94%);
-          margin: 72px auto 0;
-          padding: 70px 30px 35px;
-          border: 3px solid #3e474c;
-          border-radius: 24px;
-          background: linear-gradient(145deg,#666d71,#41474b);
-          box-shadow: inset 0 7px 6px rgba(255,255,255,.20),0 9px 20px rgba(0,0,0,.19);
+          width: min(1320px,94%);
+          margin: 78px auto 0;
+          padding: 72px 30px 39px;
+          border: 2px solid #303b41;
+          border-radius: 25px;
+          background:
+            linear-gradient(145deg,#747c81 0%,#596167 37%,#3f474b 100%);
+          box-shadow:
+            0 11px 0 #2c363b,
+            0 20px 34px rgba(22,32,38,.23),
+            inset 0 3px 0 rgba(255,255,255,.38),
+            inset 0 -8px 14px rgba(0,0,0,.18);
+        }
+
+        .mainBox::before,
+        .previewBox::before {
+          content: "";
+          position: absolute;
+          inset: 15px 18px auto;
+          height: 3px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.14);
+          pointer-events: none;
         }
 
         .floatingTitle {
           position: absolute;
-          top: -27px;
+          top: -29px;
           left: 50%;
           transform: translateX(-50%);
-          min-width: 240px;
-          padding: 11px 22px;
+          min-width: 250px;
+          padding: 12px 24px 14px;
           text-align: center;
           color: #073b68;
-          font-size: 20px;
-          font-weight: 700;
-          border: 2px solid #174461;
+          font-size: 21px;
+          font-weight: 900;
+          letter-spacing: .3px;
+          border: 2px solid #174a68;
           border-radius: 12px;
-          background: linear-gradient(#caf0ff,#59a9d5);
-          box-shadow: 0 5px 0 #17415c;
+          background: linear-gradient(180deg,#ddf7ff 0%,#86cef0 53%,#57acd7 100%);
+          box-shadow:
+            0 7px 0 #174760,
+            0 12px 19px rgba(0,0,0,.18),
+            inset 0 2px 0 rgba(255,255,255,.86);
+          text-shadow: 0 1px 0 rgba(255,255,255,.52);
+          z-index: 2;
         }
 
         .introBox {
-          padding: 18px 20px;
-          border-radius: 14px;
-          background: #edf8ff;
-          border: 2px solid #6c91a8;
+          position: relative;
+          padding: 20px 22px;
+          border-radius: 16px;
+          background: linear-gradient(180deg,#f8fdff 0%,#e4f4fb 100%);
+          border: 2px solid #79a0b7;
+          box-shadow:
+            0 5px 0 #506d7e,
+            0 9px 14px rgba(0,0,0,.13),
+            inset 0 2px 0 rgba(255,255,255,.96);
         }
 
         .introBox strong {
           display: block;
-          margin-bottom: 5px;
+          margin-bottom: 7px;
           color: #073b68;
-          font-size: 18px;
+          font-size: 19px;
+          text-shadow: 0 1px 0 #fff;
         }
 
         .introBox p {
           margin: 0;
-          line-height: 1.55;
+          line-height: 1.58;
+          font-size: 16px;
         }
 
         .metaGrid {
@@ -4773,6 +4420,44 @@ export default function ImportPdfTestPage() {
           border-radius: 999px;
         }
 
+
+        .metaGrid input,
+        .metaGrid textarea,
+        .attemptBox input,
+        .descriptionField textarea {
+          border: 2px solid #69777f !important;
+          background: linear-gradient(#ffffff,#f2f4f5);
+          box-shadow:
+            inset 0 2px 4px rgba(0,0,0,.08),
+            0 3px 0 rgba(37,48,55,.55);
+        }
+
+        .uploadBox,
+        .summaryBox,
+        .questionCard,
+        .visualEditor {
+          box-shadow:
+            0 6px 0 rgba(43,54,60,.74),
+            0 11px 20px rgba(0,0,0,.13),
+            inset 0 2px 0 rgba(255,255,255,.72);
+        }
+
+        .uploadBox {
+          background: linear-gradient(180deg,#f2fbff 0%,#dceff9 100%) !important;
+        }
+
+        .questionCard {
+          background: linear-gradient(180deg,#ffffff 0%,#f1f3f4 100%) !important;
+        }
+
+        .previewBox .floatingTitle {
+          min-width: 265px;
+        }
+
+        button:not(:disabled) {
+          -webkit-tap-highlight-color: transparent;
+        }
+
         @media(max-width:600px) {
           .header {
             width: calc(100% - 8px);
@@ -4786,6 +4471,12 @@ export default function ImportPdfTestPage() {
           .metaGrid {
             display: grid;
             grid-template-columns: 1fr;
+          }
+
+          .homeButton,
+          .grayButton,
+          .blueButton {
+            width: 100%;
           }
 
           .mainBox,
