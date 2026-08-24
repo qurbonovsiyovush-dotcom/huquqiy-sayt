@@ -1217,12 +1217,16 @@ export default function ImportPdfTestPage() {
         }
 
         .questionTextField textarea {
-          min-height: 100px;
-          padding: 12px;
+          min-height: 150px;
+          padding: 18px 20px;
           border: 2px solid #737d82;
-          border-radius: 9px;
+          border-radius: 10px;
           font-family: inherit;
-          font-size: 16px;
+          font-size: 21px;
+          line-height: 1.6;
+          text-align: justify;
+          text-justify: inter-word;
+          resize: vertical;
         }
 
         .questionImagePreview {
@@ -1247,8 +1251,9 @@ export default function ImportPdfTestPage() {
 
         .questionImagePreview img {
           display: block;
-          max-width: 100%;
-          max-height: 440px;
+          width: 100%;
+          max-width: 980px;
+          max-height: 620px;
           margin: auto;
           object-fit: contain;
         }
@@ -1277,8 +1282,8 @@ export default function ImportPdfTestPage() {
         }
 
         .correctSelector {
-          width: 34px;
-          height: 34px;
+          width: 42px;
+          height: 42px;
           cursor: pointer;
           border: 2px solid #69747a;
           border-radius: 50%;
@@ -1289,16 +1294,26 @@ export default function ImportPdfTestPage() {
         .correctOption .correctSelector {
           color: #fff;
           background: #3d9b64;
+          font-size: 20px;
+        }
+
+        .optionLetter {
+          font-size: 21px;
+          font-weight: 800;
         }
 
         .optionRow textarea {
           width: 100%;
-          min-height: 50px;
-          padding: 8px 10px;
+          min-height: 72px;
+          padding: 13px 15px;
           border: 1px solid #8d999f;
-          border-radius: 7px;
+          border-radius: 8px;
           font-family: inherit;
-          font-size: 15px;
+          font-size: 19px;
+          line-height: 1.5;
+          text-align: justify;
+          text-justify: inter-word;
+          resize: vertical;
         }
 
         .correctBadge {
@@ -1337,8 +1352,35 @@ export default function ImportPdfTestPage() {
             align-items: stretch;
           }
 
+          .questionTextField textarea {
+            min-height: 130px;
+            padding: 14px;
+            font-size: 17px;
+            line-height: 1.55;
+          }
+
           .optionRow {
-            grid-template-columns: 30px 25px 1fr;
+            grid-template-columns: 36px 28px 1fr;
+          }
+
+          .correctSelector {
+            width: 34px;
+            height: 34px;
+          }
+
+          .optionLetter {
+            font-size: 18px;
+          }
+
+          .optionRow textarea {
+            min-height: 64px;
+            padding: 11px 12px;
+            font-size: 16px;
+            line-height: 1.45;
+          }
+
+          .questionImagePreview img {
+            max-height: 420px;
           }
 
           .correctBadge {
