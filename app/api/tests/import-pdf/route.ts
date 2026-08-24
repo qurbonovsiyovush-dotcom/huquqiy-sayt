@@ -66,6 +66,13 @@ type PageInfo = {
   width: number;
   height: number;
   highlights: HighlightRect[];
+
+  /*
+    PDF.js + @napi-rs/canvas Vercel'da ba'zi PDF shriftlarini
+    rasterga chizmay qolishi mumkin. Shuning uchun sahifadagi
+    text layer satrlarini ham saqlaymiz va crop ustiga qayta chizamiz.
+  */
+  lines?: TextLine[];
 };
 
 type QuestionBlock = {
@@ -1588,6 +1595,192 @@ async function renderQuestionImage(
   );
 
   /*
+    =========================================================
+    PDF TEXT OVERLAY FIX
+    =========================================================
+
+    Muammo:
+    Vercel/Node'da PDF.js ba'zi embedded shriftlarni @napi-rs/canvas
+    ustiga raster qilmaydi. Natijada jadval chiziqlari, ranglar,
+    doiralar chiqadi, lekin ICHIDAGI MATN YO‘QOLADI.
+
+    Yechim:
+    PDF text layer'dan allaqachon olgan TextLine'larni crop ustiga
+    koordinatalari bilan qayta chizamiz.
+
+    Bu ayniqsa:
+      - jadval
+      - Eyler-Venn diagrammasi
+      - moslashtirish sxemasi
+      - rangli blok/diagrammalar
+    uchun kerak.
+  */
+  const cropPdfX1 =
+    cropX / scaleX;
+
+  const cropPdfX2 =
+    (cropX + cropWidth) /
+    scaleX;
+
+  /*
+    Canvas Y yuqoridan pastga, PDF Y esa pastdan yuqoriga.
+    Crop chegarasini yana PDF koordinatasiga qaytaramiz.
+  */
+  const cropPdfUpperY =
+    (viewport.height -
+      cropTop) /
+    scaleY;
+
+  const cropPdfLowerY =
+    (viewport.height -
+      (cropTop + cropHeight)) /
+    scaleY;
+
+  const cropLines =
+    (pageInfo.lines || [])
+      .filter((line) => {
+        const lineRight =
+          line.x + line.width;
+
+        const lineTop =
+          line.y +
+          line.height * 0.9;
+
+        const lineBottom =
+          line.y -
+          line.height * 0.35;
+
+        const horizontalHit =
+          lineRight >=
+            cropPdfX1 - 3 &&
+          line.x <=
+            cropPdfX2 + 3;
+
+        const verticalHit =
+          lineTop >=
+            cropPdfLowerY - 3 &&
+          lineBottom <=
+            cropPdfUpperY + 3;
+
+        return (
+          horizontalHit &&
+          verticalHit
+        );
+      })
+      .sort((a, b) => {
+        const dy =
+          b.y - a.y;
+
+        if (Math.abs(dy) > 2) {
+          return dy;
+        }
+
+        return a.x - b.x;
+      });
+
+  outputContext.save();
+
+  outputContext.fillStyle =
+    "#111111";
+
+  outputContext.textBaseline =
+    "alphabetic";
+
+  for (const line of cropLines) {
+    /*
+      PDF koordinatasidan crop canvas koordinatasiga.
+    */
+    const localX =
+      line.x *
+        scaleX -
+      cropX;
+
+    const absoluteCanvasBaselineY =
+      viewport.height -
+      line.y *
+        scaleY;
+
+    const localBaselineY =
+      absoluteCanvasBaselineY -
+      cropTop;
+
+    /*
+      TextLine.height odatda font o‘lchamiga yaqin.
+      Juda kichik/yirik qiymatlarni chegaralaymiz.
+    */
+    const fontPx =
+      Math.max(
+        12,
+        Math.min(
+          42,
+          line.height *
+            scaleY *
+            0.95
+        )
+      );
+
+    /*
+      PDFning original fonti mavjud bo‘lmasa ham matn ko‘rinsin.
+      Georgia/serif Vercel Node canvas'da ishonchli fallback.
+    */
+    outputContext.font =
+      `${Math.round(fontPx)}px Georgia, "Times New Roman", serif`;
+
+    /*
+      Text extractiondagi width bilan real fallback font width farq qilishi
+      mumkin. Agar matn katakdan chiqib ketsa, horizontal scale qilamiz.
+    */
+    const wantedWidth =
+      Math.max(
+        1,
+        line.width *
+          scaleX
+      );
+
+    const measured =
+      outputContext.measureText(
+        line.text
+      ).width;
+
+    if (
+      measured >
+        wantedWidth * 1.06 &&
+      measured > 0
+    ) {
+      const sx =
+        Math.max(
+          0.55,
+          wantedWidth /
+            measured
+        );
+
+      outputContext.save();
+      outputContext.translate(
+        localX,
+        localBaselineY
+      );
+      outputContext.scale(
+        sx,
+        1
+      );
+      outputContext.fillText(
+        line.text,
+        0,
+        0
+      );
+      outputContext.restore();
+    } else {
+      outputContext.fillText(
+        line.text,
+        localX,
+        localBaselineY
+      );
+    }
+  }
+
+  outputContext.restore();
+
+  /*
     Juda katta data URL bo‘lib ketmasin.
     1400px dan keng bo‘lsa proporsional kichraytiramiz.
   */
@@ -1827,18 +2020,6 @@ export async function POST(
           page
         );
 
-      pageInfos.set(
-        pageNumber,
-        {
-          page,
-          width:
-            viewport.width,
-          height:
-            viewport.height,
-          highlights,
-        }
-      );
-
       /*
         PAGE READING ORDER:
         left column first, then right column.
@@ -1849,6 +2030,19 @@ export async function POST(
           items,
           viewport.width
         );
+
+      pageInfos.set(
+        pageNumber,
+        {
+          page,
+          width:
+            viewport.width,
+          height:
+            viewport.height,
+          highlights,
+          lines,
+        }
+      );
 
       allLines.push(
         ...lines
