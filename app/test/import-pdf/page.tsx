@@ -144,6 +144,24 @@ function RichTextEditor({
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
 
+  const storageKey = `pdf-rich-editor:${editorId}`;
+
+  function readSavedDraft() {
+    try {
+      return window.sessionStorage.getItem(storageKey);
+    } catch {
+      return null;
+    }
+  }
+
+  function saveDraftHtml(html: string) {
+    try {
+      window.sessionStorage.setItem(storageKey, html);
+    } catch {
+      // sessionStorage ishlamasa ham editor ishlashda davom etadi
+    }
+  }
+
   /*
     MUHIM:
     contentEditable endi HAQIQIY uncontrolled editor.
@@ -157,31 +175,33 @@ function RichTextEditor({
   useEffect(() => {
     const editor = editorRef.current;
 
-    if (!editor || mountedOnceRef.current) {
+    if (!editor) {
       return;
     }
 
-    const cachedHtml = richTextDraftCache.get(editorId);
-    editor.innerHTML =
-      cachedHtml !== undefined
-        ? cachedHtml
+    /*
+      HAR BIR EDITOR UCHUN ALOHIDA DRAFT.
+      Scroll, parent re-render yoki component qayta mount bo‘lsa ham
+      sessionStorage'dagi oxirgi foydalanuvchi HTML'i ustun turadi.
+    */
+    const saved = readSavedDraft();
+    const initialHtml =
+      saved !== null
+        ? saved
         : editorValueToHtml(value);
 
-    richTextDraftCache.set(editorId, editor.innerHTML);
-    mountedOnceRef.current = true;
+    editor.innerHTML = initialHtml;
+    saveDraftHtml(initialHtml);
 
     /*
-      ENG MUHIM FIX:
-      contentEditable ichidagi HAR QANDAY haqiqiy DOM o‘zgarishini kuzatamiz.
-      Browser drag/drop, Backspace, Delete, Ctrl+X/Ctrl+V yoki qatorlarni
-      birlashtirganda React eventlarining qaysi tartibda kelishidan qat'i nazar,
-      oxirgi real HTML cache'ga yoziladi.
-
-      Shuning uchun scroll/rerender/remount bo‘lsa ham eski PDF HTML emas,
-      aynan foydalanuvchi tahrirlagan DOM qayta tiklanadi.
+      Browser DOMdagi HAR QANDAY o‘zgarishni darhol saqlaymiz.
+      Drag/drop, so‘zni tepaga olib chiqish, Enter/Backspace/Delete,
+      Ctrl+X/Ctrl+V — hammasi shu yerda ushlanadi.
     */
     const observer = new MutationObserver(() => {
-      richTextDraftCache.set(editorId, editor.innerHTML);
+      const html = editor.innerHTML;
+      saveDraftHtml(html);
+      onChange(html);
     });
 
     observer.observe(editor, {
@@ -192,10 +212,15 @@ function RichTextEditor({
     });
 
     return () => {
-      richTextDraftCache.set(editorId, editor.innerHTML);
+      const html = editor.innerHTML;
+      saveDraftHtml(html);
+      onChange(html);
       observer.disconnect();
     };
-  }, []);
+
+    // editorId o‘zgarmaydi; value ataylab dependency emas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorId]);
 
   function rememberLocalHtml() {
     const editor = editorRef.current;
@@ -204,13 +229,7 @@ function RichTextEditor({
       return;
     }
 
-    // Har bir tahrir darhol lokal cache'ga yoziladi.
-    // Component qayta mount bo‘lib qolsa ham aynan foydalanuvchi
-    // tahrirlagan HTML tiklanadi, eski PDF matni emas.
-    richTextDraftCache.set(
-      editorId,
-      editor.innerHTML
-    );
+    saveDraftHtml(editor.innerHTML);
   }
 
   function commitChange() {
@@ -221,7 +240,7 @@ function RichTextEditor({
     }
 
     const html = editor.innerHTML;
-    richTextDraftCache.set(editorId, html);
+    saveDraftHtml(html);
     onChange(html);
   }
 
@@ -524,13 +543,7 @@ function RichTextEditor({
         data-placeholder={placeholder}
         style={{ minHeight }}
         onInput={() => {
-          /*
-            Browser contentEditable DOMni input sikli tugaguncha yana
-            o‘zgartirishi mumkin. Shuning uchun parent state'ni aynan
-            keyingi animation frame'dagi FINAL DOM bilan yangilaymiz.
-          */
           saveSelection();
-          rememberLocalHtml();
 
           window.requestAnimationFrame(() => {
             rememberLocalHtml();
@@ -950,6 +963,24 @@ export default function ImportPdfTestPage() {
               }
             )
           : [];
+
+      try {
+        const keysToRemove: string[] = [];
+
+        for (let i = 0; i < window.sessionStorage.length; i++) {
+          const key = window.sessionStorage.key(i);
+
+          if (key?.startsWith("pdf-rich-editor:")) {
+            keysToRemove.push(key);
+          }
+        }
+
+        keysToRemove.forEach((key) =>
+          window.sessionStorage.removeItem(key)
+        );
+      } catch {
+        // ignore
+      }
 
       setQuestions(imported);
 
