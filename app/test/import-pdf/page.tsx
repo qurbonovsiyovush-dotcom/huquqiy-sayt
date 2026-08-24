@@ -16,7 +16,8 @@ type ShapeType =
   | "circle"
   | "ellipse"
   | "text"
-  | "image";
+  | "image"
+  | "matchingItem";
 
 type EditorShape = {
   id: string;
@@ -36,6 +37,10 @@ type EditorShape = {
   opacity?: number;
   objectFit?: "contain" | "cover" | "fill";
   zIndex?: number;
+
+  // Moslashtirish elementi uchun
+  matchingSide?: "left" | "right";
+  matchingKey?: string;
 };
 
 type ImportedQuestion = {
@@ -148,22 +153,24 @@ function RichTextEditor({
 
     const nextHtml = editorValueToHtml(value);
 
-    // Agar bu qiymat editorning o‘zidan kelgan bo‘lsa DOMni qayta yozmaymiz.
-    // innerHTML'ni qayta yozish browser selection/caret'ni yo‘qotadi.
-    if (nextHtml === lastEmittedHtmlRef.current) {
-      return;
-    }
-
-    // Foydalanuvchi ayni paytda shu editor ichida yozayotgan bo‘lsa
-    // hech qachon innerHTML'ni almashtirmaymiz.
-    if (
+    // contentEditable UNCONTROLLED bo‘ladi.
+    // React har bir tugmada innerHTML'ni qayta chizmaydi — shu sabab caret sakramaydi.
+    const isFocused =
       document.activeElement === editor ||
-      editor.contains(document.activeElement)
-    ) {
+      editor.contains(document.activeElement);
+
+    // Ayni editor foydalanuvchi tomonidan tahrirlanayotgan paytda
+    // parent state'dan kelgan qiymat bilan DOMga tegmaymiz.
+    if (isFocused) {
       return;
     }
 
-    if (editor.innerHTML !== nextHtml) {
+    // Faqat tashqi o‘zgarish bo‘lgandagina (PDF import, savol nusxalash va h.k.)
+    // DOMni sinxronlaymiz.
+    if (
+      editor.innerHTML !== nextHtml &&
+      nextHtml !== lastEmittedHtmlRef.current
+    ) {
       editor.innerHTML = nextHtml;
     }
 
@@ -236,6 +243,11 @@ function RichTextEditor({
     );
     saveSelection();
     emitChange();
+
+    // Toolbar bosilgandan keyin caret tanlangan joyda qoladi.
+    window.requestAnimationFrame(() => {
+      restoreSelection();
+    });
   }
 
   function toolMouseDown(
@@ -484,9 +496,9 @@ function RichTextEditor({
         onFocus={saveSelection}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
-        onBlur={emitChange}
-        dangerouslySetInnerHTML={{
-          __html: editorValueToHtml(value),
+        onBlur={() => {
+          saveSelection();
+          emitChange();
         }}
       />
 
@@ -1631,6 +1643,207 @@ export default function ImportPdfTestPage() {
     activeCanvasQuestionId,
   ]);
 
+
+  function nextMatchingKey(
+    question: ImportedQuestion,
+    side: "left" | "right"
+  ) {
+    const existing =
+      (question.shapes || [])
+        .filter(
+          (shape) =>
+            shape.type === "matchingItem" &&
+            shape.matchingSide === side
+        )
+        .map((shape) => shape.matchingKey || "");
+
+    if (side === "left") {
+      const numbers =
+        existing
+          .map((value) => Number(value))
+          .filter((value) => Number.isFinite(value));
+
+      const next =
+        numbers.length > 0
+          ? Math.max(...numbers) + 1
+          : 1;
+
+      return String(next);
+    }
+
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+
+    for (const letter of letters) {
+      if (!existing.includes(letter)) {
+        return letter;
+      }
+    }
+
+    return `a${existing.length + 1}`;
+  }
+
+  function addMatchingItem(
+    questionId: string,
+    side: "left" | "right"
+  ) {
+    const question =
+      questions.find((item) => item.id === questionId);
+
+    if (!question) {
+      return;
+    }
+
+    const key =
+      nextMatchingKey(question, side);
+
+    const sameSideCount =
+      (question.shapes || []).filter(
+        (shape) =>
+          shape.type === "matchingItem" &&
+          shape.matchingSide === side
+      ).length;
+
+    const shape: EditorShape = {
+      id: makeShapeId(),
+      type: "matchingItem",
+      matchingSide: side,
+      matchingKey: key,
+
+      // Chap va o'ng ustun alohida joylashadi
+      x:
+        side === "left"
+          ? 70
+          : 430,
+      y:
+        45 + sameSideCount * 92,
+
+      width:
+        side === "left"
+          ? 300
+          : 390,
+      height: 74,
+
+      text:
+        side === "left"
+          ? `Atama ${key}`
+          : `Izoh ${key}`,
+
+      backgroundColor: "#ffffff",
+      borderColor: "#1f2a30",
+      textColor: "#111111",
+      fontSize: 20,
+      borderWidth: 2,
+      borderRadius: 8,
+      opacity: 1,
+      zIndex: Date.now(),
+    };
+
+    updateQuestionShapes(questionId, (shapes) => [
+      ...shapes,
+      shape,
+    ]);
+
+    setSelectedShape({
+      questionId,
+      shapeId: shape.id,
+    });
+
+    setActiveCanvasQuestionId(questionId);
+  }
+
+  function addMatchingTemplate(questionId: string) {
+    const question =
+      questions.find((item) => item.id === questionId);
+
+    if (!question) {
+      return;
+    }
+
+    const hasMatching =
+      (question.shapes || []).some(
+        (shape) =>
+          shape.type === "matchingItem"
+      );
+
+    if (hasMatching) {
+      setMessage(
+        "Moslashtirish shakli allaqachon bor. + Chap yoki + O‘ng orqali yangi qator qo‘shing."
+      );
+      return;
+    }
+
+    const leftTexts = [
+      "Immunitet",
+      "Inauguratsiya",
+      "Kvorum",
+    ];
+
+    const rightTexts = [
+      "Izoh a",
+      "Izoh b",
+      "Izoh c",
+      "Izoh d",
+      "Izoh e",
+    ];
+
+    const created: EditorShape[] = [];
+
+    leftTexts.forEach((item, index) => {
+      created.push({
+        id: makeShapeId(),
+        type: "matchingItem",
+        matchingSide: "left",
+        matchingKey: String(index + 1),
+        x: 70,
+        y: 45 + index * 92,
+        width: 300,
+        height: 74,
+        text: item,
+        backgroundColor: "#ffffff",
+        borderColor: "#1f2a30",
+        textColor: "#111111",
+        fontSize: 20,
+        borderWidth: 2,
+        borderRadius: 8,
+        opacity: 1,
+        zIndex: Date.now() + index,
+      });
+    });
+
+    rightTexts.forEach((item, index) => {
+      created.push({
+        id: makeShapeId(),
+        type: "matchingItem",
+        matchingSide: "right",
+        matchingKey: String.fromCharCode(97 + index),
+        x: 430,
+        y: 35 + index * 76,
+        width: 390,
+        height: 62,
+        text: item,
+        backgroundColor: "#ffffff",
+        borderColor: "#1f2a30",
+        textColor: "#111111",
+        fontSize: 18,
+        borderWidth: 2,
+        borderRadius: 8,
+        opacity: 1,
+        zIndex: Date.now() + 20 + index,
+      });
+    });
+
+    updateQuestionShapes(questionId, (shapes) => [
+      ...shapes,
+      ...created,
+    ]);
+
+    setActiveCanvasQuestionId(questionId);
+    setSelectedShape({
+      questionId,
+      shapeId: created[0].id,
+    });
+  }
+
   function renderShapeEditor(question: ImportedQuestion) {
     const shapes = question.shapes || [];
 
@@ -1711,6 +1924,44 @@ export default function ImportPdfTestPage() {
               }
             >
               Oval
+            </button>
+
+            <button
+              type="button"
+              className="visualTool matchingTool"
+              onClick={() =>
+                addMatchingTemplate(
+                  question.id
+                )
+              }
+            >
+              Moslashtirish
+            </button>
+
+            <button
+              type="button"
+              className="visualTool matchingAddTool"
+              onClick={() =>
+                addMatchingItem(
+                  question.id,
+                  "left"
+                )
+              }
+            >
+              + Chap
+            </button>
+
+            <button
+              type="button"
+              className="visualTool matchingAddTool"
+              onClick={() =>
+                addMatchingItem(
+                  question.id,
+                  "right"
+                )
+              }
+            >
+              + O‘ng
             </button>
           </div>
 
@@ -1795,9 +2046,14 @@ export default function ImportPdfTestPage() {
                   onDoubleClick={(event) => {
                     event.stopPropagation();
 
-                    if (shape.type === "text") {
+                    if (
+                      shape.type === "text" ||
+                      shape.type === "matchingItem"
+                    ) {
                       const next = window.prompt(
-                        "Matn:",
+                        shape.type === "matchingItem"
+                          ? "Atama / izoh matni:"
+                          : "Matn:",
                         shape.text || ""
                       );
 
@@ -1829,6 +2085,28 @@ export default function ImportPdfTestPage() {
                         pointerEvents: "none",
                       }}
                     />
+                  ) : shape.type === "matchingItem" ? (
+                    <div
+                      className={
+                        shape.matchingSide === "left"
+                          ? "matchingItem matchingLeft"
+                          : "matchingItem matchingRight"
+                      }
+                    >
+                      <div className="matchingKeyCircle">
+                        {shape.matchingKey}
+                      </div>
+
+                      <div className="matchingTextBox">
+                        <span
+                          style={{
+                            fontSize: `${shape.fontSize ?? 20}px`,
+                          }}
+                        >
+                          {shape.text || ""}
+                        </span>
+                      </div>
+                    </div>
                   ) : (
                     <span
                       className="shapeText"
@@ -1839,6 +2117,27 @@ export default function ImportPdfTestPage() {
                       {shape.text || ""}
                     </span>
                   )}
+
+                  <button
+                    type="button"
+                    className="shapeDeleteX"
+                    title="O‘chirish"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+
+                      removeShape(
+                        question.id,
+                        shape.id
+                      );
+                    }}
+                  >
+                    ×
+                  </button>
 
                   {isSelected &&
                     (
@@ -1870,7 +2169,8 @@ export default function ImportPdfTestPage() {
               Tanlangan: {selected.type}
             </strong>
 
-            {selected.type === "text" && (
+            {(selected.type === "text" ||
+              selected.type === "matchingItem") && (
               <input
                 value={selected.text || ""}
                 onChange={(event) =>
@@ -1966,18 +2266,7 @@ export default function ImportPdfTestPage() {
               Orqaga
             </button>
 
-            <button
-              type="button"
-              className="dangerShapeButton"
-              onClick={() =>
-                removeShape(
-                  question.id,
-                  selected.id
-                )
-              }
-            >
-              O‘chirish
-            </button>
+
           </div>
         )}
       </div>
@@ -2070,25 +2359,116 @@ export default function ImportPdfTestPage() {
               */
               shapes:
                 Array.isArray(question.shapes)
-                  ? question.shapes.map((shape) => ({
-                      id: shape.id,
-                      type: shape.type,
-                      x: Math.round(shape.x),
-                      y: Math.round(shape.y),
-                      width: Math.max(1, Math.round(shape.width)),
-                      height: Math.max(1, Math.round(shape.height)),
-                      text: shape.text,
-                      imageSrc: shape.imageSrc,
-                      backgroundColor: shape.backgroundColor,
-                      borderColor: shape.borderColor,
-                      textColor: shape.textColor,
-                      fontSize: shape.fontSize,
-                      borderWidth: shape.borderWidth,
-                      borderRadius: shape.borderRadius,
-                      opacity: shape.opacity,
-                      objectFit: shape.objectFit,
-                      zIndex: shape.zIndex,
-                    }))
+                  ? question.shapes.flatMap((shape) => {
+                      if (shape.type !== "matchingItem") {
+                        return [
+                          {
+                            id: shape.id,
+                            type: shape.type,
+                            x: Math.round(shape.x),
+                            y: Math.round(shape.y),
+                            width: Math.max(1, Math.round(shape.width)),
+                            height: Math.max(1, Math.round(shape.height)),
+                            text: shape.text,
+                            imageSrc: shape.imageSrc,
+                            backgroundColor: shape.backgroundColor,
+                            borderColor: shape.borderColor,
+                            textColor: shape.textColor,
+                            fontSize: shape.fontSize,
+                            borderWidth: shape.borderWidth,
+                            borderRadius: shape.borderRadius,
+                            opacity: shape.opacity,
+                            objectFit: shape.objectFit,
+                            zIndex: shape.zIndex,
+                          },
+                        ];
+                      }
+
+                      const keyWidth = 50;
+                      const gap = 8;
+                      const boxX =
+                        Math.round(shape.x) + keyWidth - 8;
+                      const boxWidth =
+                        Math.max(
+                          70,
+                          Math.round(shape.width) - keyWidth + 8
+                        );
+
+                      return [
+                        {
+                          id: `${shape.id}-box`,
+                          type: "roundedRectangle",
+                          x: boxX,
+                          y: Math.round(shape.y),
+                          width: boxWidth,
+                          height: Math.max(1, Math.round(shape.height)),
+                          backgroundColor: "#ffffff",
+                          borderColor: shape.borderColor || "#1f2a30",
+                          borderWidth: 2,
+                          borderRadius: 8,
+                          zIndex: shape.zIndex,
+                        },
+                        {
+                          id: `${shape.id}-key-circle`,
+                          type: "circle",
+                          x: Math.round(shape.x),
+                          y:
+                            Math.round(shape.y) +
+                            Math.max(
+                              0,
+                              Math.round(
+                                (shape.height - keyWidth) / 2
+                              )
+                            ),
+                          width: keyWidth,
+                          height: keyWidth,
+                          backgroundColor: "#ffffff",
+                          borderColor: shape.borderColor || "#1f2a30",
+                          borderWidth: 2,
+                          borderRadius: 999,
+                          zIndex: (shape.zIndex || 1) + 1,
+                        },
+                        {
+                          id: `${shape.id}-key`,
+                          type: "text",
+                          x: Math.round(shape.x),
+                          y:
+                            Math.round(shape.y) +
+                            Math.max(
+                              0,
+                              Math.round(
+                                (shape.height - keyWidth) / 2
+                              )
+                            ),
+                          width: keyWidth,
+                          height: keyWidth,
+                          text: shape.matchingKey || "",
+                          textColor: shape.textColor || "#111111",
+                          fontSize: 19,
+                          borderWidth: 0,
+                          zIndex: (shape.zIndex || 1) + 2,
+                        },
+                        {
+                          id: `${shape.id}-text`,
+                          type: "text",
+                          x: boxX + gap,
+                          y: Math.round(shape.y) + 7,
+                          width: Math.max(
+                            40,
+                            boxWidth - gap * 2
+                          ),
+                          height: Math.max(
+                            30,
+                            Math.round(shape.height) - 14
+                          ),
+                          text: shape.text || "",
+                          textColor: shape.textColor || "#111111",
+                          fontSize: shape.fontSize || 18,
+                          borderWidth: 0,
+                          zIndex: (shape.zIndex || 1) + 2,
+                        },
+                      ];
+                    })
                   : [],
 
               points: 1,
@@ -3341,6 +3721,97 @@ export default function ImportPdfTestPage() {
           pointer-events: none;
         }
 
+        .shapeDeleteX {
+          position: absolute;
+          top: -14px;
+          right: -14px;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #ffffff;
+          border-radius: 50%;
+          color: #ffffff;
+          background: #df3434;
+          box-shadow: 0 2px 5px rgba(0,0,0,.28);
+          cursor: pointer;
+          font-family: Arial, sans-serif;
+          font-size: 20px;
+          font-weight: 900;
+          line-height: 1;
+          opacity: 0;
+          transform: scale(.85);
+          transition: .14s ease;
+          z-index: 1005;
+        }
+
+        .canvasShape:hover > .shapeDeleteX,
+        .selectedCanvasShape > .shapeDeleteX {
+          opacity: 1;
+          transform: scale(1);
+        }
+
+        .matchingItem {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          pointer-events: none;
+        }
+
+        .matchingTextBox {
+          position: absolute;
+          left: 42px;
+          right: 0;
+          top: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px 14px 8px 24px;
+          border: 2px solid #1f2a30;
+          border-radius: 8px;
+          background: #ffffff;
+          overflow: hidden;
+          text-align: center;
+        }
+
+        .matchingRight .matchingTextBox {
+          justify-content: flex-start;
+          text-align: left;
+          padding-left: 28px;
+        }
+
+        .matchingKeyCircle {
+          position: relative;
+          z-index: 3;
+          width: 52px;
+          height: 52px;
+          flex: 0 0 52px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #1f2a30;
+          border-radius: 50%;
+          background: #ffffff;
+          font-size: 21px;
+          font-weight: 700;
+        }
+
+        .matchingTool {
+          color: #6b3e00;
+          border-color: #a06616;
+          background: linear-gradient(#fff4d7,#f1c66b);
+        }
+
+        .matchingAddTool {
+          color: #073b68;
+          border-color: #174461;
+          background: linear-gradient(#e3f6ff,#9bd9f2);
+        }
+
         .resizeHandle {
           position: absolute;
           width: 13px;
@@ -3400,12 +3871,6 @@ export default function ImportPdfTestPage() {
           cursor: pointer;
           font-family: inherit;
           font-weight: 700;
-        }
-
-        .selectedShapePanel .dangerShapeButton {
-          color: #7b1515;
-          border-color: #9b2828;
-          background: #ffdede;
         }
 
         .optionsList {
