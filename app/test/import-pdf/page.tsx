@@ -140,54 +140,30 @@ function RichTextEditor({
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
 
-  // Oxirgi marta aynan shu editor parentga yuborgan HTML.
-  // Bu ref cursorning har bir state update'da boshiga sakrashini to‘xtatadi.
-  const lastEmittedHtmlRef = useRef<string>("");
+  /*
+    MUHIM:
+    contentEditable endi HAQIQIY uncontrolled editor.
+    Parentdagi `value` har bir renderda DOMga qayta yozilmaydi.
+    Shu sabab matnni bir qatordan ikkinchi qatorga ko‘chirsangiz,
+    `1-bo‘lim` qilib birlashtirsangiz yoki so‘zlarni joyidan sursangiz,
+    ular eski joyiga qaytmaydi.
+  */
+  const mountedOnceRef = useRef(false);
 
   useEffect(() => {
     const editor = editorRef.current;
 
-    if (!editor) {
+    if (!editor || mountedOnceRef.current) {
       return;
     }
 
-    const nextHtml = editorValueToHtml(value);
-
-    // contentEditable UNCONTROLLED bo‘ladi.
-    // React har bir tugmada innerHTML'ni qayta chizmaydi — shu sabab caret sakramaydi.
-    const isFocused =
-      document.activeElement === editor ||
-      editor.contains(document.activeElement);
-
-    // Ayni editor foydalanuvchi tomonidan tahrirlanayotgan paytda
-    // parent state'dan kelgan qiymat bilan DOMga tegmaymiz.
-    if (isFocused) {
-      return;
-    }
-
-    // Faqat tashqi o‘zgarish bo‘lgandagina (PDF import, savol nusxalash va h.k.)
-    // DOMni sinxronlaymiz.
-    if (
-      editor.innerHTML !== nextHtml &&
-      nextHtml !== lastEmittedHtmlRef.current
-    ) {
-      editor.innerHTML = nextHtml;
-    }
-
-    lastEmittedHtmlRef.current = nextHtml;
-  }, [value]);
+    editor.innerHTML = editorValueToHtml(value);
+    mountedOnceRef.current = true;
+  }, []);
 
   function rememberLocalHtml() {
-    const editor = editorRef.current;
-
-    if (!editor) {
-      return;
-    }
-
-    // Yozish vaqtida React parent state'ini umuman yangilamaymiz.
-    // DOM browserning o‘zida qoladi, shuning uchun cursor va ko‘chirilgan
-    // matn o‘z joyiga qaytib ketmaydi.
-    lastEmittedHtmlRef.current = editor.innerHTML;
+    // Ataylab parent state'ni yangilamaymiz.
+    // Browser contentEditable DOMini o‘zi boshqaradi.
   }
 
   function commitChange() {
@@ -197,9 +173,7 @@ function RichTextEditor({
       return;
     }
 
-    const html = editor.innerHTML;
-    lastEmittedHtmlRef.current = html;
-    onChange(html);
+    onChange(editor.innerHTML);
   }
 
   function saveSelection() {
