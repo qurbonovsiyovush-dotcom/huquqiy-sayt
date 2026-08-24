@@ -658,7 +658,6 @@ export async function POST(
         data: bytes,
         useSystemFonts: true,
         disableFontFace: false,
-        isEvalSupported: false,
       })
       .promise;
 
