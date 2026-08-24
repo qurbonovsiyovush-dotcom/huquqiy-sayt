@@ -2359,7 +2359,7 @@ export default function ImportPdfTestPage() {
               */
               shapes:
                 Array.isArray(question.shapes)
-                  ? question.shapes.flatMap((shape) => {
+                  ? question.shapes.flatMap<EditorShape>((shape): EditorShape[] => {
                       if (shape.type !== "matchingItem") {
                         return [
                           {
