@@ -33,6 +33,14 @@ type TestQuestion = {
   points?: number;
 };
 
+type TestCategory =
+  | "legislation"
+  | "thematic"
+  | "block"
+  | "national-certificate"
+  | "thirty"
+  | "custom";
+
 type TestData = {
   id: string;
   title: string;
@@ -41,9 +49,105 @@ type TestData = {
   description?: string;
   questions: TestQuestion[];
   status: TestStatus;
+
+  /*
+    Yangi kategoriya tizimi.
+    Eski testlarda bu maydon bo‘lmasligi mumkin.
+  */
+  testType?: TestCategory;
+  customTestTypeName?: string;
+
   createdAt?: string;
   updatedAt?: string;
 };
+
+const TEST_CATEGORIES: Array<{
+  key: TestCategory;
+  title: string;
+  shortTitle: string;
+  description: string;
+  icon: string;
+}> = [
+  {
+    key: "legislation",
+    title: "Qonunchilik hujjatlaridan test",
+    shortTitle: "Qonunchilik hujjatlaridan",
+    description: "Konstitutsiya, kodeks, qonun va boshqa normativ-huquqiy hujjatlar",
+    icon: "§",
+  },
+  {
+    key: "thematic",
+    title: "Mavzulashtirilgan test",
+    shortTitle: "Mavzulashtirilgan",
+    description: "Muayyan mavzu yoki bob bo‘yicha tuzilgan testlar",
+    icon: "M",
+  },
+  {
+    key: "block",
+    title: "Blok test",
+    shortTitle: "Blok test",
+    description: "Bir nechta fan yoki bo‘limni birlashtirgan blok testlar",
+    icon: "B",
+  },
+  {
+    key: "national-certificate",
+    title: "Milliy sertifikat testi",
+    shortTitle: "Milliy sertifikat",
+    description: "Milliy sertifikat formatidagi testlar",
+    icon: "MS",
+  },
+  {
+    key: "thirty",
+    title: "30 talik test",
+    shortTitle: "30 talik",
+    description: "30 ta savoldan iborat tezkor testlar",
+    icon: "30",
+  },
+  {
+    key: "custom",
+    title: "Boshqa test",
+    shortTitle: "Boshqa test",
+    description: "Test turining nomini adminning o‘zi belgilaydi",
+    icon: "+",
+  },
+];
+
+function normalizeTestType(test: TestData): TestCategory {
+  const value = test.testType;
+
+  if (
+    value === "legislation" ||
+    value === "thematic" ||
+    value === "block" ||
+    value === "national-certificate" ||
+    value === "thirty" ||
+    value === "custom"
+  ) {
+    return value;
+  }
+
+  /*
+    Eski testlar yo‘qolib ketmasligi uchun
+    kategoriyasiz testlarni “Boshqa test”ga joylaymiz.
+  */
+  return "custom";
+}
+
+function testTypeLabel(test: TestData) {
+  const type = normalizeTestType(test);
+
+  if (type === "custom") {
+    return (
+      String(test.customTestTypeName || "").trim() ||
+      "Boshqa test"
+    );
+  }
+
+  return (
+    TEST_CATEGORIES.find((item) => item.key === type)?.title ||
+    "Boshqa test"
+  );
+}
 
 export default function AdminTestsPage() {
   const router = useRouter();
@@ -60,6 +164,15 @@ export default function AdminTestsPage() {
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<"pdf" | "word" | null>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+
+  const [selectedCategory, setSelectedCategory] =
+    useState<TestCategory>("legislation");
+
+  const [createCategory, setCreateCategory] =
+    useState<TestCategory>("legislation");
+
+  const [customCreateName, setCustomCreateName] =
+    useState("");
 
   /* =========================================================
      JSON O'QISH
@@ -126,10 +239,19 @@ export default function AdminTestsPage() {
      FILTER
   ========================================================= */
 
-  const filteredTests = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const categoryTests = useMemo(() => {
+    return tests.filter(
+      (test) =>
+        normalizeTestType(test) ===
+        selectedCategory
+    );
+  }, [tests, selectedCategory]);
 
-    return tests.filter((test) => {
+  const filteredTests = useMemo(() => {
+    const query =
+      search.trim().toLowerCase();
+
+    return categoryTests.filter((test) => {
       if (
         statusFilter !== "all" &&
         test.status !== statusFilter
@@ -147,29 +269,61 @@ export default function AdminTestsPage() {
           .includes(query) ||
         String(test.subject || "")
           .toLowerCase()
+          .includes(query) ||
+        testTypeLabel(test)
+          .toLowerCase()
           .includes(query)
       );
     });
-  }, [tests, search, statusFilter]);
+  }, [
+    categoryTests,
+    search,
+    statusFilter,
+  ]);
 
   /* =========================================================
      STATISTIKA
   ========================================================= */
 
   const statistics = useMemo(() => {
-    const draft = tests.filter(
-      (test) => test.status === "draft"
-    ).length;
+    const draft =
+      categoryTests.filter(
+        (test) =>
+          test.status === "draft"
+      ).length;
 
-    const published = tests.filter(
-      (test) => test.status === "published"
-    ).length;
+    const published =
+      categoryTests.filter(
+        (test) =>
+          test.status ===
+          "published"
+      ).length;
 
     return {
-      total: tests.length,
+      total:
+        categoryTests.length,
       draft,
       published,
     };
+  }, [categoryTests]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<TestCategory, number> = {
+      legislation: 0,
+      thematic: 0,
+      block: 0,
+      "national-certificate": 0,
+      thirty: 0,
+      custom: 0,
+    };
+
+    for (const test of tests) {
+      counts[
+        normalizeTestType(test)
+      ] += 1;
+    }
+
+    return counts;
   }, [tests]);
 
   /* =========================================================
@@ -1277,7 +1431,12 @@ margin: 10px auto 12px;
           <button
             type="button"
             className="blueButton"
-            onClick={() => setCreateMenuOpen(true)}
+            onClick={() => {
+              setCreateCategory(
+                selectedCategory
+              );
+              setCreateMenuOpen(true);
+            }}
           >
             <span className="buttonMain">Yangi test yaratish</span>
           </button>
@@ -1289,13 +1448,16 @@ margin: 10px auto 12px;
           className="createOverlay"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
               setCreateMenuOpen(false);
             }
           }}
         >
           <div
-            className="createModal"
+            className="createModal createModalWide"
             role="dialog"
             aria-modal="true"
             aria-labelledby="createTestTitle"
@@ -1303,7 +1465,9 @@ margin: 10px auto 12px;
             <button
               type="button"
               className="createClose"
-              onClick={() => setCreateMenuOpen(false)}
+              onClick={() =>
+                setCreateMenuOpen(false)
+              }
               aria-label="Yopish"
             >
               ×
@@ -1314,25 +1478,112 @@ margin: 10px auto 12px;
             </div>
 
             <h2 id="createTestTitle">
-              Yangi test yaratish usulini tanlang
+              Avval test turini tanlang
             </h2>
 
             <p className="createModalText">
-              Testni oddiy editor orqali qo‘lda yarating yoki PDF fayldan
-              savol va variantlarni avtomatik ajrating.
+              Test saqlanganda tanlangan bo‘limga tushadi.
+              Shu sabab testlar bir-biriga aralashmaydi.
             </p>
+
+            <div className="createCategoryGrid">
+              {TEST_CATEGORIES.map((category) => (
+                <button
+                  type="button"
+                  key={category.key}
+                  className={
+                    createCategory === category.key
+                      ? "createCategoryCard activeCreateCategory"
+                      : "createCategoryCard"
+                  }
+                  onClick={() =>
+                    setCreateCategory(category.key)
+                  }
+                >
+                  <span className="categoryMiniIcon">
+                    {category.icon}
+                  </span>
+
+                  <strong>
+                    {category.title}
+                  </strong>
+
+                  <small>
+                    {category.description}
+                  </small>
+                </button>
+              ))}
+            </div>
+
+            {createCategory === "custom" && (
+              <div className="customTypeBox">
+                <label htmlFor="customTestTypeName">
+                  Test turining nomi
+                </label>
+
+                <input
+                  id="customTestTypeName"
+                  value={customCreateName}
+                  onChange={(event) =>
+                    setCustomCreateName(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Masalan: Final nazorat testi"
+                />
+              </div>
+            )}
+
+            <div className="createMethodTitle">
+              Endi yaratish usulini tanlang
+            </div>
 
             <div className="createChoiceGrid">
               <button
                 type="button"
                 className="createChoice createChoiceManual"
                 onClick={() => {
+                  if (
+                    createCategory === "custom" &&
+                    !customCreateName.trim()
+                  ) {
+                    window.alert(
+                      "Boshqa test uchun test turining nomini kiriting."
+                    );
+                    return;
+                  }
+
+                  const params =
+                    new URLSearchParams({
+                      testType:
+                        createCategory,
+                    });
+
+                  if (
+                    createCategory ===
+                    "custom"
+                  ) {
+                    params.set(
+                      "customTestTypeName",
+                      customCreateName.trim()
+                    );
+                  }
+
                   setCreateMenuOpen(false);
-                  router.push("/test/editor");
+
+                  router.push(
+                    `/test/editor?${params.toString()}`
+                  );
                 }}
               >
-                <span className="createChoiceIcon">✎</span>
-                <strong>Oddiy test yaratish</strong>
+                <span className="createChoiceIcon">
+                  ✎
+                </span>
+
+                <strong>
+                  Oddiy test yaratish
+                </strong>
+
                 <small>
                   Savol va variantlarni qo‘lda kiritish
                 </small>
@@ -1342,12 +1593,47 @@ margin: 10px auto 12px;
                 type="button"
                 className="createChoice createChoicePdf"
                 onClick={() => {
+                  if (
+                    createCategory === "custom" &&
+                    !customCreateName.trim()
+                  ) {
+                    window.alert(
+                      "Boshqa test uchun test turining nomini kiriting."
+                    );
+                    return;
+                  }
+
+                  const params =
+                    new URLSearchParams({
+                      testType:
+                        createCategory,
+                    });
+
+                  if (
+                    createCategory ===
+                    "custom"
+                  ) {
+                    params.set(
+                      "customTestTypeName",
+                      customCreateName.trim()
+                    );
+                  }
+
                   setCreateMenuOpen(false);
-                  router.push("/test/import-pdf");
+
+                  router.push(
+                    `/test/import-pdf?${params.toString()}`
+                  );
                 }}
               >
-                <span className="createChoiceIcon">PDF</span>
-                <strong>PDF dan test yaratish</strong>
+                <span className="createChoiceIcon">
+                  PDF
+                </span>
+
+                <strong>
+                  PDF dan test yaratish
+                </strong>
+
                 <small>
                   PDFdan savol va A/B/C/D variantlarni ajratish
                 </small>
@@ -1364,6 +1650,83 @@ margin: 10px auto 12px;
       <section className="mainBox">
         <div className="floatingTitle">
           Testlar
+        </div>
+
+        <div className="categorySection">
+          <div className="categorySectionHeader">
+            <div>
+              <strong>
+                Test turlari
+              </strong>
+
+              <span>
+                Kerakli bo‘limni tanlang
+              </span>
+            </div>
+
+            <div className="selectedCategoryName">
+              {
+                TEST_CATEGORIES.find(
+                  (item) =>
+                    item.key ===
+                    selectedCategory
+                )?.title
+              }
+            </div>
+          </div>
+
+          <div className="categoryGrid">
+            {TEST_CATEGORIES.map((category) => {
+              const active =
+                selectedCategory ===
+                category.key;
+
+              return (
+                <button
+                  key={category.key}
+                  type="button"
+                  className={
+                    active
+                      ? "categoryCard activeCategoryCard"
+                      : "categoryCard"
+                  }
+                  onClick={() => {
+                    setSelectedCategory(
+                      category.key
+                    );
+                    setStatusFilter(
+                      "all"
+                    );
+                    setSearch("");
+                  }}
+                >
+                  <span className="categoryIcon">
+                    {category.icon}
+                  </span>
+
+                  <span className="categoryCardContent">
+                    <strong>
+                      {category.title}
+                    </strong>
+
+                    <small>
+                      {
+                        category.description
+                      }
+                    </small>
+                  </span>
+
+                  <span className="categoryCount">
+                    {
+                      categoryCounts[
+                        category.key
+                      ]
+                    }
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="statistics">
@@ -1482,9 +1845,12 @@ margin: 10px auto 12px;
               <button
                 type="button"
                 className="blueButton createFirstButton"
-                onClick={() =>
-                  router.push("/test/editor")
-                }
+                onClick={() => {
+                  setCreateCategory(
+                    selectedCategory
+                  );
+                  setCreateMenuOpen(true);
+                }}
               >
                 + Birinchi testni yaratish
               </button>
@@ -1505,6 +1871,10 @@ margin: 10px auto 12px;
                     className="testCard"
                     key={test.id}
                   >
+                    <div className="testTypeBadge">
+                      {testTypeLabel(test)}
+                    </div>
+
                     {/* STATUS */}
 
                     <div
@@ -2366,6 +2736,593 @@ margin: 10px auto 12px;
               #ef6969,
               #bf2f2f
             );
+        }
+
+
+        /* ================================================
+           TEST KATEGORIYALARI
+        ================================================ */
+
+        .categorySection {
+          margin:
+            0 0 32px;
+
+          padding:
+            20px;
+
+          border:
+            2px solid #4c565c;
+
+          border-radius:
+            19px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #eef2f4 0%,
+              #cdd3d7 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(255,255,255,.95),
+            0 5px 0 #4d565b,
+            0 10px 18px
+              rgba(0,0,0,.14);
+        }
+
+        .categorySectionHeader {
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            space-between;
+
+          gap:
+            18px;
+
+          margin-bottom:
+            17px;
+
+          padding:
+            0 4px;
+        }
+
+        .categorySectionHeader > div:first-child {
+          display:
+            flex;
+
+          flex-direction:
+            column;
+
+          gap:
+            3px;
+        }
+
+        .categorySectionHeader strong {
+          color:
+            #073b68;
+
+          font-size:
+            21px;
+        }
+
+        .categorySectionHeader span {
+          color:
+            #526068;
+
+          font-size:
+            13px;
+        }
+
+        .selectedCategoryName {
+          padding:
+            8px 14px;
+
+          border:
+            1px solid #6f7b81;
+
+          border-radius:
+            9px;
+
+          color:
+            #073b68;
+
+          background:
+            rgba(255,255,255,.68);
+
+          box-shadow:
+            inset 0 2px 2px
+              rgba(255,255,255,.9);
+
+          font-weight:
+            800;
+        }
+
+        .categoryGrid {
+          display:
+            grid;
+
+          grid-template-columns:
+            repeat(3, minmax(0,1fr));
+
+          gap:
+            16px;
+        }
+
+        .categoryCard {
+          position:
+            relative;
+
+          min-height:
+            132px;
+
+          padding:
+            18px 58px 18px 17px;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          gap:
+            14px;
+
+          text-align:
+            left;
+
+          border:
+            2px solid #70797e;
+
+          border-radius:
+            15px;
+
+          color:
+            #253039;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #d6dadd 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(255,255,255,.9),
+            0 5px 0 #596267,
+            0 9px 15px
+              rgba(0,0,0,.12);
+
+          transition:
+            transform .12s ease,
+            filter .12s ease,
+            box-shadow .12s ease;
+        }
+
+        .categoryCard:hover {
+          transform:
+            translateY(-2px);
+
+          filter:
+            brightness(1.03);
+        }
+
+        .categoryCard:active {
+          transform:
+            translateY(3px);
+
+          box-shadow:
+            0 2px 0 #596267;
+        }
+
+        .activeCategoryCard {
+          color:
+            #073b68;
+
+          border-color:
+            #16567a;
+
+          background:
+            linear-gradient(
+              180deg,
+              #d7f5ff 0%,
+              #85cdec 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(255,255,255,.85),
+            0 6px 0 #174760,
+            0 11px 18px
+              rgba(0,0,0,.15);
+        }
+
+        .categoryIcon {
+          flex:
+            0 0 48px;
+
+          width:
+            48px;
+
+          height:
+            48px;
+
+          display:
+            grid;
+
+          place-items:
+            center;
+
+          border:
+            2px solid #49616f;
+
+          border-radius:
+            12px;
+
+          color:
+            #073b68;
+
+          background:
+            linear-gradient(
+              #e8faff,
+              #8bcfeb
+            );
+
+          box-shadow:
+            inset 0 3px 3px
+              rgba(255,255,255,.8),
+            0 3px 0 #405867;
+
+          font-size:
+            17px;
+
+          font-weight:
+            900;
+        }
+
+        .categoryCardContent {
+          display:
+            flex;
+
+          flex:
+            1;
+
+          flex-direction:
+            column;
+
+          gap:
+            5px;
+        }
+
+        .categoryCardContent strong {
+          font-size:
+            16px;
+
+          line-height:
+            1.15;
+        }
+
+        .categoryCardContent small {
+          color:
+            #53616a;
+
+          font-size:
+            12px;
+
+          line-height:
+            1.3;
+        }
+
+        .categoryCount {
+          position:
+            absolute;
+
+          top:
+            12px;
+
+          right:
+            12px;
+
+          min-width:
+            34px;
+
+          height:
+            34px;
+
+          padding:
+            0 8px;
+
+          display:
+            grid;
+
+          place-items:
+            center;
+
+          border:
+            2px solid #174461;
+
+          border-radius:
+            999px;
+
+          color:
+            #073b68;
+
+          background:
+            linear-gradient(
+              #e5f9ff,
+              #8fcfeb
+            );
+
+          box-shadow:
+            0 3px 0 #17415c;
+
+          font-weight:
+            900;
+        }
+
+        .testTypeBadge {
+          display:
+            inline-flex;
+
+          width:
+            fit-content;
+
+          margin:
+            0 0 12px;
+
+          padding:
+            6px 11px;
+
+          border:
+            1px solid #477289;
+
+          border-radius:
+            999px;
+
+          color:
+            #073b68;
+
+          background:
+            linear-gradient(
+              #effbff,
+              #b9e6f7
+            );
+
+          font-size:
+            12px;
+
+          font-weight:
+            900;
+        }
+
+        /* CREATE MODAL — KATEGORIYA */
+
+        .createModalWide {
+          width:
+            min(940px, 96vw);
+        }
+
+        .createCategoryGrid {
+          display:
+            grid;
+
+          grid-template-columns:
+            repeat(3, minmax(0,1fr));
+
+          gap:
+            12px;
+
+          margin:
+            20px 0;
+        }
+
+        .createCategoryCard {
+          min-height:
+            116px;
+
+          padding:
+            14px;
+
+          display:
+            flex;
+
+          flex-direction:
+            column;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          gap:
+            7px;
+
+          border:
+            2px solid #69747a;
+
+          border-radius:
+            13px;
+
+          color:
+            #273239;
+
+          background:
+            linear-gradient(
+              #ffffff,
+              #d5dadd
+            );
+
+          box-shadow:
+            inset 0 3px 3px
+              rgba(255,255,255,.9),
+            0 4px 0 #555f64;
+
+          font-family:
+            inherit;
+        }
+
+        .activeCreateCategory {
+          color:
+            #073b68;
+
+          border-color:
+            #174461;
+
+          background:
+            linear-gradient(
+              #ddf7ff,
+              #79c6e9
+            );
+
+          box-shadow:
+            inset 0 3px 3px
+              rgba(255,255,255,.9),
+            0 5px 0 #17415c;
+        }
+
+        .createCategoryCard strong {
+          font-size:
+            14px;
+        }
+
+        .createCategoryCard small {
+          color:
+            #52616a;
+
+          font-size:
+            11px;
+
+          line-height:
+            1.25;
+        }
+
+        .categoryMiniIcon {
+          min-width:
+            38px;
+
+          min-height:
+            34px;
+
+          padding:
+            4px 8px;
+
+          display:
+            grid;
+
+          place-items:
+            center;
+
+          border:
+            1px solid #486476;
+
+          border-radius:
+            8px;
+
+          color:
+            #073b68;
+
+          background:
+            #eefaff;
+
+          font-weight:
+            900;
+        }
+
+        .customTypeBox {
+          margin:
+            14px 0 20px;
+
+          padding:
+            14px;
+
+          display:
+            grid;
+
+          grid-template-columns:
+            180px 1fr;
+
+          align-items:
+            center;
+
+          gap:
+            12px;
+
+          border:
+            2px solid #65727a;
+
+          border-radius:
+            12px;
+
+          background:
+            rgba(255,255,255,.86);
+
+          box-shadow:
+            inset 0 3px 3px
+              rgba(0,0,0,.06);
+        }
+
+        .customTypeBox label {
+          color:
+            #073b68;
+
+          font-weight:
+            900;
+        }
+
+        .customTypeBox input {
+          min-height:
+            44px;
+
+          padding:
+            8px 12px;
+
+          border:
+            2px solid #7e8a91;
+
+          border-radius:
+            9px;
+
+          font-family:
+            inherit;
+
+          font-size:
+            15px;
+
+          outline:
+            none;
+        }
+
+        .customTypeBox input:focus {
+          border-color:
+            #168dc5;
+
+          box-shadow:
+            0 0 0 3px
+              rgba(22,141,197,.14);
+        }
+
+        .createMethodTitle {
+          margin:
+            18px 0 12px;
+
+          color:
+            white;
+
+          font-size:
+            18px;
+
+          font-weight:
+            900;
+
+          text-shadow:
+            0 2px 2px
+              rgba(0,0,0,.42);
         }
 
         /* ================================================
@@ -3392,7 +4349,42 @@ margin: 10px auto 12px;
            RESPONSIVE
         ================================================ */
 
-        @media (max-width: 1000px) {
+        
+        @media (max-width: 1050px) {
+          .categoryGrid,
+          .createCategoryGrid {
+            grid-template-columns:
+              repeat(2, minmax(0,1fr));
+          }
+        }
+
+        @media (max-width: 680px) {
+          .categoryGrid,
+          .createCategoryGrid {
+            grid-template-columns:
+              1fr;
+          }
+
+          .categorySectionHeader {
+            align-items:
+              flex-start;
+
+            flex-direction:
+              column;
+          }
+
+          .selectedCategoryName {
+            width:
+              100%;
+          }
+
+          .customTypeBox {
+            grid-template-columns:
+              1fr;
+          }
+        }
+
+@media (max-width: 1000px) {
           .header {
             flex-direction: column;
           }
