@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { createCanvas } from "@napi-rs/canvas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,12 +18,20 @@ type ImportedOption = {
   isCorrect: boolean;
 };
 
+type PdfCrop = {
+  pageNumber: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type ImportedQuestion = {
   id: string;
   number: number;
   questionText: string;
   options: ImportedOption[];
-  imageSrc?: string;
+  pdfCrop?: PdfCrop;
   warning?: string;
 };
 
@@ -1319,15 +1326,12 @@ function parseQuestion(
    and first A/B/C/D line on the SAME page/column.
 ========================================================= */
 
-async function renderQuestionImage(
+function getQuestionPdfCrop(
   pageInfo: PageInfo,
   firstOptionLine: TextLine | null,
   promptEndLine: TextLine | null
-) {
-  if (
-    !firstOptionLine ||
-    !promptEndLine
-  ) {
+): PdfCrop | undefined {
+  if (!firstOptionLine || !promptEndLine) {
     return undefined;
   }
 
@@ -1339,169 +1343,48 @@ async function renderQuestionImage(
   }
 
   if (
-    firstOptionLine.column !==
-      promptEndLine.column &&
-    firstOptionLine.column !==
-      "full" &&
-    promptEndLine.column !==
-      "full"
+    firstOptionLine.column !== promptEndLine.column &&
+    firstOptionLine.column !== "full" &&
+    promptEndLine.column !== "full"
   ) {
     return undefined;
   }
 
   /*
-    MUHIM:
-    Endi crop oxirgi "question line" bo‘yicha emas,
-    SAVOL PROMPTI tugagan satrdan A/B/C/D boshlanguncha olinadi.
+    PDF koordinatalari:
+      x -> chapdan o‘ngga
+      y -> pastdan yuqoriga
 
-    Shu sabab:
-      - jadval ichidagi text extraction
-      - Eyler-Venn ichidagi "I II III"
-      - moslashtirish sxemasidagi atama/izoh matnlari
-    gapni kamaytirib yubormaydi.
+    Biz brauzerga PNG bermaymiz.
+    Faqat original PDFning qaysi qismini kesish kerakligini qaytaramiz.
+    Browser PDF.js shu koordinatani asl PDFdan render qiladi.
   */
-  const gap =
-    promptEndLine.y -
-    firstOptionLine.y;
 
-  // Juda kichik joy bo‘lsa rasm deb olmaymiz.
-  if (gap < 34) {
-    return undefined;
-  }
-
-  // 2x ga yaqin sifat — matnli jadval va diagramma tiniq chiqadi.
-  const renderScale = 2.15;
-
-  const viewport =
-    pageInfo.page.getViewport({
-      scale: renderScale,
-    });
-
-  const canvas =
-    createCanvas(
-      Math.ceil(
-        viewport.width
-      ),
-      Math.ceil(
-        viewport.height
-      )
-    );
-
-  const context =
-    canvas.getContext(
-      "2d"
-    );
-
-  context.fillStyle = "#ffffff";
-  context.fillRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
-
-  await pageInfo.page
-    .render({
-      canvasContext:
-        context,
-      viewport,
-    })
-    .promise;
-
-  const scaleX =
-    viewport.width /
-    pageInfo.width;
-
-  const scaleY =
-    viewport.height /
-    pageInfo.height;
-
-  /*
-    PDF koordinatasida Y pastdan yuqoriga.
-    Promptning tagidan biroz pastroq boshlaymiz,
-    variantning tepasidan biroz yuqoriroq tugatamiz.
-  */
   const upperPdfY =
     promptEndLine.y -
     Math.max(
-      10,
-      promptEndLine.height * 0.9
+      6,
+      promptEndLine.height * 0.35
     );
 
   const lowerPdfY =
     firstOptionLine.y +
     Math.max(
-      10,
-      firstOptionLine.height * 0.8
+      6,
+      firstOptionLine.height * 0.35
     );
 
-  const topCanvas =
-    viewport.height -
-    upperPdfY *
-      scaleY;
+  const height =
+    upperPdfY -
+    lowerPdfY;
 
-  const bottomCanvas =
-    viewport.height -
-    lowerPdfY *
-      scaleY;
-
-  let cropTop =
-    Math.max(
-      0,
-      Math.floor(
-        Math.min(
-          topCanvas,
-          bottomCanvas
-        )
-      )
-    );
-
-  let cropBottom =
-    Math.min(
-      viewport.height,
-      Math.ceil(
-        Math.max(
-          topCanvas,
-          bottomCanvas
-        )
-      )
-    );
-
-  // Vizualning chetlari kesilib qolmasligi uchun vertikal padding.
-  const verticalPadding =
-    Math.round(
-      7 * renderScale
-    );
-
-  cropTop =
-    Math.max(
-      0,
-      cropTop -
-        verticalPadding
-    );
-
-  cropBottom =
-    Math.min(
-      viewport.height,
-      cropBottom +
-        verticalPadding
-    );
-
-  const cropHeight =
-    cropBottom -
-    cropTop;
-
-  if (cropHeight < 45) {
+  // Haqiqiy vizual joy bo‘lmasa crop yaratmaymiz.
+  if (height < 26) {
     return undefined;
   }
 
-  /*
-    Savol qaysi ustunda bo‘lsa faqat o‘sha ustunni kesamiz.
-    2 ustunli PDFda boshqa savollar rasmga tushib ketmaydi.
-  */
-  let pdfX1 = 10;
-  let pdfX2 =
-    pageInfo.width - 10;
+  let x1 = 8;
+  let x2 = pageInfo.width - 8;
 
   const cropColumn =
     promptEndLine.column !== "full"
@@ -1509,341 +1392,53 @@ async function renderQuestionImage(
       : firstOptionLine.column;
 
   if (cropColumn === "left") {
-    pdfX1 = 6;
-    pdfX2 =
-      pageInfo.width / 2 -
-      4;
-  } else if (
-    cropColumn === "right"
-  ) {
-    pdfX1 =
-      pageInfo.width / 2 +
-      4;
-    pdfX2 =
-      pageInfo.width - 6;
+    x1 = 4;
+    x2 = pageInfo.width / 2 - 2;
+  } else if (cropColumn === "right") {
+    x1 = pageInfo.width / 2 + 2;
+    x2 = pageInfo.width - 4;
   }
 
-  const horizontalPaddingPdf = 4;
+  /*
+    Vizualning cheti kesilib qolmasligi uchun ozgina padding.
+  */
+  const horizontalPadding = 4;
+  const verticalPadding = 5;
 
-  pdfX1 =
-    Math.max(
-      0,
-      pdfX1 -
-        horizontalPaddingPdf
-    );
-
-  pdfX2 =
-    Math.min(
-      pageInfo.width,
-      pdfX2 +
-        horizontalPaddingPdf
-    );
-
-  const cropX =
-    Math.max(
-      0,
-      Math.floor(
-        pdfX1 * scaleX
-      )
-    );
-
-  const cropWidth =
-    Math.max(
-      1,
-      Math.min(
-        viewport.width -
-          cropX,
-        Math.ceil(
-          (pdfX2 -
-            pdfX1) *
-            scaleX
-        )
-      )
-    );
-
-  const output =
-    createCanvas(
-      cropWidth,
-      cropHeight
-    );
-
-  const outputContext =
-    output.getContext(
-      "2d"
-    );
-
-  outputContext.fillStyle =
-    "#ffffff";
-
-  outputContext.fillRect(
-    0,
-    0,
-    output.width,
-    output.height
+  x1 = Math.max(0, x1 - horizontalPadding);
+  x2 = Math.min(
+    pageInfo.width,
+    x2 + horizontalPadding
   );
 
-  outputContext.drawImage(
-    canvas,
-    cropX,
-    cropTop,
-    cropWidth,
-    cropHeight,
+  const y = Math.max(
     0,
-    0,
-    cropWidth,
-    cropHeight
+    lowerPdfY - verticalPadding
   );
 
-  /*
-    =========================================================
-    PDF TEXT OVERLAY FIX
-    =========================================================
+  const top = Math.min(
+    pageInfo.height,
+    upperPdfY + verticalPadding
+  );
 
-    Muammo:
-    Vercel/Node'da PDF.js ba'zi embedded shriftlarni @napi-rs/canvas
-    ustiga raster qilmaydi. Natijada jadval chiziqlari, ranglar,
-    doiralar chiqadi, lekin ICHIDAGI MATN YO‘QOLADI.
-
-    Yechim:
-    PDF text layer'dan allaqachon olgan TextLine'larni crop ustiga
-    koordinatalari bilan qayta chizamiz.
-
-    Bu ayniqsa:
-      - jadval
-      - Eyler-Venn diagrammasi
-      - moslashtirish sxemasi
-      - rangli blok/diagrammalar
-    uchun kerak.
-  */
-  const cropPdfX1 =
-    cropX / scaleX;
-
-  const cropPdfX2 =
-    (cropX + cropWidth) /
-    scaleX;
-
-  /*
-    Canvas Y yuqoridan pastga, PDF Y esa pastdan yuqoriga.
-    Crop chegarasini yana PDF koordinatasiga qaytaramiz.
-  */
-  const cropPdfUpperY =
-    (viewport.height -
-      cropTop) /
-    scaleY;
-
-  const cropPdfLowerY =
-    (viewport.height -
-      (cropTop + cropHeight)) /
-    scaleY;
-
-  const cropLines =
-    (pageInfo.lines || [])
-      .filter((line) => {
-        const lineRight =
-          line.x + line.width;
-
-        const lineTop =
-          line.y +
-          line.height * 0.9;
-
-        const lineBottom =
-          line.y -
-          line.height * 0.35;
-
-        const horizontalHit =
-          lineRight >=
-            cropPdfX1 - 3 &&
-          line.x <=
-            cropPdfX2 + 3;
-
-        const verticalHit =
-          lineTop >=
-            cropPdfLowerY - 3 &&
-          lineBottom <=
-            cropPdfUpperY + 3;
-
-        return (
-          horizontalHit &&
-          verticalHit
-        );
-      })
-      .sort((a, b) => {
-        const dy =
-          b.y - a.y;
-
-        if (Math.abs(dy) > 2) {
-          return dy;
-        }
-
-        return a.x - b.x;
-      });
-
-  outputContext.save();
-
-  outputContext.fillStyle =
-    "#111111";
-
-  outputContext.textBaseline =
-    "alphabetic";
-
-  for (const line of cropLines) {
-    /*
-      PDF koordinatasidan crop canvas koordinatasiga.
-    */
-    const localX =
-      line.x *
-        scaleX -
-      cropX;
-
-    const absoluteCanvasBaselineY =
-      viewport.height -
-      line.y *
-        scaleY;
-
-    const localBaselineY =
-      absoluteCanvasBaselineY -
-      cropTop;
-
-    /*
-      TextLine.height odatda font o‘lchamiga yaqin.
-      Juda kichik/yirik qiymatlarni chegaralaymiz.
-    */
-    const fontPx =
-      Math.max(
-        12,
-        Math.min(
-          42,
-          line.height *
-            scaleY *
-            0.95
-        )
-      );
-
-    /*
-      PDFning original fonti mavjud bo‘lmasa ham matn ko‘rinsin.
-      Georgia/serif Vercel Node canvas'da ishonchli fallback.
-    */
-    outputContext.font =
-      `${Math.round(fontPx)}px Georgia, "Times New Roman", serif`;
-
-    /*
-      Text extractiondagi width bilan real fallback font width farq qilishi
-      mumkin. Agar matn katakdan chiqib ketsa, horizontal scale qilamiz.
-    */
-    const wantedWidth =
-      Math.max(
-        1,
-        line.width *
-          scaleX
-      );
-
-    const measured =
-      outputContext.measureText(
-        line.text
-      ).width;
-
-    if (
-      measured >
-        wantedWidth * 1.06 &&
-      measured > 0
-    ) {
-      const sx =
-        Math.max(
-          0.55,
-          wantedWidth /
-            measured
-        );
-
-      outputContext.save();
-      outputContext.translate(
-        localX,
-        localBaselineY
-      );
-      outputContext.scale(
-        sx,
-        1
-      );
-      outputContext.fillText(
-        line.text,
-        0,
-        0
-      );
-      outputContext.restore();
-    } else {
-      outputContext.fillText(
-        line.text,
-        localX,
-        localBaselineY
-      );
-    }
-  }
-
-  outputContext.restore();
-
-  /*
-    Juda katta data URL bo‘lib ketmasin.
-    1400px dan keng bo‘lsa proporsional kichraytiramiz.
-  */
-  let finalCanvas = output;
-
-  const maxOutputWidth = 1400;
+  const finalHeight = top - y;
+  const width = x2 - x1;
 
   if (
-    output.width >
-    maxOutputWidth
+    width < 40 ||
+    finalHeight < 30
   ) {
-    const ratio =
-      maxOutputWidth /
-      output.width;
-
-    const resized =
-      createCanvas(
-        maxOutputWidth,
-        Math.max(
-          1,
-          Math.round(
-            output.height *
-              ratio
-          )
-        )
-      );
-
-    const resizedContext =
-      resized.getContext(
-        "2d"
-      );
-
-    resizedContext.fillStyle =
-      "#ffffff";
-
-    resizedContext.fillRect(
-      0,
-      0,
-      resized.width,
-      resized.height
-    );
-
-    resizedContext.drawImage(
-      output,
-      0,
-      0,
-      output.width,
-      output.height,
-      0,
-      0,
-      resized.width,
-      resized.height
-    );
-
-    finalCanvas = resized;
+    return undefined;
   }
 
-  const png =
-    await finalCanvas.encode(
-      "png"
-    );
-
-  return `data:image/png;base64,${png.toString("base64")}`;
+  return {
+    pageNumber:
+      firstOptionLine.pageNumber,
+    x: x1,
+    y,
+    width,
+    height: finalHeight,
+  };
 }
 
 /* =========================================================
@@ -2068,8 +1663,8 @@ export async function POST(
           pageInfos
         );
 
-      let imageSrc:
-        string | undefined;
+      let pdfCrop:
+        PdfCrop | undefined;
 
       if (
         parsed.shouldRenderImage &&
@@ -2084,19 +1679,12 @@ export async function POST(
           );
 
         if (pageInfo) {
-          try {
-            imageSrc =
-              await renderQuestionImage(
-                pageInfo,
-                parsed.firstOptionLine,
-                parsed.promptEndLine
-              );
-          } catch (error) {
-            console.error(
-              `IMAGE Q${parsed.number} ERROR:`,
-              error
+          pdfCrop =
+            getQuestionPdfCrop(
+              pageInfo,
+              parsed.firstOptionLine,
+              parsed.promptEndLine
             );
-          }
         }
       }
 
@@ -2110,7 +1698,7 @@ export async function POST(
           parsed.questionText,
         options:
           parsed.options,
-        imageSrc,
+        pdfCrop,
         warning:
           parsed.warning,
       });
