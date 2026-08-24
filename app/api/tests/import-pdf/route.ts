@@ -1232,13 +1232,15 @@ async function renderQuestionImage(
     Conservative threshold.
     Prevents blank/normal text being misdetected as image.
   */
-  if (gap < 90) {
+  // Diagram/jadval/rasm uchun 90 juda katta edi.
+  // 28pt dan katta real vizual bo‘shliq bo‘lsa crop qilamiz.
+  if (gap < 28) {
     return undefined;
   }
 
   const viewport =
     pageInfo.page.getViewport({
-      scale: 1.6,
+      scale: 2.0,
     });
 
   const canvas =
@@ -1272,13 +1274,15 @@ async function renderQuestionImage(
     viewport.height /
     pageInfo.height;
 
+  // Savol matni bilan variantlar orasidagi vizual hududni
+  // biroz kengroq olamiz — jadval/diagramma chetlari kesilib qolmasin.
   const upperPdfY =
     lastQuestionLine.y -
-    14;
+    Math.max(20, lastQuestionLine.height * 1.6);
 
   const lowerPdfY =
     firstOptionLine.y +
-    14;
+    Math.max(20, firstOptionLine.height * 1.6);
 
   const topCanvas =
     viewport.height -
@@ -1316,7 +1320,7 @@ async function renderQuestionImage(
     cropBottom -
     cropTop;
 
-  if (cropHeight < 60) {
+  if (cropHeight < 32) {
     return undefined;
   }
 
@@ -1328,20 +1332,20 @@ async function renderQuestionImage(
     firstOptionLine.column ===
     "left"
   ) {
-    pdfX1 = 8;
+    pdfX1 = 4;
     pdfX2 =
       pageInfo.width / 2 -
-      5;
+      2;
   } else if (
     firstOptionLine.column ===
     "right"
   ) {
     pdfX1 =
       pageInfo.width / 2 +
-      5;
+      2;
 
     pdfX2 =
-      pageInfo.width - 8;
+      pageInfo.width - 4;
   }
 
   const cropX =
