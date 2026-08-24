@@ -286,14 +286,22 @@ export default function AdminTestsPage() {
   ========================================================= */
 
   const statistics = useMemo(() => {
+    /*
+      Umumiy statistika:
+      - Jami test = barcha kategoriyalardagi testlar soni
+      - Qoralama = barcha kategoriyalardagi qoralama testlar
+      - E'lon qilingan = barcha kategoriyalardagi published testlar
+
+      Tanlangan kategoriya faqat pastdagi ro'yxatni filtrlaydi.
+    */
     const draft =
-      categoryTests.filter(
+      tests.filter(
         (test) =>
           test.status === "draft"
       ).length;
 
     const published =
-      categoryTests.filter(
+      tests.filter(
         (test) =>
           test.status ===
           "published"
@@ -301,11 +309,11 @@ export default function AdminTestsPage() {
 
     return {
       total:
-        categoryTests.length,
+        tests.length,
       draft,
       published,
     };
-  }, [categoryTests]);
+  }, [tests]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<TestCategory, number> = {
@@ -1708,12 +1716,6 @@ margin: 10px auto 12px;
                     <strong>
                       {category.title}
                     </strong>
-
-                    <small>
-                      {
-                        category.description
-                      }
-                    </small>
                   </span>
 
                   <span className="categoryCount">
@@ -2995,8 +2997,11 @@ margin: 10px auto 12px;
           flex-direction:
             column;
 
+          justify-content:
+            center;
+
           gap:
-            5px;
+            0;
         }
 
         .categoryCardContent strong {
@@ -3005,17 +3010,6 @@ margin: 10px auto 12px;
 
           line-height:
             1.15;
-        }
-
-        .categoryCardContent small {
-          color:
-            #53616a;
-
-          font-size:
-            12px;
-
-          line-height:
-            1.3;
         }
 
         .categoryCount {
