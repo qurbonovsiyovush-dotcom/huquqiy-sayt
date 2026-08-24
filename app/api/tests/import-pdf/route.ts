@@ -17,22 +17,16 @@ export const revalidate = 0;
     "DOMMatrix is not defined"
   xatosi shundan paydo bo'ldi.
 */
-if (typeof globalThis.DOMMatrix === "undefined") {
-  (globalThis as typeof globalThis & {
-    DOMMatrix: typeof DOMMatrix;
-  }).DOMMatrix = DOMMatrix;
+if (typeof (globalThis as any).DOMMatrix === "undefined") {
+  (globalThis as any).DOMMatrix = DOMMatrix as any;
 }
 
-if (typeof globalThis.ImageData === "undefined") {
-  (globalThis as typeof globalThis & {
-    ImageData: typeof ImageData;
-  }).ImageData = ImageData;
+if (typeof (globalThis as any).ImageData === "undefined") {
+  (globalThis as any).ImageData = ImageData as any;
 }
 
-if (typeof globalThis.Path2D === "undefined") {
-  (globalThis as typeof globalThis & {
-    Path2D: typeof Path2D;
-  }).Path2D = Path2D;
+if (typeof (globalThis as any).Path2D === "undefined") {
+  (globalThis as any).Path2D = Path2D as any;
 }
 
 /* =========================================================
