@@ -1,9 +1,14 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createCanvas } from "@napi-rs/canvas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type ImportedOption = {
   id: string;
@@ -34,6 +39,7 @@ type PositionedText = {
   y: number;
   width: number;
   height: number;
+  pageNumber: number;
 };
 
 type TextLine = {
@@ -42,6 +48,8 @@ type TextLine = {
   y: number;
   width: number;
   height: number;
+  pageNumber: number;
+  column: "left" | "right" | "full";
 };
 
 type HighlightRect = {
@@ -50,6 +58,34 @@ type HighlightRect = {
   x2: number;
   y2: number;
 };
+
+type PageInfo = {
+  page: any;
+  width: number;
+  height: number;
+  highlights: HighlightRect[];
+};
+
+type QuestionBlock = {
+  number: number;
+  lines: TextLine[];
+};
+
+/* =========================================================
+   ADMIN
+========================================================= */
+
+async function isAdmin() {
+  const cookieStore = await cookies();
+
+  return (
+    cookieStore.get("qurbonov_role")?.value === "admin"
+  );
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random()
@@ -62,24 +98,25 @@ function normalizeSpace(value: string) {
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-function optionLabel(value: string):
-  | "A"
-  | "B"
-  | "C"
-  | "D"
-  | null {
-  const match = value.match(/^\s*([ABCD])[\)\.\-:]\s*/i);
-
-  if (!match) return null;
-
-  return match[1].toUpperCase() as "A" | "B" | "C" | "D";
+function cleanPlus(value: string) {
+  return value
+    .replace(/\(\s*\+\s*\)/g, "")
+    .replace(/\s*\+\s*$/g, "")
+    .replace(/^\s*\+\s*/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
-function stripOptionPrefix(value: string) {
-  return value.replace(/^\s*[ABCD][\)\.\-:]\s*/i, "").trim();
+function hasPlusMarker(value: string) {
+  return (
+    /\+\s*$/.test(value) ||
+    /\(\s*\+\s*\)/.test(value) ||
+    /^\s*\+\s*[ABCD][\)\.\-:]/.test(value)
+  );
 }
 
 function isQuestionStart(value: string) {
@@ -88,90 +125,51 @@ function isQuestionStart(value: string) {
 
 function questionNumber(value: string) {
   const match = value.match(/^\s*(\d{1,4})[\.\)]\s+/);
-  return match ? Number(match[1]) : null;
+
+  return match
+    ? Number(match[1])
+    : null;
 }
 
 function stripQuestionNumber(value: string) {
-  return value.replace(/^\s*\d{1,4}[\.\)]\s+/, "").trim();
+  return value
+    .replace(/^\s*\d{1,4}[\.\)]\s+/, "")
+    .trim();
 }
 
-function buildLines(items: PositionedText[]) {
-  const sorted = [...items].sort((a, b) => {
-    const dy = b.y - a.y;
+function optionLabelFromStart(
+  value: string
+): "A" | "B" | "C" | "D" | null {
+  const match = value.match(
+    /^\s*([ABCD])[\)\.\-:]\s*/ // CASE-SENSITIVE intentionally
+  );
 
-    if (Math.abs(dy) > 4) {
-      return dy;
-    }
-
-    return a.x - b.x;
-  });
-
-  const groups: PositionedText[][] = [];
-
-  for (const item of sorted) {
-    const existing = groups.find((group) => {
-      const avgY =
-        group.reduce((sum, part) => sum + part.y, 0) / group.length;
-
-      return Math.abs(avgY - item.y) <= Math.max(3.5, item.height * 0.35);
-    });
-
-    if (existing) {
-      existing.push(item);
-    } else {
-      groups.push([item]);
-    }
+  if (!match) {
+    return null;
   }
 
-  const lines: TextLine[] = groups.map((group) => {
-    group.sort((a, b) => a.x - b.x);
+  return match[1] as "A" | "B" | "C" | "D";
+}
 
-    let text = "";
-    let previousEnd = 0;
-
-    for (const item of group) {
-      const gap = item.x - previousEnd;
-
-      if (text && gap > Math.max(2.5, item.height * 0.18)) {
-        text += " ";
-      }
-
-      text += item.text;
-      previousEnd = item.x + item.width;
-    }
-
-    const x = Math.min(...group.map((item) => item.x));
-    const y = group.reduce((sum, item) => sum + item.y, 0) / group.length;
-    const right = Math.max(
-      ...group.map((item) => item.x + item.width)
-    );
-    const height = Math.max(...group.map((item) => item.height));
-
-    return {
-      text: normalizeSpace(text),
-      x,
-      y,
-      width: right - x,
-      height,
-    };
-  });
-
-  return lines
-    .filter((line) => line.text)
-    .sort((a, b) => {
-      const dy = b.y - a.y;
-
-      if (Math.abs(dy) > 3) {
-        return dy;
-      }
-
-      return a.x - b.x;
-    });
+function stripOptionPrefix(value: string) {
+  return value
+    .replace(/^\s*[ABCD][\)\.\-:]\s*/, "")
+    .trim();
 }
 
 function rectIntersects(
-  a: { x1: number; y1: number; x2: number; y2: number },
-  b: { x1: number; y1: number; x2: number; y2: number }
+  a: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  },
+  b: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  }
 ) {
   return !(
     a.x2 < b.x1 ||
@@ -181,15 +179,15 @@ function rectIntersects(
   );
 }
 
-function optionIsHighlighted(
-  optionLine: TextLine,
+function lineIsHighlighted(
+  line: TextLine,
   highlights: HighlightRect[]
 ) {
   const lineRect = {
-    x1: optionLine.x - 2,
-    y1: optionLine.y - optionLine.height * 0.35,
-    x2: optionLine.x + optionLine.width + 2,
-    y2: optionLine.y + optionLine.height * 0.95,
+    x1: line.x - 3,
+    y1: line.y - line.height * 0.4,
+    x2: line.x + line.width + 3,
+    y2: line.y + line.height * 1.05,
   };
 
   return highlights.some((highlight) =>
@@ -197,11 +195,18 @@ function optionIsHighlighted(
   );
 }
 
-async function pageHighlights(page: any): Promise<HighlightRect[]> {
+/* =========================================================
+   PDF HIGHLIGHT ANNOTATIONS
+========================================================= */
+
+async function pageHighlights(
+  page: any
+): Promise<HighlightRect[]> {
   try {
-    const annotations = await page.getAnnotations({
-      intent: "display",
-    });
+    const annotations =
+      await page.getAnnotations({
+        intent: "display",
+      });
 
     const result: HighlightRect[] = [];
 
@@ -213,12 +218,20 @@ async function pageHighlights(page: any): Promise<HighlightRect[]> {
         continue;
       }
 
-      const quadPoints = Array.isArray(annotation?.quadPoints)
-        ? annotation.quadPoints
-        : null;
+      const quadPoints =
+        Array.isArray(annotation?.quadPoints)
+          ? annotation.quadPoints
+          : null;
 
-      if (quadPoints && quadPoints.length >= 8) {
-        for (let index = 0; index + 7 < quadPoints.length; index += 8) {
+      if (
+        quadPoints &&
+        quadPoints.length >= 8
+      ) {
+        for (
+          let index = 0;
+          index + 7 < quadPoints.length;
+          index += 8
+        ) {
           const xs = [
             quadPoints[index],
             quadPoints[index + 2],
@@ -244,8 +257,16 @@ async function pageHighlights(page: any): Promise<HighlightRect[]> {
         continue;
       }
 
-      if (Array.isArray(annotation?.rect) && annotation.rect.length >= 4) {
-        const [x1, y1, x2, y2] = annotation.rect;
+      if (
+        Array.isArray(annotation?.rect) &&
+        annotation.rect.length >= 4
+      ) {
+        const [
+          x1,
+          y1,
+          x2,
+          y2,
+        ] = annotation.rect;
 
         result.push({
           x1: Math.min(x1, x2),
@@ -258,282 +279,950 @@ async function pageHighlights(page: any): Promise<HighlightRect[]> {
 
     return result;
   } catch (error) {
-    console.error("HIGHLIGHT READ ERROR:", error);
+    console.error(
+      "HIGHLIGHT READ ERROR:",
+      error
+    );
+
     return [];
   }
 }
 
-function findQuestionBlocks(lines: TextLine[]) {
-  const starts = lines
-    .map((line, index) => ({
-      line,
-      index,
-      number: questionNumber(line.text),
-    }))
+/* =========================================================
+   TEXT LINES
+========================================================= */
+
+function buildLines(
+  items: PositionedText[],
+  column: "left" | "right" | "full"
+): TextLine[] {
+  const sorted =
+    [...items].sort((a, b) => {
+      const dy = b.y - a.y;
+
+      if (Math.abs(dy) > 4) {
+        return dy;
+      }
+
+      return a.x - b.x;
+    });
+
+  const groups: PositionedText[][] = [];
+
+  for (const item of sorted) {
+    const existing =
+      groups.find((group) => {
+        const avgY =
+          group.reduce(
+            (sum, part) =>
+              sum + part.y,
+            0
+          ) / group.length;
+
+        return (
+          Math.abs(
+            avgY - item.y
+          ) <=
+          Math.max(
+            3.5,
+            item.height * 0.4
+          )
+        );
+      });
+
+    if (existing) {
+      existing.push(item);
+    } else {
+      groups.push([item]);
+    }
+  }
+
+  return groups
+    .map((group) => {
+      group.sort(
+        (a, b) =>
+          a.x - b.x
+      );
+
+      let text = "";
+      let previousEnd = 0;
+
+      for (const item of group) {
+        const gap =
+          item.x -
+          previousEnd;
+
+        if (
+          text &&
+          gap >
+            Math.max(
+              2.5,
+              item.height * 0.2
+            )
+        ) {
+          text += " ";
+        }
+
+        text += item.text;
+
+        previousEnd =
+          item.x +
+          item.width;
+      }
+
+      const x =
+        Math.min(
+          ...group.map(
+            (item) => item.x
+          )
+        );
+
+      const y =
+        group.reduce(
+          (sum, item) =>
+            sum + item.y,
+          0
+        ) / group.length;
+
+      const right =
+        Math.max(
+          ...group.map(
+            (item) =>
+              item.x +
+              item.width
+          )
+        );
+
+      const height =
+        Math.max(
+          ...group.map(
+            (item) =>
+              item.height
+          )
+        );
+
+      return {
+        text:
+          normalizeSpace(text),
+        x,
+        y,
+        width:
+          right - x,
+        height,
+        pageNumber:
+          group[0]
+            .pageNumber,
+        column,
+      } satisfies TextLine;
+    })
     .filter(
+      (line) =>
+        line.text
+    )
+    .sort((a, b) => {
+      const dy =
+        b.y - a.y;
+
+      if (
+        Math.abs(dy) > 3
+      ) {
+        return dy;
+      }
+
+      return a.x - b.x;
+    });
+}
+
+/* =========================================================
+   TWO-COLUMN DETECTION
+========================================================= */
+
+function splitIntoColumns(
+  items: PositionedText[],
+  pageWidth: number
+) {
+  /*
+    PDFda haqiqiy 2 ustun bo‘lsa, elementlar chap va o‘ngda
+    aniq guruhlanadi. Markazdan ozgina "dead zone" qoldiramiz.
+  */
+  const middle = pageWidth / 2;
+  const deadZone = Math.max(18, pageWidth * 0.035);
+
+  const left =
+    items.filter(
       (item) =>
-        item.number !== null &&
-        isQuestionStart(item.line.text)
+        item.x +
+          item.width / 2 <
+        middle - deadZone
     );
 
-  const blocks: {
-    number: number;
-    startIndex: number;
-    endIndex: number;
-    lines: TextLine[];
+  const right =
+    items.filter(
+      (item) =>
+        item.x +
+          item.width / 2 >
+        middle + deadZone
+    );
+
+  const center =
+    items.filter(
+      (item) =>
+        item.x +
+          item.width / 2 >=
+          middle - deadZone &&
+        item.x +
+          item.width / 2 <=
+          middle + deadZone
+    );
+
+  /*
+    Sarlavha kabi markazdan o‘tadigan uzun satrlarni alohida
+    full-width line sifatida saqlaymiz.
+  */
+  const wideCenter =
+    center.filter(
+      (item) =>
+        item.width >
+        pageWidth * 0.35
+    );
+
+  const looksTwoColumn =
+    left.length >= 6 &&
+    right.length >= 6;
+
+  if (!looksTwoColumn) {
+    return {
+      twoColumn: false,
+      left: items,
+      right: [] as PositionedText[],
+      full: [] as PositionedText[],
+    };
+  }
+
+  return {
+    twoColumn: true,
+    left,
+    right,
+    full: wideCenter,
+  };
+}
+
+/* =========================================================
+   INLINE OPTIONS:
+   A) ... B) ...
+   C) ... D) ...
+========================================================= */
+
+function splitInlineOptions(
+  line: TextLine
+): {
+  label: "A" | "B" | "C" | "D";
+  text: string;
+  sourceLine: TextLine;
+}[] {
+  const value = line.text;
+
+  /*
+    Uppercase A-D only.
+    This intentionally does NOT match lowercase a)/b) subparts.
+  */
+  const regex =
+    /(^|\s)([ABCD])[\)\.\-:]\s*/g;
+
+  const matches: {
+    index: number;
+    end: number;
+    label: "A" | "B" | "C" | "D";
   }[] = [];
 
-  for (let index = 0; index < starts.length; index++) {
-    const current = starts[index];
-    const next = starts[index + 1];
+  let match:
+    RegExpExecArray | null;
 
-    const endIndex = next
-      ? next.index
-      : lines.length;
+  while (
+    (match =
+      regex.exec(value)) !==
+    null
+  ) {
+    const prefixLength =
+      match[1]?.length ?? 0;
 
-    blocks.push({
-      number: current.number!,
-      startIndex: current.index,
-      endIndex,
-      lines: lines.slice(current.index, endIndex),
+    const actualIndex =
+      match.index +
+      prefixLength;
+
+    matches.push({
+      index:
+        actualIndex,
+      end:
+        regex.lastIndex,
+      label:
+        match[2] as
+          | "A"
+          | "B"
+          | "C"
+          | "D",
     });
+  }
+
+  if (
+    matches.length === 0
+  ) {
+    return [];
+  }
+
+  return matches.map(
+    (current, index) => {
+      const next =
+        matches[index + 1];
+
+      const text =
+        value
+          .slice(
+            current.end,
+            next
+              ? next.index
+              : value.length
+          )
+          .trim();
+
+      return {
+        label:
+          current.label,
+        text,
+        sourceLine:
+          line,
+      };
+    }
+  );
+}
+
+/* =========================================================
+   GLOBAL QUESTION BLOCKS
+========================================================= */
+
+function buildQuestionBlocks(
+  lines: TextLine[]
+): QuestionBlock[] {
+  const blocks:
+    QuestionBlock[] = [];
+
+  let current:
+    QuestionBlock | null =
+    null;
+
+  for (const line of lines) {
+    if (
+      isQuestionStart(
+        line.text
+      )
+    ) {
+      if (current) {
+        blocks.push(
+          current
+        );
+      }
+
+      current = {
+        number:
+          questionNumber(
+            line.text
+          ) ?? 0,
+        lines: [line],
+      };
+
+      continue;
+    }
+
+    if (current) {
+      current.lines.push(
+        line
+      );
+    }
+  }
+
+  if (current) {
+    blocks.push(current);
   }
 
   return blocks;
 }
 
+/* =========================================================
+   PARSE ONE QUESTION
+========================================================= */
+
 function parseQuestionBlock(
-  block: {
-    number: number;
-    lines: TextLine[];
-  },
-  highlights: HighlightRect[]
-): {
-  number: number;
-  questionText: string;
-  options: ImportedOption[];
-  optionStartY: number | null;
-  questionEndY: number | null;
-  optionLines: TextLine[];
-  warning?: string;
-} {
-  const optionLineIndexes: number[] = [];
+  block: QuestionBlock,
+  pageInfos: Map<number, PageInfo>
+) {
+  const questionParts:
+    string[] = [];
 
-  block.lines.forEach((line, index) => {
-    if (optionLabel(line.text)) {
-      optionLineIndexes.push(index);
-    }
-  });
+  const optionsMap =
+    new Map<
+      "A" | "B" | "C" | "D",
+      {
+        label:
+          | "A"
+          | "B"
+          | "C"
+          | "D";
+        text: string;
+        correctByPlus: boolean;
+        correctByHighlight: boolean;
+        sourceLine: TextLine;
+      }
+    >();
 
-  if (optionLineIndexes.length === 0) {
-    return {
-      number: block.number,
-      questionText: normalizeSpace(
-        block.lines
-          .map((line, index) =>
-            index === 0
-              ? stripQuestionNumber(line.text)
-              : line.text
+  let optionMode = false;
+  let currentOption:
+    | "A"
+    | "B"
+    | "C"
+    | "D"
+    | null = null;
+
+  let firstOptionLine:
+    TextLine | null =
+    null;
+
+  let lastQuestionLine:
+    TextLine | null =
+    null;
+
+  for (
+    let index = 0;
+    index <
+    block.lines.length;
+    index++
+  ) {
+    const line =
+      block.lines[index];
+
+    const lineText =
+      index === 0
+        ? stripQuestionNumber(
+            line.text
           )
-          .join("\n")
-      ),
-      options: [],
-      optionStartY: null,
-      questionEndY:
-        block.lines.length > 0
-          ? block.lines[block.lines.length - 1].y
-          : null,
-      optionLines: [],
-      warning:
-        "A/B/C/D variantlar avtomatik topilmadi. Savolni qo‘lda tekshiring.",
-    };
+        : line.text;
+
+    const inline =
+      splitInlineOptions({
+        ...line,
+        text: lineText,
+      });
+
+    if (
+      inline.length > 0
+    ) {
+      optionMode = true;
+
+      if (
+        !firstOptionLine
+      ) {
+        firstOptionLine =
+          line;
+      }
+
+      for (
+        const part of inline
+      ) {
+        const pageInfo =
+          pageInfos.get(
+            line.pageNumber
+          );
+
+        const plus =
+          hasPlusMarker(
+            part.text
+          ) ||
+          hasPlusMarker(
+            line.text
+          );
+
+        const highlight =
+          pageInfo
+            ? lineIsHighlighted(
+                line,
+                pageInfo.highlights
+              )
+            : false;
+
+        const cleaned =
+          cleanPlus(
+            part.text
+          );
+
+        const previous =
+          optionsMap.get(
+            part.label
+          );
+
+        if (previous) {
+          previous.text =
+            normalizeSpace(
+              `${previous.text} ${cleaned}`
+            );
+
+          previous.correctByPlus =
+            previous.correctByPlus ||
+            plus;
+
+          previous.correctByHighlight =
+            previous.correctByHighlight ||
+            highlight;
+        } else {
+          optionsMap.set(
+            part.label,
+            {
+              label:
+                part.label,
+              text:
+                cleaned,
+              correctByPlus:
+                plus,
+              correctByHighlight:
+                highlight,
+              sourceLine:
+                part.sourceLine,
+            }
+          );
+        }
+
+        currentOption =
+          part.label;
+      }
+
+      continue;
+    }
+
+    const directLabel =
+      optionLabelFromStart(
+        lineText
+      );
+
+    if (directLabel) {
+      optionMode = true;
+      currentOption =
+        directLabel;
+
+      if (
+        !firstOptionLine
+      ) {
+        firstOptionLine =
+          line;
+      }
+
+      const raw =
+        stripOptionPrefix(
+          lineText
+        );
+
+      const pageInfo =
+        pageInfos.get(
+          line.pageNumber
+        );
+
+      const plus =
+        hasPlusMarker(raw) ||
+        hasPlusMarker(
+          lineText
+        );
+
+      const highlight =
+        pageInfo
+          ? lineIsHighlighted(
+              line,
+              pageInfo.highlights
+            )
+          : false;
+
+      optionsMap.set(
+        directLabel,
+        {
+          label:
+            directLabel,
+          text:
+            cleanPlus(raw),
+          correctByPlus:
+            plus,
+          correctByHighlight:
+            highlight,
+          sourceLine:
+            line,
+        }
+      );
+
+      continue;
+    }
+
+    if (
+      optionMode &&
+      currentOption
+    ) {
+      const current =
+        optionsMap.get(
+          currentOption
+        );
+
+      if (current) {
+        current.text =
+          normalizeSpace(
+            `${current.text} ${cleanPlus(lineText)}`
+          );
+
+        if (
+          hasPlusMarker(
+            lineText
+          )
+        ) {
+          current.correctByPlus =
+            true;
+        }
+
+        const pageInfo =
+          pageInfos.get(
+            line.pageNumber
+          );
+
+        if (
+          pageInfo &&
+          lineIsHighlighted(
+            line,
+            pageInfo.highlights
+          )
+        ) {
+          current.correctByHighlight =
+            true;
+        }
+      }
+
+      continue;
+    }
+
+    questionParts.push(
+      lineText
+    );
+
+    lastQuestionLine =
+      line;
   }
 
-  const firstOptionIndex = optionLineIndexes[0];
-
-  const questionLines = block.lines.slice(0, firstOptionIndex);
-
-  const questionText = normalizeSpace(
-    questionLines
-      .map((line, index) =>
-        index === 0
-          ? stripQuestionNumber(line.text)
-          : line.text
-      )
-      .join("\n")
-  );
-
-  const options: ImportedOption[] = [];
-  const optionLines: TextLine[] = [];
-
-  for (let optionIndex = 0; optionIndex < optionLineIndexes.length; optionIndex++) {
-    const start = optionLineIndexes[optionIndex];
-    const end =
-      optionLineIndexes[optionIndex + 1] ?? block.lines.length;
-
-    const firstLine = block.lines[start];
-    const label = optionLabel(firstLine.text);
-
-    if (!label) continue;
-
-    const textParts = [
-      stripOptionPrefix(firstLine.text),
-      ...block.lines
-        .slice(start + 1, end)
-        .map((line) => line.text),
+  const labels:
+    (
+      | "A"
+      | "B"
+      | "C"
+      | "D"
+    )[] = [
+      "A",
+      "B",
+      "C",
+      "D",
     ];
 
-    const isCorrect = optionIsHighlighted(firstLine, highlights);
+  /*
+    PRIORITY:
+    1) + marker
+    2) PDF highlight
+    3) manual admin review
+  */
+  const plusCorrectLabels =
+    labels.filter(
+      (label) =>
+        optionsMap.get(
+          label
+        )?.correctByPlus
+    );
 
-    options.push({
-      id: makeId(
-        `q${block.number}-${label.toLowerCase()}`
-      ),
-      label,
-      text: normalizeSpace(textParts.join(" ")),
-      isCorrect,
-    });
+  const highlightedLabels =
+    labels.filter(
+      (label) =>
+        optionsMap.get(
+          label
+        )
+          ?.correctByHighlight
+    );
 
-    optionLines.push(firstLine);
-  }
+  const correctLabel =
+    plusCorrectLabels.length ===
+    1
+      ? plusCorrectLabels[0]
+      : plusCorrectLabels.length >
+          1
+        ? null
+        : highlightedLabels.length ===
+            1
+          ? highlightedLabels[0]
+          : null;
 
-  const correctCount =
-    options.filter((option) => option.isCorrect).length;
+  const options:
+    ImportedOption[] =
+    labels.map(
+      (label) => {
+        const found =
+          optionsMap.get(
+            label
+          );
 
-  let warning: string | undefined;
+        return {
+          id: makeId(
+            `q${block.number}-${label.toLowerCase()}`
+          ),
+          label,
+          text:
+            found?.text ??
+            "",
+          isCorrect:
+            correctLabel ===
+            label,
+        };
+      }
+    );
 
-  if (options.length !== 4) {
+  let warning:
+    string | undefined;
+
+  const foundCount =
+    labels.filter(
+      (label) =>
+        optionsMap.has(
+          label
+        )
+    ).length;
+
+  if (
+    foundCount !== 4
+  ) {
     warning =
-      `${options.length} ta variant topildi. 4 ta variant bo‘lishi kerak.`;
-  } else if (correctCount === 0) {
+      `${foundCount} ta variant topildi. 4 ta variant bo‘lishi kerak.`;
+  } else if (
+    plusCorrectLabels.length >
+    1
+  ) {
     warning =
-      "Sariq belgilangan to‘g‘ri javob avtomatik aniqlanmadi.";
-  } else if (correctCount > 1) {
+      "Bir nechta variantda + belgisi topildi. To‘g‘ri javobni tekshiring.";
+  } else if (
+    plusCorrectLabels.length ===
+      0 &&
+    highlightedLabels.length >
+      1
+  ) {
     warning =
       "Bir nechta sariq variant topildi. To‘g‘ri javobni tekshiring.";
+  } else if (
+    !correctLabel
+  ) {
+    warning =
+      "To‘g‘ri javob avtomatik topilmadi. To‘g‘ri variant oxiriga + belgisi qo‘ying yoki admin oynasida belgilang.";
   }
 
   return {
-    number: block.number,
-    questionText,
+    number:
+      block.number,
+    questionText:
+      normalizeSpace(
+        questionParts.join(
+          "\n"
+        )
+      ),
     options,
-    optionStartY:
-      optionLines.length > 0
-        ? Math.max(...optionLines.map((line) => line.y))
-        : null,
-    questionEndY:
-      questionLines.length > 0
-        ? Math.min(...questionLines.map((line) => line.y))
-        : null,
-    optionLines,
     warning,
+    firstOptionLine,
+    lastQuestionLine,
   };
 }
 
+/* =========================================================
+   QUESTION IMAGE / DIAGRAM CROP
+========================================================= */
+
 async function renderQuestionImage(
-  page: any,
-  pageWidth: number,
-  pageHeight: number,
-  parsed: {
-    questionText: string;
-    optionStartY: number | null;
-    questionEndY: number | null;
-  }
+  pageInfo: PageInfo,
+  firstOptionLine: TextLine | null,
+  lastQuestionLine: TextLine | null
 ) {
   if (
-    parsed.optionStartY === null ||
-    parsed.questionEndY === null
+    !firstOptionLine ||
+    !lastQuestionLine
+  ) {
+    return undefined;
+  }
+
+  if (
+    firstOptionLine.pageNumber !==
+    lastQuestionLine.pageNumber
+  ) {
+    return undefined;
+  }
+
+  const upperY =
+    lastQuestionLine.y;
+
+  const lowerY =
+    firstOptionLine.y;
+
+  const gap =
+    upperY - lowerY;
+
+  /*
+    Matn bilan variantlar orasida sezilarli katta bo‘shliq:
+    rasm / jadval / diagramma bo‘lishi mumkin.
+  */
+  if (gap < 48) {
+    return undefined;
+  }
+
+  const viewport =
+    pageInfo.page.getViewport({
+      scale: 1.6,
+    });
+
+  const canvas =
+    createCanvas(
+      Math.ceil(
+        viewport.width
+      ),
+      Math.ceil(
+        viewport.height
+      )
+    );
+
+  const context =
+    canvas.getContext(
+      "2d"
+    );
+
+  await pageInfo.page
+    .render({
+      canvasContext:
+        context,
+      viewport,
+    })
+    .promise;
+
+  const scaleX =
+    viewport.width /
+    pageInfo.width;
+
+  const scaleY =
+    viewport.height /
+    pageInfo.height;
+
+  const topPdfY =
+    upperY - 10;
+
+  const bottomPdfY =
+    lowerY + 10;
+
+  const topCanvas =
+    viewport.height -
+    topPdfY * scaleY;
+
+  const bottomCanvas =
+    viewport.height -
+    bottomPdfY *
+      scaleY;
+
+  const cropTop =
+    Math.max(
+      0,
+      Math.floor(
+        Math.min(
+          topCanvas,
+          bottomCanvas
+        )
+      )
+    );
+
+  const cropBottom =
+    Math.min(
+      viewport.height,
+      Math.ceil(
+        Math.max(
+          topCanvas,
+          bottomCanvas
+        )
+      )
+    );
+
+  const cropHeight =
+    cropBottom -
+    cropTop;
+
+  if (
+    cropHeight < 40
   ) {
     return undefined;
   }
 
   /*
-    Savol matni bilan variantlar orasida katta vertikal bo‘shliq bo‘lsa,
-    u yerda diagramma / jadval / rasm bor deb hisoblaymiz.
+    Savol qaysi ustunda bo‘lsa, shu ustunni crop qilamiz.
   */
-  const upperY = parsed.questionEndY;
-  const lowerY = parsed.optionStartY;
+  const column =
+    firstOptionLine.column;
 
-  const gap = upperY - lowerY;
+  let pdfX1 = 18;
+  let pdfX2 =
+    pageInfo.width - 18;
 
-  if (gap < 55) {
-    return undefined;
+  if (
+    column === "left"
+  ) {
+    pdfX1 = 12;
+    pdfX2 =
+      pageInfo.width /
+        2 -
+      6;
+  } else if (
+    column === "right"
+  ) {
+    pdfX1 =
+      pageInfo.width /
+        2 +
+      6;
+
+    pdfX2 =
+      pageInfo.width -
+      12;
   }
 
-  const pdfjs = await import(
-    "pdfjs-dist/legacy/build/pdf.mjs"
-  );
+  const cropX =
+    Math.max(
+      0,
+      Math.floor(
+        pdfX1 * scaleX
+      )
+    );
 
-  const viewport = page.getViewport({
-    scale: 1.65,
-  });
+  const cropWidth =
+    Math.max(
+      1,
+      Math.min(
+        viewport.width -
+          cropX,
+        Math.ceil(
+          (pdfX2 -
+            pdfX1) *
+            scaleX
+        )
+      )
+    );
 
-  const canvas = createCanvas(
-    Math.ceil(viewport.width),
-    Math.ceil(viewport.height)
-  );
+  const output =
+    createCanvas(
+      cropWidth,
+      cropHeight
+    );
 
-  const context = canvas.getContext("2d");
+  const outputContext =
+    output.getContext(
+      "2d"
+    );
 
-  await page.render({
-    canvasContext: context,
-    viewport,
-  }).promise;
+  outputContext.fillStyle =
+    "#ffffff";
 
-  /*
-    PDF koordinatasi pastdan yuqoriga,
-    Canvas esa tepadan pastga yuradi.
-  */
-  const scaleX = viewport.width / pageWidth;
-  const scaleY = viewport.height / pageHeight;
-
-  const topPdfY = upperY - 12;
-  const bottomPdfY = lowerY + 12;
-
-  const topCanvas =
-    viewport.height - topPdfY * scaleY;
-  const bottomCanvas =
-    viewport.height - bottomPdfY * scaleY;
-
-  const cropTop = Math.max(
-    0,
-    Math.floor(Math.min(topCanvas, bottomCanvas))
-  );
-
-  const cropBottom = Math.min(
-    viewport.height,
-    Math.ceil(Math.max(topCanvas, bottomCanvas))
-  );
-
-  const cropHeight =
-    cropBottom - cropTop;
-
-  if (cropHeight < 45) {
-    return undefined;
-  }
-
-  /*
-    Diagrammalar ko‘pincha sahifaning katta qismida bo‘ladi.
-    Chap/o‘ngdan ozgina margin qoldirib kesamiz.
-  */
-  const cropX = Math.max(
-    0,
-    Math.floor(20 * scaleX)
-  );
-
-  const cropWidth = Math.min(
-    viewport.width - cropX,
-    Math.ceil((pageWidth - 40) * scaleX)
-  );
-
-  const output = createCanvas(
-    Math.max(1, cropWidth),
-    Math.max(1, cropHeight)
-  );
-
-  const outputContext = output.getContext("2d");
-
-  outputContext.fillStyle = "#ffffff";
   outputContext.fillRect(
     0,
     0,
@@ -553,51 +1242,46 @@ async function renderQuestionImage(
     cropHeight
   );
 
-  const png = await output.encode("png");
+  const png =
+    await output.encode(
+      "png"
+    );
 
   return `data:image/png;base64,${png.toString("base64")}`;
 }
 
-function ensureFourOptions(
-  options: ImportedOption[],
-  questionNumberValue: number
-) {
-  const labels: ("A" | "B" | "C" | "D")[] = [
-    "A",
-    "B",
-    "C",
-    "D",
-  ];
-
-  return labels.map((label) => {
-    const existing = options.find(
-      (option) => option.label === label
-    );
-
-    if (existing) return existing;
-
-    return {
-      id: makeId(
-        `q${questionNumberValue}-${label.toLowerCase()}`
-      ),
-      label,
-      text: "",
-      isCorrect: false,
-    };
-  });
-}
+/* =========================================================
+   POST
+========================================================= */
 
 export async function POST(
   request: NextRequest
 ) {
   try {
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "PDF import faqat administrator uchun.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
     const formData =
       await request.formData();
 
     const file =
-      formData.get("file");
+      formData.get(
+        "file"
+      );
 
-    if (!(file instanceof File)) {
+    if (
+      !(file instanceof File)
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -611,7 +1295,8 @@ export async function POST(
     }
 
     if (
-      file.type !== "application/pdf" &&
+      file.type !==
+        "application/pdf" &&
       !file.name
         .toLowerCase()
         .endsWith(".pdf")
@@ -649,36 +1334,60 @@ export async function POST(
         await file.arrayBuffer()
       );
 
-    const pdfjs = await import(
-      "pdfjs-dist/legacy/build/pdf.mjs"
+    const pdfjs =
+      await import(
+        "pdfjs-dist/legacy/build/pdf.mjs"
+      );
+
+    /*
+      Vercel worker fix
+    */
+    const {
+      pathToFileURL,
+    } = await import(
+      "node:url"
     );
 
-    // Vercel/Node.js da PDF.js fake worker avtomatik topilmaydi.
-    // Worker faylini node_modules ichidan file:// URL orqali aniq ko‘rsatamiz.
-    const { pathToFileURL } = await import("node:url");
-    const path = await import("node:path");
+    const path =
+      await import(
+        "node:path"
+      );
 
-    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(
-      path.join(
-        process.cwd(),
-        "node_modules",
-        "pdfjs-dist",
-        "legacy",
-        "build",
-        "pdf.worker.mjs"
-      )
-    ).href;
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      pathToFileURL(
+        path.join(
+          process.cwd(),
+          "node_modules",
+          "pdfjs-dist",
+          "legacy",
+          "build",
+          "pdf.worker.mjs"
+        )
+      ).href;
 
-    const document = await pdfjs
-      .getDocument({
-        data: bytes,
-        useSystemFonts: true,
-        disableFontFace: false,
-      })
-      .promise;
+    const document =
+      await pdfjs
+        .getDocument({
+          data: bytes,
+          useSystemFonts:
+            true,
+          disableFontFace:
+            false,
+        })
+        .promise;
 
-    const importedQuestions:
-      ImportedQuestion[] = [];
+    const allLines:
+      TextLine[] = [];
+
+    const pageInfos =
+      new Map<
+        number,
+        PageInfo
+      >();
+
+    /* ---------------------------------------------------------
+       EVERY PAGE
+    --------------------------------------------------------- */
 
     for (
       let pageNumber = 1;
@@ -696,11 +1405,32 @@ export async function POST(
           scale: 1,
         });
 
+      const highlights =
+        await pageHighlights(
+          page
+        );
+
+      pageInfos.set(
+        pageNumber,
+        {
+          page,
+          width:
+            viewport.width,
+          height:
+            viewport.height,
+          highlights,
+        }
+      );
+
       const textContent =
         await page.getTextContent();
 
-      const positionedItems: PositionedText[] =
-        (textContent.items as PdfTextItem[])
+      const positionedItems:
+        PositionedText[] =
+        (
+          textContent.items as
+            PdfTextItem[]
+        )
           .filter(
             (item) =>
               typeof item.str ===
@@ -709,33 +1439,30 @@ export async function POST(
           )
           .map((item) => {
             const transform =
-              item.transform || [
-                1, 0, 0, 1, 0, 0,
+              item.transform ??
+              [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0,
               ];
-
-            const x =
-              Number(transform[4]) ||
-              0;
-
-            const y =
-              Number(transform[5]) ||
-              0;
-
-            const height =
-              Math.max(
-                8,
-                Math.abs(
-                  Number(
-                    transform[3]
-                  ) || 0
-                )
-              );
 
             return {
               text:
                 item.str.trim(),
-              x,
-              y,
+
+              x:
+                Number(
+                  transform[4]
+                ) || 0,
+
+              y:
+                Number(
+                  transform[5]
+                ) || 0,
+
               width:
                 Math.max(
                   1,
@@ -743,94 +1470,153 @@ export async function POST(
                     item.width
                   ) || 1
                 ),
-              height,
+
+              height:
+                Math.max(
+                  8,
+                  Math.abs(
+                    Number(
+                      transform[3]
+                    ) || 0
+                  )
+                ),
+
+              pageNumber,
             };
           });
 
-      const lines =
-        buildLines(
-          positionedItems
+      const columns =
+        splitIntoColumns(
+          positionedItems,
+          viewport.width
         );
 
-      const highlights =
-        await pageHighlights(
-          page
+      /*
+        Reading order:
+        FULL heading → LEFT column → RIGHT column
+      */
+      if (
+        columns.full.length >
+        0
+      ) {
+        allLines.push(
+          ...buildLines(
+            columns.full,
+            "full"
+          )
         );
-
-      const blocks =
-        findQuestionBlocks(
-          lines
-        );
-
-      for (const block of blocks) {
-        const parsed =
-          parseQuestionBlock(
-            block,
-            highlights
-          );
-
-        const imageSrc =
-          await renderQuestionImage(
-            page,
-            viewport.width,
-            viewport.height,
-            parsed
-          );
-
-        const options =
-          ensureFourOptions(
-            parsed.options,
-            parsed.number
-          );
-
-        let warning =
-          parsed.warning;
-
-        if (
-          imageSrc &&
-          !warning
-        ) {
-          /*
-            Rasmli savol topilgani xato emas.
-            Faqat admin previewda bilib turishi uchun
-            warning bermaymiz.
-          */
-        }
-
-        importedQuestions.push({
-          id: makeId(
-            `import-q${parsed.number}`
-          ),
-          number:
-            parsed.number,
-          questionText:
-            parsed.questionText,
-          options,
-          imageSrc,
-          warning,
-        });
       }
 
-      page.cleanup();
+      if (
+        columns.twoColumn
+      ) {
+        allLines.push(
+          ...buildLines(
+            columns.left,
+            "left"
+          )
+        );
+
+        allLines.push(
+          ...buildLines(
+            columns.right,
+            "right"
+          )
+        );
+      } else {
+        allLines.push(
+          ...buildLines(
+            columns.left,
+            "full"
+          )
+        );
+      }
     }
 
-    document.cleanup();
-    document.destroy();
+    /* ---------------------------------------------------------
+       GLOBAL BLOCKS
+    --------------------------------------------------------- */
 
-    importedQuestions.sort(
-      (a, b) =>
-        a.number - b.number
-    );
+    const blocks =
+      buildQuestionBlocks(
+        allLines
+      );
+
+    const importedQuestions:
+      ImportedQuestion[] =
+      [];
+
+    for (
+      const block of blocks
+    ) {
+      const parsed =
+        parseQuestionBlock(
+          block,
+          pageInfos
+        );
+
+      let imageSrc:
+        string | undefined;
+
+      if (
+        parsed.firstOptionLine &&
+        parsed.lastQuestionLine &&
+        parsed.firstOptionLine.pageNumber ===
+          parsed.lastQuestionLine.pageNumber
+      ) {
+        const pageInfo =
+          pageInfos.get(
+            parsed.firstOptionLine.pageNumber
+          );
+
+        if (pageInfo) {
+          imageSrc =
+            await renderQuestionImage(
+              pageInfo,
+              parsed.firstOptionLine,
+              parsed.lastQuestionLine
+            );
+        }
+      }
+
+      importedQuestions.push({
+        id:
+          makeId(
+            `import-q${parsed.number}`
+          ),
+
+        number:
+          parsed.number,
+
+        questionText:
+          parsed.questionText,
+
+        options:
+          parsed.options,
+
+        imageSrc,
+
+        warning:
+          parsed.warning,
+      });
+    }
 
     /*
-      PDFda raqamlar takrorlangan yoki sahifa boshida
-      boshqa raqamli matn savol deb tushunilgan bo‘lsa,
-      tekshirish oynasida ko‘rinsin.
+      Number order.
+      NOTE: two-column PDFs normally have sequential numbering.
     */
+    importedQuestions.sort(
+      (a, b) =>
+        a.number -
+        b.number
+    );
+
     const seen =
       new Set<number>();
 
-    for (const question of importedQuestions) {
+    for (
+      const question of importedQuestions
+    ) {
       if (
         seen.has(
           question.number
@@ -838,7 +1624,7 @@ export async function POST(
       ) {
         question.warning =
           question.warning ||
-          "Savol raqami PDF ichida takrorlangan. Tekshirib chiqing.";
+          "Savol raqami takrorlangan. Tekshirib chiqing.";
       }
 
       seen.add(
@@ -854,13 +1640,30 @@ export async function POST(
         {
           success: false,
           message:
-            "PDFdan test savollari topilmadi. PDF matnli ekanini va savollar '1.' yoki '1)' ko‘rinishida boshlanganini tekshiring.",
+            "PDFdan test savollari topilmadi. Savollar 1. yoki 1) ko‘rinishida boshlanishini tekshiring.",
         },
         {
           status: 422,
         }
       );
     }
+
+    /*
+      PDF.js page objectlarini eng oxirida cleanup qilamiz,
+      chunki rasm crop qilishda ular kerak bo‘ladi.
+    */
+    for (
+      const pageInfo of pageInfos.values()
+    ) {
+      try {
+        pageInfo.page.cleanup();
+      } catch {
+        // ignore
+      }
+    }
+
+    document.cleanup();
+    document.destroy();
 
     return NextResponse.json({
       success: true,
