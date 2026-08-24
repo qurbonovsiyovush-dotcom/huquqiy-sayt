@@ -1384,18 +1384,30 @@ function getQuestionPdfCrop(
     Browser PDF.js shu koordinatani asl PDFdan render qiladi.
   */
 
+  /*
+    Cropni "toza" kesish:
+    - savol matnining oxirgi satridan yetarlicha PASTROQDAN boshlaymiz;
+    - A/B/C/D variantlar boshlanishidan yetarlicha YUQORIDA to‘xtaymiz.
+
+    PDF koordinatasida Y pastdan yuqoriga o‘sadi.
+  */
+  /*
+    FINAL CLEAN CROP:
+    yuqorida savol matnining qoldig‘i va pastda A/B/C/D variantlari
+    crop ichiga kirib qolmasligi uchun chegarani yana ichkariga suramiz.
+  */
   const upperPdfY =
     promptEndLine.y -
     Math.max(
-      6,
-      promptEndLine.height * 0.35
+      26,
+      promptEndLine.height * 2.15
     );
 
   const lowerPdfY =
     firstOptionLine.y +
     Math.max(
-      6,
-      firstOptionLine.height * 0.35
+      28,
+      firstOptionLine.height * 2.25
     );
 
   const height =
@@ -1426,8 +1438,13 @@ function getQuestionPdfCrop(
   /*
     Vizualning cheti kesilib qolmasligi uchun ozgina padding.
   */
+  /*
+    Avvalgi 5 birlik vertikal padding savol/variant matnini
+    yana crop ichiga tortib kiritar edi.
+    Endi faqat 1.5 birlik xavfsizlik qoldiramiz.
+  */
   const horizontalPadding = 4;
-  const verticalPadding = 5;
+  const verticalPadding = 0.5;
 
   x1 = Math.max(0, x1 - horizontalPadding);
   x2 = Math.min(
