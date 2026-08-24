@@ -792,6 +792,15 @@ export default function ImportPdfTestPage() {
   const [questions, setQuestions] =
     useState<ImportedQuestion[]>([]);
 
+  /*
+    SAVOL MATNI UCHUN ALOHIDA SOURCE OF TRUTH.
+    Variantlar ishlayotgani uchun ularga tegmaymiz.
+    Savol matni esa endi questions[] ichidagi eski PDF qiymatiga
+    qaram bo‘lmaydi.
+  */
+  const [questionDrafts, setQuestionDrafts] =
+    useState<Record<string, string>>({});
+
   const [selectedShape, setSelectedShape] = useState<{
     questionId: string;
     shapeId: string;
@@ -818,6 +827,21 @@ export default function ImportPdfTestPage() {
     handle?: "nw" | "ne" | "sw" | "se";
   } | null>(null);
 
+  useEffect(() => {
+    try {
+      Object.entries(questionDrafts).forEach(
+        ([id, html]) => {
+          window.sessionStorage.setItem(
+            `pdf-rich-editor:question:${id}`,
+            html
+          );
+        }
+      );
+    } catch {
+      // ignore
+    }
+  }, [questionDrafts]);
+
   const warningCount = useMemo(
     () =>
       questions.filter(
@@ -832,6 +856,7 @@ export default function ImportPdfTestPage() {
   ) {
     setMessage("");
     setQuestions([]);
+    setQuestionDrafts({});
 
     if (!file) {
       setPdfFile(null);
@@ -892,6 +917,7 @@ export default function ImportPdfTestPage() {
       setAnalyzing(true);
       setMessage("");
       setQuestions([]);
+      setQuestionDrafts({});
 
       const formData =
         new FormData();
@@ -982,6 +1008,15 @@ export default function ImportPdfTestPage() {
         // ignore
       }
 
+      setQuestionDrafts(
+        Object.fromEntries(
+          imported.map((question) => [
+            question.id,
+            question.questionText,
+          ])
+        )
+      );
+
       setQuestions(imported);
 
       setMessage(
@@ -1007,16 +1042,24 @@ export default function ImportPdfTestPage() {
     id: string,
     value: string
   ) {
+    /*
+      Bu state faqat SAVOL MATNI uchun.
+      Har qanday ?, probel, drag/drop, qatorni birlashtirish va boshqa
+      tahrir darhol shu yerda qoladi.
+    */
+    setQuestionDrafts((current) => ({
+      ...current,
+      [id]: value,
+    }));
+
     setQuestions((current) =>
-      current.map(
-        (question) =>
-          question.id === id
-            ? {
-                ...question,
-                questionText:
-                  value,
-              }
-            : question
+      current.map((question) =>
+        question.id === id
+          ? {
+              ...question,
+              questionText: value,
+            }
+          : question
       )
     );
   }
@@ -1097,6 +1140,12 @@ export default function ImportPdfTestPage() {
         )
       )
     );
+
+    setQuestionDrafts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
   }
 
 
@@ -1129,11 +1178,18 @@ export default function ImportPdfTestPage() {
   }
 
   function addQuestion() {
+    const created = createEmptyQuestion();
+
+    setQuestionDrafts((current) => ({
+      ...current,
+      [created.id]: created.questionText,
+    }));
+
     setQuestions((current) =>
       renumberQuestions([
         ...current,
         {
-          ...createEmptyQuestion(),
+          ...created,
           number: current.length + 1,
         },
       ])
@@ -1178,6 +1234,13 @@ export default function ImportPdfTestPage() {
         })),
         warning: source.warning,
       };
+
+      setQuestionDrafts((drafts) => ({
+        ...drafts,
+        [clone.id]:
+          drafts[source.id] ??
+          source.questionText,
+      }));
 
       const next = [...current];
       next.splice(index + 1, 0, clone);
@@ -2539,7 +2602,10 @@ export default function ImportPdfTestPage() {
             ).length;
 
           return (
-            !richTextHasContent(question.questionText) ||
+            !richTextHasContent(
+              questionDrafts[question.id] ??
+              question.questionText
+            ) ||
             question.options.some(
               (option) =>
                 !richTextHasContent(option.text)
@@ -2585,7 +2651,10 @@ export default function ImportPdfTestPage() {
                 question.id,
 
               questionHtml:
-                sanitizeRichHtml(question.questionText),
+                sanitizeRichHtml(
+                  questionDrafts[question.id] ??
+                  question.questionText
+                ),
 
               options:
                 question.options.map(
@@ -3220,14 +3289,17 @@ export default function ImportPdfTestPage() {
                     </div>
                   )}
 
-                  <label className="questionTextField">
+                  <div className="questionTextField">
                     <span>
                       Savol matni
                     </span>
 
                     <RichTextEditor
                       editorId={`question:${question.id}`}
-                      value={question.questionText}
+                      value={
+                        questionDrafts[question.id] ??
+                        question.questionText
+                      }
                       onChange={(value) =>
                         changeQuestionText(
                           question.id,
@@ -3237,7 +3309,7 @@ export default function ImportPdfTestPage() {
                       placeholder="Savol matnini shu yerda tahrirlang..."
                       minHeight={170}
                     />
-                  </label>
+                  </div>
 
                   {openVisualEditors[question.id] &&
                     renderShapeEditor(question)}
