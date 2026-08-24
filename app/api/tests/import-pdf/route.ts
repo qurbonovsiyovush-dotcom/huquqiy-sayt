@@ -105,6 +105,93 @@ function normalizeText(value: string) {
     .trim();
 }
 
+/*
+  PDF MATNINI AVTOMATIK TOZALASH
+
+  PDF sahifasidagi vizual qatorlar savol matnida majburiy
+  yangi qator bo‘lib qolmasligi kerak.
+
+  Masalan PDF:
+    Quyidagi qaysi moddalar 1-
+    bo‘lim II bob tarkibiga mos tushadi?
+
+  Natija:
+    Quyidagi qaysi moddalar 1-bo‘lim II bob tarkibiga mos tushadi?
+
+  Lekin savol ichidagi sanalgan bandlar:
+    1) Tashqi siyosat
+    2) Fuqarolik
+    3) ...
+  alohida qatorda saqlanadi.
+*/
+function normalizeQuestionText(parts: string[]) {
+  const rawLines = parts
+    .flatMap((part) => String(part || "").split(/\r?\n/))
+    .map((line) =>
+      line
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .trim()
+    )
+    .filter(Boolean);
+
+  const paragraphs: string[] = [];
+  let prose = "";
+
+  function flushProse() {
+    const cleaned = prose
+      .replace(/\s+([,.;:!?])/g, "$1")
+      .replace(/\(\s+/g, "(")
+      .replace(/\s+\)/g, ")")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    if (cleaned) {
+      paragraphs.push(cleaned);
+    }
+
+    prose = "";
+  }
+
+  for (const line of rawLines) {
+    /*
+      1), 2), 3) ... yoki a), b), c) ... savolning ichki bandi.
+      Bularni alohida qatorda qoldiramiz.
+    */
+    const isInnerListItem =
+      /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
+
+    if (isInnerListItem) {
+      flushProse();
+      paragraphs.push(line);
+      continue;
+    }
+
+    if (!prose) {
+      prose = line;
+      continue;
+    }
+
+    /*
+      Satrdagi so‘z '-' bilan bo‘linib qolgan bo‘lsa:
+        1- + bo‘lim       => 1-bo‘lim
+        jinoyat- + huquq  => jinoyat-huquq
+    */
+    if (/-$/.test(prose)) {
+      prose += line;
+    } else {
+      prose += ` ${line}`;
+    }
+  }
+
+  flushProse();
+
+  return paragraphs
+    .join("\n")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
 function normalizeOneLine(value: string) {
   return value
     .replace(/\u00a0/g, " ")
@@ -1076,10 +1163,8 @@ function parseQuestion(
     number:
       block.number,
     questionText:
-      normalizeText(
-        questionParts.join(
-          "\n"
-        )
+      normalizeQuestionText(
+        questionParts
       ),
     options,
     warning,
