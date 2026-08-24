@@ -55,6 +55,7 @@ type ImportedQuestion = {
 
 
 type RichTextEditorProps = {
+  editorId: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -130,7 +131,10 @@ function sanitizeRichHtml(value: string) {
   return documentValue.body.firstElementChild?.innerHTML || "";
 }
 
+const richTextDraftCache = new Map<string, string>();
+
 function RichTextEditor({
+  editorId,
   value,
   onChange,
   placeholder = "Matn kiriting...",
@@ -157,13 +161,30 @@ function RichTextEditor({
       return;
     }
 
-    editor.innerHTML = editorValueToHtml(value);
+    const cachedHtml = richTextDraftCache.get(editorId);
+    editor.innerHTML =
+      cachedHtml !== undefined
+        ? cachedHtml
+        : editorValueToHtml(value);
+
+    richTextDraftCache.set(editorId, editor.innerHTML);
     mountedOnceRef.current = true;
   }, []);
 
   function rememberLocalHtml() {
-    // Ataylab parent state'ni yangilamaymiz.
-    // Browser contentEditable DOMini o‘zi boshqaradi.
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    // Har bir tahrir darhol lokal cache'ga yoziladi.
+    // Component qayta mount bo‘lib qolsa ham aynan foydalanuvchi
+    // tahrirlagan HTML tiklanadi, eski PDF matni emas.
+    richTextDraftCache.set(
+      editorId,
+      editor.innerHTML
+    );
   }
 
   function commitChange() {
@@ -173,7 +194,9 @@ function RichTextEditor({
       return;
     }
 
-    onChange(editor.innerHTML);
+    const html = editor.innerHTML;
+    richTextDraftCache.set(editorId, html);
+    onChange(html);
   }
 
   function saveSelection() {
@@ -3115,6 +3138,7 @@ export default function ImportPdfTestPage() {
                     </span>
 
                     <RichTextEditor
+                      editorId={`question:${question.id}`}
                       value={question.questionText}
                       onChange={(value) =>
                         changeQuestionText(
@@ -3167,6 +3191,7 @@ export default function ImportPdfTestPage() {
                           </strong>
 
                           <RichTextEditor
+                            editorId={`option:${question.id}:${option.id}`}
                             value={option.text}
                             onChange={(value) =>
                               changeOptionText(
