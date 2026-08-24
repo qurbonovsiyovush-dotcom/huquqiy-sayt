@@ -839,6 +839,76 @@ function splitInlineOptions(
 }
 
 /* =========================================================
+   VISUAL QUESTION DETECTION
+   Jadval / diagramma / belgi / atama-moslashtirish kabi savollarda
+   PDFdagi vizual qism savol matni bilan A/B/C/D orasida joylashadi.
+========================================================= */
+
+function looksLikeVisualQuestion(value: string) {
+  const text = normalizeOneLine(value).toLowerCase();
+
+  return (
+    /\bjadval(?:da|ni|dan)?\b/.test(text) ||
+    /\bdiagramma(?:si|ga|ni|dan)?\b/.test(text) ||
+    /\beyler[\s\-–—]*venn\b/.test(text) ||
+    /\bushbu\s+belgi\b/.test(text) ||
+    /\bbelgi\s+qanday\s+ma[’'`ʻʼ]?noni\b/.test(text) ||
+    /\byuridik\s+atamalar\b/.test(text) ||
+    /\batamalar\s+va\s+ularning\s+izohi\b/.test(text)
+  );
+}
+
+/*
+  Vizual savolda prompt tugagan joyni topamiz.
+  Masalan:
+    "8. Quyidagi jadvalda ..."
+    "berilgan qatorni aniqlang ?"
+  keyingi satrlar jadvalning o‘zi bo‘ladi.
+
+  Savol prompti odatda ?, ! yoki . bilan tugaydi.
+*/
+function visualPromptEndIndex(lines: TextLine[]) {
+  if (lines.length === 0) {
+    return -1;
+  }
+
+  let accumulated = "";
+
+  for (let index = 0; index < lines.length; index++) {
+    const current =
+      index === 0
+        ? stripQuestionNumber(lines[index].text)
+        : lines[index].text;
+
+    accumulated = normalizeOneLine(
+      accumulated
+        ? `${accumulated} ${current}`
+        : current
+    );
+
+    if (
+      looksLikeVisualQuestion(accumulated) &&
+      /[?!\.]\s*$/.test(accumulated)
+    ) {
+      return index;
+    }
+
+    // Vizual savol promptlari odatda 1-4 satr.
+    // Juda cho‘zilib ketsa, diagramma/jadval matnini promptga qo‘shmaymiz.
+    if (
+      index >= 3 &&
+      looksLikeVisualQuestion(accumulated)
+    ) {
+      return index;
+    }
+  }
+
+  return looksLikeVisualQuestion(accumulated)
+    ? Math.min(lines.length - 1, 1)
+    : -1;
+}
+
+/* =========================================================
    PARSE:
    QUESTION -> A -> B -> C -> D -> NEXT QUESTION
 ========================================================= */
@@ -857,6 +927,9 @@ function parseQuestion(
 
   const questionParts:
     string[] = [];
+
+  const questionLines:
+    TextLine[] = [];
 
   const optionData =
     new Map<
@@ -1072,6 +1145,10 @@ function parseQuestion(
       lineText
     );
 
+    questionLines.push(
+      line
+    );
+
     lastQuestionLine =
       line;
   }
@@ -1174,17 +1251,58 @@ function parseQuestion(
       "To‘g‘ri javob topilmadi. To‘g‘ri variant oxiriga + belgisi qo‘ying yoki admin oynasida belgilang.";
   }
 
+  const fullQuestionText =
+    normalizeQuestionText(
+      questionParts
+    );
+
+  const promptEndIndex =
+    visualPromptEndIndex(
+      questionLines
+    );
+
+  const shouldRenderImage =
+    promptEndIndex >= 0 &&
+    Boolean(firstOptionLine);
+
+  const promptParts =
+    shouldRenderImage
+      ? questionLines
+          .slice(
+            0,
+            promptEndIndex + 1
+          )
+          .map(
+            (line, index) =>
+              index === 0
+                ? stripQuestionNumber(
+                    line.text
+                  )
+                : line.text
+          )
+      : questionParts;
+
+  const promptEndLine =
+    shouldRenderImage
+      ? questionLines[
+          promptEndIndex
+        ] ?? null
+      : null;
+
   return {
     number:
       block.number,
     questionText:
       normalizeQuestionText(
-        questionParts
+        promptParts
       ),
     options,
     warning,
     firstOptionLine,
     lastQuestionLine,
+    promptEndLine,
+    shouldRenderImage,
+    fullQuestionText,
   };
 }
 
@@ -1197,50 +1315,59 @@ function parseQuestion(
 async function renderQuestionImage(
   pageInfo: PageInfo,
   firstOptionLine: TextLine | null,
-  lastQuestionLine: TextLine | null
+  promptEndLine: TextLine | null
 ) {
   if (
     !firstOptionLine ||
-    !lastQuestionLine
+    !promptEndLine
   ) {
     return undefined;
   }
 
   if (
     firstOptionLine.pageNumber !==
-    lastQuestionLine.pageNumber
+    promptEndLine.pageNumber
   ) {
     return undefined;
   }
 
   if (
     firstOptionLine.column !==
-      lastQuestionLine.column &&
+      promptEndLine.column &&
     firstOptionLine.column !==
       "full" &&
-    lastQuestionLine.column !==
+    promptEndLine.column !==
       "full"
   ) {
     return undefined;
   }
 
+  /*
+    MUHIM:
+    Endi crop oxirgi "question line" bo‘yicha emas,
+    SAVOL PROMPTI tugagan satrdan A/B/C/D boshlanguncha olinadi.
+
+    Shu sabab:
+      - jadval ichidagi text extraction
+      - Eyler-Venn ichidagi "I II III"
+      - moslashtirish sxemasidagi atama/izoh matnlari
+    gapni kamaytirib yubormaydi.
+  */
   const gap =
-    lastQuestionLine.y -
+    promptEndLine.y -
     firstOptionLine.y;
 
-  /*
-    Conservative threshold.
-    Prevents blank/normal text being misdetected as image.
-  */
-  // Diagram/jadval/rasm uchun 90 juda katta edi.
-  // 28pt dan katta real vizual bo‘shliq bo‘lsa crop qilamiz.
-  if (gap < 28) {
+  // Juda kichik joy bo‘lsa rasm deb olmaymiz.
+  if (gap < 34) {
     return undefined;
   }
 
+  // 2x ga yaqin sifat — matnli jadval va diagramma tiniq chiqadi.
+  const renderScale = 2.15;
+
   const viewport =
     pageInfo.page.getViewport({
-      scale: 2.0,
+      scale: renderScale,
     });
 
   const canvas =
@@ -1258,6 +1385,14 @@ async function renderQuestionImage(
       "2d"
     );
 
+  context.fillStyle = "#ffffff";
+  context.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
   await pageInfo.page
     .render({
       canvasContext:
@@ -1274,15 +1409,24 @@ async function renderQuestionImage(
     viewport.height /
     pageInfo.height;
 
-  // Savol matni bilan variantlar orasidagi vizual hududni
-  // biroz kengroq olamiz — jadval/diagramma chetlari kesilib qolmasin.
+  /*
+    PDF koordinatasida Y pastdan yuqoriga.
+    Promptning tagidan biroz pastroq boshlaymiz,
+    variantning tepasidan biroz yuqoriroq tugatamiz.
+  */
   const upperPdfY =
-    lastQuestionLine.y -
-    Math.max(20, lastQuestionLine.height * 1.6);
+    promptEndLine.y -
+    Math.max(
+      10,
+      promptEndLine.height * 0.9
+    );
 
   const lowerPdfY =
     firstOptionLine.y +
-    Math.max(20, firstOptionLine.height * 1.6);
+    Math.max(
+      10,
+      firstOptionLine.height * 0.8
+    );
 
   const topCanvas =
     viewport.height -
@@ -1294,7 +1438,7 @@ async function renderQuestionImage(
     lowerPdfY *
       scaleY;
 
-  const cropTop =
+  let cropTop =
     Math.max(
       0,
       Math.floor(
@@ -1305,7 +1449,7 @@ async function renderQuestionImage(
       )
     );
 
-  const cropBottom =
+  let cropBottom =
     Math.min(
       viewport.height,
       Math.ceil(
@@ -1316,37 +1460,77 @@ async function renderQuestionImage(
       )
     );
 
+  // Vizualning chetlari kesilib qolmasligi uchun vertikal padding.
+  const verticalPadding =
+    Math.round(
+      7 * renderScale
+    );
+
+  cropTop =
+    Math.max(
+      0,
+      cropTop -
+        verticalPadding
+    );
+
+  cropBottom =
+    Math.min(
+      viewport.height,
+      cropBottom +
+        verticalPadding
+    );
+
   const cropHeight =
     cropBottom -
     cropTop;
 
-  if (cropHeight < 32) {
+  if (cropHeight < 45) {
     return undefined;
   }
 
-  let pdfX1 = 12;
+  /*
+    Savol qaysi ustunda bo‘lsa faqat o‘sha ustunni kesamiz.
+    2 ustunli PDFda boshqa savollar rasmga tushib ketmaydi.
+  */
+  let pdfX1 = 10;
   let pdfX2 =
-    pageInfo.width - 12;
+    pageInfo.width - 10;
 
-  if (
-    firstOptionLine.column ===
-    "left"
-  ) {
-    pdfX1 = 4;
+  const cropColumn =
+    promptEndLine.column !== "full"
+      ? promptEndLine.column
+      : firstOptionLine.column;
+
+  if (cropColumn === "left") {
+    pdfX1 = 6;
     pdfX2 =
       pageInfo.width / 2 -
-      2;
+      4;
   } else if (
-    firstOptionLine.column ===
-    "right"
+    cropColumn === "right"
   ) {
     pdfX1 =
       pageInfo.width / 2 +
-      2;
-
+      4;
     pdfX2 =
-      pageInfo.width - 4;
+      pageInfo.width - 6;
   }
+
+  const horizontalPaddingPdf = 4;
+
+  pdfX1 =
+    Math.max(
+      0,
+      pdfX1 -
+        horizontalPaddingPdf
+    );
+
+  pdfX2 =
+    Math.min(
+      pageInfo.width,
+      pdfX2 +
+        horizontalPaddingPdf
+    );
 
   const cropX =
     Math.max(
@@ -1403,8 +1587,66 @@ async function renderQuestionImage(
     cropHeight
   );
 
+  /*
+    Juda katta data URL bo‘lib ketmasin.
+    1400px dan keng bo‘lsa proporsional kichraytiramiz.
+  */
+  let finalCanvas = output;
+
+  const maxOutputWidth = 1400;
+
+  if (
+    output.width >
+    maxOutputWidth
+  ) {
+    const ratio =
+      maxOutputWidth /
+      output.width;
+
+    const resized =
+      createCanvas(
+        maxOutputWidth,
+        Math.max(
+          1,
+          Math.round(
+            output.height *
+              ratio
+          )
+        )
+      );
+
+    const resizedContext =
+      resized.getContext(
+        "2d"
+      );
+
+    resizedContext.fillStyle =
+      "#ffffff";
+
+    resizedContext.fillRect(
+      0,
+      0,
+      resized.width,
+      resized.height
+    );
+
+    resizedContext.drawImage(
+      output,
+      0,
+      0,
+      output.width,
+      output.height,
+      0,
+      0,
+      resized.width,
+      resized.height
+    );
+
+    finalCanvas = resized;
+  }
+
   const png =
-    await output.encode(
+    await finalCanvas.encode(
       "png"
     );
 
@@ -1636,10 +1878,11 @@ export async function POST(
         string | undefined;
 
       if (
+        parsed.shouldRenderImage &&
         parsed.firstOptionLine &&
-        parsed.lastQuestionLine &&
+        parsed.promptEndLine &&
         parsed.firstOptionLine.pageNumber ===
-          parsed.lastQuestionLine.pageNumber
+          parsed.promptEndLine.pageNumber
       ) {
         const pageInfo =
           pageInfos.get(
@@ -1652,7 +1895,7 @@ export async function POST(
               await renderQuestionImage(
                 pageInfo,
                 parsed.firstOptionLine,
-                parsed.lastQuestionLine
+                parsed.promptEndLine
               );
           } catch (error) {
             console.error(
