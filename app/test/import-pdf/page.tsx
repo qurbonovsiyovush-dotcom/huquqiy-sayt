@@ -135,6 +135,10 @@ function RichTextEditor({
   const editorRef = useRef<HTMLDivElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
 
+  // Oxirgi marta aynan shu editor parentga yuborgan HTML.
+  // Bu ref cursorning har bir state update'da boshiga sakrashini to‘xtatadi.
+  const lastEmittedHtmlRef = useRef<string>("");
+
   useEffect(() => {
     const editor = editorRef.current;
 
@@ -144,12 +148,26 @@ function RichTextEditor({
 
     const nextHtml = editorValueToHtml(value);
 
+    // Agar bu qiymat editorning o‘zidan kelgan bo‘lsa DOMni qayta yozmaymiz.
+    // innerHTML'ni qayta yozish browser selection/caret'ni yo‘qotadi.
+    if (nextHtml === lastEmittedHtmlRef.current) {
+      return;
+    }
+
+    // Foydalanuvchi ayni paytda shu editor ichida yozayotgan bo‘lsa
+    // hech qachon innerHTML'ni almashtirmaymiz.
     if (
-      document.activeElement !== editor &&
-      editor.innerHTML !== nextHtml
+      document.activeElement === editor ||
+      editor.contains(document.activeElement)
     ) {
+      return;
+    }
+
+    if (editor.innerHTML !== nextHtml) {
       editor.innerHTML = nextHtml;
     }
+
+    lastEmittedHtmlRef.current = nextHtml;
   }, [value]);
 
   function emitChange() {
@@ -159,7 +177,12 @@ function RichTextEditor({
       return;
     }
 
-    onChange(editor.innerHTML);
+    const html = editor.innerHTML;
+
+    // Parent state yangilanganda useEffect DOMni qayta yozmasligi uchun
+    // avval oxirgi lokal HTMLni eslab qolamiz.
+    lastEmittedHtmlRef.current = html;
+    onChange(html);
   }
 
   function saveSelection() {
@@ -2668,7 +2691,7 @@ export default function ImportPdfTestPage() {
         </section>
       )}
 
-      <style jsx>{`
+      <style jsx global>{`
         * {
           box-sizing: border-box;
         }
@@ -3182,6 +3205,12 @@ export default function ImportPdfTestPage() {
           box-shadow: 0 3px 0 rgba(39,55,64,.18);
         }
 
+        .visualEditor button,
+        .visualEditor label,
+        .visualEditor input {
+          font-family: "Bell MT", Georgia, serif;
+        }
+
         .visualToolbar {
           padding: 11px 12px;
           display: flex;
@@ -3200,19 +3229,28 @@ export default function ImportPdfTestPage() {
         .visualToolbarButtons {
           display: flex;
           flex-wrap: wrap;
-          gap: 6px;
+          align-items: center;
+          gap: 7px;
         }
 
         .visualTool {
           position: relative;
-          min-height: 35px;
-          padding: 6px 10px;
+          min-width: 76px;
+          min-height: 38px;
+          padding: 7px 12px;
           border: 1px solid #68747b;
           border-radius: 7px;
-          background: linear-gradient(#fff,#d7d7d7);
+          background: linear-gradient(#ffffff,#d7d7d7);
+          box-shadow: inset 0 1px 0 #fff, 0 2px 0 rgba(0,0,0,.12);
           cursor: pointer;
           font-family: inherit;
+          font-size: 14px;
           font-weight: 700;
+        }
+
+        .visualTool:hover {
+          filter: brightness(.98);
+          transform: translateY(-1px);
         }
 
         .imageVisualTool {
