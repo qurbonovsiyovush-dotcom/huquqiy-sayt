@@ -10,12 +10,41 @@ type ImportedOption = {
   isCorrect: boolean;
 };
 
+type ShapeType =
+  | "rectangle"
+  | "roundedRectangle"
+  | "circle"
+  | "ellipse"
+  | "text"
+  | "image";
+
+type EditorShape = {
+  id: string;
+  type: ShapeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  imageSrc?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  textColor?: string;
+  fontSize?: number;
+  borderWidth?: number;
+  borderRadius?: number;
+  opacity?: number;
+  objectFit?: "contain" | "cover" | "fill";
+  zIndex?: number;
+};
+
 type ImportedQuestion = {
   id: string;
   number: number;
   questionText: string;
   options: ImportedOption[];
   imageSrc?: string;
+  shapes?: EditorShape[];
   warning?: string;
 };
 
@@ -641,6 +670,29 @@ export default function ImportPdfTestPage() {
   const [questions, setQuestions] =
     useState<ImportedQuestion[]>([]);
 
+  const [selectedShape, setSelectedShape] = useState<{
+    questionId: string;
+    shapeId: string;
+  } | null>(null);
+
+  const [activeCanvasQuestionId, setActiveCanvasQuestionId] =
+    useState<string | null>(null);
+
+  const copiedShapeRef = useRef<EditorShape | null>(null);
+
+  const pointerActionRef = useRef<{
+    mode: "move" | "resize";
+    questionId: string;
+    shapeId: string;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+    handle?: "nw" | "ne" | "sw" | "se";
+  } | null>(null);
+
   const warningCount = useMemo(
     () =>
       questions.filter(
@@ -753,7 +805,38 @@ export default function ImportPdfTestPage() {
         Array.isArray(
           data.questions
         )
-          ? data.questions
+          ? data.questions.map(
+              (question: ImportedQuestion) => {
+                const legacyImageShape: EditorShape[] =
+                  question.imageSrc
+                    ? [
+                        {
+                          id: `pdf-img-${question.id}`,
+                          type: "image",
+                          x: 110,
+                          y: 40,
+                          width: 620,
+                          height: 300,
+                          imageSrc: question.imageSrc,
+                          objectFit: "contain",
+                          borderWidth: 0,
+                          borderRadius: 6,
+                          zIndex: 1,
+                        },
+                      ]
+                    : [];
+
+                return {
+                  ...question,
+                  imageSrc: undefined,
+                  shapes:
+                    Array.isArray(question.shapes) &&
+                    question.shapes.length > 0
+                      ? question.shapes
+                      : legacyImageShape,
+                };
+              }
+            )
           : [];
 
       setQuestions(imported);
@@ -897,6 +980,7 @@ export default function ImportPdfTestPage() {
         text: "",
         isCorrect: label === "A",
       })),
+      shapes: [],
       warning: "Yangi savol. Matn va variantlarni to‘ldiring.",
     };
   }
@@ -941,6 +1025,14 @@ export default function ImportPdfTestPage() {
             .toString(36)
             .slice(2, 6)}`,
         })),
+        shapes: (source.shapes || []).map((shape) => ({
+          ...shape,
+          id: `shape-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 8)}`,
+          x: shape.x + 18,
+          y: shape.y + 18,
+        })),
         warning: source.warning,
       };
 
@@ -973,6 +1065,150 @@ export default function ImportPdfTestPage() {
     });
   }
 
+  function makeShapeId() {
+    return `shape-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 9)}`;
+  }
+
+  function updateQuestionShapes(
+    questionId: string,
+    updater: (shapes: EditorShape[]) => EditorShape[]
+  ) {
+    setQuestions((current) =>
+      current.map((question) =>
+        question.id === questionId
+          ? {
+              ...question,
+              shapes: updater(question.shapes || []),
+              imageSrc: undefined,
+            }
+          : question
+      )
+    );
+  }
+
+  function addShape(
+    questionId: string,
+    type: Exclude<ShapeType, "image">
+  ) {
+    const baseZ =
+      Math.max(
+        0,
+        ...(
+          questions.find((q) => q.id === questionId)?.shapes || []
+        ).map((shape) => Number(shape.zIndex) || 0)
+      ) + 1;
+
+    const shape: EditorShape = {
+      id: makeShapeId(),
+      type,
+      x: 120,
+      y: 70,
+      width:
+        type === "circle"
+          ? 170
+          : type === "text"
+          ? 260
+          : 240,
+      height:
+        type === "circle"
+          ? 170
+          : type === "text"
+          ? 80
+          : 150,
+      text:
+        type === "text"
+          ? "Matn"
+          : undefined,
+      backgroundColor:
+        type === "text"
+          ? "transparent"
+          : "#8fc9ef",
+      borderColor: "#2f5975",
+      textColor: "#111111",
+      fontSize: 22,
+      borderWidth:
+        type === "text"
+          ? 0
+          : 2,
+      borderRadius:
+        type === "roundedRectangle"
+          ? 22
+          : type === "circle" ||
+            type === "ellipse"
+          ? 999
+          : 4,
+      opacity: 1,
+      zIndex: baseZ,
+    };
+
+    updateQuestionShapes(questionId, (shapes) => [
+      ...shapes,
+      shape,
+    ]);
+
+    setSelectedShape({
+      questionId,
+      shapeId: shape.id,
+    });
+    setActiveCanvasQuestionId(questionId);
+  }
+
+  function addImageDataUrl(
+    questionId: string,
+    imageSrc: string
+  ) {
+    const image = new Image();
+
+    image.onload = () => {
+      const maxWidth = 680;
+      const maxHeight = 380;
+      const ratio = Math.min(
+        maxWidth / Math.max(1, image.naturalWidth),
+        maxHeight / Math.max(1, image.naturalHeight),
+        1
+      );
+
+      const width = Math.max(
+        120,
+        Math.round(image.naturalWidth * ratio)
+      );
+      const height = Math.max(
+        90,
+        Math.round(image.naturalHeight * ratio)
+      );
+
+      const shape: EditorShape = {
+        id: makeShapeId(),
+        type: "image",
+        x: Math.max(20, Math.round((900 - width) / 2)),
+        y: 55,
+        width,
+        height,
+        imageSrc,
+        objectFit: "contain",
+        borderWidth: 0,
+        borderRadius: 6,
+        opacity: 1,
+        zIndex: Date.now(),
+      };
+
+      updateQuestionShapes(questionId, (shapes) => [
+        ...shapes,
+        shape,
+      ]);
+
+      setSelectedShape({
+        questionId,
+        shapeId: shape.id,
+      });
+      setActiveCanvasQuestionId(questionId);
+    };
+
+    image.src = imageSrc;
+  }
+
   function changeQuestionImage(
     questionId: string,
     file: File | null
@@ -986,8 +1222,8 @@ export default function ImportPdfTestPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage("Rasm hajmi 5 MB dan oshmasligi kerak.");
+    if (file.size > 8 * 1024 * 1024) {
+      setMessage("Rasm hajmi 8 MB dan oshmasligi kerak.");
       return;
     }
 
@@ -999,35 +1235,729 @@ export default function ImportPdfTestPage() {
           ? reader.result
           : "";
 
-      if (!imageSrc) {
-        return;
+      if (imageSrc) {
+        addImageDataUrl(questionId, imageSrc);
       }
-
-      setQuestions((current) =>
-        current.map((question) =>
-          question.id === questionId
-            ? {
-                ...question,
-                imageSrc,
-              }
-            : question
-        )
-      );
     };
 
     reader.readAsDataURL(file);
   }
 
-  function removeQuestionImage(questionId: string) {
-    setQuestions((current) =>
-      current.map((question) =>
-        question.id === questionId
+  function updateShape(
+    questionId: string,
+    shapeId: string,
+    patch: Partial<EditorShape>
+  ) {
+    updateQuestionShapes(questionId, (shapes) =>
+      shapes.map((shape) =>
+        shape.id === shapeId
           ? {
-              ...question,
-              imageSrc: undefined,
+              ...shape,
+              ...patch,
             }
-          : question
+          : shape
       )
+    );
+  }
+
+  function removeShape(
+    questionId: string,
+    shapeId: string
+  ) {
+    updateQuestionShapes(questionId, (shapes) =>
+      shapes.filter((shape) => shape.id !== shapeId)
+    );
+
+    setSelectedShape((current) =>
+      current?.questionId === questionId &&
+      current?.shapeId === shapeId
+        ? null
+        : current
+    );
+  }
+
+  function duplicateShape(
+    questionId: string,
+    shapeId: string
+  ) {
+    const question =
+      questions.find((item) => item.id === questionId);
+
+    const source =
+      question?.shapes?.find((shape) => shape.id === shapeId);
+
+    if (!source) {
+      return;
+    }
+
+    const clone: EditorShape = {
+      ...source,
+      id: makeShapeId(),
+      x: source.x + 24,
+      y: source.y + 24,
+      zIndex: (Number(source.zIndex) || 0) + 1,
+    };
+
+    updateQuestionShapes(questionId, (shapes) => [
+      ...shapes,
+      clone,
+    ]);
+
+    setSelectedShape({
+      questionId,
+      shapeId: clone.id,
+    });
+  }
+
+  function changeShapeLayer(
+    questionId: string,
+    shapeId: string,
+    direction: "front" | "back"
+  ) {
+    const question =
+      questions.find((item) => item.id === questionId);
+
+    const shapes = question?.shapes || [];
+
+    if (shapes.length === 0) {
+      return;
+    }
+
+    const values =
+      shapes.map((shape) => Number(shape.zIndex) || 0);
+
+    updateShape(
+      questionId,
+      shapeId,
+      {
+        zIndex:
+          direction === "front"
+            ? Math.max(...values) + 1
+            : Math.min(...values) - 1,
+      }
+    );
+  }
+
+  function startShapePointer(
+    event: React.PointerEvent,
+    questionId: string,
+    shape: EditorShape,
+    mode: "move" | "resize",
+    handle?: "nw" | "ne" | "sw" | "se"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setSelectedShape({
+      questionId,
+      shapeId: shape.id,
+    });
+    setActiveCanvasQuestionId(questionId);
+
+    pointerActionRef.current = {
+      mode,
+      questionId,
+      shapeId: shape.id,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: shape.x,
+      startY: shape.y,
+      startWidth: shape.width,
+      startHeight: shape.height,
+      handle,
+    };
+  }
+
+  useEffect(() => {
+    function onPointerMove(event: PointerEvent) {
+      const action = pointerActionRef.current;
+
+      if (!action) {
+        return;
+      }
+
+      const dx = event.clientX - action.startClientX;
+      const dy = event.clientY - action.startClientY;
+
+      if (action.mode === "move") {
+        updateShape(
+          action.questionId,
+          action.shapeId,
+          {
+            x: Math.max(0, action.startX + dx),
+            y: Math.max(0, action.startY + dy),
+          }
+        );
+        return;
+      }
+
+      const minSize = 40;
+      let x = action.startX;
+      let y = action.startY;
+      let width = action.startWidth;
+      let height = action.startHeight;
+
+      if (action.handle?.includes("e")) {
+        width = Math.max(minSize, action.startWidth + dx);
+      }
+
+      if (action.handle?.includes("s")) {
+        height = Math.max(minSize, action.startHeight + dy);
+      }
+
+      if (action.handle?.includes("w")) {
+        const nextWidth =
+          Math.max(minSize, action.startWidth - dx);
+
+        x =
+          action.startX +
+          (action.startWidth - nextWidth);
+
+        width = nextWidth;
+      }
+
+      if (action.handle?.includes("n")) {
+        const nextHeight =
+          Math.max(minSize, action.startHeight - dy);
+
+        y =
+          action.startY +
+          (action.startHeight - nextHeight);
+
+        height = nextHeight;
+      }
+
+      updateShape(
+        action.questionId,
+        action.shapeId,
+        {
+          x: Math.max(0, x),
+          y: Math.max(0, y),
+          width,
+          height,
+        }
+      );
+    }
+
+    function onPointerUp() {
+      pointerActionRef.current = null;
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [questions]);
+
+  useEffect(() => {
+    function isEditableTarget(target: EventTarget | null) {
+      const element = target as HTMLElement | null;
+
+      return Boolean(
+        element &&
+          (
+            element.tagName === "INPUT" ||
+            element.tagName === "TEXTAREA" ||
+            element.tagName === "SELECT" ||
+            element.isContentEditable
+          )
+      );
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const ctrl =
+        event.ctrlKey ||
+        event.metaKey;
+
+      if (
+        ctrl &&
+        event.key.toLowerCase() === "c" &&
+        selectedShape
+      ) {
+        const question =
+          questions.find(
+            (item) => item.id === selectedShape.questionId
+          );
+
+        const shape =
+          question?.shapes?.find(
+            (item) => item.id === selectedShape.shapeId
+          );
+
+        if (shape) {
+          copiedShapeRef.current = {
+            ...shape,
+          };
+          event.preventDefault();
+        }
+
+        return;
+      }
+
+      if (
+        ctrl &&
+        event.key.toLowerCase() === "v" &&
+        copiedShapeRef.current &&
+        activeCanvasQuestionId
+      ) {
+        const source =
+          copiedShapeRef.current;
+
+        const clone: EditorShape = {
+          ...source,
+          id: makeShapeId(),
+          x: source.x + 28,
+          y: source.y + 28,
+          zIndex: (Number(source.zIndex) || 0) + 1,
+        };
+
+        updateQuestionShapes(
+          activeCanvasQuestionId,
+          (shapes) => [
+            ...shapes,
+            clone,
+          ]
+        );
+
+        setSelectedShape({
+          questionId: activeCanvasQuestionId,
+          shapeId: clone.id,
+        });
+
+        event.preventDefault();
+        return;
+      }
+
+      if (
+        (event.key === "Delete" ||
+          event.key === "Backspace") &&
+        selectedShape
+      ) {
+        removeShape(
+          selectedShape.questionId,
+          selectedShape.shapeId
+        );
+        event.preventDefault();
+      }
+    }
+
+    function onPaste(event: ClipboardEvent) {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const questionId =
+        activeCanvasQuestionId ||
+        selectedShape?.questionId;
+
+      if (!questionId) {
+        return;
+      }
+
+      const imageItem =
+        Array.from(event.clipboardData?.items || [])
+          .find((item) =>
+            item.type.startsWith("image/")
+          );
+
+      const file =
+        imageItem?.getAsFile();
+
+      if (!file) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const imageSrc =
+          typeof reader.result === "string"
+            ? reader.result
+            : "";
+
+        if (imageSrc) {
+          addImageDataUrl(
+            questionId,
+            imageSrc
+          );
+        }
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("paste", onPaste);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, [
+    questions,
+    selectedShape,
+    activeCanvasQuestionId,
+  ]);
+
+  function renderShapeEditor(question: ImportedQuestion) {
+    const shapes = question.shapes || [];
+
+    const selected =
+      selectedShape?.questionId === question.id
+        ? shapes.find(
+            (shape) =>
+              shape.id === selectedShape.shapeId
+          )
+        : undefined;
+
+    return (
+      <div className="visualEditor">
+        <div className="visualToolbar">
+          <strong>Rasm / shakl editori</strong>
+
+          <div className="visualToolbarButtons">
+            <label className="visualTool imageVisualTool">
+              Rasm
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  changeQuestionImage(
+                    question.id,
+                    event.target.files?.[0] ?? null
+                  );
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+
+            <button
+              type="button"
+              className="visualTool"
+              onClick={() =>
+                addShape(question.id, "text")
+              }
+            >
+              Matn
+            </button>
+
+            <button
+              type="button"
+              className="visualTool"
+              onClick={() =>
+                addShape(question.id, "rectangle")
+              }
+            >
+              To‘rtburchak
+            </button>
+
+            <button
+              type="button"
+              className="visualTool"
+              onClick={() =>
+                addShape(question.id, "roundedRectangle")
+              }
+            >
+              Yumaloq
+            </button>
+
+            <button
+              type="button"
+              className="visualTool"
+              onClick={() =>
+                addShape(question.id, "circle")
+              }
+            >
+              Doira
+            </button>
+
+            <button
+              type="button"
+              className="visualTool"
+              onClick={() =>
+                addShape(question.id, "ellipse")
+              }
+            >
+              Oval
+            </button>
+          </div>
+
+          <span className="clipboardHint">
+            Rasmni tanlang: Ctrl+C / Ctrl+V · Clipboard rasmini Ctrl+V · Delete
+          </span>
+        </div>
+
+        <div
+          className="shapeCanvasScroll"
+          onPointerDown={() => {
+            setActiveCanvasQuestionId(question.id);
+            setSelectedShape(null);
+          }}
+        >
+          <div
+            className={
+              activeCanvasQuestionId === question.id
+                ? "shapeCanvas activeCanvas"
+                : "shapeCanvas"
+            }
+          >
+            {shapes.length === 0 && (
+              <div className="emptyCanvas">
+                PDFdagi rasm shu yerga tushadi yoki “Rasm” tugmasi / Ctrl+V orqali rasm qo‘shing.
+              </div>
+            )}
+
+            {shapes.map((shape) => {
+              const isSelected =
+                selectedShape?.questionId === question.id &&
+                selectedShape?.shapeId === shape.id;
+
+              const style: React.CSSProperties = {
+                left: shape.x,
+                top: shape.y,
+                width: shape.width,
+                height: shape.height,
+                zIndex: shape.zIndex ?? 1,
+                opacity: shape.opacity ?? 1,
+                borderWidth:
+                  shape.type === "image"
+                    ? shape.borderWidth ?? 0
+                    : shape.borderWidth ?? 2,
+                borderColor:
+                  shape.borderColor ?? "#2f5975",
+                borderStyle:
+                  shape.type === "text"
+                    ? "dashed"
+                    : "solid",
+                borderRadius:
+                  shape.type === "circle" ||
+                  shape.type === "ellipse"
+                    ? "999px"
+                    : `${shape.borderRadius ?? 4}px`,
+                background:
+                  shape.type === "text"
+                    ? "transparent"
+                    : shape.type === "image"
+                    ? "transparent"
+                    : shape.backgroundColor ?? "#8fc9ef",
+                color: shape.textColor ?? "#111111",
+              };
+
+              return (
+                <div
+                  key={shape.id}
+                  className={
+                    isSelected
+                      ? "canvasShape selectedCanvasShape"
+                      : "canvasShape"
+                  }
+                  style={style}
+                  onPointerDown={(event) =>
+                    startShapePointer(
+                      event,
+                      question.id,
+                      shape,
+                      "move"
+                    )
+                  }
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+
+                    if (shape.type === "text") {
+                      const next = window.prompt(
+                        "Matn:",
+                        shape.text || ""
+                      );
+
+                      if (next !== null) {
+                        updateShape(
+                          question.id,
+                          shape.id,
+                          {
+                            text: next,
+                          }
+                        );
+                      }
+                    }
+                  }}
+                >
+                  {shape.type === "image" &&
+                  shape.imageSrc ? (
+                    <img
+                      src={shape.imageSrc}
+                      alt="Savol rasmi"
+                      draggable={false}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "block",
+                        objectFit:
+                          shape.objectFit ?? "contain",
+                        borderRadius: "inherit",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className="shapeText"
+                      style={{
+                        fontSize: `${shape.fontSize ?? 22}px`,
+                      }}
+                    >
+                      {shape.text || ""}
+                    </span>
+                  )}
+
+                  {isSelected &&
+                    (
+                      ["nw", "ne", "sw", "se"] as const
+                    ).map((handle) => (
+                      <span
+                        key={handle}
+                        className={`resizeHandle handle-${handle}`}
+                        onPointerDown={(event) =>
+                          startShapePointer(
+                            event,
+                            question.id,
+                            shape,
+                            "resize",
+                            handle
+                          )
+                        }
+                      />
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {selected && (
+          <div className="selectedShapePanel">
+            <strong>
+              Tanlangan: {selected.type}
+            </strong>
+
+            {selected.type === "text" && (
+              <input
+                value={selected.text || ""}
+                onChange={(event) =>
+                  updateShape(
+                    question.id,
+                    selected.id,
+                    {
+                      text: event.target.value,
+                    }
+                  )
+                }
+                placeholder="Shakl matni"
+              />
+            )}
+
+            <label>
+              W
+              <input
+                type="number"
+                min={40}
+                value={Math.round(selected.width)}
+                onChange={(event) =>
+                  updateShape(
+                    question.id,
+                    selected.id,
+                    {
+                      width: Math.max(
+                        40,
+                        Number(event.target.value) || 40
+                      ),
+                    }
+                  )
+                }
+              />
+            </label>
+
+            <label>
+              H
+              <input
+                type="number"
+                min={40}
+                value={Math.round(selected.height)}
+                onChange={(event) =>
+                  updateShape(
+                    question.id,
+                    selected.id,
+                    {
+                      height: Math.max(
+                        40,
+                        Number(event.target.value) || 40
+                      ),
+                    }
+                  )
+                }
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={() =>
+                duplicateShape(
+                  question.id,
+                  selected.id
+                )
+              }
+            >
+              Nusxa
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                changeShapeLayer(
+                  question.id,
+                  selected.id,
+                  "front"
+                )
+              }
+            >
+              Oldinga
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                changeShapeLayer(
+                  question.id,
+                  selected.id,
+                  "back"
+                )
+              }
+            >
+              Orqaga
+            </button>
+
+            <button
+              type="button"
+              className="dangerShapeButton"
+              onClick={() =>
+                removeShape(
+                  question.id,
+                  selected.id
+                )
+              }
+            >
+              O‘chirish
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -1116,31 +2046,26 @@ export default function ImportPdfTestPage() {
                 schema'dagi image shape sifatida saqlaymiz.
               */
               shapes:
-                question.imageSrc
-                  ? [
-                      {
-                        id:
-                          `img-${question.id}`,
-                        type:
-                          "image",
-                        x: 100,
-                        y: 20,
-                        width:
-                          620,
-                        height:
-                          300,
-                        imageSrc:
-                          question.imageSrc,
-                        objectFit:
-                          "contain",
-                        borderWidth:
-                          0,
-                        borderRadius:
-                          6,
-                        zIndex:
-                          1,
-                      },
-                    ]
+                Array.isArray(question.shapes)
+                  ? question.shapes.map((shape) => ({
+                      id: shape.id,
+                      type: shape.type,
+                      x: Math.round(shape.x),
+                      y: Math.round(shape.y),
+                      width: Math.max(1, Math.round(shape.width)),
+                      height: Math.max(1, Math.round(shape.height)),
+                      text: shape.text,
+                      imageSrc: shape.imageSrc,
+                      backgroundColor: shape.backgroundColor,
+                      borderColor: shape.borderColor,
+                      textColor: shape.textColor,
+                      fontSize: shape.fontSize,
+                      borderWidth: shape.borderWidth,
+                      borderRadius: shape.borderRadius,
+                      opacity: shape.opacity,
+                      objectFit: shape.objectFit,
+                      zIndex: shape.zIndex,
+                    }))
                   : [],
 
               points: 1,
@@ -1655,49 +2580,7 @@ export default function ImportPdfTestPage() {
                     />
                   </label>
 
-                  {question.imageSrc && (
-                    <div className="questionImagePreview">
-                      <div className="imageLabel">
-                        PDFdan ajratilgan rasm / diagramma
-                      </div>
-
-                      <img
-                        src={
-                          question.imageSrc
-                        }
-                        alt={`${question.number}-savol rasmi`}
-                      />
-
-                      <div className="imageActions">
-                        <label className="imageReplaceButton">
-                          Rasmni almashtirish
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(event) => {
-                              changeQuestionImage(
-                                question.id,
-                                event.target.files?.[0] ?? null
-                              );
-                              event.currentTarget.value = "";
-                            }}
-                          />
-                        </label>
-
-                        <button
-                          type="button"
-                          className="imageRemoveButton"
-                          onClick={() =>
-                            removeQuestionImage(
-                              question.id
-                            )
-                          }
-                        >
-                          Rasmni olib tashlash
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  {renderShapeEditor(question)}
 
                   <div className="optionsList">
                     {question.options.map(
@@ -2290,6 +3173,203 @@ export default function ImportPdfTestPage() {
           background: #ffdede;
         }
 
+        .visualEditor {
+          margin: 18px 0 22px;
+          overflow: hidden;
+          border: 2px solid #365b70;
+          border-radius: 14px;
+          background: #f8fbfc;
+          box-shadow: 0 3px 0 rgba(39,55,64,.18);
+        }
+
+        .visualToolbar {
+          padding: 11px 12px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+          border-bottom: 1px solid #9eabb2;
+          background: linear-gradient(#f8f8f8,#dedede);
+        }
+
+        .visualToolbar > strong {
+          color: #073b68;
+          margin-right: 4px;
+        }
+
+        .visualToolbarButtons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+
+        .visualTool {
+          position: relative;
+          min-height: 35px;
+          padding: 6px 10px;
+          border: 1px solid #68747b;
+          border-radius: 7px;
+          background: linear-gradient(#fff,#d7d7d7);
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .imageVisualTool {
+          color: #125a32;
+          border-color: #277b49;
+          background: linear-gradient(#e9faee,#aee0bd);
+        }
+
+        .visualTool input {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        .clipboardHint {
+          margin-left: auto;
+          color: #5c686f;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .shapeCanvasScroll {
+          width: 100%;
+          overflow: auto;
+          padding: 12px;
+          background:
+            linear-gradient(90deg, rgba(50,70,80,.05) 1px, transparent 1px),
+            linear-gradient(rgba(50,70,80,.05) 1px, transparent 1px),
+            #eef2f4;
+          background-size: 20px 20px;
+        }
+
+        .shapeCanvas {
+          position: relative;
+          width: 900px;
+          height: 500px;
+          margin: 0 auto;
+          overflow: hidden;
+          border: 2px solid #8d999f;
+          border-radius: 10px;
+          background: #fff;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,.9);
+          touch-action: none;
+          user-select: none;
+        }
+
+        .activeCanvas {
+          outline: 3px solid rgba(22,143,201,.25);
+          outline-offset: 2px;
+        }
+
+        .emptyCanvas {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 30px;
+          color: #7b878e;
+          font-size: 15px;
+          text-align: center;
+          pointer-events: none;
+        }
+
+        .canvasShape {
+          position: absolute;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          cursor: move;
+          touch-action: none;
+        }
+
+        .selectedCanvasShape {
+          outline: 2px solid #168fc9;
+          outline-offset: 2px;
+        }
+
+        .shapeText {
+          width: 100%;
+          padding: 8px;
+          text-align: center;
+          overflow: hidden;
+          overflow-wrap: anywhere;
+          pointer-events: none;
+        }
+
+        .resizeHandle {
+          position: absolute;
+          width: 13px;
+          height: 13px;
+          border: 2px solid #07517e;
+          background: #fff;
+          border-radius: 2px;
+          z-index: 999;
+        }
+
+        .handle-nw { left: -8px; top: -8px; cursor: nwse-resize; }
+        .handle-ne { right: -8px; top: -8px; cursor: nesw-resize; }
+        .handle-sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
+        .handle-se { right: -8px; bottom: -8px; cursor: nwse-resize; }
+
+        .selectedShapePanel {
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+          border-top: 1px solid #9eabb2;
+          background: #f7f9fa;
+        }
+
+        .selectedShapePanel > strong {
+          color: #073b68;
+          margin-right: 4px;
+        }
+
+        .selectedShapePanel label {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-weight: 700;
+        }
+
+        .selectedShapePanel input {
+          width: 100px;
+          min-height: 34px;
+          padding: 5px 7px;
+          border: 1px solid #8c989e;
+          border-radius: 6px;
+          font-family: inherit;
+        }
+
+        .selectedShapePanel > input {
+          width: min(260px, 100%);
+        }
+
+        .selectedShapePanel button {
+          min-height: 34px;
+          padding: 5px 10px;
+          border: 1px solid #68747b;
+          border-radius: 6px;
+          background: linear-gradient(#fff,#d9d9d9);
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .selectedShapePanel .dangerShapeButton {
+          color: #7b1515;
+          border-color: #9b2828;
+          background: #ffdede;
+        }
+
         .optionsList {
           margin-top: 15px;
           display: flex;
@@ -2438,6 +3518,42 @@ export default function ImportPdfTestPage() {
 
           .questionImagePreview img {
             max-height: 420px;
+          }
+
+          .visualToolbar {
+            align-items: stretch;
+          }
+
+          .visualToolbarButtons {
+            width: 100%;
+          }
+
+          .visualTool {
+            flex: 1 1 auto;
+            text-align: center;
+          }
+
+          .clipboardHint {
+            width: 100%;
+            margin-left: 0;
+          }
+
+          .shapeCanvasScroll {
+            padding: 7px;
+          }
+
+          .shapeCanvas {
+            width: 760px;
+            height: 460px;
+          }
+
+          .selectedShapePanel {
+            align-items: stretch;
+          }
+
+          .selectedShapePanel button,
+          .selectedShapePanel label {
+            flex: 1 1 auto;
           }
 
           .correctBadge {
