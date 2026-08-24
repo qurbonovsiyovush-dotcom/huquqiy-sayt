@@ -653,6 +653,22 @@ export async function POST(
       "pdfjs-dist/legacy/build/pdf.mjs"
     );
 
+    // Vercel/Node.js da PDF.js fake worker avtomatik topilmaydi.
+    // Worker faylini node_modules ichidan file:// URL orqali aniq ko‘rsatamiz.
+    const { pathToFileURL } = await import("node:url");
+    const path = await import("node:path");
+
+    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(
+      path.join(
+        process.cwd(),
+        "node_modules",
+        "pdfjs-dist",
+        "legacy",
+        "build",
+        "pdf.worker.mjs"
+      )
+    ).href;
+
     const document = await pdfjs
       .getDocument({
         data: bytes,
