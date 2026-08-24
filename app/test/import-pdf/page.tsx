@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ImportedOption = {
@@ -18,6 +18,610 @@ type ImportedQuestion = {
   imageSrc?: string;
   warning?: string;
 };
+
+
+type RichTextEditorProps = {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  minHeight?: number;
+  compact?: boolean;
+};
+
+function editorValueToHtml(value: string) {
+  const source = String(value || "");
+
+  if (/<[a-z][\s\S]*>/i.test(source)) {
+    return source;
+  }
+
+  return source
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+function richTextHasContent(value: string) {
+  if (typeof window === "undefined") {
+    return String(value || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .trim().length > 0;
+  }
+
+  const element = document.createElement("div");
+  element.innerHTML = String(value || "");
+
+  return (element.textContent || "")
+    .replace(/\u00a0/g, " ")
+    .trim().length > 0;
+}
+
+function sanitizeRichHtml(value: string) {
+  if (typeof window === "undefined") {
+    return value;
+  }
+
+  const parser = new DOMParser();
+  const documentValue = parser.parseFromString(
+    `<div>${value}</div>`,
+    "text/html"
+  );
+
+  documentValue
+    .querySelectorAll(
+      "script,style,iframe,object,embed,form,input,button,textarea,select,link,meta"
+    )
+    .forEach((node) => node.remove());
+
+  documentValue.querySelectorAll("*").forEach((node) => {
+    [...node.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim().toLowerCase();
+
+      if (name.startsWith("on")) {
+        node.removeAttribute(attribute.name);
+      }
+
+      if (
+        (name === "href" || name === "src") &&
+        value.startsWith("javascript:")
+      ) {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return documentValue.body.firstElementChild?.innerHTML || "";
+}
+
+function RichTextEditor({
+  value,
+  onChange,
+  placeholder = "Matn kiriting...",
+  minHeight = 160,
+  compact = false,
+}: RichTextEditorProps) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    const nextHtml = editorValueToHtml(value);
+
+    if (
+      document.activeElement !== editor &&
+      editor.innerHTML !== nextHtml
+    ) {
+      editor.innerHTML = nextHtml;
+    }
+  }, [value]);
+
+  function emitChange() {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    onChange(editor.innerHTML);
+  }
+
+  function saveSelection() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+
+    if (
+      !editor ||
+      !selection ||
+      selection.rangeCount === 0
+    ) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+
+    if (editor.contains(range.commonAncestorContainer)) {
+      savedRangeRef.current = range.cloneRange();
+    }
+  }
+
+  function restoreSelection() {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    editor.focus();
+
+    const range = savedRangeRef.current;
+    const selection = window.getSelection();
+
+    if (!range || !selection) {
+      return;
+    }
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function command(
+    name: string,
+    commandValue?: string
+  ) {
+    restoreSelection();
+    document.execCommand(
+      name,
+      false,
+      commandValue
+    );
+    saveSelection();
+    emitChange();
+  }
+
+  function toolMouseDown(
+    event: React.MouseEvent<HTMLElement>
+  ) {
+    event.preventDefault();
+    saveSelection();
+  }
+
+  return (
+    <div className={compact ? "richEditor richEditorCompact" : "richEditor"}>
+      <div className="richToolbar">
+        <div className="toolbarGroup">
+          <button
+            type="button"
+            title="Bekor qilish (Undo)"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("undo")}
+          >
+            ↶
+          </button>
+
+          <button
+            type="button"
+            title="Qaytarish (Redo)"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("redo")}
+          >
+            ↷
+          </button>
+        </div>
+
+        <div className="toolbarGroup toolbarSelectGroup">
+          <select
+            title="Shrift"
+            defaultValue="Bell MT"
+            onMouseDown={saveSelection}
+            onChange={(event) =>
+              command(
+                "fontName",
+                event.target.value
+              )
+            }
+          >
+            <option value="Bell MT">Bell MT</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Tahoma">Tahoma</option>
+          </select>
+
+          <select
+            title="Matn o‘lchami"
+            defaultValue="4"
+            onMouseDown={saveSelection}
+            onChange={(event) =>
+              command(
+                "fontSize",
+                event.target.value
+              )
+            }
+          >
+            <option value="2">13</option>
+            <option value="3">16</option>
+            <option value="4">18</option>
+            <option value="5">24</option>
+            <option value="6">32</option>
+            <option value="7">48</option>
+          </select>
+        </div>
+
+        <div className="toolbarGroup">
+          <button
+            type="button"
+            className="formatBold"
+            title="Qalin"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("bold")}
+          >
+            B
+          </button>
+
+          <button
+            type="button"
+            className="formatItalic"
+            title="Kursiv"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("italic")}
+          >
+            I
+          </button>
+
+          <button
+            type="button"
+            className="formatUnderline"
+            title="Tagiga chizish"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("underline")}
+          >
+            U
+          </button>
+
+          <button
+            type="button"
+            className="formatStrike"
+            title="Ustidan chizish"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("strikeThrough")}
+          >
+            abc
+          </button>
+        </div>
+
+        <div className="toolbarGroup colorTools">
+          <label title="Matn rangi">
+            <span>A</span>
+            <input
+              type="color"
+              defaultValue="#111111"
+              onMouseDown={saveSelection}
+              onChange={(event) =>
+                command(
+                  "foreColor",
+                  event.target.value
+                )
+              }
+            />
+          </label>
+
+          <label title="Marker / fon rangi">
+            <span>▰</span>
+            <input
+              type="color"
+              defaultValue="#fff176"
+              onMouseDown={saveSelection}
+              onChange={(event) =>
+                command(
+                  "hiliteColor",
+                  event.target.value
+                )
+              }
+            />
+          </label>
+        </div>
+
+        <div className="toolbarGroup">
+          <button
+            type="button"
+            title="Chapga tekislash"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("justifyLeft")}
+          >
+            ≡←
+          </button>
+
+          <button
+            type="button"
+            title="Markazga tekislash"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("justifyCenter")}
+          >
+            ≡
+          </button>
+
+          <button
+            type="button"
+            title="O‘ngga tekislash"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("justifyRight")}
+          >
+            →≡
+          </button>
+
+          <button
+            type="button"
+            title="Ikki chetidan tekislash"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("justifyFull")}
+          >
+            ☰
+          </button>
+        </div>
+
+        <div className="toolbarGroup">
+          <button
+            type="button"
+            title="Raqamli ro‘yxat"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("insertOrderedList")}
+          >
+            1.
+          </button>
+
+          <button
+            type="button"
+            title="Belgili ro‘yxat"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("insertUnorderedList")}
+          >
+            •
+          </button>
+
+          <button
+            type="button"
+            title="Chapga surish"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("outdent")}
+          >
+            ⇤
+          </button>
+
+          <button
+            type="button"
+            title="Ichkariga surish"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("indent")}
+          >
+            ⇥
+          </button>
+        </div>
+
+        <div className="toolbarGroup">
+          <button
+            type="button"
+            title="Formatlashni tozalash"
+            onMouseDown={toolMouseDown}
+            onClick={() => command("removeFormat")}
+          >
+            Tx
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={editorRef}
+        className="richEditorArea"
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        style={{ minHeight }}
+        onInput={() => {
+          saveSelection();
+          emitChange();
+        }}
+        onFocus={saveSelection}
+        onMouseUp={saveSelection}
+        onKeyUp={saveSelection}
+        onBlur={emitChange}
+        dangerouslySetInnerHTML={{
+          __html: editorValueToHtml(value),
+        }}
+      />
+
+      <style jsx>{`
+        .richEditor {
+          overflow: hidden;
+          border: 2px solid #66737a;
+          border-radius: 13px;
+          background: #fff;
+          box-shadow:
+            inset 0 2px 3px rgba(0,0,0,.07),
+            0 2px 0 rgba(50,60,66,.22);
+        }
+
+        .richToolbar {
+          padding: 8px;
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 7px;
+          border-bottom: 1px solid #9aa5ab;
+          background: linear-gradient(#f8f8f8,#dedede);
+        }
+
+        .toolbarGroup {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding-right: 7px;
+          border-right: 1px solid #aab1b5;
+        }
+
+        .toolbarGroup:last-child {
+          border-right: 0;
+        }
+
+        .richToolbar button,
+        .richToolbar select,
+        .colorTools label {
+          min-height: 36px;
+          border: 1px solid #7f898e;
+          border-radius: 6px;
+          background: linear-gradient(#fff,#dedede);
+          font-family: "Bell MT", "Times New Roman", serif;
+        }
+
+        .richToolbar button {
+          min-width: 36px;
+          padding: 4px 9px;
+          cursor: pointer;
+          font-size: 15px;
+          font-weight: 700;
+        }
+
+        .richToolbar button:hover {
+          border-color: #168fc9;
+          background: #e4f6ff;
+        }
+
+        .richToolbar select {
+          padding: 4px 8px;
+          cursor: pointer;
+        }
+
+        .toolbarSelectGroup select:first-child {
+          width: 150px;
+        }
+
+        .toolbarSelectGroup select:last-child {
+          width: 68px;
+        }
+
+        .formatBold {
+          font-weight: 900 !important;
+        }
+
+        .formatItalic {
+          font-style: italic;
+        }
+
+        .formatUnderline {
+          text-decoration: underline;
+        }
+
+        .formatStrike {
+          text-decoration: line-through;
+          font-size: 12px !important;
+        }
+
+        .colorTools label {
+          position: relative;
+          width: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-weight: 900;
+        }
+
+        .colorTools input {
+          position: absolute;
+          inset: auto 4px 2px;
+          width: 30px;
+          height: 5px;
+          padding: 0;
+          border: 0;
+          opacity: .85;
+          cursor: pointer;
+        }
+
+        .richEditorArea {
+          padding: 18px 20px;
+          outline: none;
+          overflow: auto;
+          color: #111;
+          background: #fff;
+          font-family: "Bell MT", "Times New Roman", serif;
+          font-size: 21px;
+          line-height: 1.65;
+          text-align: justify;
+          text-justify: inter-word;
+          white-space: normal;
+          overflow-wrap: anywhere;
+        }
+
+        .richEditorArea:empty::before {
+          content: attr(data-placeholder);
+          color: #8a9398;
+          pointer-events: none;
+        }
+
+        .richEditorArea :global(p) {
+          margin: 0 0 12px;
+        }
+
+        .richEditorArea :global(ol),
+        .richEditorArea :global(ul) {
+          margin: 8px 0;
+          padding-left: 30px;
+        }
+
+        .richEditorCompact .richToolbar {
+          padding: 6px;
+        }
+
+        .richEditorCompact .richEditorArea {
+          padding: 13px 15px;
+          font-size: 19px;
+          line-height: 1.5;
+        }
+
+        @media(max-width:700px) {
+          .richToolbar {
+            align-items: stretch;
+          }
+
+          .toolbarGroup {
+            padding-right: 4px;
+          }
+
+          .richToolbar button {
+            min-width: 33px;
+            min-height: 34px;
+            padding: 3px 7px;
+          }
+
+          .toolbarSelectGroup {
+            width: 100%;
+            border-right: 0;
+          }
+
+          .toolbarSelectGroup select:first-child {
+            flex: 1;
+            width: auto;
+          }
+
+          .richEditorArea,
+          .richEditorCompact .richEditorArea {
+            padding: 13px;
+            font-size: 17px;
+            line-height: 1.55;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default function ImportPdfTestPage() {
   const router = useRouter();
@@ -447,10 +1051,10 @@ export default function ImportPdfTestPage() {
             ).length;
 
           return (
-            !question.questionText.trim() ||
+            !richTextHasContent(question.questionText) ||
             question.options.some(
               (option) =>
-                !option.text.trim()
+                !richTextHasContent(option.text)
             ) ||
             correctCount !== 1
           );
@@ -493,7 +1097,7 @@ export default function ImportPdfTestPage() {
                 question.id,
 
               questionHtml:
-                question.questionText,
+                sanitizeRichHtml(question.questionText),
 
               options:
                 question.options.map(
@@ -501,7 +1105,7 @@ export default function ImportPdfTestPage() {
                     id:
                       option.id,
                     text:
-                      option.text,
+                      sanitizeRichHtml(option.text),
                     isCorrect:
                       option.isCorrect,
                   })
@@ -1038,20 +1642,16 @@ export default function ImportPdfTestPage() {
                       Savol matni
                     </span>
 
-                    <textarea
-                      value={
-                        question.questionText
-                      }
-                      onChange={(
-                        event
-                      ) =>
+                    <RichTextEditor
+                      value={question.questionText}
+                      onChange={(value) =>
                         changeQuestionText(
                           question.id,
-                          event
-                            .target
-                            .value
+                          value
                         )
                       }
+                      placeholder="Savol matnini shu yerda tahrirlang..."
+                      minHeight={170}
                     />
                   </label>
 
@@ -1135,21 +1735,18 @@ export default function ImportPdfTestPage() {
                             }
                           </strong>
 
-                          <textarea
-                            value={
-                              option.text
-                            }
-                            onChange={(
-                              event
-                            ) =>
+                          <RichTextEditor
+                            value={option.text}
+                            onChange={(value) =>
                               changeOptionText(
                                 question.id,
                                 option.id,
-                                event
-                                  .target
-                                  .value
+                                value
                               )
                             }
+                            placeholder={`${option.label} variant matni...`}
+                            minHeight={80}
+                            compact
                           />
 
                           {option.isCorrect && (
@@ -1702,7 +2299,7 @@ export default function ImportPdfTestPage() {
 
         .optionRow {
           display: grid;
-          grid-template-columns: 38px 34px 1fr auto;
+          grid-template-columns: 42px 34px minmax(0,1fr) auto;
           align-items: center;
           gap: 8px;
           padding: 9px;
