@@ -1366,108 +1366,313 @@ function getQuestionPdfCrop(
     return undefined;
   }
 
+  /*
+    =========================================================
+    DYNAMIC VISUAL CROP
+    =========================================================
+
+    Endi bir xil fixed razmer ishlatilmaydi.
+
+    Qoida:
+      1) Savol matnining OXIRIDAN keyin boshlanadi.
+      2) A/B/C/D variantining BOSHLANISHIDAN oldin tugaydi.
+      3) Shu oraliqdagi real PDF text obyektlari bo‘yicha chap/o‘ng
+         chegarani o‘zi topadi.
+      4) Sahifa/ustun chetidagi uzun vertikal chiziqlar cropga kirmaydi.
+
+    Ya'ni har bir jadval, Venn, moslashtirish uchun o‘z razmeri chiqadi.
+  */
+
+  const rawTopY =
+    promptEndLine.y -
+    Math.max(
+      6,
+      promptEndLine.height * 0.45
+    );
+
+  const rawBottomY =
+    firstOptionLine.y +
+    Math.max(
+      6,
+      firstOptionLine.height * 0.45
+    );
+
   if (
-    firstOptionLine.column !== promptEndLine.column &&
-    firstOptionLine.column !== "full" &&
-    promptEndLine.column !== "full"
+    rawTopY -
+      rawBottomY <
+    24
   ) {
     return undefined;
   }
 
   /*
-    PDF koordinatalari:
-      x -> chapdan o‘ngga
-      y -> pastdan yuqoriga
-
-    Biz brauzerga PNG bermaymiz.
-    Faqat original PDFning qaysi qismini kesish kerakligini qaytaramiz.
-    Browser PDF.js shu koordinatani asl PDFdan render qiladi.
+    Faqat savoldan keyin va variantdan oldin turgan textlarni olamiz.
+    Promptning o‘zi va A/B/C/D variantlari bu filtrga kirmaydi.
   */
+  const insideLines =
+    (pageInfo.lines || [])
+      .filter((line) => {
+        if (
+          line.pageNumber !==
+          promptEndLine.pageNumber
+        ) {
+          return false;
+        }
+
+        const lineTop =
+          line.y +
+          line.height *
+            0.75;
+
+        const lineBottom =
+          line.y -
+          line.height *
+            0.35;
+
+        return (
+          lineTop <
+            rawTopY &&
+          lineBottom >
+            rawBottomY
+        );
+      });
 
   /*
-    Cropni "toza" kesish:
-    - savol matnining oxirgi satridan yetarlicha PASTROQDAN boshlaymiz;
-    - A/B/C/D variantlar boshlanishidan yetarlicha YUQORIDA to‘xtaymiz.
-
-    PDF koordinatasida Y pastdan yuqoriga o‘sadi.
+    Agar text layer topilmasa ham eski prinsip bo‘yicha
+    vertikal crop qaytaramiz, lekin sahifa chetlarini olmaymiz.
   */
-  /*
-    FINAL CLEAN CROP:
-    yuqorida savol matnining qoldig‘i va pastda A/B/C/D variantlari
-    crop ichiga kirib qolmasligi uchun chegarani yana ichkariga suramiz.
-  */
-  const upperPdfY =
-    promptEndLine.y -
-    Math.max(
-      26,
-      promptEndLine.height * 2.15
-    );
+  if (
+    insideLines.length === 0
+  ) {
+    const fallbackX =
+      pageInfo.width * 0.08;
 
-  const lowerPdfY =
-    firstOptionLine.y +
-    Math.max(
-      28,
-      firstOptionLine.height * 2.25
-    );
+    const fallbackWidth =
+      pageInfo.width * 0.84;
 
-  const height =
-    upperPdfY -
-    lowerPdfY;
-
-  // Haqiqiy vizual joy bo‘lmasa crop yaratmaymiz.
-  if (height < 26) {
-    return undefined;
+    return {
+      pageNumber:
+        firstOptionLine.pageNumber,
+      x:
+        fallbackX,
+      y:
+        Math.max(
+          0,
+          rawBottomY
+        ),
+      width:
+        Math.min(
+          fallbackWidth,
+          pageInfo.width -
+            fallbackX
+        ),
+      height:
+        Math.max(
+          30,
+          rawTopY -
+            rawBottomY
+        ),
+    };
   }
 
-  let x1 = 8;
-  let x2 = pageInfo.width - 8;
+  /*
+    REAL CONTENT BOUNDING BOX.
 
-  const cropColumn =
-    promptEndLine.column !== "full"
-      ? promptEndLine.column
-      : firstOptionLine.column;
+    Textlarning o‘zidan min/max X/Y olamiz.
+    Bu ayniqsa:
+      - jadval
+      - moslashtirish
+      - Eyler-Venn
+    uchun yaxshi ishlaydi.
+  */
+  const minTextX =
+    Math.min(
+      ...insideLines.map(
+        (line) => line.x
+      )
+    );
 
-  if (cropColumn === "left") {
-    x1 = 4;
-    x2 = pageInfo.width / 2 - 2;
-  } else if (cropColumn === "right") {
-    x1 = pageInfo.width / 2 + 2;
-    x2 = pageInfo.width - 4;
-  }
+  const maxTextX =
+    Math.max(
+      ...insideLines.map(
+        (line) =>
+          line.x +
+          line.width
+      )
+    );
+
+  const highestTextTop =
+    Math.max(
+      ...insideLines.map(
+        (line) =>
+          line.y +
+          line.height *
+            1.0
+      )
+    );
+
+  const lowestTextBottom =
+    Math.min(
+      ...insideLines.map(
+        (line) =>
+          line.y -
+          line.height *
+            0.45
+      )
+    );
 
   /*
-    Vizualning cheti kesilib qolmasligi uchun ozgina padding.
+    Diagramma/table chiziqlari matndan biroz tashqarida bo‘lishi mumkin,
+    shuning uchun dinamik padding.
   */
+  const averageHeight =
+    insideLines.reduce(
+      (sum, line) =>
+        sum + line.height,
+      0
+    ) /
+    Math.max(
+      1,
+      insideLines.length
+    );
+
+  const horizontalPadding =
+    Math.max(
+      16,
+      Math.min(
+        34,
+        averageHeight *
+          2.2
+      )
+    );
+
+  const verticalPadding =
+    Math.max(
+      8,
+      Math.min(
+        18,
+        averageHeight *
+          1.15
+      )
+    );
+
+  let x1 =
+    minTextX -
+    horizontalPadding;
+
+  let x2 =
+    maxTextX +
+    horizontalPadding;
+
   /*
-    Avvalgi 5 birlik vertikal padding savol/variant matnini
-    yana crop ichiga tortib kiritar edi.
-    Endi faqat 1.5 birlik xavfsizlik qoldiramiz.
+    Muhim:
+    PDF sahifasining chetidagi uzun separator chiziqlarni
+    umuman cropga kiritmaymiz.
+
+    Chap/o‘ngdan kamida 4% ichkarida bo‘lamiz.
   */
-  const horizontalPadding = 4;
-  const verticalPadding = 0.5;
+  const safePageLeft =
+    pageInfo.width *
+    0.04;
 
-  x1 = Math.max(0, x1 - horizontalPadding);
-  x2 = Math.min(
-    pageInfo.width,
-    x2 + horizontalPadding
-  );
+  const safePageRight =
+    pageInfo.width *
+    0.96;
 
-  const y = Math.max(
-    0,
-    lowerPdfY - verticalPadding
-  );
+  x1 =
+    Math.max(
+      safePageLeft,
+      x1
+    );
 
-  const top = Math.min(
-    pageInfo.height,
-    upperPdfY + verticalPadding
-  );
+  x2 =
+    Math.min(
+      safePageRight,
+      x2
+    );
 
-  const finalHeight = top - y;
-  const width = x2 - x1;
+  /*
+    Vizual text juda tor bo‘lsa (masalan Venn ichida I/II/III),
+    diagrammaning ellipslari kesilib qolmasligi uchun
+    savol joylashgan markaz atrofida minimal kenglik beramiz.
+
+    Bu FIXED crop emas — faqat minimum xavfsizlik kengligi.
+  */
+  const currentWidth =
+    x2 - x1;
+
+  const minimumVisualWidth =
+    Math.min(
+      pageInfo.width * 0.62,
+      430
+    );
 
   if (
-    width < 40 ||
-    finalHeight < 30
+    currentWidth <
+    minimumVisualWidth
+  ) {
+    const center =
+      (x1 + x2) / 2;
+
+    x1 =
+      center -
+      minimumVisualWidth / 2;
+
+    x2 =
+      center +
+      minimumVisualWidth / 2;
+
+    if (
+      x1 <
+      safePageLeft
+    ) {
+      const shift =
+        safePageLeft - x1;
+
+      x1 += shift;
+      x2 += shift;
+    }
+
+    if (
+      x2 >
+      safePageRight
+    ) {
+      const shift =
+        x2 -
+        safePageRight;
+
+      x1 -= shift;
+      x2 -= shift;
+    }
+  }
+
+  /*
+    Vertikal chegara ham real contentdan olinadi,
+    lekin hech qachon savol matniga yoki variantga chiqib ketmaydi.
+  */
+  const top =
+    Math.min(
+      rawTopY,
+      highestTextTop +
+        verticalPadding
+    );
+
+  const bottom =
+    Math.max(
+      rawBottomY,
+      lowestTextBottom -
+        verticalPadding
+    );
+
+  const width =
+    x2 - x1;
+
+  const height =
+    top - bottom;
+
+  if (
+    width < 80 ||
+    height < 30
   ) {
     return undefined;
   }
@@ -1475,10 +1680,34 @@ function getQuestionPdfCrop(
   return {
     pageNumber:
       firstOptionLine.pageNumber,
-    x: x1,
-    y,
-    width,
-    height: finalHeight,
+    x:
+      Math.max(
+        0,
+        x1
+      ),
+    y:
+      Math.max(
+        0,
+        bottom
+      ),
+    width:
+      Math.min(
+        width,
+        pageInfo.width -
+          Math.max(
+            0,
+            x1
+          )
+      ),
+    height:
+      Math.min(
+        height,
+        pageInfo.height -
+          Math.max(
+            0,
+            bottom
+          )
+      ),
   };
 }
 
