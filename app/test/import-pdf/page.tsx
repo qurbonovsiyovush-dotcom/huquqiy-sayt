@@ -26,6 +26,8 @@ export default function ImportPdfTestPage() {
   const [subject, setSubject] = useState("");
   const [duration, setDuration] = useState(60);
   const [description, setDescription] = useState("");
+  const [attemptLimitEnabled, setAttemptLimitEnabled] = useState(true);
+  const [attemptLimit, setAttemptLimit] = useState(1);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   const [analyzing, setAnalyzing] = useState(false);
@@ -258,21 +260,170 @@ export default function ImportPdfTestPage() {
     }
 
     setQuestions((current) =>
-      current
-        .filter(
+      renumberQuestions(
+        current.filter(
           (question) =>
             question.id !== id
         )
-        .map(
-          (
-            question,
-            index
-          ) => ({
-            ...question,
-            number:
-              index + 1,
-          })
+      )
+    );
+  }
+
+
+  function renumberQuestions(items: ImportedQuestion[]) {
+    return items.map((question, index) => ({
+      ...question,
+      number: index + 1,
+    }));
+  }
+
+  function createEmptyQuestion(): ImportedQuestion {
+    const questionId =
+      `manual-q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    return {
+      id: questionId,
+      number: questions.length + 1,
+      questionText: "",
+      options: (["A", "B", "C", "D"] as const).map((label) => ({
+        id: `${questionId}-${label.toLowerCase()}-${Math.random()
+          .toString(36)
+          .slice(2, 6)}`,
+        label,
+        text: "",
+        isCorrect: label === "A",
+      })),
+      warning: "Yangi savol. Matn va variantlarni to‘ldiring.",
+    };
+  }
+
+  function addQuestion() {
+    setQuestions((current) =>
+      renumberQuestions([
+        ...current,
+        {
+          ...createEmptyQuestion(),
+          number: current.length + 1,
+        },
+      ])
+    );
+
+    window.setTimeout(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 50);
+  }
+
+  function duplicateQuestion(id: string) {
+    setQuestions((current) => {
+      const index = current.findIndex((item) => item.id === id);
+
+      if (index < 0) {
+        return current;
+      }
+
+      const source = current[index];
+      const cloneId =
+        `copy-q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      const clone: ImportedQuestion = {
+        ...source,
+        id: cloneId,
+        options: source.options.map((option) => ({
+          ...option,
+          id: `${cloneId}-${option.label.toLowerCase()}-${Math.random()
+            .toString(36)
+            .slice(2, 6)}`,
+        })),
+        warning: source.warning,
+      };
+
+      const next = [...current];
+      next.splice(index + 1, 0, clone);
+
+      return renumberQuestions(next);
+    });
+  }
+
+  function moveQuestion(id: string, direction: -1 | 1) {
+    setQuestions((current) => {
+      const index = current.findIndex((item) => item.id === id);
+
+      if (index < 0) {
+        return current;
+      }
+
+      const target = index + direction;
+
+      if (target < 0 || target >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+
+      return renumberQuestions(next);
+    });
+  }
+
+  function changeQuestionImage(
+    questionId: string,
+    file: File | null
+  ) {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("Faqat rasm fayli tanlang.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Rasm hajmi 5 MB dan oshmasligi kerak.");
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const imageSrc =
+        typeof reader.result === "string"
+          ? reader.result
+          : "";
+
+      if (!imageSrc) {
+        return;
+      }
+
+      setQuestions((current) =>
+        current.map((question) =>
+          question.id === questionId
+            ? {
+                ...question,
+                imageSrc,
+              }
+            : question
         )
+      );
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  function removeQuestionImage(questionId: string) {
+    setQuestions((current) =>
+      current.map((question) =>
+        question.id === questionId
+          ? {
+              ...question,
+              imageSrc: undefined,
+            }
+          : question
+      )
     );
   }
 
@@ -330,6 +481,10 @@ export default function ImportPdfTestPage() {
         description:
           description.trim(),
         status: "draft",
+        attemptLimit:
+          attemptLimitEnabled
+            ? Math.max(1, Number(attemptLimit) || 1)
+            : null,
 
         questions:
           questions.map(
@@ -494,7 +649,7 @@ export default function ImportPdfTestPage() {
           </strong>
 
           <p>
-            Savol matni, A/B/C/D variantlar, sariq bilan belgilangan to‘g‘ri javob va savol ichidagi diagramma/rasmlar avtomatik ajratishga harakat qilinadi. Natijani albatta tekshirib chiqing.
+            Savol matni, A/B/C/D variantlar, + belgisi bilan ko‘rsatilgan to‘g‘ri javob va savol ichidagi diagramma/rasmlar avtomatik ajratiladi. Tahlildan keyin savolni tahrirlash, rasm qo‘shish, savol qo‘shish, nusxalash va tartibini o‘zgartirish mumkin.
           </p>
         </div>
 
@@ -568,6 +723,47 @@ export default function ImportPdfTestPage() {
             </div>
           </label>
 
+
+          <label className="attemptField">
+            <span>Urinishlar soni</span>
+
+            <div className="attemptBox">
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={attemptLimit}
+                disabled={!attemptLimitEnabled}
+                onChange={(event) =>
+                  setAttemptLimit(
+                    Math.max(
+                      1,
+                      Number(event.target.value) || 1
+                    )
+                  )
+                }
+              />
+
+              <button
+                type="button"
+                className={
+                  attemptLimitEnabled
+                    ? "attemptToggle active"
+                    : "attemptToggle"
+                }
+                onClick={() =>
+                  setAttemptLimitEnabled(
+                    (current) => !current
+                  )
+                }
+              >
+                {attemptLimitEnabled
+                  ? "Cheklangan"
+                  : "Cheksiz"}
+              </button>
+            </div>
+          </label>
+
           <label className="descriptionField">
             <span>Izoh</span>
 
@@ -621,7 +817,7 @@ export default function ImportPdfTestPage() {
           </h2>
 
           <p>
-            To‘g‘ri javoblarni sariq highlight bilan belgilang.
+            Eng ishonchli usul: to‘g‘ri variantga + belgisi qo‘ying.
           </p>
 
           <label className="fileButton">
@@ -709,18 +905,25 @@ export default function ImportPdfTestPage() {
               </span>
             </div>
 
-            <button
-              type="button"
-              className="saveDraftButton"
-              onClick={
-                saveDraft
-              }
-              disabled={
-                saving
-              }
-            >
-              QORALAMA SIFATIDA SAQLASH
-            </button>
+            <div className="previewActions">
+              <button
+                type="button"
+                className="addQuestionButton"
+                onClick={addQuestion}
+                disabled={saving}
+              >
+                + YANGI SAVOL
+              </button>
+
+              <button
+                type="button"
+                className="saveDraftButton"
+                onClick={saveDraft}
+                disabled={saving}
+              >
+                QORALAMA SIFATIDA SAQLASH
+              </button>
+            </div>
           </div>
 
           <div className="questionsList">
@@ -746,17 +949,80 @@ export default function ImportPdfTestPage() {
                       -savol
                     </div>
 
-                    <button
-                      type="button"
-                      className="removeButton"
-                      onClick={() =>
-                        removeQuestion(
-                          question.id
-                        )
-                      }
-                    >
-                      O‘chirish
-                    </button>
+                    <div className="questionTools">
+                      <button
+                        type="button"
+                        className="toolButton"
+                        onClick={() =>
+                          moveQuestion(
+                            question.id,
+                            -1
+                          )
+                        }
+                        disabled={
+                          question.number === 1
+                        }
+                        title="Yuqoriga ko‘chirish"
+                      >
+                        ↑
+                      </button>
+
+                      <button
+                        type="button"
+                        className="toolButton"
+                        onClick={() =>
+                          moveQuestion(
+                            question.id,
+                            1
+                          )
+                        }
+                        disabled={
+                          question.number === questions.length
+                        }
+                        title="Pastga ko‘chirish"
+                      >
+                        ↓
+                      </button>
+
+                      <button
+                        type="button"
+                        className="duplicateButton"
+                        onClick={() =>
+                          duplicateQuestion(
+                            question.id
+                          )
+                        }
+                      >
+                        Nusxalash
+                      </button>
+
+                      <label className="imageButton">
+                        Rasm qo‘shish
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            changeQuestionImage(
+                              question.id,
+                              event.target.files?.[0] ?? null
+                            );
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        className="removeButton"
+                        onClick={() =>
+                          removeQuestion(
+                            question.id
+                          )
+                        }
+                      >
+                        O‘chirish
+                      </button>
+                    </div>
                   </div>
 
                   {question.warning && (
@@ -801,6 +1067,35 @@ export default function ImportPdfTestPage() {
                         }
                         alt={`${question.number}-savol rasmi`}
                       />
+
+                      <div className="imageActions">
+                        <label className="imageReplaceButton">
+                          Rasmni almashtirish
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => {
+                              changeQuestionImage(
+                                question.id,
+                                event.target.files?.[0] ?? null
+                              );
+                              event.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          className="imageRemoveButton"
+                          onClick={() =>
+                            removeQuestionImage(
+                              question.id
+                            )
+                          }
+                        >
+                          Rasmni olib tashlash
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -874,13 +1169,18 @@ export default function ImportPdfTestPage() {
           <div className="bottomSave">
             <button
               type="button"
+              className="addQuestionButton"
+              onClick={addQuestion}
+              disabled={saving}
+            >
+              + YANGI SAVOL
+            </button>
+
+            <button
+              type="button"
               className="saveDraftButton"
-              onClick={
-                saveDraft
-              }
-              disabled={
-                saving
-              }
+              onClick={saveDraft}
+              disabled={saving}
             >
               QORALAMA SIFATIDA SAQLASH
             </button>
@@ -1010,7 +1310,7 @@ export default function ImportPdfTestPage() {
         .metaGrid {
           margin-top: 22px;
           display: grid;
-          grid-template-columns: repeat(3,minmax(0,1fr));
+          grid-template-columns: repeat(4,minmax(0,1fr));
           gap: 16px;
         }
 
@@ -1020,6 +1320,34 @@ export default function ImportPdfTestPage() {
           gap: 7px;
           color: #fff;
           font-weight: 700;
+        }
+
+        .attemptField {
+          min-width: 0;
+        }
+
+        .attemptBox {
+          display: grid;
+          grid-template-columns: minmax(0,1fr) auto;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .attemptToggle {
+          min-height: 47px;
+          padding: 0 12px;
+          border: 2px solid #606a70;
+          border-radius: 10px;
+          background: linear-gradient(#fafafa,#c5c5c5);
+          font-family: inherit;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .attemptToggle.active {
+          color: #07517e;
+          border-color: #174461;
+          background: linear-gradient(#d7f4ff,#7fc9ec);
         }
 
         .descriptionField {
@@ -1121,6 +1449,8 @@ export default function ImportPdfTestPage() {
           margin-top: 20px;
           display: flex;
           justify-content: center;
+          flex-wrap: wrap;
+          gap: 12px;
         }
 
         .analyzeButton,
@@ -1153,6 +1483,27 @@ export default function ImportPdfTestPage() {
           gap: 4px;
         }
 
+        .previewActions {
+          display: flex !important;
+          flex-direction: row !important;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 10px !important;
+        }
+
+        .addQuestionButton {
+          min-height: 56px;
+          padding: 11px 24px;
+          cursor: pointer;
+          color: #125a32;
+          font-family: inherit;
+          font-weight: 800;
+          border: 2px solid #277b49;
+          border-radius: 12px;
+          background: linear-gradient(#d8f5e1,#75cf95);
+          box-shadow: 0 5px 0 #277144;
+        }
+
         .questionsList {
           margin-top: 20px;
           display: flex;
@@ -1178,6 +1529,59 @@ export default function ImportPdfTestPage() {
           align-items: center;
           gap: 12px;
           margin-bottom: 14px;
+        }
+
+        .questionTools {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 7px;
+        }
+
+        .toolButton,
+        .duplicateButton,
+        .imageButton {
+          min-height: 34px;
+          padding: 6px 10px;
+          border: 2px solid #626d73;
+          border-radius: 7px;
+          background: linear-gradient(#fff,#cfcfcf);
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .toolButton {
+          min-width: 38px;
+          font-size: 17px;
+        }
+
+        .toolButton:disabled {
+          opacity: .35;
+          cursor: not-allowed;
+        }
+
+        .duplicateButton {
+          color: #073b68;
+          border-color: #174461;
+          background: linear-gradient(#dff5ff,#91d3f0);
+        }
+
+        .imageButton {
+          position: relative;
+          color: #125a32;
+          border-color: #277b49;
+          background: linear-gradient(#e1f7e7,#9bd9ae);
+        }
+
+        .imageButton input,
+        .imageReplaceButton input {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          opacity: 0;
+          pointer-events: none;
         }
 
         .questionNumber {
@@ -1256,6 +1660,37 @@ export default function ImportPdfTestPage() {
           max-height: 620px;
           margin: auto;
           object-fit: contain;
+        }
+
+        .imageActions {
+          margin-top: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 9px;
+        }
+
+        .imageReplaceButton,
+        .imageRemoveButton {
+          position: relative;
+          min-height: 38px;
+          padding: 8px 13px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .imageReplaceButton {
+          color: #073b68;
+          border: 2px solid #174461;
+          background: #bfe8fb;
+        }
+
+        .imageRemoveButton {
+          color: #7b1515;
+          border: 2px solid #9b2828;
+          background: #ffdede;
         }
 
         .optionsList {
@@ -1350,6 +1785,31 @@ export default function ImportPdfTestPage() {
           .previewHeader {
             flex-direction: column;
             align-items: stretch;
+          }
+
+          .previewActions {
+            width: 100%;
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+          }
+
+          .questionTop {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .questionTools {
+            width: 100%;
+            justify-content: flex-start;
+          }
+
+          .questionTools > * {
+            flex: 1 1 auto;
+            text-align: center;
+          }
+
+          .attemptBox {
+            grid-template-columns: 1fr;
           }
 
           .questionTextField textarea {
