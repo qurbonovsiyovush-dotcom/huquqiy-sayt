@@ -136,10 +136,28 @@ function normalizeQuestionText(parts: string[]) {
     .filter(Boolean);
 
   const paragraphs: string[] = [];
-  let prose = "";
+  let current = "";
 
-  function flushProse() {
-    const cleaned = prose
+  function appendLine(line: string) {
+    if (!current) {
+      current = line;
+      return;
+    }
+
+    /*
+      PDF satr oxirida '-' bilan bo‘lingan bo‘lsa:
+        1- + bo‘lim        => 1-bo‘lim
+        jinoyat- + huquq   => jinoyat-huquq
+    */
+    if (/-$/.test(current)) {
+      current += line;
+    } else {
+      current += ` ${line}`;
+    }
+  }
+
+  function flushCurrent() {
+    const cleaned = current
       .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/\(\s+/g, "(")
       .replace(/\s+\)/g, ")")
@@ -150,41 +168,38 @@ function normalizeQuestionText(parts: string[]) {
       paragraphs.push(cleaned);
     }
 
-    prose = "";
+    current = "";
   }
 
   for (const line of rawLines) {
     /*
-      1), 2), 3) ... yoki a), b), c) ... savolning ichki bandi.
-      Bularni alohida qatorda qoldiramiz.
+      Yangi ichki band boshlanishi:
+        1) ...
+        2) ...
+        a) ...
+        b) ...
+
+      MUHIM:
+      Bandning keyingi vizual PDF qatorlari shu bandning DAVOMI
+      hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
     */
-    const isInnerListItem =
+    const startsInnerListItem =
       /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
 
-    if (isInnerListItem) {
-      flushProse();
-      paragraphs.push(line);
-      continue;
-    }
-
-    if (!prose) {
-      prose = line;
+    if (startsInnerListItem) {
+      flushCurrent();
+      current = line;
       continue;
     }
 
     /*
-      Satrdagi so‘z '-' bilan bo‘linib qolgan bo‘lsa:
-        1- + bo‘lim       => 1-bo‘lim
-        jinoyat- + huquq  => jinoyat-huquq
+      Oddiy qator — hozirgi gap/bandning davomi.
+      Shuning uchun yangi \n qo‘ymaymiz, shu qatorga ulaymiz.
     */
-    if (/-$/.test(prose)) {
-      prose += line;
-    } else {
-      prose += ` ${line}`;
-    }
+    appendLine(line);
   }
 
-  flushProse();
+  flushCurrent();
 
   return paragraphs
     .join("\n")
