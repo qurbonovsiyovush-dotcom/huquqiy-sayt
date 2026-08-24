@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 type TestCategory =
   | "legislation"
@@ -804,8 +804,6 @@ function RichTextEditor({
 
 export default function ImportPdfTestPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [duration, setDuration] = useState(60);
@@ -864,8 +862,19 @@ export default function ImportPdfTestPage() {
   } | null>(null);
 
   useEffect(() => {
+    // URL parametrlarini faqat brauzerda o'qiymiz.
+    // Bu Next.js prerender vaqtida URL parametr muammosini oldini oladi.
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
     const urlType =
-      searchParams.get("testType");
+      params.get("testType");
 
     if (urlType) {
       setTestType(
@@ -876,7 +885,7 @@ export default function ImportPdfTestPage() {
     }
 
     const customName =
-      searchParams.get(
+      params.get(
         "customTestTypeName"
       );
 
@@ -885,7 +894,7 @@ export default function ImportPdfTestPage() {
         customName
       );
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     try {
