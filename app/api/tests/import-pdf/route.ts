@@ -163,8 +163,16 @@ function stripQuestionNumber(value: string) {
 function optionLabelFromStart(
   value: string
 ): OptionLabel | null {
+  /*
+    Qabul qilinadi:
+      A) ...
+      +A) ...
+      + A) ...
+      A)+ ...
+      A) + ...
+  */
   const match = value.match(
-    /^\s*([ABCD])[\)\.\-:]\s*/
+    /^\s*\+?\s*([ABCD])[\)\.\-:]\s*\+?\s*/
   );
 
   return match
@@ -174,8 +182,18 @@ function optionLabelFromStart(
 
 function stripOptionPrefix(value: string) {
   return value
-    .replace(/^\s*[ABCD][\)\.\-:]\s*/, "")
+    .replace(
+      /^\s*\+?\s*[ABCD][\)\.\-:]\s*\+?\s*/,
+      ""
+    )
     .trim();
+}
+
+function optionMarkerHasLeadingOrTrailingPlus(value: string) {
+  return (
+    /^\s*\+\s*[ABCD][\)\.\-:]/.test(value) ||
+    /^\s*[ABCD][\)\.\-:]\s*\+/.test(value)
+  );
 }
 
 /* =========================================================
@@ -652,13 +670,21 @@ function buildQuestionBlocks(
 function splitInlineOptions(
   text: string
 ) {
+  /*
+    Bir qatorda quyidagilarni ham taniydi:
+      A) ... B) ...
+      +A) ... B) ...
+      A)+ ... B) ...
+      A) + ... B) ...
+  */
   const regex =
-    /(^|\s)([ABCD])[\)\.\-:]\s*/g;
+    /(^|\s)(\+?\s*)([ABCD])[\)\.\-:]\s*(\+?\s*)/g;
 
   const matches: {
     label: OptionLabel;
     markerStart: number;
     contentStart: number;
+    markerHasPlus: boolean;
   }[] = [];
 
   let match:
@@ -674,12 +700,15 @@ function splitInlineOptions(
 
     matches.push({
       label:
-        match[2] as OptionLabel,
+        match[3] as OptionLabel,
       markerStart:
         match.index +
         leadingLength,
       contentStart:
         regex.lastIndex,
+      markerHasPlus:
+        Boolean(match[2]?.includes("+")) ||
+        Boolean(match[4]?.includes("+")),
     });
   }
 
@@ -700,6 +729,8 @@ function splitInlineOptions(
                 : text.length
             )
             .trim(),
+        markerHasPlus:
+          current.markerHasPlus,
       };
     }
   );
@@ -792,6 +823,7 @@ function parseQuestion(
           );
 
         const plus =
+          part.markerHasPlus ||
           hasPlus(
             part.text
           );
@@ -870,6 +902,9 @@ function parseQuestion(
             cleanPlus(raw),
           ],
           plus:
+            optionMarkerHasLeadingOrTrailingPlus(
+              lineText
+            ) ||
             hasPlus(raw) ||
             hasPlus(
               lineText
