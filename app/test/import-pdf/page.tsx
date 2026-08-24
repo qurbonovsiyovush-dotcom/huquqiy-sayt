@@ -498,8 +498,20 @@ function RichTextEditor({
         data-placeholder={placeholder}
         style={{ minHeight }}
         onInput={() => {
+          /*
+            MUHIM FIX:
+            Har bir real DOM o‘zgarishi (yozish, Backspace, Delete,
+            drag/drop bilan so‘zni boshqa joyga ko‘chirish va h.k.)
+            shu zahoti parent state'ga ham yoziladi.
+
+            Oldin faqat lokal DOM/cache yangilanib, parentdagi eski
+            questionText keyinroq qayta ishlatilishi mumkin edi.
+            Shu sabab foydalanuvchi tepaga ko‘chirgan matn yana eski
+            joyiga qaytib qolardi.
+          */
           saveSelection();
           rememberLocalHtml();
+          commitChange();
         }}
         onFocus={() => {
           saveSelection();
@@ -507,14 +519,35 @@ function RichTextEditor({
         }}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
-        onDrop={() => {
+        onPaste={() => {
           window.requestAnimationFrame(() => {
             saveSelection();
             rememberLocalHtml();
+            commitChange();
+          });
+        }}
+        onCut={() => {
+          window.requestAnimationFrame(() => {
+            saveSelection();
+            rememberLocalHtml();
+            commitChange();
+          });
+        }}
+        onDrop={() => {
+          /*
+            Tanlangan matnni sichqoncha bilan boshqa joyga tashlashda
+            brauzer DOMni drop eventidan KEYIN o‘zgartiradi.
+            Shu sabab requestAnimationFrame ichida yangi HTMLni olamiz.
+          */
+          window.requestAnimationFrame(() => {
+            saveSelection();
+            rememberLocalHtml();
+            commitChange();
           });
         }}
         onBlur={() => {
           saveSelection();
+          rememberLocalHtml();
           commitChange();
         }}
       />
