@@ -1,9 +1,39 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/*
+  PDF.js Node/Vercel polyfill.
+
+  Biz serverda PDFni rasmga render qilmaymiz.
+  Lekin pdfjs-dist PDFni ochish/getTextContent qilish paytida ham
+  DOMMatrix / ImageData / Path2D global obyektlarini kutishi mumkin.
+
+  Oldingi @napi-rs/canvas importi olib tashlanganda:
+    "DOMMatrix is not defined"
+  xatosi shundan paydo bo'ldi.
+*/
+if (typeof globalThis.DOMMatrix === "undefined") {
+  (globalThis as typeof globalThis & {
+    DOMMatrix: typeof DOMMatrix;
+  }).DOMMatrix = DOMMatrix;
+}
+
+if (typeof globalThis.ImageData === "undefined") {
+  (globalThis as typeof globalThis & {
+    ImageData: typeof ImageData;
+  }).ImageData = ImageData;
+}
+
+if (typeof globalThis.Path2D === "undefined") {
+  (globalThis as typeof globalThis & {
+    Path2D: typeof Path2D;
+  }).Path2D = Path2D;
+}
 
 /* =========================================================
    TYPES
