@@ -1400,11 +1400,16 @@ function getQuestionPdfCrop(
       promptEndLine.height * 0.35
     );
 
+  /*
+    Variant boshlanishidan ancha yuqorida to‘xtaymiz.
+    Oldingi 0.35 koeffitsiyent A) satrining yuqori qismini cropga
+    kiritib yuborayotgan edi.
+  */
   const rawBottomY =
     firstOptionLine.y +
     Math.max(
-      5,
-      firstOptionLine.height * 0.35
+      10,
+      firstOptionLine.height * 1.15
     );
 
   if (
@@ -1461,11 +1466,16 @@ function getQuestionPdfCrop(
       pageInfo.width * 0.018
     );
 
+  /*
+    Sahifa tashqi chetida ozgina xavfsizlik qoldiramiz.
+    3.5% jadvalning birinchi ustunini (№ / 1 / 2 / 3...) kesib yuborayotgan
+    edi, shuning uchun 1.5% ga tushirdik.
+  */
   let hardLeft =
-    pageInfo.width * 0.035;
+    pageInfo.width * 0.015;
 
   let hardRight =
-    pageInfo.width * 0.965;
+    pageInfo.width * 0.985;
 
   if (targetColumn === "left") {
     hardRight =
@@ -1567,21 +1577,26 @@ function getQuestionPdfCrop(
     Shakl chiziqlari matndan biroz tashqarida bo'lishi mumkin.
     Padding dinamik, ammo ustun chegarasidan oshmaydi.
   */
+  /*
+    Jadvalning yashil borderlari textdan ancha tashqarida turishi mumkin.
+    Shuning uchun gorizontal paddingni biroz kengaytiramiz.
+    Bu baribir hardLeft/hardRight va separator chegarasidan oshmaydi.
+  */
   const horizontalPadding =
     Math.max(
-      14,
+      24,
       Math.min(
-        30,
-        averageHeight * 2
+        48,
+        averageHeight * 3.1
       )
     );
 
   const verticalPadding =
     Math.max(
-      7,
+      5,
       Math.min(
-        16,
-        averageHeight * 1.05
+        12,
+        averageHeight * 0.85
       )
     );
 
