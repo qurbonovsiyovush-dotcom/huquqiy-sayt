@@ -177,7 +177,20 @@ function RichTextEditor({
     lastEmittedHtmlRef.current = nextHtml;
   }, [value]);
 
-  function emitChange() {
+  function rememberLocalHtml() {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    // Yozish vaqtida React parent state'ini umuman yangilamaymiz.
+    // DOM browserning o‘zida qoladi, shuning uchun cursor va ko‘chirilgan
+    // matn o‘z joyiga qaytib ketmaydi.
+    lastEmittedHtmlRef.current = editor.innerHTML;
+  }
+
+  function commitChange() {
     const editor = editorRef.current;
 
     if (!editor) {
@@ -185,9 +198,6 @@ function RichTextEditor({
     }
 
     const html = editor.innerHTML;
-
-    // Parent state yangilanganda useEffect DOMni qayta yozmasligi uchun
-    // avval oxirgi lokal HTMLni eslab qolamiz.
     lastEmittedHtmlRef.current = html;
     onChange(html);
   }
@@ -242,9 +252,10 @@ function RichTextEditor({
       commandValue
     );
     saveSelection();
-    emitChange();
+    rememberLocalHtml();
 
     // Toolbar bosilgandan keyin caret tanlangan joyda qoladi.
+    // Parent state faqat editor blur bo‘lganda yangilanadi.
     window.requestAnimationFrame(() => {
       restoreSelection();
     });
@@ -491,14 +502,23 @@ function RichTextEditor({
         style={{ minHeight }}
         onInput={() => {
           saveSelection();
-          emitChange();
+          rememberLocalHtml();
         }}
-        onFocus={saveSelection}
+        onFocus={() => {
+          saveSelection();
+          rememberLocalHtml();
+        }}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
+        onDrop={() => {
+          window.requestAnimationFrame(() => {
+            saveSelection();
+            rememberLocalHtml();
+          });
+        }}
         onBlur={() => {
           saveSelection();
-          emitChange();
+          commitChange();
         }}
       />
 
@@ -712,6 +732,9 @@ export default function ImportPdfTestPage() {
 
   const [activeCanvasQuestionId, setActiveCanvasQuestionId] =
     useState<string | null>(null);
+
+  const [openVisualEditors, setOpenVisualEditors] =
+    useState<Record<string, boolean>>({});
 
   const copiedShapeRef = useRef<EditorShape | null>(null);
 
@@ -1713,15 +1736,20 @@ export default function ImportPdfTestPage() {
       x:
         side === "left"
           ? 70
-          : 430,
+          : 390,
       y:
-        45 + sameSideCount * 92,
+        side === "left"
+          ? 75 + sameSideCount * 135
+          : 35 + sameSideCount * 90,
 
       width:
         side === "left"
-          ? 300
-          : 390,
-      height: 74,
+          ? 285
+          : 470,
+      height:
+        side === "left"
+          ? 96
+          : 72,
 
       text:
         side === "left"
@@ -1795,16 +1823,16 @@ export default function ImportPdfTestPage() {
         matchingSide: "left",
         matchingKey: String(index + 1),
         x: 70,
-        y: 45 + index * 92,
-        width: 300,
-        height: 74,
+        y: 75 + index * 135,
+        width: 285,
+        height: 96,
         text: item,
         backgroundColor: "#ffffff",
         borderColor: "#1f2a30",
         textColor: "#111111",
-        fontSize: 20,
+        fontSize: 21,
         borderWidth: 2,
-        borderRadius: 8,
+        borderRadius: 4,
         opacity: 1,
         zIndex: Date.now() + index,
       });
@@ -1816,17 +1844,17 @@ export default function ImportPdfTestPage() {
         type: "matchingItem",
         matchingSide: "right",
         matchingKey: String.fromCharCode(97 + index),
-        x: 430,
-        y: 35 + index * 76,
-        width: 390,
-        height: 62,
+        x: 390,
+        y: 35 + index * 90,
+        width: 470,
+        height: 72,
         text: item,
         backgroundColor: "#ffffff",
         borderColor: "#1f2a30",
         textColor: "#111111",
         fontSize: 18,
         borderWidth: 2,
-        borderRadius: 8,
+        borderRadius: 4,
         opacity: 1,
         zIndex: Date.now() + 20 + index,
       });
@@ -2003,8 +2031,9 @@ export default function ImportPdfTestPage() {
                 zIndex: shape.zIndex ?? 1,
                 opacity: shape.opacity ?? 1,
                 borderWidth:
-                  shape.type === "image"
-                    ? shape.borderWidth ?? 0
+                  shape.type === "image" ||
+                  shape.type === "matchingItem"
+                    ? 0
                     : shape.borderWidth ?? 2,
                 borderColor:
                   shape.borderColor ?? "#2f5975",
@@ -2013,14 +2042,16 @@ export default function ImportPdfTestPage() {
                     ? "dashed"
                     : "solid",
                 borderRadius:
-                  shape.type === "circle" ||
-                  shape.type === "ellipse"
+                  shape.type === "matchingItem"
+                    ? "0"
+                    : shape.type === "circle" ||
+                      shape.type === "ellipse"
                     ? "999px"
                     : `${shape.borderRadius ?? 4}px`,
                 background:
-                  shape.type === "text"
-                    ? "transparent"
-                    : shape.type === "image"
+                  shape.type === "text" ||
+                  shape.type === "image" ||
+                  shape.type === "matchingItem"
                     ? "transparent"
                     : shape.backgroundColor ?? "#8fc9ef",
                 color: shape.textColor ?? "#111111",
@@ -2928,20 +2959,29 @@ export default function ImportPdfTestPage() {
                         Nusxalash
                       </button>
 
-                      <label className="imageButton">
-                        Rasm qo‘shish
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(event) => {
-                            changeQuestionImage(
-                              question.id,
-                              event.target.files?.[0] ?? null
-                            );
-                            event.currentTarget.value = "";
-                          }}
-                        />
-                      </label>
+                      <button
+                        type="button"
+                        className={
+                          openVisualEditors[question.id]
+                            ? "imageButton imageButtonActive"
+                            : "imageButton"
+                        }
+                        onClick={() => {
+                          setOpenVisualEditors((current) => ({
+                            ...current,
+                            [question.id]:
+                              !current[question.id],
+                          }));
+
+                          setActiveCanvasQuestionId(
+                            question.id
+                          );
+                        }}
+                      >
+                        {openVisualEditors[question.id]
+                          ? "Rasm / shaklni yopish"
+                          : "Rasm / shakl"}
+                      </button>
 
                       <button
                         type="button"
@@ -2983,7 +3023,8 @@ export default function ImportPdfTestPage() {
                     />
                   </label>
 
-                  {renderShapeEditor(question)}
+                  {openVisualEditors[question.id] &&
+                    renderShapeEditor(question)}
 
                   <div className="optionsList">
                     {question.options.map(
@@ -3458,6 +3499,12 @@ export default function ImportPdfTestPage() {
           background: linear-gradient(#e1f7e7,#9bd9ae);
         }
 
+        .imageButtonActive {
+          color: #073b68;
+          border-color: #174461;
+          background: linear-gradient(#dff5ff,#91d3f0);
+        }
+
         .imageButton input,
         .imageReplaceButton input {
           position: absolute;
@@ -3763,41 +3810,54 @@ export default function ImportPdfTestPage() {
 
         .matchingTextBox {
           position: absolute;
-          left: 42px;
+          left: 40px;
           right: 0;
           top: 0;
           bottom: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 8px 14px 8px 24px;
-          border: 2px solid #1f2a30;
-          border-radius: 8px;
+          padding: 10px 18px 10px 30px;
+          border: 2px solid #111;
+          border-radius: 4px;
           background: #ffffff;
           overflow: hidden;
           text-align: center;
+          box-shadow: none;
         }
 
         .matchingRight .matchingTextBox {
           justify-content: flex-start;
           text-align: left;
-          padding-left: 28px;
+          padding-left: 34px;
+          line-height: 1.28;
         }
 
         .matchingKeyCircle {
           position: relative;
           z-index: 3;
-          width: 52px;
-          height: 52px;
-          flex: 0 0 52px;
+          width: 60px;
+          height: 60px;
+          flex: 0 0 60px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 2px solid #1f2a30;
+          border: 2px solid #111;
           border-radius: 50%;
           background: #ffffff;
-          font-size: 21px;
-          font-weight: 700;
+          font-size: 22px;
+          font-weight: 400;
+        }
+
+        .matchingLeft .matchingKeyCircle {
+          margin-left: 0;
+        }
+
+        .matchingRight .matchingKeyCircle {
+          width: 54px;
+          height: 54px;
+          flex-basis: 54px;
+          font-size: 20px;
         }
 
         .matchingTool {
