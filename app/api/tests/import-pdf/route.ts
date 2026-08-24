@@ -10,9 +10,11 @@ export const revalidate = 0;
    TYPES
 ========================================================= */
 
+type OptionLabel = "A" | "B" | "C" | "D";
+
 type ImportedOption = {
   id: string;
-  label: "A" | "B" | "C" | "D";
+  label: OptionLabel;
   text: string;
   isCorrect: boolean;
 };
@@ -31,7 +33,6 @@ type PdfTextItem = {
   transform: number[];
   width?: number;
   height?: number;
-  hasEOL?: boolean;
 };
 
 type PositionedText = {
@@ -41,6 +42,16 @@ type PositionedText = {
   width: number;
   height: number;
   pageNumber: number;
+};
+
+type TextLine = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageNumber: number;
+  column: "left" | "right" | "full";
 };
 
 type HighlightRect = {
@@ -54,13 +65,12 @@ type PageInfo = {
   page: any;
   width: number;
   height: number;
-  items: PositionedText[];
   highlights: HighlightRect[];
 };
 
-type RawQuestionBlock = {
+type QuestionBlock = {
   number: number;
-  raw: string;
+  lines: TextLine[];
 };
 
 /* =========================================================
@@ -85,21 +95,20 @@ function makeId(prefix: string) {
     .slice(2, 10)}`;
 }
 
-function normalizeOneLine(value: string) {
-  return value
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeMultiline(value: string) {
+function normalizeText(value: string) {
   return value
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeOneLine(value: string) {
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -112,7 +121,7 @@ function cleanPlus(value: string) {
     .trim();
 }
 
-function hasPlusMarker(value: string) {
+function hasPlus(value: string) {
   return (
     /\+\s*$/.test(value) ||
     /\(\s*\+\s*\)/.test(value) ||
@@ -120,413 +129,96 @@ function hasPlusMarker(value: string) {
   );
 }
 
-function safeQuestionNumber(value: string) {
-  const n = Number(value);
+function questionNumberFromLine(value: string) {
+  /*
+    MUHIM:
+    Test savollari faqat "1.", "2.", "3." ... formatida.
+    "1)", "2)" esa savol ichidagi bandlar, savol deb olinmaydi.
+  */
+  const match = value.match(/^\s*(\d{1,4})\.\s+\S/);
 
-  if (!Number.isFinite(n)) {
+  if (!match) {
     return null;
   }
 
-  if (n < 1 || n > 5000) {
+  const number = Number(match[1]);
+
+  if (
+    !Number.isFinite(number) ||
+    number < 1 ||
+    number > 5000
+  ) {
     return null;
   }
 
-  return Math.trunc(n);
+  return number;
+}
+
+function stripQuestionNumber(value: string) {
+  return value
+    .replace(/^\s*\d{1,4}\.\s+/, "")
+    .trim();
+}
+
+function optionLabelFromStart(
+  value: string
+): OptionLabel | null {
+  const match = value.match(
+    /^\s*([ABCD])[\)\.\-:]\s*/
+  );
+
+  return match
+    ? (match[1] as OptionLabel)
+    : null;
+}
+
+function stripOptionPrefix(value: string) {
+  return value
+    .replace(/^\s*[ABCD][\)\.\-:]\s*/, "")
+    .trim();
 }
 
 /* =========================================================
-   PDF TEXT -> NATURAL DOCUMENT STRING
+   HIGHLIGHT
 ========================================================= */
 
-function textItemsToNaturalText(items: PdfTextItem[]) {
-  let output = "";
-
-  for (const item of items) {
-    const value =
-      typeof item.str === "string"
-        ? item.str
-        : "";
-
-    if (!value) {
-      if (item.hasEOL) {
-        output += "\n";
-      }
-
-      continue;
-    }
-
-    if (
-      output &&
-      !output.endsWith("\n") &&
-      !output.endsWith(" ")
-    ) {
-      output += " ";
-    }
-
-    output += value;
-
-    if (item.hasEOL) {
-      output += "\n";
-    }
+function rectIntersects(
+  a: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  },
+  b: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
   }
-
-  return normalizeMultiline(output);
-}
-
-/* =========================================================
-   QUESTION BLOCKS
-   IMPORTANT:
-   Questions are detected from NATURAL PDF text order,
-   NOT from x/y column splitting.
-========================================================= */
-
-function buildQuestionBlocks(documentText: string): RawQuestionBlock[] {
-  const normalized =
-    `\n${documentText.replace(/\r/g, "")}\n`;
-
-  /*
-    Question must begin at start of a line.
-    This prevents:
-      1) ...
-      2) ...
-    inside a question from becoming separate test questions.
-  */
-  const regex =
-    /^\s*(\d{1,4})[\.\)]\s+(.+)$/gm;
-
-  const starts: {
-    number: number;
-    index: number;
-    bodyStart: number;
-  }[] = [];
-
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(normalized)) !== null) {
-    const number =
-      safeQuestionNumber(match[1]);
-
-    if (number === null) {
-      continue;
-    }
-
-    /*
-      Body starts immediately after "1. " / "1) ".
-      match[2] is first line text, but slicing from bodyStart
-      preserves the following lines too.
-    */
-    const prefixMatch =
-      match[0].match(/^\s*\d{1,4}[\.\)]\s+/);
-
-    const prefixLength =
-      prefixMatch?.[0]?.length ?? 0;
-
-    starts.push({
-      number,
-      index: match.index,
-      bodyStart: match.index + prefixLength,
-    });
-  }
-
-  const blocks: RawQuestionBlock[] = [];
-
-  for (let i = 0; i < starts.length; i++) {
-    const current = starts[i];
-    const next = starts[i + 1];
-
-    const end =
-      next
-        ? next.index
-        : normalized.length;
-
-    const raw =
-      normalized
-        .slice(
-          current.bodyStart,
-          end
-        )
-        .trim();
-
-    blocks.push({
-      number: current.number,
-      raw,
-    });
-  }
-
-  return blocks;
-}
-
-/* =========================================================
-   OPTION PARSER
-   Supports:
-      A) ... B) ...
-      C) ... D) ...
-   and vertical A/B/C/D.
-   Lowercase a)/b) subparts are intentionally ignored.
-========================================================= */
-
-function findOptionMarkers(raw: string) {
-  /*
-    Uppercase only.
-    Marker may be:
-      start of block
-      new line
-      whitespace after previous text
-
-    We intentionally do NOT use /i.
-  */
-  const regex =
-    /(^|[\n\r]|[ \t]{1,})([ABCD])[\)\.\-:]\s*/g;
-
-  const markers: {
-    label: "A" | "B" | "C" | "D";
-    markerStart: number;
-    contentStart: number;
-  }[] = [];
-
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(raw)) !== null) {
-    const leading =
-      match[1] ?? "";
-
-    const markerStart =
-      match.index + leading.length;
-
-    markers.push({
-      label:
-        match[2] as
-          | "A"
-          | "B"
-          | "C"
-          | "D",
-      markerStart,
-      contentStart:
-        regex.lastIndex,
-    });
-  }
-
-  return markers;
-}
-
-function parseQuestionTextAndOptions(
-  block: RawQuestionBlock,
-  highlightedLabels: Set<string>
 ) {
-  const markers =
-    findOptionMarkers(block.raw);
-
-  /*
-    To trust option parsing, we require A/B/C/D to appear
-    in sensible order. This avoids accidental A)/B) matches.
-  */
-  const firstByLabel =
-    new Map<
-      "A" | "B" | "C" | "D",
-      {
-        label: "A" | "B" | "C" | "D";
-        markerStart: number;
-        contentStart: number;
-      }
-    >();
-
-  for (const marker of markers) {
-    if (!firstByLabel.has(marker.label)) {
-      firstByLabel.set(marker.label, marker);
-    }
-  }
-
-  const orderedLabels:
-    ("A" | "B" | "C" | "D")[] = [
-      "A",
-      "B",
-      "C",
-      "D",
-    ];
-
-  const selectedMarkers =
-    orderedLabels
-      .map((label) => firstByLabel.get(label))
-      .filter(
-        (
-          marker
-        ): marker is {
-          label: "A" | "B" | "C" | "D";
-          markerStart: number;
-          contentStart: number;
-        } => Boolean(marker)
-      )
-      .sort(
-        (a, b) =>
-          a.markerStart - b.markerStart
-      );
-
-  const hasSensibleOrder =
-    selectedMarkers.length >= 2 &&
-    selectedMarkers.every((marker, index) => {
-      if (index === 0) {
-        return true;
-      }
-
-      const prev =
-        selectedMarkers[index - 1];
-
-      return (
-        orderedLabels.indexOf(marker.label) >
-        orderedLabels.indexOf(prev.label)
-      );
-    });
-
-  if (!hasSensibleOrder) {
-    return {
-      questionText:
-        normalizeMultiline(block.raw),
-      options: [] as ImportedOption[],
-      warning:
-        "A/B/C/D variantlar avtomatik topilmadi. Savolni qo‘lda tekshiring.",
-    };
-  }
-
-  const questionText =
-    normalizeMultiline(
-      block.raw.slice(
-        0,
-        selectedMarkers[0].markerStart
-      )
-    );
-
-  const parsedOptions: {
-    label: "A" | "B" | "C" | "D";
-    text: string;
-    correctByPlus: boolean;
-    correctByHighlight: boolean;
-  }[] = [];
-
-  for (
-    let index = 0;
-    index < selectedMarkers.length;
-    index++
-  ) {
-    const current =
-      selectedMarkers[index];
-
-    const next =
-      selectedMarkers[index + 1];
-
-    const rawOptionText =
-      block.raw.slice(
-        current.contentStart,
-        next
-          ? next.markerStart
-          : block.raw.length
-      );
-
-    parsedOptions.push({
-      label: current.label,
-      text:
-        normalizeMultiline(
-          cleanPlus(rawOptionText)
-        ),
-      correctByPlus:
-        hasPlusMarker(rawOptionText),
-      correctByHighlight:
-        highlightedLabels.has(
-          current.label
-        ),
-    });
-  }
-
-  /*
-    + has priority over yellow highlight.
-  */
-  const plusLabels =
-    parsedOptions
-      .filter(
-        (option) =>
-          option.correctByPlus
-      )
-      .map(
-        (option) =>
-          option.label
-      );
-
-  const highlightLabels =
-    parsedOptions
-      .filter(
-        (option) =>
-          option.correctByHighlight
-      )
-      .map(
-        (option) =>
-          option.label
-      );
-
-  let correctLabel:
-    "A" | "B" | "C" | "D" | null =
-    null;
-
-  if (plusLabels.length === 1) {
-    correctLabel =
-      plusLabels[0];
-  } else if (
-    plusLabels.length === 0 &&
-    highlightLabels.length === 1
-  ) {
-    correctLabel =
-      highlightLabels[0];
-  }
-
-  const options: ImportedOption[] =
-    parsedOptions.map((option) => ({
-      id: makeId(
-        `q${block.number}-${option.label.toLowerCase()}`
-      ),
-      label: option.label,
-      text: option.text,
-      isCorrect:
-        option.label === correctLabel,
-    }));
-
-  let warning:
-    string | undefined;
-
-  const distinctLabels =
-    new Set(
-      options.map(
-        (option) =>
-          option.label
-      )
-    );
-
-  if (distinctLabels.size !== 4) {
-    warning =
-      `${distinctLabels.size} ta variant topildi. 4 ta variant bo‘lishi kerak.`;
-  } else if (
-    plusLabels.length > 1
-  ) {
-    warning =
-      "Bir nechta variantda + belgisi topildi. To‘g‘ri javobni tekshiring.";
-  } else if (
-    plusLabels.length === 0 &&
-    highlightLabels.length > 1
-  ) {
-    warning =
-      "Bir nechta sariq variant topildi. To‘g‘ri javobni tekshiring.";
-  } else if (!correctLabel) {
-    warning =
-      "To‘g‘ri javob avtomatik topilmadi. To‘g‘ri variant oxiriga + belgisi qo‘ying yoki admin oynasida belgilang.";
-  }
-
-  return {
-    questionText,
-    options,
-    warning,
-  };
+  return !(
+    a.x2 < b.x1 ||
+    a.x1 > b.x2 ||
+    a.y2 < b.y1 ||
+    a.y1 > b.y2
+  );
 }
 
-/* =========================================================
-   HIGHLIGHT ANNOTATIONS
-========================================================= */
+function lineIsHighlighted(
+  line: TextLine,
+  highlights: HighlightRect[]
+) {
+  const lineRect = {
+    x1: line.x - 3,
+    y1: line.y - line.height * 0.45,
+    x2: line.x + line.width + 3,
+    y2: line.y + line.height * 1.05,
+  };
+
+  return highlights.some((highlight) =>
+    rectIntersects(lineRect, highlight)
+  );
+}
 
 async function pageHighlights(
   page: any
@@ -590,12 +282,8 @@ async function pageHighlights(
         Array.isArray(annotation?.rect) &&
         annotation.rect.length >= 4
       ) {
-        const [
-          x1,
-          y1,
-          x2,
-          y2,
-        ] = annotation.rect;
+        const [x1, y1, x2, y2] =
+          annotation.rect;
 
         result.push({
           x1: Math.min(x1, x2),
@@ -617,97 +305,8 @@ async function pageHighlights(
   }
 }
 
-function rectIntersects(
-  a: {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  },
-  b: {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  }
-) {
-  return !(
-    a.x2 < b.x1 ||
-    a.x1 > b.x2 ||
-    a.y2 < b.y1 ||
-    a.y1 > b.y2
-  );
-}
-
-function highlightedOptionLabelsOnPage(
-  items: PositionedText[],
-  highlights: HighlightRect[]
-) {
-  const result =
-    new Set<string>();
-
-  for (const highlight of highlights) {
-    const intersecting =
-      items
-        .filter((item) => {
-          const itemRect = {
-            x1: item.x,
-            y1:
-              item.y -
-              item.height * 0.35,
-            x2:
-              item.x +
-              item.width,
-            y2:
-              item.y +
-              item.height,
-          };
-
-          return rectIntersects(
-            itemRect,
-            highlight
-          );
-        })
-        .sort((a, b) => {
-          const dy =
-            Math.abs(
-              a.y - b.y
-            );
-
-          if (dy > 4) {
-            return b.y - a.y;
-          }
-
-          return a.x - b.x;
-        });
-
-    const text =
-      normalizeOneLine(
-        intersecting
-          .map(
-            (item) =>
-              item.text
-          )
-          .join(" ")
-      );
-
-    const match =
-      text.match(
-        /(?:^|\s)([ABCD])[\)\.\-:]/
-      );
-
-    if (match) {
-      result.add(
-        match[1]
-      );
-    }
-  }
-
-  return result;
-}
-
 /* =========================================================
-   POSITIONED ITEMS
+   TEXT ITEMS -> LINES
 ========================================================= */
 
 function buildPositionedItems(
@@ -717,8 +316,7 @@ function buildPositionedItems(
   return textItems
     .filter(
       (item) =>
-        typeof item.str ===
-          "string" &&
+        typeof item.str === "string" &&
         item.str.trim()
     )
     .map((item) => {
@@ -728,30 +326,21 @@ function buildPositionedItems(
         ];
 
       return {
-        text:
-          item.str.trim(),
+        text: item.str.trim(),
         x:
-          Number(
-            transform[4]
-          ) || 0,
+          Number(transform[4]) || 0,
         y:
-          Number(
-            transform[5]
-          ) || 0,
+          Number(transform[5]) || 0,
         width:
           Math.max(
             1,
-            Number(
-              item.width
-            ) || 1
+            Number(item.width) || 1
           ),
         height:
           Math.max(
             8,
             Math.abs(
-              Number(
-                transform[3]
-              ) || 0
+              Number(transform[3]) || 0
             )
           ),
         pageNumber,
@@ -759,124 +348,762 @@ function buildPositionedItems(
     });
 }
 
-/* =========================================================
-   IMAGE / DIAGRAM DETECTION
-   Conservative:
-   only crop when we can confidently locate:
-   question start -> option A on same page,
-   and there is a large vertical gap.
-========================================================= */
+function groupItemsIntoLines(
+  items: PositionedText[],
+  column: "left" | "right" | "full"
+): TextLine[] {
+  const sorted =
+    [...items].sort((a, b) => {
+      const dy = b.y - a.y;
 
-function findQuestionVisualBounds(
-  pageInfo: PageInfo,
-  questionNumberValue: number
-) {
-  const items =
-    [...pageInfo.items].sort(
-      (a, b) => {
-        const dy =
-          b.y - a.y;
-
-        if (
-          Math.abs(dy) > 4
-        ) {
-          return dy;
-        }
-
-        return a.x - b.x;
+      if (Math.abs(dy) > 3.5) {
+        return dy;
       }
-    );
 
-  const qRegex =
-    new RegExp(
-      `^${questionNumberValue}[\\.\\)]$|^${questionNumberValue}[\\.\\)]\\s`
-    );
+      return a.x - b.x;
+    });
 
-  let questionStart:
-    PositionedText | null =
-    null;
+  const groups: PositionedText[][] = [];
 
-  for (const item of items) {
-    if (
-      qRegex.test(
-        item.text.trim()
-      )
-    ) {
-      questionStart =
-        item;
-      break;
+  for (const item of sorted) {
+    let bestGroup:
+      PositionedText[] | null = null;
+
+    let bestDistance =
+      Number.POSITIVE_INFINITY;
+
+    for (const group of groups) {
+      const avgY =
+        group.reduce(
+          (sum, part) =>
+            sum + part.y,
+          0
+        ) / group.length;
+
+      const distance =
+        Math.abs(
+          avgY - item.y
+        );
+
+      const tolerance =
+        Math.max(
+          3.5,
+          item.height * 0.45
+        );
+
+      if (
+        distance <= tolerance &&
+        distance < bestDistance
+      ) {
+        bestDistance =
+          distance;
+
+        bestGroup =
+          group;
+      }
+    }
+
+    if (bestGroup) {
+      bestGroup.push(item);
+    } else {
+      groups.push([item]);
     }
   }
 
-  if (!questionStart) {
-    return null;
+  return groups
+    .map((group) => {
+      group.sort(
+        (a, b) =>
+          a.x - b.x
+      );
+
+      let text = "";
+      let previousRight:
+        number | null = null;
+
+      for (const item of group) {
+        if (
+          previousRight !== null
+        ) {
+          const gap =
+            item.x -
+            previousRight;
+
+          if (
+            gap >
+            Math.max(
+              2.5,
+              item.height * 0.18
+            )
+          ) {
+            text += " ";
+          }
+        }
+
+        text +=
+          item.text;
+
+        previousRight =
+          item.x +
+          item.width;
+      }
+
+      const x =
+        Math.min(
+          ...group.map(
+            (item) => item.x
+          )
+        );
+
+      const y =
+        group.reduce(
+          (sum, item) =>
+            sum + item.y,
+          0
+        ) / group.length;
+
+      const right =
+        Math.max(
+          ...group.map(
+            (item) =>
+              item.x +
+              item.width
+          )
+        );
+
+      const height =
+        Math.max(
+          ...group.map(
+            (item) =>
+              item.height
+          )
+        );
+
+      return {
+        text:
+          normalizeOneLine(text),
+        x,
+        y,
+        width:
+          right - x,
+        height,
+        pageNumber:
+          group[0].pageNumber,
+        column,
+      };
+    })
+    .filter(
+      (line) =>
+        line.text.length > 0
+    )
+    .sort((a, b) => {
+      const dy =
+        b.y - a.y;
+
+      if (
+        Math.abs(dy) > 3
+      ) {
+        return dy;
+      }
+
+      return a.x - b.x;
+    });
+}
+
+/* =========================================================
+   PAGE READING ORDER
+   Two-column pages:
+   LEFT TOP->BOTTOM, then RIGHT TOP->BOTTOM.
+   No item is discarded in the middle.
+========================================================= */
+
+function pageLines(
+  items: PositionedText[],
+  pageWidth: number
+) {
+  if (items.length === 0) {
+    return [] as TextLine[];
+  }
+
+  const middle =
+    pageWidth / 2;
+
+  /*
+    We detect whether there is meaningful text on BOTH sides.
+  */
+  const leftCount =
+    items.filter(
+      (item) =>
+        item.x <
+        middle - 10
+    ).length;
+
+  const rightCount =
+    items.filter(
+      (item) =>
+        item.x >
+        middle + 10
+    ).length;
+
+  const twoColumn =
+    leftCount >= 8 &&
+    rightCount >= 8;
+
+  if (!twoColumn) {
+    return groupItemsIntoLines(
+      items,
+      "full"
+    );
   }
 
   /*
-    Find A) below/after question start, reasonably near same x region.
+    IMPORTANT:
+    assign EVERY item to exactly one column.
+    No dead zone, no dropped tokens.
   */
-  const optionA =
-    items.find(
-      (item) => {
+  const left =
+    items.filter(
+      (item) =>
+        item.x +
+          item.width / 2 <=
+        middle
+    );
+
+  const right =
+    items.filter(
+      (item) =>
+        item.x +
+          item.width / 2 >
+        middle
+    );
+
+  const leftLines =
+    groupItemsIntoLines(
+      left,
+      "left"
+    );
+
+  const rightLines =
+    groupItemsIntoLines(
+      right,
+      "right"
+    );
+
+  return [
+    ...leftLines,
+    ...rightLines,
+  ];
+}
+
+/* =========================================================
+   QUESTION BLOCKS
+========================================================= */
+
+function buildQuestionBlocks(
+  lines: TextLine[]
+): QuestionBlock[] {
+  const blocks:
+    QuestionBlock[] = [];
+
+  let current:
+    QuestionBlock | null =
+    null;
+
+  for (const line of lines) {
+    const number =
+      questionNumberFromLine(
+        line.text
+      );
+
+    if (number !== null) {
+      if (current) {
+        blocks.push(current);
+      }
+
+      current = {
+        number,
+        lines: [line],
+      };
+
+      continue;
+    }
+
+    if (current) {
+      current.lines.push(
+        line
+      );
+    }
+  }
+
+  if (current) {
+    blocks.push(current);
+  }
+
+  return blocks;
+}
+
+/* =========================================================
+   INLINE OPTION SPLITTER
+   Example:
+      A) 1,4 B) 2,3
+      C) 1,3 D) 2,4
+========================================================= */
+
+function splitInlineOptions(
+  text: string
+) {
+  const regex =
+    /(^|\s)([ABCD])[\)\.\-:]\s*/g;
+
+  const matches: {
+    label: OptionLabel;
+    markerStart: number;
+    contentStart: number;
+  }[] = [];
+
+  let match:
+    RegExpExecArray | null;
+
+  while (
+    (match =
+      regex.exec(text)) !==
+    null
+  ) {
+    const leadingLength =
+      match[1]?.length ?? 0;
+
+    matches.push({
+      label:
+        match[2] as OptionLabel,
+      markerStart:
+        match.index +
+        leadingLength,
+      contentStart:
+        regex.lastIndex,
+    });
+  }
+
+  return matches.map(
+    (current, index) => {
+      const next =
+        matches[index + 1];
+
+      return {
+        label:
+          current.label,
+        text:
+          text
+            .slice(
+              current.contentStart,
+              next
+                ? next.markerStart
+                : text.length
+            )
+            .trim(),
+      };
+    }
+  );
+}
+
+/* =========================================================
+   PARSE:
+   QUESTION -> A -> B -> C -> D -> NEXT QUESTION
+========================================================= */
+
+function parseQuestion(
+  block: QuestionBlock,
+  pageInfos: Map<number, PageInfo>
+) {
+  const labels:
+    OptionLabel[] = [
+      "A",
+      "B",
+      "C",
+      "D",
+    ];
+
+  const questionParts:
+    string[] = [];
+
+  const optionData =
+    new Map<
+      OptionLabel,
+      {
+        textParts: string[];
+        plus: boolean;
+        highlight: boolean;
+        firstLine: TextLine;
+      }
+    >();
+
+  let currentOption:
+    OptionLabel | null =
+    null;
+
+  let firstOptionLine:
+    TextLine | null =
+    null;
+
+  let lastQuestionLine:
+    TextLine | null =
+    null;
+
+  for (
+    let index = 0;
+    index <
+    block.lines.length;
+    index++
+  ) {
+    const line =
+      block.lines[index];
+
+    const lineText =
+      index === 0
+        ? stripQuestionNumber(
+            line.text
+          )
+        : line.text;
+
+    const inline =
+      splitInlineOptions(
+        lineText
+      );
+
+    if (
+      inline.length > 0
+    ) {
+      if (!firstOptionLine) {
+        firstOptionLine =
+          line;
+      }
+
+      const pageInfo =
+        pageInfos.get(
+          line.pageNumber
+        );
+
+      for (const part of inline) {
+        currentOption =
+          part.label;
+
+        const existing =
+          optionData.get(
+            part.label
+          );
+
+        const plus =
+          hasPlus(
+            part.text
+          );
+
+        const highlight =
+          pageInfo
+            ? lineIsHighlighted(
+                line,
+                pageInfo.highlights
+              )
+            : false;
+
+        if (existing) {
+          existing.textParts.push(
+            cleanPlus(
+              part.text
+            )
+          );
+
+          existing.plus =
+            existing.plus ||
+            plus;
+
+          existing.highlight =
+            existing.highlight ||
+            highlight;
+        } else {
+          optionData.set(
+            part.label,
+            {
+              textParts: [
+                cleanPlus(
+                  part.text
+                ),
+              ],
+              plus,
+              highlight,
+              firstLine:
+                line,
+            }
+          );
+        }
+      }
+
+      continue;
+    }
+
+    const directLabel =
+      optionLabelFromStart(
+        lineText
+      );
+
+    if (directLabel) {
+      currentOption =
+        directLabel;
+
+      if (!firstOptionLine) {
+        firstOptionLine =
+          line;
+      }
+
+      const raw =
+        stripOptionPrefix(
+          lineText
+        );
+
+      const pageInfo =
+        pageInfos.get(
+          line.pageNumber
+        );
+
+      optionData.set(
+        directLabel,
+        {
+          textParts: [
+            cleanPlus(raw),
+          ],
+          plus:
+            hasPlus(raw) ||
+            hasPlus(
+              lineText
+            ),
+          highlight:
+            pageInfo
+              ? lineIsHighlighted(
+                  line,
+                  pageInfo.highlights
+                )
+              : false,
+          firstLine:
+            line,
+        }
+      );
+
+      continue;
+    }
+
+    if (currentOption) {
+      const existing =
+        optionData.get(
+          currentOption
+        );
+
+      if (existing) {
+        existing.textParts.push(
+          cleanPlus(
+            lineText
+          )
+        );
+
         if (
-          !/^A[\)\.\-:]$|^A[\)\.\-:]\s/.test(
-            item.text.trim()
+          hasPlus(
+            lineText
           )
         ) {
-          return false;
+          existing.plus =
+            true;
         }
 
-        return (
-          item.y <
-          questionStart!.y
-        );
-      }
-    ) ?? null;
+        const pageInfo =
+          pageInfos.get(
+            line.pageNumber
+          );
 
-  if (!optionA) {
-    return null;
+        if (
+          pageInfo &&
+          lineIsHighlighted(
+            line,
+            pageInfo.highlights
+          )
+        ) {
+          existing.highlight =
+            true;
+        }
+      }
+
+      continue;
+    }
+
+    questionParts.push(
+      lineText
+    );
+
+    lastQuestionLine =
+      line;
+  }
+
+  const plusLabels =
+    labels.filter(
+      (label) =>
+        optionData.get(
+          label
+        )?.plus
+    );
+
+  const highlightLabels =
+    labels.filter(
+      (label) =>
+        optionData.get(
+          label
+        )?.highlight
+    );
+
+  let correctLabel:
+    OptionLabel | null =
+    null;
+
+  /*
+    PRIORITY:
+    1. +
+    2. yellow highlight
+    3. manual admin selection
+  */
+  if (
+    plusLabels.length === 1
+  ) {
+    correctLabel =
+      plusLabels[0];
+  } else if (
+    plusLabels.length === 0 &&
+    highlightLabels.length === 1
+  ) {
+    correctLabel =
+      highlightLabels[0];
+  }
+
+  const options:
+    ImportedOption[] =
+    labels.map(
+      (label) => {
+        const found =
+          optionData.get(
+            label
+          );
+
+        return {
+          id: makeId(
+            `q${block.number}-${label.toLowerCase()}`
+          ),
+          label,
+          text:
+            found
+              ? normalizeText(
+                  found.textParts.join(
+                    " "
+                  )
+                )
+              : "",
+          isCorrect:
+            correctLabel ===
+            label,
+        };
+      }
+    );
+
+  const foundCount =
+    labels.filter(
+      (label) =>
+        optionData.has(
+          label
+        )
+    ).length;
+
+  let warning:
+    string | undefined;
+
+  if (foundCount !== 4) {
+    warning =
+      `${foundCount} ta variant topildi. A, B, C, D to‘liq topilmadi.`;
+  } else if (
+    plusLabels.length > 1
+  ) {
+    warning =
+      "Bir nechta variantda + belgisi topildi. To‘g‘ri javobni tekshiring.";
+  } else if (
+    plusLabels.length === 0 &&
+    highlightLabels.length > 1
+  ) {
+    warning =
+      "Bir nechta sariq variant topildi. To‘g‘ri javobni tekshiring.";
+  } else if (!correctLabel) {
+    warning =
+      "To‘g‘ri javob topilmadi. To‘g‘ri variant oxiriga + belgisi qo‘ying yoki admin oynasida belgilang.";
   }
 
   return {
-    questionStart,
-    optionA,
+    number:
+      block.number,
+    questionText:
+      normalizeText(
+        questionParts.join(
+          "\n"
+        )
+      ),
+    options,
+    warning,
+    firstOptionLine,
+    lastQuestionLine,
   };
 }
 
+/* =========================================================
+   IMAGE / DIAGRAM
+   Only if there is a REAL large gap between question text
+   and first A/B/C/D line on the SAME page/column.
+========================================================= */
+
 async function renderQuestionImage(
   pageInfo: PageInfo,
-  questionNumberValue: number
+  firstOptionLine: TextLine | null,
+  lastQuestionLine: TextLine | null
 ) {
-  const bounds =
-    findQuestionVisualBounds(
-      pageInfo,
-      questionNumberValue
-    );
-
-  if (!bounds) {
+  if (
+    !firstOptionLine ||
+    !lastQuestionLine
+  ) {
     return undefined;
   }
 
-  const {
-    questionStart,
-    optionA,
-  } = bounds;
+  if (
+    firstOptionLine.pageNumber !==
+    lastQuestionLine.pageNumber
+  ) {
+    return undefined;
+  }
+
+  if (
+    firstOptionLine.column !==
+      lastQuestionLine.column &&
+    firstOptionLine.column !==
+      "full" &&
+    lastQuestionLine.column !==
+      "full"
+  ) {
+    return undefined;
+  }
+
+  const gap =
+    lastQuestionLine.y -
+    firstOptionLine.y;
 
   /*
-    Huge gap only.
-    Regular text questions should NOT get accidental screenshots.
+    Conservative threshold.
+    Prevents blank/normal text being misdetected as image.
   */
-  const gap =
-    questionStart.y -
-    optionA.y;
-
-  if (gap < 120) {
+  if (gap < 90) {
     return undefined;
   }
 
   const viewport =
     pageInfo.page.getViewport({
-      scale: 1.55,
+      scale: 1.6,
     });
 
   const canvas =
@@ -910,15 +1137,13 @@ async function renderQuestionImage(
     viewport.height /
     pageInfo.height;
 
-  /*
-    Crop BELOW question start and ABOVE option A.
-    We leave margins so diagram/table is preserved.
-  */
   const upperPdfY =
-    questionStart.y - 18;
+    lastQuestionLine.y -
+    14;
 
   const lowerPdfY =
-    optionA.y + 18;
+    firstOptionLine.y +
+    14;
 
   const topCanvas =
     viewport.height -
@@ -956,44 +1181,39 @@ async function renderQuestionImage(
     cropBottom -
     cropTop;
 
-  if (cropHeight < 55) {
+  if (cropHeight < 60) {
     return undefined;
   }
-
-  /*
-    Use x position to guess whether question belongs to left/right column.
-    This is ONLY for image cropping, not for text parsing.
-  */
-  const pageMiddle =
-    pageInfo.width / 2;
 
   let pdfX1 = 12;
   let pdfX2 =
     pageInfo.width - 12;
 
   if (
-    questionStart.x <
-    pageMiddle * 0.75
+    firstOptionLine.column ===
+    "left"
   ) {
-    pdfX1 = 10;
+    pdfX1 = 8;
     pdfX2 =
-      pageMiddle - 5;
+      pageInfo.width / 2 -
+      5;
   } else if (
-    questionStart.x >
-    pageMiddle * 0.9
+    firstOptionLine.column ===
+    "right"
   ) {
     pdfX1 =
-      pageMiddle + 5;
+      pageInfo.width / 2 +
+      5;
+
     pdfX2 =
-      pageInfo.width - 10;
+      pageInfo.width - 8;
   }
 
   const cropX =
     Math.max(
       0,
       Math.floor(
-        pdfX1 *
-          scaleX
+        pdfX1 * scaleX
       )
     );
 
@@ -1050,44 +1270,6 @@ async function renderQuestionImage(
     );
 
   return `data:image/png;base64,${png.toString("base64")}`;
-}
-
-/* =========================================================
-   PAGE LOOKUP FOR QUESTION IMAGE
-========================================================= */
-
-function findPageForQuestion(
-  pageInfos: Map<number, PageInfo>,
-  questionNumberValue: number
-) {
-  const startRegex =
-    new RegExp(
-      `^${questionNumberValue}[\\.\\)]$|^${questionNumberValue}[\\.\\)]\\s`
-    );
-
-  for (
-    const [
-      pageNumber,
-      pageInfo,
-    ] of pageInfos
-  ) {
-    const found =
-      pageInfo.items.some(
-        (item) =>
-          startRegex.test(
-            item.text.trim()
-          )
-      );
-
-    if (found) {
-      return {
-        pageNumber,
-        pageInfo,
-      };
-    }
-  }
-
-  return null;
 }
 
 /* =========================================================
@@ -1180,7 +1362,8 @@ export async function POST(
       );
 
     /*
-      Vercel PDF.js worker fix
+      VERCEL PDF.JS WORKER FIX
+      Keep this — it already worked on your deployment.
     */
     const {
       pathToFileURL,
@@ -1216,20 +1399,17 @@ export async function POST(
         })
         .promise;
 
+    const allLines:
+      TextLine[] = [];
+
     const pageInfos =
       new Map<
         number,
         PageInfo
       >();
 
-    const documentTextParts:
-      string[] = [];
-
-    const allHighlightedLabels =
-      new Set<string>();
-
     /* ---------------------------------------------------------
-       READ PDF IN NATIVE CONTENT ORDER
+       PAGE BY PAGE
     --------------------------------------------------------- */
 
     for (
@@ -1252,18 +1432,10 @@ export async function POST(
         await page.getTextContent();
 
       const rawItems =
-        textContent.items as PdfTextItem[];
+        textContent.items as
+          PdfTextItem[];
 
-      const pageText =
-        textItemsToNaturalText(
-          rawItems
-        );
-
-      documentTextParts.push(
-        pageText
-      );
-
-      const positionedItems =
+      const items =
         buildPositionedItems(
           rawItems,
           pageNumber
@@ -1274,21 +1446,6 @@ export async function POST(
           page
         );
 
-      const pageHighlightedLabels =
-        highlightedOptionLabelsOnPage(
-          positionedItems,
-          highlights
-        );
-
-      for (
-        const label of
-        pageHighlightedLabels
-      ) {
-        allHighlightedLabels.add(
-          label
-        );
-      }
-
       pageInfos.set(
         pageNumber,
         {
@@ -1297,83 +1454,82 @@ export async function POST(
             viewport.width,
           height:
             viewport.height,
-          items:
-            positionedItems,
           highlights,
         }
       );
+
+      /*
+        PAGE READING ORDER:
+        left column first, then right column.
+        No center text is discarded.
+      */
+      const lines =
+        pageLines(
+          items,
+          viewport.width
+        );
+
+      allLines.push(
+        ...lines
+      );
     }
 
-    const documentText =
-      documentTextParts.join(
-        "\n"
-      );
-
     /* ---------------------------------------------------------
-       QUESTIONS
+       QUESTION BLOCKS
     --------------------------------------------------------- */
 
-    const rawBlocks =
+    const blocks =
       buildQuestionBlocks(
-        documentText
+        allLines
       );
 
-    const importedQuestions:
-      ImportedQuestion[] =
-      [];
+    const imported:
+      ImportedQuestion[] = [];
 
-    for (
-      const block of rawBlocks
-    ) {
-      /*
-        Highlight fallback is intentionally conservative:
-        we only trust it globally when it identifies one label.
-        + remains the primary answer marker.
-      */
-      const highlightLabelsForQuestion =
-        allHighlightedLabels.size === 1
-          ? allHighlightedLabels
-          : new Set<string>();
-
+    for (const block of blocks) {
       const parsed =
-        parseQuestionTextAndOptions(
+        parseQuestion(
           block,
-          highlightLabelsForQuestion
+          pageInfos
         );
 
       let imageSrc:
         string | undefined;
 
-      const pageMatch =
-        findPageForQuestion(
-          pageInfos,
-          block.number
-        );
-
-      if (pageMatch) {
-        try {
-          imageSrc =
-            await renderQuestionImage(
-              pageMatch.pageInfo,
-              block.number
-            );
-        } catch (error) {
-          console.error(
-            `QUESTION IMAGE ${block.number} ERROR:`,
-            error
+      if (
+        parsed.firstOptionLine &&
+        parsed.lastQuestionLine &&
+        parsed.firstOptionLine.pageNumber ===
+          parsed.lastQuestionLine.pageNumber
+      ) {
+        const pageInfo =
+          pageInfos.get(
+            parsed.firstOptionLine.pageNumber
           );
 
-          imageSrc =
-            undefined;
+        if (pageInfo) {
+          try {
+            imageSrc =
+              await renderQuestionImage(
+                pageInfo,
+                parsed.firstOptionLine,
+                parsed.lastQuestionLine
+              );
+          } catch (error) {
+            console.error(
+              `IMAGE Q${parsed.number} ERROR:`,
+              error
+            );
+          }
         }
       }
 
-      importedQuestions.push({
+      imported.push({
         id: makeId(
-          `import-q${block.number}`
+          `import-q${parsed.number}`
         ),
         number:
-          block.number,
+          parsed.number,
         questionText:
           parsed.questionText,
         options:
@@ -1385,8 +1541,8 @@ export async function POST(
     }
 
     /* ---------------------------------------------------------
-       CLEAN DUPLICATES
-       Keep the first valid occurrence of each question number.
+       REMOVE DUPLICATE QUESTION NUMBERS
+       Prefer the version with more non-empty options.
     --------------------------------------------------------- */
 
     const unique =
@@ -1395,10 +1551,7 @@ export async function POST(
         ImportedQuestion
       >();
 
-    for (
-      const question of
-      importedQuestions
-    ) {
+    for (const question of imported) {
       const existing =
         unique.get(
           question.number
@@ -1413,12 +1566,21 @@ export async function POST(
         continue;
       }
 
-      /*
-        If duplicate exists, prefer one with more valid options.
-      */
+      const existingFilled =
+        existing.options.filter(
+          (option) =>
+            option.text.trim()
+        ).length;
+
+      const newFilled =
+        question.options.filter(
+          (option) =>
+            option.text.trim()
+        ).length;
+
       if (
-        question.options.length >
-        existing.options.length
+        newFilled >
+        existingFilled
       ) {
         unique.set(
           question.number,
@@ -1441,7 +1603,7 @@ export async function POST(
         {
           success: false,
           message:
-            "PDFdan test savollari topilmadi. Savollar alohida satrda 1. yoki 1) ko‘rinishida boshlanishini tekshiring.",
+            "PDFdan test savollari topilmadi. Test savollari '1.' '2.' '3.' ko‘rinishida bo‘lishi kerak.",
         },
         {
           status: 422,
