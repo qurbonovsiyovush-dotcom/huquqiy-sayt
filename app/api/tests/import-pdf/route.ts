@@ -1,20 +1,11 @@
-import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
-import { createCanvas } from "@napi-rs/canvas";
+"use client";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-/* =========================================================
-   TYPES
-========================================================= */
-
-type OptionLabel = "A" | "B" | "C" | "D";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type ImportedOption = {
   id: string;
-  label: OptionLabel;
+  label: "A" | "B" | "C" | "D";
   text: string;
   isCorrect: boolean;
 };
@@ -28,1327 +19,40 @@ type ImportedQuestion = {
   warning?: string;
 };
 
-type PdfTextItem = {
-  str: string;
-  transform: number[];
-  width?: number;
-  height?: number;
-};
+export default function ImportPdfTestPage() {
+  const router = useRouter();
 
-type PositionedText = {
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  pageNumber: number;
-};
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [duration, setDuration] = useState(60);
+  const [description, setDescription] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
 
-type TextLine = {
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  pageNumber: number;
-  column: "left" | "right" | "full";
-};
+  const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-type HighlightRect = {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-};
+  const [message, setMessage] = useState("");
+  const [questions, setQuestions] =
+    useState<ImportedQuestion[]>([]);
 
-type PageInfo = {
-  page: any;
-  width: number;
-  height: number;
-  highlights: HighlightRect[];
-};
-
-type QuestionBlock = {
-  number: number;
-  lines: TextLine[];
-};
-
-/* =========================================================
-   ADMIN
-========================================================= */
-
-async function isAdmin() {
-  const cookieStore = await cookies();
-
-  return (
-    cookieStore.get("qurbonov_role")?.value === "admin"
-  );
-}
-
-/* =========================================================
-   BASIC HELPERS
-========================================================= */
-
-function makeId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}`;
-}
-
-function normalizeText(value: string) {
-  return value
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function normalizeOneLine(value: string) {
-  return value
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function cleanPlus(value: string) {
-  return value
-    .replace(/\(\s*\+\s*\)/g, "")
-    .replace(/\s*\+\s*$/g, "")
-    .replace(/^\s*\+\s*/g, "")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
-function hasPlus(value: string) {
-  return (
-    /\+\s*$/.test(value) ||
-    /\(\s*\+\s*\)/.test(value) ||
-    /^\s*\+\s*/.test(value)
-  );
-}
-
-function questionNumberFromLine(value: string) {
-  /*
-    MUHIM:
-    Test savollari faqat "1.", "2.", "3." ... formatida.
-    "1)", "2)" esa savol ichidagi bandlar, savol deb olinmaydi.
-  */
-  const match = value.match(/^\s*(\d{1,4})\.\s+\S/);
-
-  if (!match) {
-    return null;
-  }
-
-  const number = Number(match[1]);
-
-  if (
-    !Number.isFinite(number) ||
-    number < 1 ||
-    number > 5000
-  ) {
-    return null;
-  }
-
-  return number;
-}
-
-function stripQuestionNumber(value: string) {
-  return value
-    .replace(/^\s*\d{1,4}\.\s+/, "")
-    .trim();
-}
-
-function optionLabelFromStart(
-  value: string
-): OptionLabel | null {
-  /*
-    Qabul qilinadi:
-      A) ...
-      +A) ...
-      + A) ...
-      A)+ ...
-      A) + ...
-  */
-  const match = value.match(
-    /^\s*\+?\s*([ABCD])[\)\.\-:]\s*\+?\s*/
+  const warningCount = useMemo(
+    () =>
+      questions.filter(
+        (item) =>
+          item.warning
+      ).length,
+    [questions]
   );
 
-  return match
-    ? (match[1] as OptionLabel)
-    : null;
-}
-
-function stripOptionPrefix(value: string) {
-  return value
-    .replace(
-      /^\s*\+?\s*[ABCD][\)\.\-:]\s*\+?\s*/,
-      ""
-    )
-    .trim();
-}
-
-function optionMarkerHasLeadingOrTrailingPlus(value: string) {
-  return (
-    /^\s*\+\s*[ABCD][\)\.\-:]/.test(value) ||
-    /^\s*[ABCD][\)\.\-:]\s*\+/.test(value)
-  );
-}
-
-/* =========================================================
-   HIGHLIGHT
-========================================================= */
-
-function rectIntersects(
-  a: {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  },
-  b: {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  }
-) {
-  return !(
-    a.x2 < b.x1 ||
-    a.x1 > b.x2 ||
-    a.y2 < b.y1 ||
-    a.y1 > b.y2
-  );
-}
-
-function lineIsHighlighted(
-  line: TextLine,
-  highlights: HighlightRect[]
-) {
-  const lineRect = {
-    x1: line.x - 3,
-    y1: line.y - line.height * 0.45,
-    x2: line.x + line.width + 3,
-    y2: line.y + line.height * 1.05,
-  };
-
-  return highlights.some((highlight) =>
-    rectIntersects(lineRect, highlight)
-  );
-}
-
-async function pageHighlights(
-  page: any
-): Promise<HighlightRect[]> {
-  try {
-    const annotations =
-      await page.getAnnotations({
-        intent: "display",
-      });
-
-    const result: HighlightRect[] = [];
-
-    for (const annotation of annotations) {
-      if (
-        annotation?.subtype !== "Highlight" &&
-        annotation?.annotationType !== 9
-      ) {
-        continue;
-      }
-
-      const quadPoints =
-        Array.isArray(annotation?.quadPoints)
-          ? annotation.quadPoints
-          : null;
-
-      if (
-        quadPoints &&
-        quadPoints.length >= 8
-      ) {
-        for (
-          let index = 0;
-          index + 7 < quadPoints.length;
-          index += 8
-        ) {
-          const xs = [
-            quadPoints[index],
-            quadPoints[index + 2],
-            quadPoints[index + 4],
-            quadPoints[index + 6],
-          ];
-
-          const ys = [
-            quadPoints[index + 1],
-            quadPoints[index + 3],
-            quadPoints[index + 5],
-            quadPoints[index + 7],
-          ];
-
-          result.push({
-            x1: Math.min(...xs),
-            y1: Math.min(...ys),
-            x2: Math.max(...xs),
-            y2: Math.max(...ys),
-          });
-        }
-
-        continue;
-      }
-
-      if (
-        Array.isArray(annotation?.rect) &&
-        annotation.rect.length >= 4
-      ) {
-        const [x1, y1, x2, y2] =
-          annotation.rect;
-
-        result.push({
-          x1: Math.min(x1, x2),
-          y1: Math.min(y1, y2),
-          x2: Math.max(x1, x2),
-          y2: Math.max(y1, y2),
-        });
-      }
-    }
-
-    return result;
-  } catch (error) {
-    console.error(
-      "HIGHLIGHT READ ERROR:",
-      error
-    );
-
-    return [];
-  }
-}
-
-/* =========================================================
-   TEXT ITEMS -> LINES
-========================================================= */
-
-function buildPositionedItems(
-  textItems: PdfTextItem[],
-  pageNumber: number
-): PositionedText[] {
-  return textItems
-    .filter(
-      (item) =>
-        typeof item.str === "string" &&
-        item.str.trim()
-    )
-    .map((item) => {
-      const transform =
-        item.transform ?? [
-          1, 0, 0, 1, 0, 0,
-        ];
-
-      return {
-        text: item.str.trim(),
-        x:
-          Number(transform[4]) || 0,
-        y:
-          Number(transform[5]) || 0,
-        width:
-          Math.max(
-            1,
-            Number(item.width) || 1
-          ),
-        height:
-          Math.max(
-            8,
-            Math.abs(
-              Number(transform[3]) || 0
-            )
-          ),
-        pageNumber,
-      };
-    });
-}
-
-function groupItemsIntoLines(
-  items: PositionedText[],
-  column: "left" | "right" | "full"
-): TextLine[] {
-  const sorted =
-    [...items].sort((a, b) => {
-      const dy = b.y - a.y;
-
-      if (Math.abs(dy) > 3.5) {
-        return dy;
-      }
-
-      return a.x - b.x;
-    });
-
-  const groups: PositionedText[][] = [];
-
-  for (const item of sorted) {
-    let bestGroup:
-      PositionedText[] | null = null;
-
-    let bestDistance =
-      Number.POSITIVE_INFINITY;
-
-    for (const group of groups) {
-      const avgY =
-        group.reduce(
-          (sum, part) =>
-            sum + part.y,
-          0
-        ) / group.length;
-
-      const distance =
-        Math.abs(
-          avgY - item.y
-        );
-
-      const tolerance =
-        Math.max(
-          3.5,
-          item.height * 0.45
-        );
-
-      if (
-        distance <= tolerance &&
-        distance < bestDistance
-      ) {
-        bestDistance =
-          distance;
-
-        bestGroup =
-          group;
-      }
-    }
-
-    if (bestGroup) {
-      bestGroup.push(item);
-    } else {
-      groups.push([item]);
-    }
-  }
-
-  return groups
-    .map((group) => {
-      group.sort(
-        (a, b) =>
-          a.x - b.x
-      );
-
-      let text = "";
-      let previousRight:
-        number | null = null;
-
-      for (const item of group) {
-        if (
-          previousRight !== null
-        ) {
-          const gap =
-            item.x -
-            previousRight;
-
-          if (
-            gap >
-            Math.max(
-              2.5,
-              item.height * 0.18
-            )
-          ) {
-            text += " ";
-          }
-        }
-
-        text +=
-          item.text;
-
-        previousRight =
-          item.x +
-          item.width;
-      }
-
-      const x =
-        Math.min(
-          ...group.map(
-            (item) => item.x
-          )
-        );
-
-      const y =
-        group.reduce(
-          (sum, item) =>
-            sum + item.y,
-          0
-        ) / group.length;
-
-      const right =
-        Math.max(
-          ...group.map(
-            (item) =>
-              item.x +
-              item.width
-          )
-        );
-
-      const height =
-        Math.max(
-          ...group.map(
-            (item) =>
-              item.height
-          )
-        );
-
-      return {
-        text:
-          normalizeOneLine(text),
-        x,
-        y,
-        width:
-          right - x,
-        height,
-        pageNumber:
-          group[0].pageNumber,
-        column,
-      };
-    })
-    .filter(
-      (line) =>
-        line.text.length > 0
-    )
-    .sort((a, b) => {
-      const dy =
-        b.y - a.y;
-
-      if (
-        Math.abs(dy) > 3
-      ) {
-        return dy;
-      }
-
-      return a.x - b.x;
-    });
-}
-
-/* =========================================================
-   PAGE READING ORDER
-   Two-column pages:
-   LEFT TOP->BOTTOM, then RIGHT TOP->BOTTOM.
-   No item is discarded in the middle.
-========================================================= */
-
-function pageLines(
-  items: PositionedText[],
-  pageWidth: number
-) {
-  if (items.length === 0) {
-    return [] as TextLine[];
-  }
-
-  const middle =
-    pageWidth / 2;
-
-  /*
-    We detect whether there is meaningful text on BOTH sides.
-  */
-  const leftCount =
-    items.filter(
-      (item) =>
-        item.x <
-        middle - 10
-    ).length;
-
-  const rightCount =
-    items.filter(
-      (item) =>
-        item.x >
-        middle + 10
-    ).length;
-
-  const twoColumn =
-    leftCount >= 8 &&
-    rightCount >= 8;
-
-  if (!twoColumn) {
-    return groupItemsIntoLines(
-      items,
-      "full"
-    );
-  }
-
-  /*
-    IMPORTANT:
-    assign EVERY item to exactly one column.
-    No dead zone, no dropped tokens.
-  */
-  const left =
-    items.filter(
-      (item) =>
-        item.x +
-          item.width / 2 <=
-        middle
-    );
-
-  const right =
-    items.filter(
-      (item) =>
-        item.x +
-          item.width / 2 >
-        middle
-    );
-
-  const leftLines =
-    groupItemsIntoLines(
-      left,
-      "left"
-    );
-
-  const rightLines =
-    groupItemsIntoLines(
-      right,
-      "right"
-    );
-
-  return [
-    ...leftLines,
-    ...rightLines,
-  ];
-}
-
-/* =========================================================
-   QUESTION BLOCKS
-========================================================= */
-
-function buildQuestionBlocks(
-  lines: TextLine[]
-): QuestionBlock[] {
-  const blocks:
-    QuestionBlock[] = [];
-
-  let current:
-    QuestionBlock | null =
-    null;
-
-  for (const line of lines) {
-    const number =
-      questionNumberFromLine(
-        line.text
-      );
-
-    if (number !== null) {
-      if (current) {
-        blocks.push(current);
-      }
-
-      current = {
-        number,
-        lines: [line],
-      };
-
-      continue;
-    }
-
-    if (current) {
-      current.lines.push(
-        line
-      );
-    }
-  }
-
-  if (current) {
-    blocks.push(current);
-  }
-
-  return blocks;
-}
-
-/* =========================================================
-   INLINE OPTION SPLITTER
-   Example:
-      A) 1,4 B) 2,3
-      C) 1,3 D) 2,4
-========================================================= */
-
-function splitInlineOptions(
-  text: string
-) {
-  /*
-    Bir qatorda quyidagilarni ham taniydi:
-      A) ... B) ...
-      +A) ... B) ...
-      A)+ ... B) ...
-      A) + ... B) ...
-  */
-  const regex =
-    /(^|\s)(\+?\s*)([ABCD])[\)\.\-:]\s*(\+?\s*)/g;
-
-  const matches: {
-    label: OptionLabel;
-    markerStart: number;
-    contentStart: number;
-    markerHasPlus: boolean;
-  }[] = [];
-
-  let match:
-    RegExpExecArray | null;
-
-  while (
-    (match =
-      regex.exec(text)) !==
-    null
+  function handleFile(
+    file: File | null
   ) {
-    const leadingLength =
-      match[1]?.length ?? 0;
-
-    matches.push({
-      label:
-        match[3] as OptionLabel,
-      markerStart:
-        match.index +
-        leadingLength,
-      contentStart:
-        regex.lastIndex,
-      markerHasPlus:
-        Boolean(match[2]?.includes("+")) ||
-        Boolean(match[4]?.includes("+")),
-    });
-  }
-
-  return matches.map(
-    (current, index) => {
-      const next =
-        matches[index + 1];
-
-      return {
-        label:
-          current.label,
-        text:
-          text
-            .slice(
-              current.contentStart,
-              next
-                ? next.markerStart
-                : text.length
-            )
-            .trim(),
-        markerHasPlus:
-          current.markerHasPlus,
-      };
-    }
-  );
-}
-
-/* =========================================================
-   PARSE:
-   QUESTION -> A -> B -> C -> D -> NEXT QUESTION
-========================================================= */
-
-function parseQuestion(
-  block: QuestionBlock,
-  pageInfos: Map<number, PageInfo>
-) {
-  const labels:
-    OptionLabel[] = [
-      "A",
-      "B",
-      "C",
-      "D",
-    ];
-
-  const questionParts:
-    string[] = [];
-
-  const optionData =
-    new Map<
-      OptionLabel,
-      {
-        textParts: string[];
-        plus: boolean;
-        highlight: boolean;
-        firstLine: TextLine;
-      }
-    >();
-
-  let currentOption:
-    OptionLabel | null =
-    null;
-
-  let firstOptionLine:
-    TextLine | null =
-    null;
-
-  let lastQuestionLine:
-    TextLine | null =
-    null;
-
-  for (
-    let index = 0;
-    index <
-    block.lines.length;
-    index++
-  ) {
-    const line =
-      block.lines[index];
-
-    const lineText =
-      index === 0
-        ? stripQuestionNumber(
-            line.text
-          )
-        : line.text;
-
-    const inline =
-      splitInlineOptions(
-        lineText
-      );
-
-    if (
-      inline.length > 0
-    ) {
-      if (!firstOptionLine) {
-        firstOptionLine =
-          line;
-      }
-
-      const pageInfo =
-        pageInfos.get(
-          line.pageNumber
-        );
-
-      for (const part of inline) {
-        currentOption =
-          part.label;
-
-        const existing =
-          optionData.get(
-            part.label
-          );
-
-        const plus =
-          part.markerHasPlus ||
-          hasPlus(
-            part.text
-          );
-
-        const highlight =
-          pageInfo
-            ? lineIsHighlighted(
-                line,
-                pageInfo.highlights
-              )
-            : false;
-
-        if (existing) {
-          existing.textParts.push(
-            cleanPlus(
-              part.text
-            )
-          );
-
-          existing.plus =
-            existing.plus ||
-            plus;
-
-          existing.highlight =
-            existing.highlight ||
-            highlight;
-        } else {
-          optionData.set(
-            part.label,
-            {
-              textParts: [
-                cleanPlus(
-                  part.text
-                ),
-              ],
-              plus,
-              highlight,
-              firstLine:
-                line,
-            }
-          );
-        }
-      }
-
-      continue;
-    }
-
-    const directLabel =
-      optionLabelFromStart(
-        lineText
-      );
-
-    if (directLabel) {
-      currentOption =
-        directLabel;
-
-      if (!firstOptionLine) {
-        firstOptionLine =
-          line;
-      }
-
-      const raw =
-        stripOptionPrefix(
-          lineText
-        );
-
-      const pageInfo =
-        pageInfos.get(
-          line.pageNumber
-        );
-
-      optionData.set(
-        directLabel,
-        {
-          textParts: [
-            cleanPlus(raw),
-          ],
-          plus:
-            optionMarkerHasLeadingOrTrailingPlus(
-              lineText
-            ) ||
-            hasPlus(raw) ||
-            hasPlus(
-              lineText
-            ),
-          highlight:
-            pageInfo
-              ? lineIsHighlighted(
-                  line,
-                  pageInfo.highlights
-                )
-              : false,
-          firstLine:
-            line,
-        }
-      );
-
-      continue;
-    }
-
-    if (currentOption) {
-      const existing =
-        optionData.get(
-          currentOption
-        );
-
-      if (existing) {
-        existing.textParts.push(
-          cleanPlus(
-            lineText
-          )
-        );
-
-        if (
-          hasPlus(
-            lineText
-          )
-        ) {
-          existing.plus =
-            true;
-        }
-
-        const pageInfo =
-          pageInfos.get(
-            line.pageNumber
-          );
-
-        if (
-          pageInfo &&
-          lineIsHighlighted(
-            line,
-            pageInfo.highlights
-          )
-        ) {
-          existing.highlight =
-            true;
-        }
-      }
-
-      continue;
-    }
-
-    questionParts.push(
-      lineText
-    );
-
-    lastQuestionLine =
-      line;
-  }
-
-  const plusLabels =
-    labels.filter(
-      (label) =>
-        optionData.get(
-          label
-        )?.plus
-    );
-
-  const highlightLabels =
-    labels.filter(
-      (label) =>
-        optionData.get(
-          label
-        )?.highlight
-    );
-
-  let correctLabel:
-    OptionLabel | null =
-    null;
-
-  /*
-    PRIORITY:
-    1. +
-    2. yellow highlight
-    3. manual admin selection
-  */
-  if (
-    plusLabels.length === 1
-  ) {
-    correctLabel =
-      plusLabels[0];
-  } else if (
-    plusLabels.length === 0 &&
-    highlightLabels.length === 1
-  ) {
-    correctLabel =
-      highlightLabels[0];
-  }
-
-  const options:
-    ImportedOption[] =
-    labels.map(
-      (label) => {
-        const found =
-          optionData.get(
-            label
-          );
-
-        return {
-          id: makeId(
-            `q${block.number}-${label.toLowerCase()}`
-          ),
-          label,
-          text:
-            found
-              ? normalizeText(
-                  found.textParts.join(
-                    " "
-                  )
-                )
-              : "",
-          isCorrect:
-            correctLabel ===
-            label,
-        };
-      }
-    );
-
-  const foundCount =
-    labels.filter(
-      (label) =>
-        optionData.has(
-          label
-        )
-    ).length;
-
-  let warning:
-    string | undefined;
-
-  if (foundCount !== 4) {
-    warning =
-      `${foundCount} ta variant topildi. A, B, C, D to‘liq topilmadi.`;
-  } else if (
-    plusLabels.length > 1
-  ) {
-    warning =
-      "Bir nechta variantda + belgisi topildi. To‘g‘ri javobni tekshiring.";
-  } else if (
-    plusLabels.length === 0 &&
-    highlightLabels.length > 1
-  ) {
-    warning =
-      "Bir nechta sariq variant topildi. To‘g‘ri javobni tekshiring.";
-  } else if (!correctLabel) {
-    warning =
-      "To‘g‘ri javob topilmadi. To‘g‘ri variant oxiriga + belgisi qo‘ying yoki admin oynasida belgilang.";
-  }
-
-  return {
-    number:
-      block.number,
-    questionText:
-      normalizeText(
-        questionParts.join(
-          "\n"
-        )
-      ),
-    options,
-    warning,
-    firstOptionLine,
-    lastQuestionLine,
-  };
-}
-
-/* =========================================================
-   IMAGE / DIAGRAM
-   Only if there is a REAL large gap between question text
-   and first A/B/C/D line on the SAME page/column.
-========================================================= */
-
-async function renderQuestionImage(
-  pageInfo: PageInfo,
-  firstOptionLine: TextLine | null,
-  lastQuestionLine: TextLine | null
-) {
-  if (
-    !firstOptionLine ||
-    !lastQuestionLine
-  ) {
-    return undefined;
-  }
-
-  if (
-    firstOptionLine.pageNumber !==
-    lastQuestionLine.pageNumber
-  ) {
-    return undefined;
-  }
-
-  if (
-    firstOptionLine.column !==
-      lastQuestionLine.column &&
-    firstOptionLine.column !==
-      "full" &&
-    lastQuestionLine.column !==
-      "full"
-  ) {
-    return undefined;
-  }
-
-  const gap =
-    lastQuestionLine.y -
-    firstOptionLine.y;
-
-  /*
-    Conservative threshold.
-    Prevents blank/normal text being misdetected as image.
-  */
-  if (gap < 90) {
-    return undefined;
-  }
-
-  const viewport =
-    pageInfo.page.getViewport({
-      scale: 1.6,
-    });
-
-  const canvas =
-    createCanvas(
-      Math.ceil(
-        viewport.width
-      ),
-      Math.ceil(
-        viewport.height
-      )
-    );
-
-  const context =
-    canvas.getContext(
-      "2d"
-    );
-
-  await pageInfo.page
-    .render({
-      canvasContext:
-        context,
-      viewport,
-    })
-    .promise;
-
-  const scaleX =
-    viewport.width /
-    pageInfo.width;
-
-  const scaleY =
-    viewport.height /
-    pageInfo.height;
-
-  const upperPdfY =
-    lastQuestionLine.y -
-    14;
-
-  const lowerPdfY =
-    firstOptionLine.y +
-    14;
-
-  const topCanvas =
-    viewport.height -
-    upperPdfY *
-      scaleY;
-
-  const bottomCanvas =
-    viewport.height -
-    lowerPdfY *
-      scaleY;
-
-  const cropTop =
-    Math.max(
-      0,
-      Math.floor(
-        Math.min(
-          topCanvas,
-          bottomCanvas
-        )
-      )
-    );
-
-  const cropBottom =
-    Math.min(
-      viewport.height,
-      Math.ceil(
-        Math.max(
-          topCanvas,
-          bottomCanvas
-        )
-      )
-    );
-
-  const cropHeight =
-    cropBottom -
-    cropTop;
-
-  if (cropHeight < 60) {
-    return undefined;
-  }
-
-  let pdfX1 = 12;
-  let pdfX2 =
-    pageInfo.width - 12;
-
-  if (
-    firstOptionLine.column ===
-    "left"
-  ) {
-    pdfX1 = 8;
-    pdfX2 =
-      pageInfo.width / 2 -
-      5;
-  } else if (
-    firstOptionLine.column ===
-    "right"
-  ) {
-    pdfX1 =
-      pageInfo.width / 2 +
-      5;
-
-    pdfX2 =
-      pageInfo.width - 8;
-  }
-
-  const cropX =
-    Math.max(
-      0,
-      Math.floor(
-        pdfX1 * scaleX
-      )
-    );
-
-  const cropWidth =
-    Math.max(
-      1,
-      Math.min(
-        viewport.width -
-          cropX,
-        Math.ceil(
-          (pdfX2 -
-            pdfX1) *
-            scaleX
-        )
-      )
-    );
-
-  const output =
-    createCanvas(
-      cropWidth,
-      cropHeight
-    );
-
-  const outputContext =
-    output.getContext(
-      "2d"
-    );
-
-  outputContext.fillStyle =
-    "#ffffff";
-
-  outputContext.fillRect(
-    0,
-    0,
-    output.width,
-    output.height
-  );
-
-  outputContext.drawImage(
-    canvas,
-    cropX,
-    cropTop,
-    cropWidth,
-    cropHeight,
-    0,
-    0,
-    cropWidth,
-    cropHeight
-  );
-
-  const png =
-    await output.encode(
-      "png"
-    );
-
-  return `data:image/png;base64,${png.toString("base64")}`;
-}
-
-/* =========================================================
-   POST
-========================================================= */
-
-export async function POST(
-  request: NextRequest
-) {
-  try {
-    if (!(await isAdmin())) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "PDF import faqat administrator uchun.",
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-    const formData =
-      await request.formData();
-
-    const file =
-      formData.get(
-        "file"
-      );
-
-    if (
-      !(file instanceof File)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "PDF fayl topilmadi.",
-        },
-        {
-          status: 400,
-        }
-      );
+    setMessage("");
+    setQuestions([]);
+
+    if (!file) {
+      setPdfFile(null);
+      return;
     }
 
     if (
@@ -1358,336 +62,1332 @@ export async function POST(
         .toLowerCase()
         .endsWith(".pdf")
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Faqat PDF fayl yuklash mumkin.",
-        },
-        {
-          status: 400,
-        }
+      setPdfFile(null);
+      setMessage(
+        "Faqat PDF fayl yuklash mumkin."
       );
+      return;
     }
 
     if (
       file.size >
       30 * 1024 * 1024
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "PDF hajmi 30 MB dan oshmasligi kerak.",
-        },
-        {
-          status: 400,
-        }
+      setPdfFile(null);
+      setMessage(
+        "PDF hajmi 30 MB dan oshmasligi kerak."
       );
+      return;
     }
 
-    const bytes =
-      new Uint8Array(
-        await file.arrayBuffer()
+    setPdfFile(file);
+  }
+
+  async function analyzePdf() {
+    if (!title.trim()) {
+      setMessage(
+        "Test nomini kiriting."
       );
-
-    const pdfjs =
-      await import(
-        "pdfjs-dist/legacy/build/pdf.mjs"
-      );
-
-    /*
-      VERCEL PDF.JS WORKER FIX
-      Keep this — it already worked on your deployment.
-    */
-    const {
-      pathToFileURL,
-    } = await import(
-      "node:url"
-    );
-
-    const path =
-      await import(
-        "node:path"
-      );
-
-    pdfjs.GlobalWorkerOptions.workerSrc =
-      pathToFileURL(
-        path.join(
-          process.cwd(),
-          "node_modules",
-          "pdfjs-dist",
-          "legacy",
-          "build",
-          "pdf.worker.mjs"
-        )
-      ).href;
-
-    const document =
-      await pdfjs
-        .getDocument({
-          data: bytes,
-          useSystemFonts:
-            true,
-          disableFontFace:
-            false,
-        })
-        .promise;
-
-    const allLines:
-      TextLine[] = [];
-
-    const pageInfos =
-      new Map<
-        number,
-        PageInfo
-      >();
-
-    /* ---------------------------------------------------------
-       PAGE BY PAGE
-    --------------------------------------------------------- */
-
-    for (
-      let pageNumber = 1;
-      pageNumber <=
-      document.numPages;
-      pageNumber++
-    ) {
-      const page =
-        await document.getPage(
-          pageNumber
-        );
-
-      const viewport =
-        page.getViewport({
-          scale: 1,
-        });
-
-      const textContent =
-        await page.getTextContent();
-
-      const rawItems =
-        textContent.items as
-          PdfTextItem[];
-
-      const items =
-        buildPositionedItems(
-          rawItems,
-          pageNumber
-        );
-
-      const highlights =
-        await pageHighlights(
-          page
-        );
-
-      pageInfos.set(
-        pageNumber,
-        {
-          page,
-          width:
-            viewport.width,
-          height:
-            viewport.height,
-          highlights,
-        }
-      );
-
-      /*
-        PAGE READING ORDER:
-        left column first, then right column.
-        No center text is discarded.
-      */
-      const lines =
-        pageLines(
-          items,
-          viewport.width
-        );
-
-      allLines.push(
-        ...lines
-      );
+      return;
     }
 
-    /* ---------------------------------------------------------
-       QUESTION BLOCKS
-    --------------------------------------------------------- */
+    if (!subject.trim()) {
+      setMessage(
+        "Fan nomini kiriting."
+      );
+      return;
+    }
 
-    const blocks =
-      buildQuestionBlocks(
-        allLines
+    if (!pdfFile) {
+      setMessage(
+        "Avval PDF faylni tanlang."
+      );
+      return;
+    }
+
+    try {
+      setAnalyzing(true);
+      setMessage("");
+      setQuestions([]);
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "file",
+        pdfFile
       );
 
-    const imported:
-      ImportedQuestion[] = [];
-
-    for (const block of blocks) {
-      const parsed =
-        parseQuestion(
-          block,
-          pageInfos
-        );
-
-      let imageSrc:
-        string | undefined;
-
-      if (
-        parsed.firstOptionLine &&
-        parsed.lastQuestionLine &&
-        parsed.firstOptionLine.pageNumber ===
-          parsed.lastQuestionLine.pageNumber
-      ) {
-        const pageInfo =
-          pageInfos.get(
-            parsed.firstOptionLine.pageNumber
-          );
-
-        if (pageInfo) {
-          try {
-            imageSrc =
-              await renderQuestionImage(
-                pageInfo,
-                parsed.firstOptionLine,
-                parsed.lastQuestionLine
-              );
-          } catch (error) {
-            console.error(
-              `IMAGE Q${parsed.number} ERROR:`,
-              error
-            );
+      const response =
+        await fetch(
+          "/api/tests/import-pdf",
+          {
+            method: "POST",
+            credentials:
+              "include",
+            body: formData,
           }
-        }
-      }
-
-      imported.push({
-        id: makeId(
-          `import-q${parsed.number}`
-        ),
-        number:
-          parsed.number,
-        questionText:
-          parsed.questionText,
-        options:
-          parsed.options,
-        imageSrc,
-        warning:
-          parsed.warning,
-      });
-    }
-
-    /* ---------------------------------------------------------
-       REMOVE DUPLICATE QUESTION NUMBERS
-       Prefer the version with more non-empty options.
-    --------------------------------------------------------- */
-
-    const unique =
-      new Map<
-        number,
-        ImportedQuestion
-      >();
-
-    for (const question of imported) {
-      const existing =
-        unique.get(
-          question.number
         );
 
-      if (!existing) {
-        unique.set(
-          question.number,
-          question
-        );
-
-        continue;
-      }
-
-      const existingFilled =
-        existing.options.filter(
-          (option) =>
-            option.text.trim()
-        ).length;
-
-      const newFilled =
-        question.options.filter(
-          (option) =>
-            option.text.trim()
-        ).length;
+      const data =
+        await response.json();
 
       if (
-        newFilled >
-        existingFilled
+        !response.ok ||
+        !data?.success
       ) {
-        unique.set(
-          question.number,
-          question
+        throw new Error(
+          data?.message ||
+            "PDFni tahlil qilib bo‘lmadi."
         );
       }
+
+      const imported:
+        ImportedQuestion[] =
+        Array.isArray(
+          data.questions
+        )
+          ? data.questions
+          : [];
+
+      setQuestions(imported);
+
+      setMessage(
+        `PDFdan ${imported.length} ta savol ajratildi.`
+      );
+    } catch (error) {
+      console.error(
+        "PDF IMPORT ERROR:",
+        error
+      );
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "PDFni tahlil qilishda xatolik."
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  function changeQuestionText(
+    id: string,
+    value: string
+  ) {
+    setQuestions((current) =>
+      current.map(
+        (question) =>
+          question.id === id
+            ? {
+                ...question,
+                questionText:
+                  value,
+              }
+            : question
+      )
+    );
+  }
+
+  function changeOptionText(
+    questionId: string,
+    optionId: string,
+    value: string
+  ) {
+    setQuestions((current) =>
+      current.map(
+        (question) =>
+          question.id ===
+          questionId
+            ? {
+                ...question,
+                options:
+                  question.options.map(
+                    (option) =>
+                      option.id ===
+                      optionId
+                        ? {
+                            ...option,
+                            text: value,
+                          }
+                        : option
+                  ),
+              }
+            : question
+      )
+    );
+  }
+
+  function setCorrectAnswer(
+    questionId: string,
+    optionId: string
+  ) {
+    setQuestions((current) =>
+      current.map(
+        (question) =>
+          question.id ===
+          questionId
+            ? {
+                ...question,
+                warning:
+                  undefined,
+                options:
+                  question.options.map(
+                    (option) => ({
+                      ...option,
+                      isCorrect:
+                        option.id ===
+                        optionId,
+                    })
+                  ),
+              }
+            : question
+      )
+    );
+  }
+
+  function removeQuestion(
+    id: string
+  ) {
+    if (
+      !window.confirm(
+        "Ushbu savolni olib tashlaysizmi?"
+      )
+    ) {
+      return;
     }
 
-    const finalQuestions =
-      [...unique.values()].sort(
-        (a, b) =>
-          a.number - b.number
+    setQuestions((current) =>
+      current
+        .filter(
+          (question) =>
+            question.id !== id
+        )
+        .map(
+          (
+            question,
+            index
+          ) => ({
+            ...question,
+            number:
+              index + 1,
+          })
+        )
+    );
+  }
+
+  async function saveDraft() {
+    if (
+      questions.length === 0
+    ) {
+      setMessage(
+        "Saqlash uchun savollar yo‘q."
+      );
+      return;
+    }
+
+    const invalid =
+      questions.filter(
+        (question) => {
+          const correctCount =
+            question.options.filter(
+              (option) =>
+                option.isCorrect
+            ).length;
+
+          return (
+            !question.questionText.trim() ||
+            question.options.some(
+              (option) =>
+                !option.text.trim()
+            ) ||
+            correctCount !== 1
+          );
+        }
       );
 
     if (
-      finalQuestions.length ===
-      0
+      invalid.length > 0
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "PDFdan test savollari topilmadi. Test savollari '1.' '2.' '3.' ko‘rinishida bo‘lishi kerak.",
-        },
-        {
-          status: 422,
-        }
+      setMessage(
+        `${invalid.length} ta savolda xato bor. Har bir savolda 4 ta variant va 1 ta to‘g‘ri javob bo‘lishi kerak.`
       );
+      return;
     }
 
-    /* ---------------------------------------------------------
-       CLEANUP
-    --------------------------------------------------------- */
+    try {
+      setSaving(true);
+      setMessage("");
 
-    for (
-      const pageInfo of
-      pageInfos.values()
-    ) {
-      try {
-        pageInfo.page.cleanup();
-      } catch {
-        // ignore
+      const payload = {
+        title:
+          title.trim(),
+        subject:
+          subject.trim(),
+        duration:
+          Number(duration) ||
+          60,
+        description:
+          description.trim(),
+        status: "draft",
+
+        questions:
+          questions.map(
+            (question) => ({
+              id:
+                question.id,
+
+              questionHtml:
+                question.questionText,
+
+              options:
+                question.options.map(
+                  (option) => ({
+                    id:
+                      option.id,
+                    text:
+                      option.text,
+                    isCorrect:
+                      option.isCorrect,
+                  })
+                ),
+
+              /*
+                Rasm topilgan bo‘lsa, mavjud test editor
+                schema'dagi image shape sifatida saqlaymiz.
+              */
+              shapes:
+                question.imageSrc
+                  ? [
+                      {
+                        id:
+                          `img-${question.id}`,
+                        type:
+                          "image",
+                        x: 100,
+                        y: 20,
+                        width:
+                          620,
+                        height:
+                          300,
+                        imageSrc:
+                          question.imageSrc,
+                        objectFit:
+                          "contain",
+                        borderWidth:
+                          0,
+                        borderRadius:
+                          6,
+                        zIndex:
+                          1,
+                      },
+                    ]
+                  : [],
+
+              points: 1,
+            })
+          ),
+      };
+
+      const response =
+        await fetch(
+          "/api/tests",
+          {
+            method: "POST",
+            credentials:
+              "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify(
+                payload
+              ),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data?.success
+      ) {
+        throw new Error(
+          data?.message ||
+            "Testni saqlab bo‘lmadi."
+        );
       }
+
+      window.alert(
+        "PDFdan yaratilgan test qoralama sifatida saqlandi."
+      );
+
+      router.push(
+        "/admin/tests"
+      );
+    } catch (error) {
+      console.error(
+        "SAVE IMPORTED TEST ERROR:",
+        error
+      );
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Testni saqlashda xatolik."
+      );
+    } finally {
+      setSaving(false);
     }
-
-    document.cleanup();
-    document.destroy();
-
-    return NextResponse.json({
-      success: true,
-      questions:
-        finalQuestions,
-      total:
-        finalQuestions.length,
-    });
-  } catch (error) {
-    console.error(
-      "PDF TEST IMPORT ERROR:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "PDFni tahlil qilishda server xatosi yuz berdi.",
-      },
-      {
-        status: 500,
-      }
-    );
   }
+
+  return (
+    <main className="page">
+      <header className="header">
+        <div className="headerTitle">
+          <span>
+            ADMIN PANEL
+          </span>
+
+          <strong>
+            PDF dan test yaratish
+          </strong>
+        </div>
+
+        <div className="headerActions">
+          <button
+            type="button"
+            className="grayButton"
+            onClick={() =>
+              router.push(
+                "/admin/tests"
+              )
+            }
+          >
+            Testlarni boshqarish
+          </button>
+
+          <button
+            type="button"
+            className="blueButton"
+            onClick={() =>
+              router.push(
+                "/test/editor"
+              )
+            }
+          >
+            Oddiy test yaratish
+          </button>
+        </div>
+      </header>
+
+      <section className="mainBox">
+        <div className="floatingTitle">
+          PDF import
+        </div>
+
+        <div className="introBox">
+          <strong>
+            PDF → avtomatik test
+          </strong>
+
+          <p>
+            Savol matni, A/B/C/D variantlar, sariq bilan belgilangan to‘g‘ri javob va savol ichidagi diagramma/rasmlar avtomatik ajratishga harakat qilinadi. Natijani albatta tekshirib chiqing.
+          </p>
+        </div>
+
+        <div className="metaGrid">
+          <label>
+            <span>
+              Test nomi
+            </span>
+
+            <input
+              value={title}
+              onChange={(
+                event
+              ) =>
+                setTitle(
+                  event.target
+                    .value
+                )
+              }
+              placeholder="Masalan: Jinoyat huquqi — 1-test"
+            />
+          </label>
+
+          <label>
+            <span>
+              Fan nomi
+            </span>
+
+            <input
+              value={subject}
+              onChange={(
+                event
+              ) =>
+                setSubject(
+                  event.target
+                    .value
+                )
+              }
+              placeholder="Masalan: Jinoyat huquqi"
+            />
+          </label>
+
+          <label>
+            <span>Vaqt</span>
+
+            <div className="durationBox">
+              <input
+                type="number"
+                min={1}
+                max={600}
+                value={duration}
+                onChange={(
+                  event
+                ) =>
+                  setDuration(
+                    Math.max(
+                      1,
+                      Number(
+                        event
+                          .target
+                          .value
+                      ) || 1
+                    )
+                  )
+                }
+              />
+
+              <strong>
+                daqiqa
+              </strong>
+            </div>
+          </label>
+
+          <label className="descriptionField">
+            <span>Izoh</span>
+
+            <textarea
+              value={
+                description
+              }
+              onChange={(
+                event
+              ) =>
+                setDescription(
+                  event.target
+                    .value
+                )
+              }
+              placeholder="Ixtiyoriy..."
+            />
+          </label>
+        </div>
+
+        <div
+          className={
+            pdfFile
+              ? "uploadArea hasFile"
+              : "uploadArea"
+          }
+          onDragOver={(
+            event
+          ) =>
+            event.preventDefault()
+          }
+          onDrop={(
+            event
+          ) => {
+            event.preventDefault();
+
+            handleFile(
+              event
+                .dataTransfer
+                .files?.[0] ??
+                null
+            );
+          }}
+        >
+          <div className="pdfBadge">
+            PDF
+          </div>
+
+          <h2>
+            PDF faylni tanlang
+          </h2>
+
+          <p>
+            To‘g‘ri javoblarni sariq highlight bilan belgilang.
+          </p>
+
+          <label className="fileButton">
+            PDF tanlash
+
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(
+                event
+              ) =>
+                handleFile(
+                  event.target
+                    .files?.[0] ??
+                    null
+                )
+              }
+            />
+          </label>
+
+          {pdfFile && (
+            <div className="selectedFile">
+              <strong>
+                {pdfFile.name}
+              </strong>
+
+              <span>
+                {(
+                  pdfFile.size /
+                  1024 /
+                  1024
+                ).toFixed(2)}{" "}
+                MB
+              </span>
+            </div>
+          )}
+        </div>
+
+        {message && (
+          <div className="messageBox">
+            {message}
+          </div>
+        )}
+
+        <div className="analyzeActions">
+          <button
+            type="button"
+            className="analyzeButton"
+            onClick={
+              analyzePdf
+            }
+            disabled={
+              analyzing ||
+              saving
+            }
+          >
+            {analyzing
+              ? "PDF tahlil qilinmoqda..."
+              : "PDFNI TAHLIL QILISH"}
+          </button>
+        </div>
+      </section>
+
+      {questions.length >
+        0 && (
+        <section className="previewBox">
+          <div className="floatingTitle">
+            Tekshirish
+          </div>
+
+          <div className="previewHeader">
+            <div>
+              <strong>
+                {
+                  questions.length
+                }{" "}
+                ta savol topildi
+              </strong>
+
+              <span>
+                {warningCount >
+                0
+                  ? `${warningCount} ta savol tekshirilishi kerak`
+                  : "Barcha savollar tayyor"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="saveDraftButton"
+              onClick={
+                saveDraft
+              }
+              disabled={
+                saving
+              }
+            >
+              QORALAMA SIFATIDA SAQLASH
+            </button>
+          </div>
+
+          <div className="questionsList">
+            {questions.map(
+              (
+                question
+              ) => (
+                <article
+                  className={
+                    question.warning
+                      ? "questionCard warningCard"
+                      : "questionCard"
+                  }
+                  key={
+                    question.id
+                  }
+                >
+                  <div className="questionTop">
+                    <div className="questionNumber">
+                      {
+                        question.number
+                      }
+                      -savol
+                    </div>
+
+                    <button
+                      type="button"
+                      className="removeButton"
+                      onClick={() =>
+                        removeQuestion(
+                          question.id
+                        )
+                      }
+                    >
+                      O‘chirish
+                    </button>
+                  </div>
+
+                  {question.warning && (
+                    <div className="warningBox">
+                      {
+                        question.warning
+                      }
+                    </div>
+                  )}
+
+                  <label className="questionTextField">
+                    <span>
+                      Savol matni
+                    </span>
+
+                    <textarea
+                      value={
+                        question.questionText
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        changeQuestionText(
+                          question.id,
+                          event
+                            .target
+                            .value
+                        )
+                      }
+                    />
+                  </label>
+
+                  {question.imageSrc && (
+                    <div className="questionImagePreview">
+                      <div className="imageLabel">
+                        PDFdan ajratilgan rasm / diagramma
+                      </div>
+
+                      <img
+                        src={
+                          question.imageSrc
+                        }
+                        alt={`${question.number}-savol rasmi`}
+                      />
+                    </div>
+                  )}
+
+                  <div className="optionsList">
+                    {question.options.map(
+                      (
+                        option
+                      ) => (
+                        <div
+                          className={
+                            option.isCorrect
+                              ? "optionRow correctOption"
+                              : "optionRow"
+                          }
+                          key={
+                            option.id
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="correctSelector"
+                            onClick={() =>
+                              setCorrectAnswer(
+                                question.id,
+                                option.id
+                              )
+                            }
+                          >
+                            {option.isCorrect
+                              ? "✓"
+                              : ""}
+                          </button>
+
+                          <strong className="optionLetter">
+                            {
+                              option.label
+                            }
+                          </strong>
+
+                          <textarea
+                            value={
+                              option.text
+                            }
+                            onChange={(
+                              event
+                            ) =>
+                              changeOptionText(
+                                question.id,
+                                option.id,
+                                event
+                                  .target
+                                  .value
+                              )
+                            }
+                          />
+
+                          {option.isCorrect && (
+                            <span className="correctBadge">
+                              TO‘G‘RI
+                            </span>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+                </article>
+              )
+            )}
+          </div>
+
+          <div className="bottomSave">
+            <button
+              type="button"
+              className="saveDraftButton"
+              onClick={
+                saveDraft
+              }
+              disabled={
+                saving
+              }
+            >
+              QORALAMA SIFATIDA SAQLASH
+            </button>
+          </div>
+        </section>
+      )}
+
+      <style jsx>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        .page {
+          min-height: 100vh;
+          padding-bottom: 70px;
+          background: #e5eaed;
+          color: #101820;
+          font-family: "Bell MT", "Times New Roman", serif;
+        }
+
+        .header {
+          width: min(1480px, 96%);
+          margin: 24px auto 0;
+          padding: 20px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          border: 3px solid #30383d;
+          border-radius: 24px;
+          background: linear-gradient(145deg,#697176,#42494d);
+          box-shadow: inset 0 6px 6px rgba(255,255,255,.24),0 9px 20px rgba(0,0,0,.18);
+        }
+
+        .headerTitle {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          color: #fff;
+        }
+
+        .headerTitle span {
+          font-size: 12px;
+          letter-spacing: 2px;
+        }
+
+        .headerTitle strong {
+          font-size: 28px;
+        }
+
+        .headerActions {
+          display: flex;
+          gap: 12px;
+        }
+
+        .grayButton,
+        .blueButton {
+          min-height: 52px;
+          padding: 10px 18px;
+          border-radius: 12px;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .grayButton {
+          border: 2px solid #535a5e;
+          background: linear-gradient(#fafafa,#b6b6b6);
+          box-shadow: 0 5px 0 #4b5256;
+        }
+
+        .blueButton {
+          color: #073b68;
+          border: 2px solid #174461;
+          background: linear-gradient(#caefff,#63b3df);
+          box-shadow: 0 5px 0 #17415c;
+        }
+
+        .mainBox,
+        .previewBox {
+          position: relative;
+          width: min(1300px,94%);
+          margin: 72px auto 0;
+          padding: 70px 30px 35px;
+          border: 3px solid #3e474c;
+          border-radius: 24px;
+          background: linear-gradient(145deg,#666d71,#41474b);
+          box-shadow: inset 0 7px 6px rgba(255,255,255,.20),0 9px 20px rgba(0,0,0,.19);
+        }
+
+        .floatingTitle {
+          position: absolute;
+          top: -27px;
+          left: 50%;
+          transform: translateX(-50%);
+          min-width: 240px;
+          padding: 11px 22px;
+          text-align: center;
+          color: #073b68;
+          font-size: 20px;
+          font-weight: 700;
+          border: 2px solid #174461;
+          border-radius: 12px;
+          background: linear-gradient(#caf0ff,#59a9d5);
+          box-shadow: 0 5px 0 #17415c;
+        }
+
+        .introBox {
+          padding: 18px 20px;
+          border-radius: 14px;
+          background: #edf8ff;
+          border: 2px solid #6c91a8;
+        }
+
+        .introBox strong {
+          display: block;
+          margin-bottom: 5px;
+          color: #073b68;
+          font-size: 18px;
+        }
+
+        .introBox p {
+          margin: 0;
+          line-height: 1.55;
+        }
+
+        .metaGrid {
+          margin-top: 22px;
+          display: grid;
+          grid-template-columns: repeat(3,minmax(0,1fr));
+          gap: 16px;
+        }
+
+        .metaGrid label {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          color: #fff;
+          font-weight: 700;
+        }
+
+        .descriptionField {
+          grid-column: 1/-1;
+        }
+
+        .metaGrid input,
+        .metaGrid textarea {
+          width: 100%;
+          padding: 12px 13px;
+          border: 2px solid #69747a;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 16px;
+          background: #fff;
+        }
+
+        .metaGrid textarea {
+          min-height: 85px;
+        }
+
+        .durationBox {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .uploadArea {
+          margin-top: 24px;
+          min-height: 270px;
+          padding: 30px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          text-align: center;
+          border: 3px dashed #7b858a;
+          border-radius: 18px;
+          background: linear-gradient(#f8f8f8,#e0e0e0);
+        }
+
+        .uploadArea.hasFile {
+          border-style: solid;
+          border-color: #3980a8;
+          background: linear-gradient(#f2fbff,#dceefa);
+        }
+
+        .pdfBadge {
+          min-width: 80px;
+          padding: 9px 14px;
+          color: #fff;
+          font-size: 20px;
+          font-weight: 900;
+          border-radius: 9px;
+          background: #ba3434;
+        }
+
+        .fileButton {
+          position: relative;
+          padding: 11px 18px;
+          cursor: pointer;
+          color: #073b68;
+          font-weight: 700;
+          border: 2px solid #174461;
+          border-radius: 10px;
+          background: #aee1fa;
+        }
+
+        .fileButton input {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          opacity: 0;
+        }
+
+        .selectedFile {
+          padding: 8px 12px;
+          background: #fff;
+          border-radius: 8px;
+        }
+
+        .selectedFile span {
+          margin-left: 10px;
+          color: #657178;
+        }
+
+        .messageBox {
+          margin-top: 17px;
+          padding: 13px 15px;
+          border-radius: 10px;
+          background: #fff;
+          font-weight: 700;
+        }
+
+        .analyzeActions,
+        .bottomSave {
+          margin-top: 20px;
+          display: flex;
+          justify-content: center;
+        }
+
+        .analyzeButton,
+        .saveDraftButton {
+          min-height: 56px;
+          padding: 11px 24px;
+          cursor: pointer;
+          color: #073b68;
+          font-family: inherit;
+          font-weight: 800;
+          border: 2px solid #174461;
+          border-radius: 12px;
+          background: linear-gradient(#c9efff,#5eacd8);
+          box-shadow: 0 5px 0 #17415c;
+        }
+
+        .previewHeader {
+          padding: 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          background: #fff;
+          border-radius: 13px;
+        }
+
+        .previewHeader > div {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .questionsList {
+          margin-top: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .questionCard {
+          padding: 20px;
+          border: 2px solid #59646a;
+          border-radius: 17px;
+          background: linear-gradient(#fafafa,#e3e3e3);
+          box-shadow: 0 5px 0 #666d71;
+        }
+
+        .warningCard {
+          border-color: #bb7b25;
+        }
+
+        .questionTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .questionNumber {
+          padding: 7px 13px;
+          color: #073b68;
+          font-weight: 800;
+          border: 2px solid #174461;
+          border-radius: 9px;
+          background: #9bd8f6;
+        }
+
+        .removeButton {
+          padding: 6px 11px;
+          border: 2px solid #9b2828;
+          border-radius: 7px;
+          background: #ef8d8d;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+        }
+
+        .warningBox {
+          margin-bottom: 12px;
+          padding: 10px 12px;
+          color: #7b4b09;
+          background: #fff2d8;
+          border: 1px solid #c58a33;
+          border-radius: 8px;
+          font-weight: 700;
+        }
+
+        .questionTextField {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          font-weight: 700;
+        }
+
+        .questionTextField textarea {
+          min-height: 150px;
+          padding: 18px 20px;
+          border: 2px solid #737d82;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 21px;
+          line-height: 1.6;
+          text-align: justify;
+          text-justify: inter-word;
+          resize: vertical;
+        }
+
+        .questionImagePreview {
+          margin: 16px 0;
+          padding: 12px;
+          text-align: center;
+          border: 2px solid #365b70;
+          border-radius: 13px;
+          background: #fff;
+        }
+
+        .imageLabel {
+          width: fit-content;
+          margin: 0 auto 10px;
+          padding: 5px 10px;
+          color: #073b68;
+          font-size: 12px;
+          font-weight: 700;
+          border-radius: 999px;
+          background: #d8effc;
+        }
+
+        .questionImagePreview img {
+          display: block;
+          width: 100%;
+          max-width: 980px;
+          max-height: 620px;
+          margin: auto;
+          object-fit: contain;
+        }
+
+        .optionsList {
+          margin-top: 15px;
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+
+        .optionRow {
+          display: grid;
+          grid-template-columns: 38px 34px 1fr auto;
+          align-items: center;
+          gap: 8px;
+          padding: 9px;
+          border: 1px solid #8d999f;
+          border-radius: 9px;
+          background: #f5f5f5;
+        }
+
+        .correctOption {
+          border: 2px solid #348255;
+          background: #e7f7ed;
+        }
+
+        .correctSelector {
+          width: 42px;
+          height: 42px;
+          cursor: pointer;
+          border: 2px solid #69747a;
+          border-radius: 50%;
+          background: #fff;
+          font-weight: 900;
+        }
+
+        .correctOption .correctSelector {
+          color: #fff;
+          background: #3d9b64;
+          font-size: 20px;
+        }
+
+        .optionLetter {
+          font-size: 21px;
+          font-weight: 800;
+        }
+
+        .optionRow textarea {
+          width: 100%;
+          min-height: 72px;
+          padding: 13px 15px;
+          border: 1px solid #8d999f;
+          border-radius: 8px;
+          font-family: inherit;
+          font-size: 19px;
+          line-height: 1.5;
+          text-align: justify;
+          text-justify: inter-word;
+          resize: vertical;
+        }
+
+        .correctBadge {
+          padding: 5px 8px;
+          color: #17623a;
+          font-size: 10px;
+          font-weight: 900;
+          background: #ccebd7;
+          border-radius: 999px;
+        }
+
+        @media(max-width:600px) {
+          .header {
+            width: calc(100% - 8px);
+            margin-top: 5px;
+            padding: 10px;
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .headerActions,
+          .metaGrid {
+            display: grid;
+            grid-template-columns: 1fr;
+          }
+
+          .mainBox,
+          .previewBox {
+            width: calc(100% - 8px);
+            margin-top: 50px;
+            padding: 48px 8px 18px;
+          }
+
+          .previewHeader {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .questionTextField textarea {
+            min-height: 130px;
+            padding: 14px;
+            font-size: 17px;
+            line-height: 1.55;
+          }
+
+          .optionRow {
+            grid-template-columns: 36px 28px 1fr;
+          }
+
+          .correctSelector {
+            width: 34px;
+            height: 34px;
+          }
+
+          .optionLetter {
+            font-size: 18px;
+          }
+
+          .optionRow textarea {
+            min-height: 64px;
+            padding: 11px 12px;
+            font-size: 16px;
+            line-height: 1.45;
+          }
+
+          .questionImagePreview img {
+            max-height: 420px;
+          }
+
+          .correctBadge {
+            grid-column: 3;
+          }
+        }
+      `}</style>
+    </main>
+  );
 }
