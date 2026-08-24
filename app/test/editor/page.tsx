@@ -21,6 +21,34 @@ type TestStatus =
   | "draft"
   | "published";
 
+type TestCategory =
+  | "legislation"
+  | "thematic"
+  | "block"
+  | "national-certificate"
+  | "thirty"
+  | "custom";
+
+const TEST_CATEGORY_LABELS: Record<TestCategory, string> = {
+  legislation: "Qonunchilik hujjatlaridan test",
+  thematic: "Mavzulashtirilgan test",
+  block: "Blok test",
+  "national-certificate": "Milliy sertifikat testi",
+  thirty: "30 talik test",
+  custom: "Boshqa test",
+};
+
+function normalizeTestCategory(value: unknown): TestCategory {
+  return value === "legislation" ||
+    value === "thematic" ||
+    value === "block" ||
+    value === "national-certificate" ||
+    value === "thirty" ||
+    value === "custom"
+    ? value
+    : "custom";
+}
+
 type ShapeType =
   | "rectangle"
   | "roundedRectangle"
@@ -104,11 +132,8 @@ type TestData = {
 
   status: TestStatus;
 
-  /*
-    null = cheksiz urinish.
-    1, 2, 3... = ruxsat etilgan maksimal urinishlar soni.
-  */
-  attemptLimit?: number | null;
+  testType?: TestCategory;
+  customTestTypeName?: string;
 
   createdAt?: string;
   updatedAt?: string;
@@ -243,22 +268,17 @@ export default function TestEditorPage() {
     setDescription,
   ] = useState("");
 
-  /* =======================================================
-     URINISHLAR
-
-     unlimitedAttempts = true  -> cheksiz
-     unlimitedAttempts = false -> attemptLimit soni bo‘yicha
-  ======================================================= */
+  const [
+    testType,
+    setTestType,
+  ] = useState<TestCategory>(
+    "legislation"
+  );
 
   const [
-    attemptLimit,
-    setAttemptLimit,
-  ] = useState(1);
-
-  const [
-    unlimitedAttempts,
-    setUnlimitedAttempts,
-  ] = useState(true);
+    customTestTypeName,
+    setCustomTestTypeName,
+  ] = useState("");
 
   const [
     questions,
@@ -344,6 +364,28 @@ export default function TestEditorPage() {
     setEditingId(
       params.get("id")
     );
+
+    const urlType =
+      params.get("testType");
+
+    if (urlType) {
+      setTestType(
+        normalizeTestCategory(
+          urlType
+        )
+      );
+    }
+
+    const customName =
+      params.get(
+        "customTestTypeName"
+      );
+
+    if (customName) {
+      setCustomTestTypeName(
+        customName
+      );
+    }
 
     setParamsReady(true);
   }, []);
@@ -464,25 +506,18 @@ export default function TestEditorPage() {
             ""
         );
 
-        /*
-          Eski testlarda attemptLimit bo‘lmasligi mumkin.
-          Bunday testlar avtomatik ravishda CHEKSIZ deb olinadi.
-        */
-        if (
-          test.attemptLimit === null ||
-          typeof test.attemptLimit === "undefined"
-        ) {
-          setUnlimitedAttempts(true);
-          setAttemptLimit(1);
-        } else {
-          setUnlimitedAttempts(false);
-          setAttemptLimit(
-            Math.max(
-              1,
-              Number(test.attemptLimit) || 1
-            )
-          );
-        }
+        setTestType(
+          normalizeTestCategory(
+            test.testType
+          )
+        );
+
+        setCustomTestTypeName(
+          String(
+            test.customTestTypeName ||
+              ""
+          )
+        );
 
         const loadedQuestions =
           Array.isArray(
@@ -1419,6 +1454,17 @@ export default function TestEditorPage() {
     }
 
     if (
+      testType === "custom" &&
+      !customTestTypeName.trim()
+    ) {
+      alert(
+        "Boshqa test turi uchun test turining nomini kiriting."
+      );
+
+      return;
+    }
+
+    if (
       questions.length ===
       0
     ) {
@@ -1494,17 +1540,12 @@ export default function TestEditorPage() {
 
         description,
 
-        /*
-          null = cheksiz.
-          Son = maksimal urinishlar soni.
-        */
-        attemptLimit:
-          unlimitedAttempts
-            ? null
-            : Math.max(
-                1,
-                Number(attemptLimit) || 1
-              ),
+        testType,
+
+        customTestTypeName:
+          testType === "custom"
+            ? customTestTypeName.trim()
+            : "",
 
         questions:
           payloadQuestions,
@@ -1608,10 +1649,11 @@ export default function TestEditorPage() {
         subject: subject.trim(),
         duration: Math.max(1, Number(duration) || 30),
         description,
-        attemptLimit:
-          unlimitedAttempts
-            ? null
-            : Math.max(1, Number(attemptLimit) || 1),
+        testType,
+        customTestTypeName:
+          testType === "custom"
+            ? customTestTypeName.trim()
+            : "",
         questions: exportQuestions,
         status: "draft" as TestStatus,
       },
@@ -1719,6 +1761,74 @@ export default function TestEditorPage() {
 
         <div className="infoPanel">
 
+          <label className="categoryField">
+            <span>
+              Test turi
+            </span>
+
+            <select
+              value={testType}
+              onChange={(event) =>
+                setTestType(
+                  normalizeTestCategory(
+                    event.target.value
+                  )
+                )
+              }
+            >
+              <option value="legislation">
+                Qonunchilik hujjatlaridan test
+              </option>
+              <option value="thematic">
+                Mavzulashtirilgan test
+              </option>
+              <option value="block">
+                Blok test
+              </option>
+              <option value="national-certificate">
+                Milliy sertifikat testi
+              </option>
+              <option value="thirty">
+                30 talik test
+              </option>
+              <option value="custom">
+                Boshqa test
+              </option>
+            </select>
+          </label>
+
+          {testType === "custom" && (
+            <label className="customCategoryField">
+              <span>
+                Test turining nomi
+              </span>
+
+              <input
+                value={customTestTypeName}
+                onChange={(event) =>
+                  setCustomTestTypeName(
+                    event.target.value
+                  )
+                }
+                placeholder="Masalan: Final nazorat testi"
+              />
+            </label>
+          )}
+
+          <div className="selectedTypeBanner">
+            <span>
+              Tanlangan bo‘lim
+            </span>
+            <strong>
+              {testType === "custom"
+                ? customTestTypeName.trim() ||
+                  "Boshqa test"
+                : TEST_CATEGORY_LABELS[
+                    testType
+                  ]}
+            </strong>
+          </div>
+
           <label>
             <span>
               Test nomi
@@ -1782,63 +1892,6 @@ export default function TestEditorPage() {
               </strong>
 
             </div>
-          </label>
-
-          <label className="attemptField">
-            <span>
-              Urinishlar soni
-            </span>
-
-            <div className="attemptControl">
-              <div className="attemptNumberBox">
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={attemptLimit}
-                  disabled={unlimitedAttempts}
-                  onChange={(e) =>
-                    setAttemptLimit(
-                      Math.max(
-                        1,
-                        Math.floor(
-                          Number(e.target.value) || 1
-                        )
-                      )
-                    )
-                  }
-                />
-
-                <strong>
-                  marta
-                </strong>
-              </div>
-
-              <label className="unlimitedSwitch">
-                <input
-                  type="checkbox"
-                  checked={unlimitedAttempts}
-                  onChange={(e) =>
-                    setUnlimitedAttempts(
-                      e.target.checked
-                    )
-                  }
-                />
-
-                <span className="switchTrack">
-                  <span className="switchThumb" />
-                </span>
-
-                <strong>
-                  Cheksiz
-                </strong>
-              </label>
-            </div>
-
-            <small className="attemptHelp">
-              Masalan: 1 — faqat bir marta, 2 — ikki marta.
-              “Cheksiz” tanlansa, o‘quvchi istagancha ishlashi mumkin.
-            </small>
           </label>
 
           <label className="descriptionField">
@@ -3121,10 +3174,9 @@ export default function TestEditorPage() {
           display: grid;
 
           grid-template-columns:
-            minmax(0, 1.8fr)
-            minmax(0, 1.35fr)
-            minmax(190px, .75fr)
-            minmax(250px, 1fr);
+            minmax(0, 2fr)
+            minmax(0, 1.6fr)
+            minmax(220px, .8fr);
 
           align-items: center;
 
@@ -3206,6 +3258,86 @@ export default function TestEditorPage() {
           text-align: left;
         }
 
+
+        .categoryField,
+        .customCategoryField {
+          min-width: 0;
+        }
+
+        .categoryField select {
+          width: 100%;
+          min-height: 45px;
+          padding: 8px 12px;
+          border: 2px solid #65747d;
+          border-radius: 10px;
+          color: #123548;
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #e8eef1 100%
+            );
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.95),
+            0 3px 0 #6d7a81;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          outline: none;
+          cursor: pointer;
+        }
+
+        .categoryField select:focus {
+          border-color: #168fc8;
+          box-shadow:
+            0 0 0 3px rgba(22,143,200,.15),
+            0 3px 0 #477a92;
+        }
+
+        .customCategoryField input {
+          border-color: #bf8b24 !important;
+          background:
+            linear-gradient(
+              180deg,
+              #fffdf5 0%,
+              #fff0bd 100%
+            ) !important;
+        }
+
+        .selectedTypeBanner {
+          min-height: 72px;
+          padding: 11px 14px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 4px;
+          border: 2px solid #175275;
+          border-radius: 11px;
+          color: #073b68;
+          background:
+            linear-gradient(
+              180deg,
+              #ddf7ff 0%,
+              #8dd2ef 100%
+            );
+          box-shadow:
+            inset 0 3px 3px rgba(255,255,255,.9),
+            0 4px 0 #174760;
+        }
+
+        .selectedTypeBanner span {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .7px;
+          text-transform: uppercase;
+          opacity: .78;
+        }
+
+        .selectedTypeBanner strong {
+          font-size: 16px;
+          line-height: 1.15;
+        }
+
         .descriptionField {
           grid-column:
             1 / -1;
@@ -3227,113 +3359,6 @@ export default function TestEditorPage() {
 
         .durationRow strong {
           white-space: nowrap;
-        }
-
-        /* URINISHLAR */
-
-        .attemptField {
-          min-width: 0;
-        }
-
-        .attemptControl {
-          width: 100%;
-          display: grid;
-          gap: 10px;
-        }
-
-        .attemptNumberBox {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .attemptNumberBox input {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .attemptNumberBox input:disabled {
-          opacity: .52;
-          cursor: not-allowed;
-          background: #e5e7e9;
-        }
-
-        .attemptNumberBox strong {
-          white-space: nowrap;
-        }
-
-        .unlimitedSwitch {
-          width: 100%;
-          min-height: 48px;
-          padding: 8px 12px;
-          display: flex !important;
-          flex-direction: row !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 10px !important;
-          border: 2px solid #777;
-          border-radius: 10px;
-          background: linear-gradient(#fff, #d5d5d5);
-          box-shadow: inset 0 3px 3px white, 0 3px 0 #777;
-          cursor: pointer;
-          user-select: none;
-        }
-
-        .unlimitedSwitch > input {
-          position: absolute;
-          opacity: 0;
-          pointer-events: none;
-          width: 1px;
-          height: 1px;
-        }
-
-        .switchTrack {
-          position: relative;
-          width: 48px !important;
-          height: 26px;
-          flex: 0 0 48px;
-          border: 2px solid #666;
-          border-radius: 999px;
-          background: #bbb;
-          transition: .2s ease;
-        }
-
-        .switchThumb {
-          position: absolute;
-          top: 2px;
-          left: 2px;
-          width: 18px !important;
-          height: 18px;
-          border-radius: 50%;
-          background: #fff;
-          box-shadow: 0 1px 3px rgba(0,0,0,.35);
-          transition: .2s ease;
-        }
-
-        .unlimitedSwitch > input:checked + .switchTrack {
-          border-color: #176a91;
-          background: #4fb0df;
-        }
-
-        .unlimitedSwitch > input:checked + .switchTrack .switchThumb {
-          transform: translateX(22px);
-        }
-
-        .unlimitedSwitch > strong {
-          color: #073b68;
-          white-space: nowrap;
-          font-size: 15px;
-        }
-
-        .attemptHelp {
-          display: block;
-          margin-top: 2px;
-          color: #47545b;
-          font-size: 12px;
-          font-weight: 600;
-          line-height: 1.35;
-          text-align: center;
         }
 
 
