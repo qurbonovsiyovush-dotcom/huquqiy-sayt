@@ -169,6 +169,32 @@ function RichTextEditor({
 
     richTextDraftCache.set(editorId, editor.innerHTML);
     mountedOnceRef.current = true;
+
+    /*
+      ENG MUHIM FIX:
+      contentEditable ichidagi HAR QANDAY haqiqiy DOM o‘zgarishini kuzatamiz.
+      Browser drag/drop, Backspace, Delete, Ctrl+X/Ctrl+V yoki qatorlarni
+      birlashtirganda React eventlarining qaysi tartibda kelishidan qat'i nazar,
+      oxirgi real HTML cache'ga yoziladi.
+
+      Shuning uchun scroll/rerender/remount bo‘lsa ham eski PDF HTML emas,
+      aynan foydalanuvchi tahrirlagan DOM qayta tiklanadi.
+    */
+    const observer = new MutationObserver(() => {
+      richTextDraftCache.set(editorId, editor.innerHTML);
+    });
+
+    observer.observe(editor, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+    });
+
+    return () => {
+      richTextDraftCache.set(editorId, editor.innerHTML);
+      observer.disconnect();
+    };
   }, []);
 
   function rememberLocalHtml() {
@@ -499,19 +525,17 @@ function RichTextEditor({
         style={{ minHeight }}
         onInput={() => {
           /*
-            MUHIM FIX:
-            Har bir real DOM o‘zgarishi (yozish, Backspace, Delete,
-            drag/drop bilan so‘zni boshqa joyga ko‘chirish va h.k.)
-            shu zahoti parent state'ga ham yoziladi.
-
-            Oldin faqat lokal DOM/cache yangilanib, parentdagi eski
-            questionText keyinroq qayta ishlatilishi mumkin edi.
-            Shu sabab foydalanuvchi tepaga ko‘chirgan matn yana eski
-            joyiga qaytib qolardi.
+            Browser contentEditable DOMni input sikli tugaguncha yana
+            o‘zgartirishi mumkin. Shuning uchun parent state'ni aynan
+            keyingi animation frame'dagi FINAL DOM bilan yangilaymiz.
           */
           saveSelection();
           rememberLocalHtml();
-          commitChange();
+
+          window.requestAnimationFrame(() => {
+            rememberLocalHtml();
+            commitChange();
+          });
         }}
         onFocus={() => {
           saveSelection();
