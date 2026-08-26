@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { get, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -7,6 +7,20 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const TESTS_BLOB_PATH = "huquqiy-sayt/tests.json";
+
+const IMPORT_ROOT = "huquqiy-sayt/test-imports";
+
+function importMetaPath(testId: string) {
+  return `${IMPORT_ROOT}/${testId}/meta.json`;
+}
+
+function importChunkPath(testId: string, startIndex: number) {
+  return `${IMPORT_ROOT}/${testId}/chunks/${String(startIndex).padStart(8, "0")}.json`;
+}
+
+function importChunkPrefix(testId: string) {
+  return `${IMPORT_ROOT}/${testId}/chunks/`;
+}
 
 type TestStatus = "draft" | "published";
 
@@ -269,9 +283,6 @@ async function createChunkedTest(
     );
   }
 
-  const tests =
-    await readTests();
-
   const now =
     new Date().toISOString();
 
@@ -336,13 +347,36 @@ async function createChunkedTest(
     updatedAt: now,
   };
 
-  tests.push(
-    newTest
+  /*
+    MUHIM ARXITEKTURA:
+    Import metama'lumoti UNIQUE blob path'ga yoziladi.
+    Bu fayl overwrite qilinmaydi, shuning uchun Vercel Blob stale-read
+    muammosi chunklar orasida paydo bo‘lmaydi.
+  */
+  await put(
+    importMetaPath(id),
+    JSON.stringify(newTest),
+    {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge: 0,
+    }
   );
 
-  await writeTests(
-    tests
-  );
+  /*
+    Admin ro‘yxatida qoralama darhol ko‘rinishi uchun placeholderni
+    tests.json'ga ham yozishga harakat qilamiz. Keyingi chunklar esa
+    tests.json'ni qayta-qayta overwrite QILMAYDI.
+  */
+  const tests =
+    await readTests();
+
+  tests.push(newTest);
+
+  await writeTests(tests);
 
   return NextResponse.json(
     {
@@ -359,6 +393,9 @@ async function createChunkedTest(
 
 /* =========================================================
    APPEND QUESTIONS CHUNK
+   Har bir chunk alohida UNIQUE blob faylga yoziladi.
+   Shu sabab 0 -> 10 -> 20 -> ... ketma-ketligida tests.json'ni
+   qayta-qayta o‘qish/yozish shart emas.
 ========================================================= */
 
 async function appendQuestionsChunk(
@@ -428,104 +465,26 @@ async function appendQuestionsChunk(
   }
 
   /*
-    MUHIM:
-    Fixed-path Blob ketma-ket overwrite qilinganda keyingi request
-    qisqa muddat eski JSON holatini o‘qib qolishi mumkin.
-
-    Shu sabab:
-      - test topilmaganda;
-      - yoki serverdagi questions.length frontend yuborgan startIndex'dan
-        kichik bo‘lganda
-    Blob qayta o‘qiladi.
+    Meta UNIQUE path'da. Bu yerda tests.json'ga qaramaymiz.
   */
-  let tests: TestData[] = [];
-  let index = -1;
-  let existing: unknown[] = [];
-
-  for (let attempt = 0; attempt < 10; attempt++) {
-    tests = await readTests();
-
-    index = tests.findIndex(
-      (item) =>
-        item.id === testId
+  const metaResult =
+    await get(
+      importMetaPath(testId),
+      {
+        access: "private",
+      }
     );
 
-    if (index >= 0) {
-      const candidate =
-        Array.isArray(
-          tests[index].questions
-        )
-          ? tests[index].questions as unknown[]
-          : [];
-
-      existing = candidate;
-
-      /*
-        Aynan kerakli startIndex ko‘rinsa — yozishga tayyor.
-      */
-      if (
-        existing.length ===
-        startIndex
-      ) {
-        break;
-      }
-
-      /*
-        Server startIndex'dan oldinga o‘tib ketgan bo‘lsa, bu ko‘pincha
-        browser bir xil chunkni qayta yuborganini anglatadi.
-        Shu chunk allaqachon saqlangan deb idempotent javob qaytaramiz.
-      */
-      if (
-        existing.length >=
-        startIndex + chunk.length
-      ) {
-        const expectedQuestions =
-          Number(
-            tests[index].importState
-              ?.expectedQuestions
-          ) || existing.length;
-
-        return NextResponse.json(
-          {
-            success: true,
-            duplicate: true,
-            testId,
-            receivedQuestions:
-              existing.length,
-            expectedQuestions,
-            remaining:
-              Math.max(
-                0,
-                expectedQuestions -
-                  existing.length
-              ),
-          },
-          {
-            status: 200,
-          }
-        );
-      }
-    }
-
-    /*
-      Hali oldingi chunk ko‘rinmagan.
-      Biroz kutib Blob'ni qayta o‘qiymiz.
-    */
-    await new Promise(
-      (resolve) =>
-        setTimeout(
-          resolve,
-          250 * (attempt + 1)
-        )
-    );
-  }
-
-  if (index < 0) {
+  if (
+    !metaResult ||
+    metaResult.statusCode !== 200 ||
+    !metaResult.stream
+  ) {
     return NextResponse.json(
       {
         success: false,
         message:
-          "Test yaratildi, ammo Blob'dan qayta o‘qishda topilmadi.",
+          "Import metama’lumoti topilmadi.",
       },
       {
         status: 404,
@@ -533,46 +492,20 @@ async function appendQuestionsChunk(
     );
   }
 
-  /*
-    Retrylardan keyin ham serverdagi uzunlik startIndex bilan teng
-    bo‘lmasa, ma'lumotni buzmaslik uchun yozmaymiz.
-  */
-  if (
-    existing.length !==
-    startIndex
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          `Savollar ketma-ketligi mos emas. Server ${existing.length}-savoldan davom etishni kutmoqda, brauzer esa ${startIndex}-savoldan yubordi.`,
-        expectedStartIndex:
-          existing.length,
-        receivedStartIndex:
-          startIndex,
-      },
-      {
-        status: 409,
-      }
-    );
-  }
+  const metaText =
+    await new Response(
+      metaResult.stream
+    ).text();
 
-  const test =
-    tests[index];
+  const meta =
+    JSON.parse(metaText) as TestData;
 
   const expectedQuestions =
     Number(
-      test.importState
+      meta.importState
         ?.expectedQuestions
-    ) ||
-    (
-      startIndex +
-      chunk.length
-    );
+    ) || 0;
 
-  /*
-    Kutilgan umumiy savollar sonidan oshib ketishiga yo‘l qo‘ymaymiz.
-  */
   if (
     startIndex +
       chunk.length >
@@ -582,7 +515,7 @@ async function appendQuestionsChunk(
       {
         success: false,
         message:
-          `Savollar soni kutilgan miqdordan oshib ketmoqda: ${startIndex + chunk.length}/${expectedQuestions}.`,
+          `Savollar soni kutilgan miqdordan oshmoqda: ${startIndex + chunk.length}/${expectedQuestions}.`,
       },
       {
         status: 400,
@@ -590,54 +523,56 @@ async function appendQuestionsChunk(
     );
   }
 
-  const updatedQuestions = [
-    ...existing,
-    ...chunk,
-  ];
-
-  const now =
-    new Date().toISOString();
-
-  tests[index] = {
-    ...test,
-
-    questions:
-      updatedQuestions,
-
-    importState: {
-      mode: "chunked",
-
-      expectedQuestions,
-
-      receivedQuestions:
-        updatedQuestions.length,
-
-      completed: false,
-    },
-
-    updatedAt: now,
+  const chunkPayload = {
+    testId,
+    startIndex,
+    count: chunk.length,
+    questions: chunk,
+    createdAt:
+      new Date().toISOString(),
   };
 
-  await writeTests(
-    tests
+  /*
+    Bir xil startIndex qayta yuborilsa shu fayl overwrite bo‘ladi.
+    Demak append idempotent — savollar dublikat bo‘lib ketmaydi.
+  */
+  await put(
+    importChunkPath(
+      testId,
+      startIndex
+    ),
+    JSON.stringify(
+      chunkPayload
+    ),
+    {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge: 0,
+    }
   );
 
   return NextResponse.json(
     {
       success: true,
-
       testId,
-
       receivedQuestions:
-        updatedQuestions.length,
-
+        Math.min(
+          expectedQuestions,
+          startIndex +
+            chunk.length
+        ),
       expectedQuestions,
-
       remaining:
         Math.max(
           0,
           expectedQuestions -
-            updatedQuestions.length
+            (
+              startIndex +
+              chunk.length
+            )
         ),
     },
     {
@@ -648,6 +583,8 @@ async function appendQuestionsChunk(
 
 /* =========================================================
    FINALIZE CHUNKED TEST
+   Barcha UNIQUE chunk bloblarini yig‘ib, faqat SHU YERDA tests.json'ga
+   to‘liq testni bir marta yozamiz.
 ========================================================= */
 
 async function finalizeChunkedTest(
@@ -671,59 +608,24 @@ async function finalizeChunkedTest(
     );
   }
 
-  let tests: TestData[] = [];
-  let index = -1;
-
-  /*
-    Oxirgi chunk yozilgandan keyin finalize juda tez kelishi mumkin.
-    Shuning uchun yakuniy holat ko‘ringuncha Blob'ni qayta o‘qiymiz.
-  */
-  for (let attempt = 0; attempt < 10; attempt++) {
-    tests = await readTests();
-
-    index = tests.findIndex(
-      (item) =>
-        item.id === testId
-    );
-
-    if (index >= 0) {
-      const candidateQuestions: unknown[] =
-        Array.isArray(
-          tests[index].questions
-        )
-          ? (tests[index].questions as unknown[])
-          : [];
-
-      const candidateExpected =
-        Number(
-          tests[index].importState
-            ?.expectedQuestions
-        ) ||
-        candidateQuestions.length;
-
-      if (
-        candidateQuestions.length ===
-        candidateExpected
-      ) {
-        break;
+  const metaResult =
+    await get(
+      importMetaPath(testId),
+      {
+        access: "private",
       }
-    }
-
-    await new Promise(
-      (resolve) =>
-        setTimeout(
-          resolve,
-          250 * (attempt + 1)
-        )
     );
-  }
 
-  if (index < 0) {
+  if (
+    !metaResult ||
+    metaResult.statusCode !== 200 ||
+    !metaResult.stream
+  ) {
     return NextResponse.json(
       {
         success: false,
         message:
-          "Test topilmadi.",
+          "Import metama’lumoti topilmadi.",
       },
       {
         status: 404,
@@ -731,37 +633,161 @@ async function finalizeChunkedTest(
     );
   }
 
-  const test =
-    tests[index];
+  const metaText =
+    await new Response(
+      metaResult.stream
+    ).text();
 
-  const questions =
-    Array.isArray(
-      test.questions
-    )
-      ? test.questions
-      : [];
+  const meta =
+    JSON.parse(metaText) as TestData;
 
   const expectedQuestions =
     Number(
-      test.importState
+      meta.importState
         ?.expectedQuestions
-    ) ||
-    questions.length;
+    ) || 0;
+
+  /*
+    list() yangi yaratilgan alohida chunk bloblarini topadi.
+    840 ta savol 10 tadan bo‘lsa taxminan 84 ta chunk — limitdan ancha kam.
+  */
+  const listed =
+    await list({
+      prefix:
+        importChunkPrefix(
+          testId
+        ),
+      limit: 1000,
+    });
+
+  const chunkBlobs =
+    [...listed.blobs].sort(
+      (a, b) =>
+        a.pathname.localeCompare(
+          b.pathname
+        )
+    );
 
   if (
-    questions.length !==
+    chunkBlobs.length === 0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Birorta savol bo‘lagi topilmadi.",
+      },
+      {
+        status: 409,
+      }
+    );
+  }
+
+  const chunkRows: {
+    startIndex: number;
+    questions: unknown[];
+  }[] = [];
+
+  for (const blob of chunkBlobs) {
+    const chunkResult =
+      await get(
+        blob.pathname,
+        {
+          access: "private",
+        }
+      );
+
+    if (
+      !chunkResult ||
+      chunkResult.statusCode !== 200 ||
+      !chunkResult.stream
+    ) {
+      continue;
+    }
+
+    const chunkText =
+      await new Response(
+        chunkResult.stream
+      ).text();
+
+    const parsed =
+      JSON.parse(chunkText);
+
+    const startIndex =
+      Number(
+        parsed?.startIndex
+      );
+
+    const questions =
+      Array.isArray(
+        parsed?.questions
+      )
+        ? parsed.questions
+        : [];
+
+    if (
+      Number.isInteger(
+        startIndex
+      ) &&
+      startIndex >= 0 &&
+      questions.length > 0
+    ) {
+      chunkRows.push({
+        startIndex,
+        questions,
+      });
+    }
+  }
+
+  chunkRows.sort(
+    (a, b) =>
+      a.startIndex -
+      b.startIndex
+  );
+
+  const assembled: unknown[] = [];
+  let expectedStart = 0;
+
+  for (const row of chunkRows) {
+    if (
+      row.startIndex !==
+      expectedStart
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            `Savol bo‘laklarida uzilish bor. Server ${expectedStart}-savoldan boshlanuvchi bo‘lakni kutmoqda, ammo ${row.startIndex}-savoldan boshlanuvchi bo‘lak topildi.`,
+          expectedStartIndex:
+            expectedStart,
+          foundStartIndex:
+            row.startIndex,
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    assembled.push(
+      ...row.questions
+    );
+
+    expectedStart =
+      assembled.length;
+  }
+
+  if (
+    assembled.length !==
     expectedQuestions
   ) {
     return NextResponse.json(
       {
         success: false,
-
         message:
-          `Test hali to‘liq saqlanmagan. ${questions.length}/${expectedQuestions} ta savol serverda mavjud.`,
-
+          `Test hali to‘liq saqlanmagan. ${assembled.length}/${expectedQuestions} ta savol chunklarda mavjud.`,
         receivedQuestions:
-          questions.length,
-
+          assembled.length,
         expectedQuestions,
       },
       {
@@ -778,39 +804,78 @@ async function finalizeChunkedTest(
       body?.status
     );
 
-  tests[index] = {
-    ...test,
-
-    status:
-      finalStatus,
-
+  const completedTest: TestData = {
+    ...meta,
+    questions: assembled,
+    status: finalStatus,
     importState: {
       mode: "chunked",
-
       expectedQuestions,
-
       receivedQuestions:
-        questions.length,
-
+        assembled.length,
       completed: true,
     },
-
     updatedAt: now,
   };
 
-  await writeTests(
-    tests
-  );
+  /*
+    tests.json'da placeholder topilsa update qilamiz;
+    stale read sabab topilmasa ham testni yo‘qotmaymiz — qo‘shamiz.
+  */
+  const tests =
+    await readTests();
+
+  const index =
+    tests.findIndex(
+      (item) =>
+        item.id === testId
+    );
+
+  if (index >= 0) {
+    tests[index] =
+      completedTest;
+  } else {
+    tests.push(
+      completedTest
+    );
+  }
+
+  await writeTests(tests);
+
+  /*
+    Vaqtinchalik chunklarni tozalash.
+    Cleanup xato qilsa test saqlanishiga ta'sir qilmaydi.
+  */
+  try {
+    const pathsToDelete = [
+      importMetaPath(testId),
+      ...chunkBlobs.map(
+        (blob) =>
+          blob.pathname
+      ),
+    ];
+
+    if (
+      pathsToDelete.length > 0
+    ) {
+      await del(
+        pathsToDelete
+      );
+    }
+  } catch (cleanupError) {
+    console.warn(
+      "TEMP IMPORT CLEANUP ERROR:",
+      cleanupError
+    );
+  }
 
   return NextResponse.json(
     {
       success: true,
-
       message:
         "Test to‘liq saqlandi.",
-
       test:
-        tests[index],
+        completedTest,
     },
     {
       status: 200,
