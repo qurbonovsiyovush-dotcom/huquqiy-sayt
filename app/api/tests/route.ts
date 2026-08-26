@@ -166,7 +166,7 @@ async function writeTests(
       allowOverwrite: true,
       contentType:
         "application/json; charset=utf-8",
-      cacheControlMaxAge: 60,
+      cacheControlMaxAge: 0,
     }
   );
 }
@@ -427,21 +427,39 @@ async function appendQuestionsChunk(
     );
   }
 
-  const tests =
+  let tests =
     await readTests();
 
-  const index =
+  let index =
     tests.findIndex(
       (item) =>
         item.id === testId
     );
+
+  // Yangi yaratilgan test Blob'da darhol ko‘rinmasa, qisqa retry qilamiz.
+  if (index < 0) {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 300 * (attempt + 1))
+      );
+
+      tests = await readTests();
+
+      index = tests.findIndex(
+        (item) =>
+          item.id === testId
+      );
+
+      if (index >= 0) break;
+    }
+  }
 
   if (index < 0) {
     return NextResponse.json(
       {
         success: false,
         message:
-          "Test topilmadi.",
+          "Test yaratildi, ammo Blob'dan qayta o‘qishda topilmadi. Saqlashni qayta bosing.",
       },
       {
         status: 404,
