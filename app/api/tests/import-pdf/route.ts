@@ -757,45 +757,267 @@ function pageLines(
    QUESTION BLOCKS
 ========================================================= */
 
+function isPdfDecorationLine(value: string) {
+  const text = normalizeOneLine(value);
+  const lower = text.toLowerCase();
+
+  if (!text) {
+    return true;
+  }
+
+  /* Har sahifada takrorlanadigan kolontitul / sahifa raqami */
+  if (
+    /^qurbonov\s+s\.j\.?$/i.test(text) ||
+    /^qurbonob\s+siyovush$/i.test(text) ||
+    /^\d{1,3}$/.test(text)
+  ) {
+    return true;
+  }
+
+  /* Maxsus blok variant sarlavhalari — savolning qismi emas. */
+  if (/^[12]\s*[-–—]?\s*variant\s*\(\s*30\s*ta\s*\)$/i.test(text)) {
+    return true;
+  }
+
+  /* Javoblar bo'limi sarlavhalari */
+  if (
+    /^umumiy\s+javoblar$/i.test(text) ||
+    /^javoblar(?:\s+kaliti)?$/i.test(text)
+  ) {
+    return true;
+  }
+
+  /* Sahifadagi dekorativ bo'lim/bob sarlavhalari. */
+  if (
+    /^[IVXLCDM]+\s+bob\./i.test(text) ||
+    /^(birinchi|ikkinchi|uchinchi|to['’ʻʼ`]?rtinchi|beshinchi|oltinchi)\s+bo['’ʻʼ`]?lim\b/i.test(lower) ||
+    /\bmoddalar\s+bo['’ʻʼ`]?yicha\s+(?:test|\d+\s*ta)/i.test(lower) ||
+    /^o['’ʻʼ`]?zbekiston\s+respublikasi\s+konstitutsiyasi$/i.test(lower)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function blockHasAllOptions(lines: TextLine[]) {
+  const found = new Set<OptionLabel>();
+
+  for (const line of lines) {
+    const direct = optionLabelFromStart(line.text);
+
+    if (direct) {
+      found.add(direct);
+    }
+
+    const inline = splitInlineOptions(line.text);
+
+    for (const part of inline) {
+      found.add(part.label);
+    }
+  }
+
+  return (
+    found.has("A") &&
+    found.has("B") &&
+    found.has("C") &&
+    found.has("D")
+  );
+}
+
+/*
+  =========================================================
+  SAVOLLARNI KETMA-KET AJRATISH
+  =========================================================
+
+  Ushbu PDFning tuzilishi:
+    1..780   — asosiy testlar
+    1..30    — 1-variant blok test
+    1..30    — 2-variant blok test
+
+  Saytda esa ularni bitta ketma-ket ro'yxat qilamiz:
+    1..780
+    781..810
+    811..840
+
+  MUHIM:
+  Savol ichidagi:
+    1. jinsi
+    2. irqi
+    3. millati
+  kabi bandlar yangi savol EMAS.
+
+  Yangi savol faqat:
+    - kutilayotgan navbatdagi raqam bo'lsa;
+    - oldingi savolda A/B/C/D variantlari to'liq topilgan bo'lsa
+  boshlanadi.
+
+  Shu sababli 85-savol ichidagi 1..8 bandlar 1..8-savolga
+  aylanib ketmaydi va boshqa sahifadagi savol oldingi savolning
+  o'rnini bosmaydi.
+*/
 function buildQuestionBlocks(
   lines: TextLine[]
 ): QuestionBlock[] {
-  const blocks:
-    QuestionBlock[] = [];
+  const blocks: QuestionBlock[] = [];
 
-  let current:
-    QuestionBlock | null =
-    null;
+  type Phase = "main" | "variant1" | "variant2";
+
+  let phase: Phase = "main";
+  let expectedLocalNumber = 1;
+  let currentLocalNumber: number | null = null;
+  let currentGlobalNumber: number | null = null;
+  let currentLines: TextLine[] = [];
+
+  function globalNumberFor(
+    currentPhase: Phase,
+    localNumber: number
+  ) {
+    if (currentPhase === "main") {
+      return localNumber;
+    }
+
+    if (currentPhase === "variant1") {
+      return 780 + localNumber;
+    }
+
+    return 810 + localNumber;
+  }
+
+  function flushCurrent() {
+    if (
+      currentGlobalNumber !== null &&
+      currentLines.length > 0
+    ) {
+      blocks.push({
+        number: currentGlobalNumber,
+        lines: currentLines,
+      });
+    }
+
+    currentLocalNumber = null;
+    currentGlobalNumber = null;
+    currentLines = [];
+  }
+
+  function startQuestion(
+    localNumber: number,
+    line: TextLine
+  ) {
+    currentLocalNumber = localNumber;
+    currentGlobalNumber = globalNumberFor(
+      phase,
+      localNumber
+    );
+    currentLines = [line];
+    expectedLocalNumber = localNumber + 1;
+  }
 
   for (const line of lines) {
-    const number =
-      questionNumberFromLine(
-        line.text
-      );
+    if (isPdfDecorationLine(line.text)) {
+      continue;
+    }
 
-    if (number !== null) {
-      if (current) {
-        blocks.push(current);
+    const candidate = questionNumberFromLine(
+      line.text
+    );
+
+    /*
+      Hali birinchi savol boshlanmagan bo'lsa,
+      faqat aynan kutilayotgan raqamni olamiz.
+    */
+    if (currentGlobalNumber === null) {
+      if (candidate === expectedLocalNumber) {
+        startQuestion(candidate, line);
       }
-
-      current = {
-        number,
-        lines: [line],
-      };
 
       continue;
     }
 
-    if (current) {
-      current.lines.push(
-        line
-      );
+    /*
+      Avvalgi savol variantlari tugamaguncha hech qanday "N."
+      yangi savol deb olinmaydi. Bu ichki raqamlangan bandlarni
+      ishonchli himoya qiladi.
+    */
+    const currentIsComplete = blockHasAllOptions(
+      currentLines
+    );
+
+    if (candidate !== null && currentIsComplete) {
+      /* MAIN: 1..780 */
+      if (
+        phase === "main" &&
+        candidate === expectedLocalNumber &&
+        expectedLocalNumber <= 780
+      ) {
+        flushCurrent();
+        startQuestion(candidate, line);
+        continue;
+      }
+
+      /*
+        780 tugagach PDFda raqam 1 ga qaytadi.
+        Bu 1-variantning 1-savoli bo'lib, saytda 781 bo'ladi.
+      */
+      if (
+        phase === "main" &&
+        currentLocalNumber === 780 &&
+        candidate === 1
+      ) {
+        flushCurrent();
+        phase = "variant1";
+        expectedLocalNumber = 1;
+        startQuestion(1, line);
+        continue;
+      }
+
+      /* VARIANT 1: local 1..30 => global 781..810 */
+      if (
+        phase === "variant1" &&
+        candidate === expectedLocalNumber &&
+        expectedLocalNumber <= 30
+      ) {
+        flushCurrent();
+        startQuestion(candidate, line);
+        continue;
+      }
+
+      /*
+        1-variantning 30-savolidan keyin PDF yana 1 ga qaytadi.
+        Bu 2-variantning 1-savoli bo'lib, saytda 811 bo'ladi.
+      */
+      if (
+        phase === "variant1" &&
+        currentLocalNumber === 30 &&
+        candidate === 1
+      ) {
+        flushCurrent();
+        phase = "variant2";
+        expectedLocalNumber = 1;
+        startQuestion(1, line);
+        continue;
+      }
+
+      /* VARIANT 2: local 1..30 => global 811..840 */
+      if (
+        phase === "variant2" &&
+        candidate === expectedLocalNumber &&
+        expectedLocalNumber <= 30
+      ) {
+        flushCurrent();
+        startQuestion(candidate, line);
+        continue;
+      }
     }
+
+    /*
+      Yangi haqiqiy savol emas — demak bu satr hozirgi savolning
+      ichki bandi, jadvali, izohi yoki variant davomi.
+    */
+    currentLines.push(line);
   }
 
-  if (current) {
-    blocks.push(current);
-  }
+  flushCurrent();
 
   return blocks;
 }
@@ -2012,59 +2234,44 @@ export async function POST(
     }
 
     /* ---------------------------------------------------------
-       REMOVE DUPLICATE QUESTION NUMBERS
-       Prefer the version with more non-empty options.
+       FINAL ORDER
+
+       buildQuestionBlocks() savollarni allaqachon qat'iy ketma-ket
+       1..840 ko'rinishida global raqamlagan. Shu sababli eski
+       Map<number,...> deduplikatsiya QAT'IYAN ishlatilmaydi.
+
+       Eski kod bir xil raqamni ko'rsa "variantlari ko'proq" bo'lgan
+       blok bilan haqiqiy savolni almashtirib yuborardi. Natijada
+       1-savol o'rniga boshqa joydagi ichki "1." band kelib qolishi
+       mumkin edi.
     --------------------------------------------------------- */
 
-    const unique =
-      new Map<
-        number,
-        ImportedQuestion
-      >();
+    const finalQuestions = imported;
 
-    for (const question of imported) {
-      const existing =
-        unique.get(
-          question.number
-        );
+    /*
+      Ketma-ketlikni tekshiramiz. Importni buzmaymiz, lekin server
+      logida qaysi global savol raqami yo'qolganini aniq ko'rsatamiz.
+    */
+    const missingNumbers: number[] = [];
 
-      if (!existing) {
-        unique.set(
-          question.number,
-          question
-        );
-
-        continue;
-      }
-
-      const existingFilled =
-        existing.options.filter(
-          (option) =>
-            option.text.trim()
-        ).length;
-
-      const newFilled =
-        question.options.filter(
-          (option) =>
-            option.text.trim()
-        ).length;
-
+    for (
+      let expected = 1;
+      expected <= finalQuestions.length;
+      expected++
+    ) {
       if (
-        newFilled >
-        existingFilled
+        finalQuestions[expected - 1]?.number !== expected
       ) {
-        unique.set(
-          question.number,
-          question
-        );
+        missingNumbers.push(expected);
       }
     }
 
-    const finalQuestions =
-      [...unique.values()].sort(
-        (a, b) =>
-          a.number - b.number
+    if (missingNumbers.length > 0) {
+      console.warn(
+        "PDF QUESTION SEQUENCE WARNING:",
+        missingNumbers.slice(0, 50)
       );
+    }
 
     if (
       finalQuestions.length ===
