@@ -275,7 +275,7 @@ function questionNumberFromLine(value: string) {
     Test savollari faqat "1.", "2.", "3." ... formatida.
     "1)", "2)" esa savol ichidagi bandlar, savol deb olinmaydi.
   */
-  const match = value.match(/^\s*(\d{1,4})\.\s+\S/);
+  const match = value.match(/^\s*(\d{1,4})\.(?:\s+\S.*)?\s*$/);
 
   if (!match) {
     return null;
@@ -913,7 +913,87 @@ function buildQuestionBlocks(
     expectedLocalNumber = localNumber + 1;
   }
 
+  function isVariant1Title(value: string) {
+    const text = normalizeOneLine(value);
+    return /^1\s*[-–—]?\s*variant\s*\(\s*30\s*ta\s*\)$/i.test(text);
+  }
+
+  function isVariant2Title(value: string) {
+    const text = normalizeOneLine(value);
+    return /^2\s*[-–—]?\s*variant\s*\(\s*30\s*ta\s*\)$/i.test(text);
+  }
+
+  /*
+    VARIANTLARDA 1..30 raqamlar ichki sanalgan bandlar bilan to'qnashishi
+    mumkin. Masalan 1-savol ichida "1.", "2.", "3." bandlar bor.
+
+    Shuning uchun variantlarda:
+      - oldingi savol A/B/C/D bilan tugagan bo'lsa — keyingi raqam qabul qilinadi;
+      - 11-savoldan keyin esa kutilayotgan raqamni to'g'ridan-to'g'ri olamiz,
+        chunki ichki ro'yxatlar odatda 1..10 doirasida bo'ladi.
+
+    ASOSIY 1..780 testlarda esa raqamlar qat'iy ketma-ket keladi.
+    108-savol kabi jadval savollarida A/B/C/D text-layer ba'zan noodatiy
+    ajralgani uchun oldingi savolning "to'liq" bo'lishini kutmaymiz.
+  */
+  function mayStartExpectedQuestion(
+    candidate: number,
+    line: TextLine
+  ) {
+    if (candidate !== expectedLocalNumber) {
+      return false;
+    }
+
+    if (phase === "main") {
+      return candidate >= 1 && candidate <= 780;
+    }
+
+    if (candidate < 1 || candidate > 30) {
+      return false;
+    }
+
+    if (currentGlobalNumber === null) {
+      return candidate === 1;
+    }
+
+    if (blockHasAllOptions(currentLines)) {
+      return true;
+    }
+
+    if (candidate >= 11) {
+      return true;
+    }
+
+    /*
+      Qo'shimcha ehtiyot chorasi:
+      variantning haqiqiy savol sarlavhasi odatda ancha uzun bo'ladi.
+      Bu qisqa "2. ..." ichki bandlarni xato savol deb olish ehtimolini
+      kamaytiradi. Bu shart faqat A/B/C/D hali to'liq topilmagan holatda.
+    */
+    const withoutNumber = stripQuestionNumber(line.text);
+    return withoutNumber.length >= 45;
+  }
+
   for (const line of lines) {
+    /*
+      MUHIM: variant sarlavhasini isPdfDecorationLine() dan OLDIN ko'ramiz.
+      Chunki isPdfDecorationLine() ularni ataylab dekoratsiya sifatida
+      yashiradi.
+    */
+    if (isVariant1Title(line.text)) {
+      flushCurrent();
+      phase = "variant1";
+      expectedLocalNumber = 1;
+      continue;
+    }
+
+    if (isVariant2Title(line.text)) {
+      flushCurrent();
+      phase = "variant2";
+      expectedLocalNumber = 1;
+      continue;
+    }
+
     if (isPdfDecorationLine(line.text)) {
       continue;
     }
@@ -922,104 +1002,41 @@ function buildQuestionBlocks(
       line.text
     );
 
-    /*
-      Hali birinchi savol boshlanmagan bo'lsa,
-      faqat aynan kutilayotgan raqamni olamiz.
-    */
     if (currentGlobalNumber === null) {
-      if (candidate === expectedLocalNumber) {
+      if (
+        candidate !== null &&
+        mayStartExpectedQuestion(candidate, line)
+      ) {
         startQuestion(candidate, line);
       }
 
       continue;
     }
 
-    /*
-      Avvalgi savol variantlari tugamaguncha hech qanday "N."
-      yangi savol deb olinmaydi. Bu ichki raqamlangan bandlarni
-      ishonchli himoya qiladi.
-    */
-    const currentIsComplete = blockHasAllOptions(
-      currentLines
-    );
-
-    if (candidate !== null && currentIsComplete) {
-      /* MAIN: 1..780 */
-      if (
-        phase === "main" &&
-        candidate === expectedLocalNumber &&
-        expectedLocalNumber <= 780
-      ) {
-        flushCurrent();
-        startQuestion(candidate, line);
-        continue;
-      }
-
-      /*
-        780 tugagach PDFda raqam 1 ga qaytadi.
-        Bu 1-variantning 1-savoli bo'lib, saytda 781 bo'ladi.
-      */
-      if (
-        phase === "main" &&
-        currentLocalNumber === 780 &&
-        candidate === 1
-      ) {
-        flushCurrent();
-        phase = "variant1";
-        expectedLocalNumber = 1;
-        startQuestion(1, line);
-        continue;
-      }
-
-      /* VARIANT 1: local 1..30 => global 781..810 */
-      if (
-        phase === "variant1" &&
-        candidate === expectedLocalNumber &&
-        expectedLocalNumber <= 30
-      ) {
-        flushCurrent();
-        startQuestion(candidate, line);
-        continue;
-      }
-
-      /*
-        1-variantning 30-savolidan keyin PDF yana 1 ga qaytadi.
-        Bu 2-variantning 1-savoli bo'lib, saytda 811 bo'ladi.
-      */
-      if (
-        phase === "variant1" &&
-        currentLocalNumber === 30 &&
-        candidate === 1
-      ) {
-        flushCurrent();
-        phase = "variant2";
-        expectedLocalNumber = 1;
-        startQuestion(1, line);
-        continue;
-      }
-
-      /* VARIANT 2: local 1..30 => global 811..840 */
-      if (
-        phase === "variant2" &&
-        candidate === expectedLocalNumber &&
-        expectedLocalNumber <= 30
-      ) {
-        flushCurrent();
-        startQuestion(candidate, line);
-        continue;
-      }
+    if (
+      candidate !== null &&
+      mayStartExpectedQuestion(candidate, line)
+    ) {
+      flushCurrent();
+      startQuestion(candidate, line);
+      continue;
     }
 
     /*
-      Yangi haqiqiy savol emas — demak bu satr hozirgi savolning
-      ichki bandi, jadvali, izohi yoki variant davomi.
+      Bu haqiqiy yangi savol emas. Demak hozirgi savolning ichki bandi,
+      jadvali, diagrammasi, moslashtirish qismi yoki variant davomi.
     */
     currentLines.push(line);
   }
 
   flushCurrent();
 
-  return blocks;
+  /*
+    Oxirgi himoya: bloklar PDFdagi real ketma-ketlikda qoladi.
+    Hech qanday Map-deduplikatsiya yoki "ko'proq variantli blokni tanlash"
+    ishlatilmaydi.
+  */
+  return blocks.sort((a, b) => a.number - b.number);
 }
 
 /* =========================================================
@@ -2256,11 +2273,11 @@ export async function POST(
 
     for (
       let expected = 1;
-      expected <= finalQuestions.length;
+      expected <= 840;
       expected++
     ) {
       if (
-        finalQuestions[expected - 1]?.number !== expected
+        finalQuestions.find((item) => item.number === expected) === undefined
       ) {
         missingNumbers.push(expected);
       }
@@ -2313,6 +2330,8 @@ export async function POST(
         finalQuestions,
       total:
         finalQuestions.length,
+      expectedTotal: 840,
+      missingNumbers,
     });
   } catch (error) {
     console.error(
