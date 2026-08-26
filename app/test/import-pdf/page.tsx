@@ -2662,265 +2662,338 @@ export default function ImportPdfTestPage() {
       return;
     }
 
-    if (
-      questions.length === 0
-    ) {
-      setMessage(
-        "Saqlash uchun savollar yo‘q."
-      );
+    if (questions.length === 0) {
+      setMessage("Saqlash uchun savollar yo‘q.");
       return;
     }
 
-    const invalid =
-      questions.filter(
-        (question) => {
-          const correctCount =
-            question.options.filter(
-              (option) =>
-                option.isCorrect
-            ).length;
+    const invalid = questions.filter((question) => {
+      const correctCount = question.options.filter(
+        (option) => option.isCorrect
+      ).length;
 
-          return (
-            !richTextHasContent(
-              questionDrafts[question.id] ??
-              question.questionText
-            ) ||
-            question.options.some(
-              (option) =>
-                !richTextHasContent(option.text)
-            ) ||
-            correctCount !== 1
-          );
-        }
+      return (
+        !richTextHasContent(
+          questionDrafts[question.id] ?? question.questionText
+        ) ||
+        question.options.some(
+          (option) => !richTextHasContent(option.text)
+        ) ||
+        correctCount !== 1
       );
+    });
 
-    if (
-      invalid.length > 0
-    ) {
+    if (invalid.length > 0) {
       setMessage(
         `${invalid.length} ta savolda xato bor. Har bir savolda 4 ta variant va 1 ta to‘g‘ri javob bo‘lishi kerak.`
       );
       return;
     }
 
-    try {
-      setSaving(true);
-      setMessage("");
+    async function readApiResponse(response: Response) {
+      const text = await response.text();
+      let data: any = null;
 
-      const payload = {
-        title:
-          title.trim(),
-        subject:
-          subject.trim(),
-        duration:
-          Number(duration) ||
-          60,
-        description:
-          description.trim(),
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        if (response.status === 413) {
+          throw new Error(
+            "Yuborilayotgan ma’lumot hajmi server limitidan oshdi. Savollar kichikroq bo‘laklarda yuboriladi, lekin bitta rasm juda katta bo‘lsa uni kichraytirish kerak."
+          );
+        }
 
-        testType,
-
-        customTestTypeName:
-          testType === "custom"
-            ? customTestTypeName.trim()
-            : "",
-
-        status: "draft",
-        attemptLimit:
-          attemptLimitEnabled
-            ? Math.max(1, Number(attemptLimit) || 1)
-            : null,
-
-        questions:
-          questions.map(
-            (question) => ({
-              id:
-                question.id,
-
-              questionHtml:
-                sanitizeRichHtml(
-                  questionDrafts[question.id] ??
-                  question.questionText
-                ),
-
-              options:
-                question.options.map(
-                  (option) => ({
-                    id:
-                      option.id,
-                    text:
-                      sanitizeRichHtml(option.text),
-                    isCorrect:
-                      option.isCorrect,
-                  })
-                ),
-
-              /*
-                Rasm topilgan bo‘lsa, mavjud test editor
-                schema'dagi image shape sifatida saqlaymiz.
-              */
-              shapes:
-                Array.isArray(question.shapes)
-                  ? question.shapes.flatMap<EditorShape>((shape): EditorShape[] => {
-                      if (shape.type !== "matchingItem") {
-                        return [
-                          {
-                            id: shape.id,
-                            type: shape.type,
-                            x: Math.round(shape.x),
-                            y: Math.round(shape.y),
-                            width: Math.max(1, Math.round(shape.width)),
-                            height: Math.max(1, Math.round(shape.height)),
-                            text: shape.text,
-                            imageSrc: shape.imageSrc,
-                            backgroundColor: shape.backgroundColor,
-                            borderColor: shape.borderColor,
-                            textColor: shape.textColor,
-                            fontSize: shape.fontSize,
-                            borderWidth: shape.borderWidth,
-                            borderRadius: shape.borderRadius,
-                            opacity: shape.opacity,
-                            objectFit: shape.objectFit,
-                            zIndex: shape.zIndex,
-                          },
-                        ];
-                      }
-
-                      const keyWidth = 50;
-                      const gap = 8;
-                      const boxX =
-                        Math.round(shape.x) + keyWidth - 8;
-                      const boxWidth =
-                        Math.max(
-                          70,
-                          Math.round(shape.width) - keyWidth + 8
-                        );
-
-                      return [
-                        {
-                          id: `${shape.id}-box`,
-                          type: "roundedRectangle",
-                          x: boxX,
-                          y: Math.round(shape.y),
-                          width: boxWidth,
-                          height: Math.max(1, Math.round(shape.height)),
-                          backgroundColor: "#ffffff",
-                          borderColor: shape.borderColor || "#1f2a30",
-                          borderWidth: 2,
-                          borderRadius: 8,
-                          zIndex: shape.zIndex,
-                        },
-                        {
-                          id: `${shape.id}-key-circle`,
-                          type: "circle",
-                          x: Math.round(shape.x),
-                          y:
-                            Math.round(shape.y) +
-                            Math.max(
-                              0,
-                              Math.round(
-                                (shape.height - keyWidth) / 2
-                              )
-                            ),
-                          width: keyWidth,
-                          height: keyWidth,
-                          backgroundColor: "#ffffff",
-                          borderColor: shape.borderColor || "#1f2a30",
-                          borderWidth: 2,
-                          borderRadius: 999,
-                          zIndex: (shape.zIndex || 1) + 1,
-                        },
-                        {
-                          id: `${shape.id}-key`,
-                          type: "text",
-                          x: Math.round(shape.x),
-                          y:
-                            Math.round(shape.y) +
-                            Math.max(
-                              0,
-                              Math.round(
-                                (shape.height - keyWidth) / 2
-                              )
-                            ),
-                          width: keyWidth,
-                          height: keyWidth,
-                          text: shape.matchingKey || "",
-                          textColor: shape.textColor || "#111111",
-                          fontSize: 19,
-                          borderWidth: 0,
-                          zIndex: (shape.zIndex || 1) + 2,
-                        },
-                        {
-                          id: `${shape.id}-text`,
-                          type: "text",
-                          x: boxX + gap,
-                          y: Math.round(shape.y) + 7,
-                          width: Math.max(
-                            40,
-                            boxWidth - gap * 2
-                          ),
-                          height: Math.max(
-                            30,
-                            Math.round(shape.height) - 14
-                          ),
-                          text: shape.text || "",
-                          textColor: shape.textColor || "#111111",
-                          fontSize: shape.fontSize || 18,
-                          borderWidth: 0,
-                          zIndex: (shape.zIndex || 1) + 2,
-                        },
-                      ];
-                    })
-                  : [],
-
-              points: 1,
-            })
-          ),
-      };
-
-      const response =
-        await fetch(
-          "/api/tests",
-          {
-            method: "POST",
-            credentials:
-              "include",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body:
-              JSON.stringify(
-                payload
-              ),
-          }
-        );
-
-      const data =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !data?.success
-      ) {
         throw new Error(
-          data?.message ||
-            "Testni saqlab bo‘lmadi."
+          text || `Server xatosi: ${response.status}`
         );
       }
 
-      window.alert(
-        "PDFdan yaratilgan test qoralama sifatida saqlandi."
+      if (!response.ok || !data?.success) {
+        throw new Error(
+          data?.message || `Server xatosi: ${response.status}`
+        );
+      }
+
+      return data;
+    }
+
+    try {
+      setSaving(true);
+      setMessage("Testni saqlash boshlandi...");
+
+      const preparedQuestions = questions.map((question) => ({
+        id: question.id,
+
+        questionHtml: sanitizeRichHtml(
+          questionDrafts[question.id] ?? question.questionText
+        ),
+
+        options: question.options.map((option) => ({
+          id: option.id,
+          text: sanitizeRichHtml(option.text),
+          isCorrect: option.isCorrect,
+        })),
+
+        shapes: Array.isArray(question.shapes)
+          ? question.shapes.flatMap<EditorShape>(
+              (shape): EditorShape[] => {
+                if (shape.type !== "matchingItem") {
+                  return [
+                    {
+                      id: shape.id,
+                      type: shape.type,
+                      x: Math.round(shape.x),
+                      y: Math.round(shape.y),
+                      width: Math.max(1, Math.round(shape.width)),
+                      height: Math.max(1, Math.round(shape.height)),
+                      text: shape.text,
+                      imageSrc: shape.imageSrc,
+                      backgroundColor: shape.backgroundColor,
+                      borderColor: shape.borderColor,
+                      textColor: shape.textColor,
+                      fontSize: shape.fontSize,
+                      borderWidth: shape.borderWidth,
+                      borderRadius: shape.borderRadius,
+                      opacity: shape.opacity,
+                      objectFit: shape.objectFit,
+                      zIndex: shape.zIndex,
+                    },
+                  ];
+                }
+
+                const keyWidth = 50;
+                const gap = 8;
+                const boxX = Math.round(shape.x) + keyWidth - 8;
+                const boxWidth = Math.max(
+                  70,
+                  Math.round(shape.width) - keyWidth + 8
+                );
+
+                return [
+                  {
+                    id: `${shape.id}-box`,
+                    type: "roundedRectangle",
+                    x: boxX,
+                    y: Math.round(shape.y),
+                    width: boxWidth,
+                    height: Math.max(1, Math.round(shape.height)),
+                    backgroundColor: "#ffffff",
+                    borderColor: shape.borderColor || "#1f2a30",
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    zIndex: shape.zIndex,
+                  },
+                  {
+                    id: `${shape.id}-key-circle`,
+                    type: "circle",
+                    x: Math.round(shape.x),
+                    y:
+                      Math.round(shape.y) +
+                      Math.max(
+                        0,
+                        Math.round((shape.height - keyWidth) / 2)
+                      ),
+                    width: keyWidth,
+                    height: keyWidth,
+                    backgroundColor: "#ffffff",
+                    borderColor: shape.borderColor || "#1f2a30",
+                    borderWidth: 2,
+                    borderRadius: 999,
+                    zIndex: (shape.zIndex || 1) + 1,
+                  },
+                  {
+                    id: `${shape.id}-key`,
+                    type: "text",
+                    x: Math.round(shape.x),
+                    y:
+                      Math.round(shape.y) +
+                      Math.max(
+                        0,
+                        Math.round((shape.height - keyWidth) / 2)
+                      ),
+                    width: keyWidth,
+                    height: keyWidth,
+                    text: shape.matchingKey || "",
+                    textColor: shape.textColor || "#111111",
+                    fontSize: 19,
+                    borderWidth: 0,
+                    zIndex: (shape.zIndex || 1) + 2,
+                  },
+                  {
+                    id: `${shape.id}-text`,
+                    type: "text",
+                    x: boxX + gap,
+                    y: Math.round(shape.y) + 7,
+                    width: Math.max(40, boxWidth - gap * 2),
+                    height: Math.max(30, Math.round(shape.height) - 14),
+                    text: shape.text || "",
+                    textColor: shape.textColor || "#111111",
+                    fontSize: shape.fontSize || 18,
+                    borderWidth: 0,
+                    zIndex: (shape.zIndex || 1) + 2,
+                  },
+                ];
+              }
+            )
+          : [],
+
+        points: 1,
+      }));
+
+      /* =====================================================
+         1-BOSQICH: bo‘sh test yozuvini yaratamiz
+      ===================================================== */
+
+      const createResponse = await fetch("/api/tests", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "create-chunked-test",
+          title: title.trim(),
+          subject: subject.trim(),
+          duration: Number(duration) || 60,
+          description: description.trim(),
+          testType,
+          customTestTypeName:
+            testType === "custom" ? customTestTypeName.trim() : "",
+          status: "draft",
+          attemptLimit: attemptLimitEnabled
+            ? Math.max(1, Number(attemptLimit) || 1)
+            : null,
+          expectedQuestions: preparedQuestions.length,
+        }),
+      });
+
+      const createData = await readApiResponse(createResponse);
+      const testId = String(createData?.testId || "");
+
+      if (!testId) {
+        throw new Error("Yangi test ID olinmadi.");
+      }
+
+      /* =====================================================
+         2-BOSQICH: savollarni xavfsiz hajmdagi bo‘laklarda yuboramiz.
+
+         Faqat "10 tadan" emas: rasm/base64 bo‘lsa request hajmi ham
+         hisobga olinadi. Bu Vercel Request Entity Too Large xatosini
+         keskin kamaytiradi.
+      ===================================================== */
+
+      const MAX_QUESTIONS_PER_CHUNK = 10;
+      const MAX_CHUNK_BYTES = 1_800_000;
+      const MAX_SINGLE_QUESTION_BYTES = 3_500_000;
+      const encoder = new TextEncoder();
+
+      type PreparedQuestion = (typeof preparedQuestions)[number];
+      const chunks: { startIndex: number; items: PreparedQuestion[] }[] = [];
+
+      let currentChunk: PreparedQuestion[] = [];
+      let currentChunkBytes = 0;
+      let currentStartIndex = 0;
+
+      for (let index = 0; index < preparedQuestions.length; index++) {
+        const question = preparedQuestions[index];
+        const questionBytes = encoder.encode(
+          JSON.stringify(question)
+        ).length;
+
+        if (questionBytes > MAX_SINGLE_QUESTION_BYTES) {
+          throw new Error(
+            `${index + 1}-savoldagi rasm yoki shakl juda katta. Shu savoldagi rasmni kichraytiring va qayta saqlang.`
+          );
+        }
+
+        const shouldFlush =
+          currentChunk.length > 0 &&
+          (currentChunk.length >= MAX_QUESTIONS_PER_CHUNK ||
+            currentChunkBytes + questionBytes > MAX_CHUNK_BYTES);
+
+        if (shouldFlush) {
+          chunks.push({
+            startIndex: currentStartIndex,
+            items: currentChunk,
+          });
+
+          currentStartIndex = index;
+          currentChunk = [];
+          currentChunkBytes = 0;
+        }
+
+        currentChunk.push(question);
+        currentChunkBytes += questionBytes;
+      }
+
+      if (currentChunk.length > 0) {
+        chunks.push({
+          startIndex: currentStartIndex,
+          items: currentChunk,
+        });
+      }
+
+      let savedCount = 0;
+
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+
+        setMessage(
+          `${savedCount}/${preparedQuestions.length} ta savol saqlandi... (${chunkIndex + 1}/${chunks.length} bo‘lak)`
+        );
+
+        const chunkResponse = await fetch("/api/tests", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "append-questions",
+            testId,
+            startIndex: chunk.startIndex,
+            questions: chunk.items,
+          }),
+        });
+
+        const chunkData = await readApiResponse(chunkResponse);
+        savedCount = Number(chunkData?.receivedQuestions) || 0;
+
+        setMessage(
+          `${savedCount}/${preparedQuestions.length} ta savol saqlandi...`
+        );
+      }
+
+      /* =====================================================
+         3-BOSQICH: testni yakunlaymiz
+      ===================================================== */
+
+      const finalizeResponse = await fetch("/api/tests", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "finalize-chunked-test",
+          testId,
+          status: "draft",
+        }),
+      });
+
+      await readApiResponse(finalizeResponse);
+
+      setMessage(
+        `${preparedQuestions.length} ta savol muvaffaqiyatli saqlandi.`
       );
 
-      router.push(
-        "/admin/tests"
+      window.alert(
+        `Test muvaffaqiyatli saqlandi.\n\nJami: ${preparedQuestions.length} ta savol.`
       );
+
+      router.push("/admin/tests");
     } catch (error) {
-      console.error(
-        "SAVE IMPORTED TEST ERROR:",
-        error
-      );
+      console.error("SAVE IMPORTED TEST ERROR:", error);
 
       setMessage(
         error instanceof Error
