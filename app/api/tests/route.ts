@@ -1,652 +1,874 @@
-async function saveDraft() {
+import { NextRequest, NextResponse } from "next/server";
+import { get, put } from "@vercel/blob";
+import crypto from "crypto";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const TESTS_BLOB_PATH = "huquqiy-sayt/tests.json";
+
+type TestStatus = "draft" | "published";
+
+type TestData = {
+  id: string;
+
+  title?: string;
+  subject?: string;
+  duration?: number;
+  description?: string;
+
+  testType?: string;
+  customTestTypeName?: string;
+
+  status?: TestStatus;
+
+  questions?: unknown[];
+
+  attemptLimit?: number | null;
+
+  importState?: {
+    mode?: "chunked";
+    expectedQuestions?: number;
+    receivedQuestions?: number;
+    completed?: boolean;
+  };
+
+  createdAt?: string;
+  updatedAt?: string;
+
+  [key: string]: unknown;
+};
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function checkBlobToken() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN topilmadi."
+    );
+  }
+}
+
+function normalizeTests(
+  value: unknown
+): TestData[] {
+  if (!Array.isArray(value)) {
+    throw new Error(
+      "tests.json formati noto‘g‘ri."
+    );
+  }
+
+  return value as TestData[];
+}
+
+function normalizeAttemptLimit(
+  value: unknown
+): number | null {
   if (
-    testType === "custom" &&
-    !customTestTypeName.trim()
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === "unlimited"
   ) {
-    setMessage(
-      "Boshqa test turi uchun test turining nomini kiriting."
-    );
-    return;
+    return null;
   }
 
-  if (questions.length === 0) {
-    setMessage(
-      "Saqlash uchun savollar yo‘q."
-    );
-    return;
+  const parsed =
+    Number(value);
+
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < 1
+  ) {
+    return null;
   }
 
-  const invalid =
-    questions.filter(
-      (question) => {
-        const correctCount =
-          question.options.filter(
-            (option) =>
-              option.isCorrect
-          ).length;
+  return Math.floor(parsed);
+}
 
-        return (
-          !richTextHasContent(
-            questionDrafts[
-              question.id
-            ] ??
-              question.questionText
-          ) ||
-          question.options.some(
-            (option) =>
-              !richTextHasContent(
-                option.text
-              )
-          ) ||
-          correctCount !== 1
-        );
+function normalizeStatus(
+  value: unknown
+): TestStatus {
+  return value === "published"
+    ? "published"
+    : "draft";
+}
+
+/* =========================================================
+   BLOB READ
+========================================================= */
+
+async function readTests(): Promise<TestData[]> {
+  checkBlobToken();
+
+  const result =
+    await get(
+      TESTS_BLOB_PATH,
+      {
+        access: "private",
       }
     );
 
-  if (invalid.length > 0) {
-    setMessage(
-      `${invalid.length} ta savolda xato bor. Har bir savolda 4 ta variant va 1 ta to‘g‘ri javob bo‘lishi kerak.`
+  if (
+    !result ||
+    result.statusCode !== 200 ||
+    !result.stream
+  ) {
+    throw new Error(
+      `tests.json o‘qilmadi. Status: ${
+        result?.statusCode ??
+        "noma'lum"
+      }`
     );
-    return;
   }
 
-  /*
-    Server JSON bo'lmagan javob qaytarsa ham
-    "Unexpected token R" chiqmasligi uchun.
-  */
-  async function readApiResponse(
-    response: Response
+  const text =
+    await new Response(
+      result.stream
+    ).text();
+
+  if (!text.trim()) {
+    throw new Error(
+      "tests.json bo‘sh."
+    );
+  }
+
+  const parsed =
+    JSON.parse(text);
+
+  return normalizeTests(
+    parsed
+  );
+}
+
+/* =========================================================
+   BLOB WRITE
+========================================================= */
+
+async function writeTests(
+  tests: TestData[]
+) {
+  checkBlobToken();
+
+  await put(
+    TESTS_BLOB_PATH,
+    JSON.stringify(
+      tests,
+      null,
+      2
+    ),
+    {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge: 60,
+    }
+  );
+}
+
+/* =========================================================
+   GET
+========================================================= */
+
+export async function GET() {
+  try {
+    const tests =
+      await readTests();
+
+    const sortedTests =
+      [...tests].sort(
+        (a, b) => {
+          const aTime =
+            new Date(
+              String(
+                a.updatedAt ||
+                a.createdAt ||
+                ""
+              )
+            ).getTime() || 0;
+
+          const bTime =
+            new Date(
+              String(
+                b.updatedAt ||
+                b.createdAt ||
+                ""
+              )
+            ).getTime() || 0;
+
+          return bTime - aTime;
+        }
+      );
+
+    return NextResponse.json(
+      {
+        success: true,
+        tests: sortedTests,
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
+  } catch (error) {
+    console.error(
+      "GET /api/tests ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Testlarni yuklashda server xatosi.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+/* =========================================================
+   CREATE CHUNKED TEST
+========================================================= */
+
+async function createChunkedTest(
+  body: any
+) {
+  const title =
+    String(
+      body?.title || ""
+    ).trim();
+
+  const subject =
+    String(
+      body?.subject || ""
+    ).trim();
+
+  if (!title) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test nomi kiritilmagan.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const tests =
+    await readTests();
+
+  const now =
+    new Date().toISOString();
+
+  const expectedQuestions =
+    Math.max(
+      1,
+      Number(
+        body?.expectedQuestions
+      ) || 1
+    );
+
+  const id =
+    crypto.randomUUID();
+
+  const newTest: TestData = {
+    id,
+
+    title,
+    subject,
+
+    duration:
+      Math.max(
+        1,
+        Number(
+          body?.duration
+        ) || 30
+      ),
+
+    description:
+      String(
+        body?.description || ""
+      ),
+
+    testType:
+      String(
+        body?.testType || ""
+      ),
+
+    customTestTypeName:
+      String(
+        body?.customTestTypeName ||
+        ""
+      ),
+
+    status: "draft",
+
+    attemptLimit:
+      normalizeAttemptLimit(
+        body?.attemptLimit
+      ),
+
+    questions: [],
+
+    importState: {
+      mode: "chunked",
+      expectedQuestions,
+      receivedQuestions: 0,
+      completed: false,
+    },
+
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  tests.push(
+    newTest
+  );
+
+  await writeTests(
+    tests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+      testId: id,
+      receivedQuestions: 0,
+      expectedQuestions,
+    },
+    {
+      status: 201,
+    }
+  );
+}
+
+/* =========================================================
+   APPEND QUESTIONS CHUNK
+========================================================= */
+
+async function appendQuestionsChunk(
+  body: any
+) {
+  const testId =
+    String(
+      body?.testId || ""
+    ).trim();
+
+  if (!testId) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "testId topilmadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const chunk =
+    Array.isArray(
+      body?.questions
+    )
+      ? body.questions
+      : [];
+
+  if (
+    chunk.length === 0
   ) {
-    const text =
-      await response.text();
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Savollar bo‘lagi bo‘sh.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
 
-    let data: any = null;
+  const startIndex =
+    Number(
+      body?.startIndex
+    );
 
-    try {
-      data = text
-        ? JSON.parse(text)
-        : {};
-    } catch {
-      throw new Error(
-        text ||
-          `Server xatosi: ${response.status}`
+  if (
+    !Number.isInteger(
+      startIndex
+    ) ||
+    startIndex < 0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "startIndex noto‘g‘ri.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const tests =
+    await readTests();
+
+  const index =
+    tests.findIndex(
+      (item) =>
+        item.id === testId
+    );
+
+  if (index < 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test topilmadi.",
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  const test =
+    tests[index];
+
+  const existing =
+    Array.isArray(
+      test.questions
+    )
+      ? test.questions
+      : [];
+
+  /*
+    Chunklar qat'iy ketma-ket kelishi shart.
+
+    Masalan:
+      0..19
+      20..39
+      40..59
+  */
+  if (
+    startIndex !==
+    existing.length
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          `Savollar ketma-ketligi mos emas. Server ${existing.length}-savoldan davom etishni kutmoqda.`,
+        expectedStartIndex:
+          existing.length,
+      },
+      {
+        status: 409,
+      }
+    );
+  }
+
+  const updatedQuestions = [
+    ...existing,
+    ...chunk,
+  ];
+
+  const expectedQuestions =
+    Number(
+      test.importState
+        ?.expectedQuestions
+    ) || updatedQuestions.length;
+
+  const now =
+    new Date().toISOString();
+
+  tests[index] = {
+    ...test,
+
+    questions:
+      updatedQuestions,
+
+    importState: {
+      mode: "chunked",
+
+      expectedQuestions,
+
+      receivedQuestions:
+        updatedQuestions.length,
+
+      completed: false,
+    },
+
+    updatedAt: now,
+  };
+
+  await writeTests(
+    tests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+
+      testId,
+
+      receivedQuestions:
+        updatedQuestions.length,
+
+      expectedQuestions,
+
+      remaining:
+        Math.max(
+          0,
+          expectedQuestions -
+            updatedQuestions.length
+        ),
+    },
+    {
+      status: 200,
+    }
+  );
+}
+
+/* =========================================================
+   FINALIZE CHUNKED TEST
+========================================================= */
+
+async function finalizeChunkedTest(
+  body: any
+) {
+  const testId =
+    String(
+      body?.testId || ""
+    ).trim();
+
+  if (!testId) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "testId topilmadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const tests =
+    await readTests();
+
+  const index =
+    tests.findIndex(
+      (item) =>
+        item.id === testId
+    );
+
+  if (index < 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test topilmadi.",
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  const test =
+    tests[index];
+
+  const questions =
+    Array.isArray(
+      test.questions
+    )
+      ? test.questions
+      : [];
+
+  const expectedQuestions =
+    Number(
+      test.importState
+        ?.expectedQuestions
+    ) ||
+    questions.length;
+
+  if (
+    questions.length !==
+    expectedQuestions
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+
+        message:
+          `Test hali to‘liq saqlanmagan. ${questions.length}/${expectedQuestions} ta savol serverda mavjud.`,
+
+        receivedQuestions:
+          questions.length,
+
+        expectedQuestions,
+      },
+      {
+        status: 409,
+      }
+    );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const finalStatus =
+    normalizeStatus(
+      body?.status
+    );
+
+  tests[index] = {
+    ...test,
+
+    status:
+      finalStatus,
+
+    importState: {
+      mode: "chunked",
+
+      expectedQuestions,
+
+      receivedQuestions:
+        questions.length,
+
+      completed: true,
+    },
+
+    updatedAt: now,
+  };
+
+  await writeTests(
+    tests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+
+      message:
+        "Test to‘liq saqlandi.",
+
+      test:
+        tests[index],
+    },
+    {
+      status: 200,
+    }
+  );
+}
+
+/* =========================================================
+   LEGACY / NORMAL POST
+========================================================= */
+
+async function createNormalTest(
+  body: any
+) {
+  const title =
+    String(
+      body?.title || ""
+    ).trim();
+
+  const subject =
+    String(
+      body?.subject || ""
+    ).trim();
+
+  if (!title) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test nomi kiritilmagan.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const questions =
+    Array.isArray(
+      body?.questions
+    )
+      ? body.questions
+      : [];
+
+  if (
+    questions.length === 0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Kamida bitta savol bo‘lishi kerak.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const tests =
+    await readTests();
+
+  const now =
+    new Date().toISOString();
+
+  const newTest: TestData = {
+    ...body,
+
+    id:
+      crypto.randomUUID(),
+
+    title,
+    subject,
+
+    duration:
+      Math.max(
+        1,
+        Number(
+          body?.duration
+        ) || 30
+      ),
+
+    description:
+      String(
+        body?.description || ""
+      ),
+
+    questions,
+
+    status:
+      normalizeStatus(
+        body?.status
+      ),
+
+    attemptLimit:
+      normalizeAttemptLimit(
+        body?.attemptLimit
+      ),
+
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  tests.push(
+    newTest
+  );
+
+  await writeTests(
+    tests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+
+      message:
+        "Test muvaffaqiyatli yaratildi.",
+
+      test:
+        newTest,
+    },
+    {
+      status: 201,
+    }
+  );
+}
+
+/* =========================================================
+   POST ROUTER
+========================================================= */
+
+export async function POST(
+  request: NextRequest
+) {
+  try {
+    const body =
+      await request.json();
+
+    const action =
+      String(
+        body?.action || ""
+      );
+
+    if (
+      action ===
+      "create-chunked-test"
+    ) {
+      return await createChunkedTest(
+        body
       );
     }
 
     if (
-      !response.ok ||
-      !data?.success
+      action ===
+      "append-questions"
     ) {
-      throw new Error(
-        data?.message ||
-          `Server xatosi: ${response.status}`
+      return await appendQuestionsChunk(
+        body
       );
     }
 
-    return data;
-  }
-
-  try {
-    setSaving(true);
-    setMessage(
-      "Testni saqlash boshlandi..."
-    );
+    if (
+      action ===
+      "finalize-chunked-test"
+    ) {
+      return await finalizeChunkedTest(
+        body
+      );
+    }
 
     /*
-      Savollarni server schema'ga tayyorlaymiz.
+      Eski test editor ishlashi uchun
+      oddiy POST saqlanib qoladi.
     */
-    const preparedQuestions =
-      questions.map(
-        (question) => ({
-          id:
-            question.id,
-
-          questionHtml:
-            sanitizeRichHtml(
-              questionDrafts[
-                question.id
-              ] ??
-                question.questionText
-            ),
-
-          options:
-            question.options.map(
-              (option) => ({
-                id:
-                  option.id,
-
-                text:
-                  sanitizeRichHtml(
-                    option.text
-                  ),
-
-                isCorrect:
-                  option.isCorrect,
-              })
-            ),
-
-          shapes:
-            Array.isArray(
-              question.shapes
-            )
-              ? question.shapes.flatMap<EditorShape>(
-                  (
-                    shape
-                  ): EditorShape[] => {
-                    if (
-                      shape.type !==
-                      "matchingItem"
-                    ) {
-                      return [
-                        {
-                          id:
-                            shape.id,
-
-                          type:
-                            shape.type,
-
-                          x:
-                            Math.round(
-                              shape.x
-                            ),
-
-                          y:
-                            Math.round(
-                              shape.y
-                            ),
-
-                          width:
-                            Math.max(
-                              1,
-                              Math.round(
-                                shape.width
-                              )
-                            ),
-
-                          height:
-                            Math.max(
-                              1,
-                              Math.round(
-                                shape.height
-                              )
-                            ),
-
-                          text:
-                            shape.text,
-
-                          imageSrc:
-                            shape.imageSrc,
-
-                          backgroundColor:
-                            shape.backgroundColor,
-
-                          borderColor:
-                            shape.borderColor,
-
-                          textColor:
-                            shape.textColor,
-
-                          fontSize:
-                            shape.fontSize,
-
-                          borderWidth:
-                            shape.borderWidth,
-
-                          borderRadius:
-                            shape.borderRadius,
-
-                          opacity:
-                            shape.opacity,
-
-                          objectFit:
-                            shape.objectFit,
-
-                          zIndex:
-                            shape.zIndex,
-                        },
-                      ];
-                    }
-
-                    const keyWidth =
-                      50;
-
-                    const gap =
-                      8;
-
-                    const boxX =
-                      Math.round(
-                        shape.x
-                      ) +
-                      keyWidth -
-                      8;
-
-                    const boxWidth =
-                      Math.max(
-                        70,
-                        Math.round(
-                          shape.width
-                        ) -
-                          keyWidth +
-                          8
-                      );
-
-                    return [
-                      {
-                        id:
-                          `${shape.id}-box`,
-
-                        type:
-                          "roundedRectangle",
-
-                        x:
-                          boxX,
-
-                        y:
-                          Math.round(
-                            shape.y
-                          ),
-
-                        width:
-                          boxWidth,
-
-                        height:
-                          Math.max(
-                            1,
-                            Math.round(
-                              shape.height
-                            )
-                          ),
-
-                        backgroundColor:
-                          "#ffffff",
-
-                        borderColor:
-                          shape.borderColor ||
-                          "#1f2a30",
-
-                        borderWidth:
-                          2,
-
-                        borderRadius:
-                          8,
-
-                        zIndex:
-                          shape.zIndex,
-                      },
-
-                      {
-                        id:
-                          `${shape.id}-key-circle`,
-
-                        type:
-                          "circle",
-
-                        x:
-                          Math.round(
-                            shape.x
-                          ),
-
-                        y:
-                          Math.round(
-                            shape.y
-                          ) +
-                          Math.max(
-                            0,
-                            Math.round(
-                              (
-                                shape.height -
-                                keyWidth
-                              ) /
-                                2
-                            )
-                          ),
-
-                        width:
-                          keyWidth,
-
-                        height:
-                          keyWidth,
-
-                        backgroundColor:
-                          "#ffffff",
-
-                        borderColor:
-                          shape.borderColor ||
-                          "#1f2a30",
-
-                        borderWidth:
-                          2,
-
-                        borderRadius:
-                          999,
-
-                        zIndex:
-                          (shape.zIndex ||
-                            1) +
-                          1,
-                      },
-
-                      {
-                        id:
-                          `${shape.id}-key`,
-
-                        type:
-                          "text",
-
-                        x:
-                          Math.round(
-                            shape.x
-                          ),
-
-                        y:
-                          Math.round(
-                            shape.y
-                          ) +
-                          Math.max(
-                            0,
-                            Math.round(
-                              (
-                                shape.height -
-                                keyWidth
-                              ) /
-                                2
-                            )
-                          ),
-
-                        width:
-                          keyWidth,
-
-                        height:
-                          keyWidth,
-
-                        text:
-                          shape.matchingKey ||
-                          "",
-
-                        textColor:
-                          shape.textColor ||
-                          "#111111",
-
-                        fontSize:
-                          19,
-
-                        borderWidth:
-                          0,
-
-                        zIndex:
-                          (shape.zIndex ||
-                            1) +
-                          2,
-                      },
-
-                      {
-                        id:
-                          `${shape.id}-text`,
-
-                        type:
-                          "text",
-
-                        x:
-                          boxX +
-                          gap,
-
-                        y:
-                          Math.round(
-                            shape.y
-                          ) +
-                          7,
-
-                        width:
-                          Math.max(
-                            40,
-                            boxWidth -
-                              gap *
-                                2
-                          ),
-
-                        height:
-                          Math.max(
-                            30,
-                            Math.round(
-                              shape.height
-                            ) -
-                              14
-                          ),
-
-                        text:
-                          shape.text ||
-                          "",
-
-                        textColor:
-                          shape.textColor ||
-                          "#111111",
-
-                        fontSize:
-                          shape.fontSize ||
-                          18,
-
-                        borderWidth:
-                          0,
-
-                        zIndex:
-                          (shape.zIndex ||
-                            1) +
-                          2,
-                      },
-                    ];
-                  }
-                )
-              : [],
-
-          points: 1,
-        })
-      );
-
-    /* =====================================================
-       1-BOSQICH — BO'SH TEST YARATAMIZ
-    ===================================================== */
-
-    const createResponse =
-      await fetch(
-        "/api/tests",
-        {
-          method: "POST",
-
-          credentials:
-            "include",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body:
-            JSON.stringify({
-              action:
-                "create-chunked-test",
-
-              title:
-                title.trim(),
-
-              subject:
-                subject.trim(),
-
-              duration:
-                Number(
-                  duration
-                ) || 60,
-
-              description:
-                description.trim(),
-
-              testType,
-
-              customTestTypeName:
-                testType ===
-                "custom"
-                  ? customTestTypeName.trim()
-                  : "",
-
-              status:
-                "draft",
-
-              attemptLimit:
-                attemptLimitEnabled
-                  ? Math.max(
-                      1,
-                      Number(
-                        attemptLimit
-                      ) || 1
-                    )
-                  : null,
-
-              expectedQuestions:
-                preparedQuestions.length,
-            }),
-        }
-      );
-
-    const createData =
-      await readApiResponse(
-        createResponse
-      );
-
-    const testId =
-      String(
-        createData.testId ||
-          ""
-      );
-
-    if (!testId) {
-      throw new Error(
-        "Yangi test ID olinmadi."
-      );
-    }
-
-    /* =====================================================
-       2-BOSQICH — SAVOLLARNI 10 TADAN YUBORAMIZ
-    ===================================================== */
-
-    const CHUNK_SIZE =
-      10;
-
-    for (
-      let startIndex = 0;
-      startIndex <
-      preparedQuestions.length;
-      startIndex +=
-        CHUNK_SIZE
-    ) {
-      const chunk =
-        preparedQuestions.slice(
-          startIndex,
-          startIndex +
-            CHUNK_SIZE
-        );
-
-      setMessage(
-        `${startIndex}/${preparedQuestions.length} ta savol saqlandi...`
-      );
-
-      const chunkResponse =
-        await fetch(
-          "/api/tests",
-          {
-            method:
-              "POST",
-
-            credentials:
-              "include",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                action:
-                  "append-questions",
-
-                testId,
-
-                startIndex,
-
-                questions:
-                  chunk,
-              }),
-          }
-        );
-
-      const chunkData =
-        await readApiResponse(
-          chunkResponse
-        );
-
-      setMessage(
-        `${chunkData.receivedQuestions}/${preparedQuestions.length} ta savol saqlandi...`
-      );
-    }
-
-    /* =====================================================
-       3-BOSQICH — TESTNI YAKUNLAYMIZ
-    ===================================================== */
-
-    const finalizeResponse =
-      await fetch(
-        "/api/tests",
-        {
-          method:
-            "POST",
-
-          credentials:
-            "include",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body:
-            JSON.stringify({
-              action:
-                "finalize-chunked-test",
-
-              testId,
-
-              status:
-                "draft",
-            }),
-        }
-      );
-
-    await readApiResponse(
-      finalizeResponse
-    );
-
-    setMessage(
-      `${preparedQuestions.length} ta savol muvaffaqiyatli saqlandi.`
-    );
-
-    window.alert(
-      `Test muvaffaqiyatli saqlandi.\n\nJami: ${preparedQuestions.length} ta savol.`
-    );
-
-    router.push(
-      "/admin/tests"
+    return await createNormalTest(
+      body
     );
   } catch (error) {
     console.error(
-      "SAVE IMPORTED TEST ERROR:",
+      "POST /api/tests ERROR:",
       error
     );
 
-    setMessage(
-      error instanceof Error
-        ? error.message
-        : "Testni saqlashda xatolik."
+    return NextResponse.json(
+      {
+        success: false,
+
+        message:
+          error instanceof Error
+            ? error.message
+            : "Testni yaratishda server xatosi.",
+      },
+      {
+        status: 500,
+      }
     );
-  } finally {
-    setSaving(false);
   }
 }
