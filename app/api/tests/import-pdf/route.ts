@@ -176,6 +176,37 @@ function normalizeQuestionText(parts: string[]) {
   const paragraphs: string[] = [];
   let current = "";
 
+  /*
+    Moslashtirish / hukmli savollarda quyidagilar alohida satr bo‘lib qoladi:
+
+      I. ...
+      II. ...
+      III. ...
+      IV. ...
+      V. ... va h.k.
+
+      a) ...
+      b) ...
+      c) ...
+      d) ...
+
+      1) ...
+      2) ...
+      3) ...
+
+    MUHIM:
+    Katta A), B), C), D) bu yerga kelmaydi — ular parseQuestion()
+    ichida javob variantlari sifatida alohida ajratiladi.
+  */
+  const ROMAN_ITEM_RE =
+    /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)[\)\.\-:]\s+\S/;
+
+  const LOWER_MATCH_ITEM_RE =
+    /^[a-z][\)\.\-:]\s+\S/;
+
+  const NUMBERED_ITEM_RE =
+    /^\d{1,3}[\)\.]\s+\S/;
+
   function appendLine(line: string) {
     if (!current) {
       current = line;
@@ -194,13 +225,31 @@ function normalizeQuestionText(parts: string[]) {
     }
   }
 
-  function flushCurrent() {
-    const cleaned = current
-      .replace(/\s+([,.;:!?])/g, "$1")
+  function cleanQuestionPunctuation(value: string) {
+    return value
+      /*
+        Vergul, nuqta, nuqtali vergul va ikki nuqtadan oldingi
+        ortiqcha bo‘shliq olib tashlanadi.
+      */
+      .replace(/\s+([,.;:!])/g, "$1")
+
+      /*
+        So‘roq belgisi matnga yopishib qolmasin:
+          "tayaniladi?"  ->  "tayaniladi ?"
+
+        PDFdan nechta bo‘shliq kelishidan qat’i nazar aynan bitta
+        ko‘rinadigan masofa qoldiramiz.
+      */
+      .replace(/\s*\?/g, " ?")
+
       .replace(/\(\s+/g, "(")
       .replace(/\s+\)/g, ")")
-      .replace(/\s{2,}/g, " ")
+      .replace(/[ \t]{2,}/g, " ")
       .trim();
+  }
+
+  function flushCurrent() {
+    const cleaned = cleanQuestionPunctuation(current);
 
     if (cleaned) {
       paragraphs.push(cleaned);
@@ -210,19 +259,10 @@ function normalizeQuestionText(parts: string[]) {
   }
 
   for (const line of rawLines) {
-    /*
-      Yangi ichki band boshlanishi:
-        1) ...
-        2) ...
-        a) ...
-        b) ...
-
-      MUHIM:
-      Bandning keyingi vizual PDF qatorlari shu bandning DAVOMI
-      hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
-    */
     const startsInnerListItem =
-      /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
+      ROMAN_ITEM_RE.test(line) ||
+      LOWER_MATCH_ITEM_RE.test(line) ||
+      NUMBERED_ITEM_RE.test(line);
 
     if (startsInnerListItem) {
       flushCurrent();
@@ -240,8 +280,8 @@ function normalizeQuestionText(parts: string[]) {
   flushCurrent();
 
   return paragraphs
+    .map((paragraph) => cleanQuestionPunctuation(paragraph))
     .join("\n")
-    .replace(/\s+([,.;:!?])/g, "$1")
     .trim();
 }
 
