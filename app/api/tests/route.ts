@@ -427,31 +427,97 @@ async function appendQuestionsChunk(
     );
   }
 
-  let tests =
-    await readTests();
+  /*
+    MUHIM:
+    Fixed-path Blob ketma-ket overwrite qilinganda keyingi request
+    qisqa muddat eski JSON holatini o‘qib qolishi mumkin.
 
-  let index =
-    tests.findIndex(
+    Shu sabab:
+      - test topilmaganda;
+      - yoki serverdagi questions.length frontend yuborgan startIndex'dan
+        kichik bo‘lganda
+    Blob qayta o‘qiladi.
+  */
+  let tests: TestData[] = [];
+  let index = -1;
+  let existing: unknown[] = [];
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    tests = await readTests();
+
+    index = tests.findIndex(
       (item) =>
         item.id === testId
     );
 
-  // Yangi yaratilgan test Blob'da darhol ko‘rinmasa, qisqa retry qilamiz.
-  if (index < 0) {
-    for (let attempt = 0; attempt < 6; attempt++) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, 300 * (attempt + 1))
-      );
+    if (index >= 0) {
+      const candidate =
+        Array.isArray(
+          tests[index].questions
+        )
+          ? tests[index].questions as unknown[]
+          : [];
 
-      tests = await readTests();
+      existing = candidate;
 
-      index = tests.findIndex(
-        (item) =>
-          item.id === testId
-      );
+      /*
+        Aynan kerakli startIndex ko‘rinsa — yozishga tayyor.
+      */
+      if (
+        existing.length ===
+        startIndex
+      ) {
+        break;
+      }
 
-      if (index >= 0) break;
+      /*
+        Server startIndex'dan oldinga o‘tib ketgan bo‘lsa, bu ko‘pincha
+        browser bir xil chunkni qayta yuborganini anglatadi.
+        Shu chunk allaqachon saqlangan deb idempotent javob qaytaramiz.
+      */
+      if (
+        existing.length >=
+        startIndex + chunk.length
+      ) {
+        const expectedQuestions =
+          Number(
+            tests[index].importState
+              ?.expectedQuestions
+          ) || existing.length;
+
+        return NextResponse.json(
+          {
+            success: true,
+            duplicate: true,
+            testId,
+            receivedQuestions:
+              existing.length,
+            expectedQuestions,
+            remaining:
+              Math.max(
+                0,
+                expectedQuestions -
+                  existing.length
+              ),
+          },
+          {
+            status: 200,
+          }
+        );
+      }
     }
+
+    /*
+      Hali oldingi chunk ko‘rinmagan.
+      Biroz kutib Blob'ni qayta o‘qiymiz.
+    */
+    await new Promise(
+      (resolve) =>
+        setTimeout(
+          resolve,
+          250 * (attempt + 1)
+        )
+    );
   }
 
   if (index < 0) {
@@ -459,7 +525,7 @@ async function appendQuestionsChunk(
       {
         success: false,
         message:
-          "Test yaratildi, ammo Blob'dan qayta o‘qishda topilmadi. Saqlashni qayta bosing.",
+          "Test yaratildi, ammo Blob'dan qayta o‘qishda topilmadi.",
       },
       {
         status: 404,
@@ -467,38 +533,59 @@ async function appendQuestionsChunk(
     );
   }
 
-  const test =
-    tests[index];
-
-  const existing =
-    Array.isArray(
-      test.questions
-    )
-      ? test.questions
-      : [];
-
   /*
-    Chunklar qat'iy ketma-ket kelishi shart.
-
-    Masalan:
-      0..19
-      20..39
-      40..59
+    Retrylardan keyin ham serverdagi uzunlik startIndex bilan teng
+    bo‘lmasa, ma'lumotni buzmaslik uchun yozmaymiz.
   */
   if (
-    startIndex !==
-    existing.length
+    existing.length !==
+    startIndex
   ) {
     return NextResponse.json(
       {
         success: false,
         message:
-          `Savollar ketma-ketligi mos emas. Server ${existing.length}-savoldan davom etishni kutmoqda.`,
+          `Savollar ketma-ketligi mos emas. Server ${existing.length}-savoldan davom etishni kutmoqda, brauzer esa ${startIndex}-savoldan yubordi.`,
         expectedStartIndex:
           existing.length,
+        receivedStartIndex:
+          startIndex,
       },
       {
         status: 409,
+      }
+    );
+  }
+
+  const test =
+    tests[index];
+
+  const expectedQuestions =
+    Number(
+      test.importState
+        ?.expectedQuestions
+    ) ||
+    (
+      startIndex +
+      chunk.length
+    );
+
+  /*
+    Kutilgan umumiy savollar sonidan oshib ketishiga yo‘l qo‘ymaymiz.
+  */
+  if (
+    startIndex +
+      chunk.length >
+    expectedQuestions
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          `Savollar soni kutilgan miqdordan oshib ketmoqda: ${startIndex + chunk.length}/${expectedQuestions}.`,
+      },
+      {
+        status: 400,
       }
     );
   }
@@ -507,12 +594,6 @@ async function appendQuestionsChunk(
     ...existing,
     ...chunk,
   ];
-
-  const expectedQuestions =
-    Number(
-      test.importState
-        ?.expectedQuestions
-    ) || updatedQuestions.length;
 
   const now =
     new Date().toISOString();
@@ -590,14 +671,52 @@ async function finalizeChunkedTest(
     );
   }
 
-  const tests =
-    await readTests();
+  let tests: TestData[] = [];
+  let index = -1;
 
-  const index =
-    tests.findIndex(
+  /*
+    Oxirgi chunk yozilgandan keyin finalize juda tez kelishi mumkin.
+    Shuning uchun yakuniy holat ko‘ringuncha Blob'ni qayta o‘qiymiz.
+  */
+  for (let attempt = 0; attempt < 10; attempt++) {
+    tests = await readTests();
+
+    index = tests.findIndex(
       (item) =>
         item.id === testId
     );
+
+    if (index >= 0) {
+      const candidateQuestions =
+        Array.isArray(
+          tests[index].questions
+        )
+          ? tests[index].questions
+          : [];
+
+      const candidateExpected =
+        Number(
+          tests[index].importState
+            ?.expectedQuestions
+        ) ||
+        candidateQuestions.length;
+
+      if (
+        candidateQuestions.length ===
+        candidateExpected
+      ) {
+        break;
+      }
+    }
+
+    await new Promise(
+      (resolve) =>
+        setTimeout(
+          resolve,
+          250 * (attempt + 1)
+        )
+    );
+  }
 
   if (index < 0) {
     return NextResponse.json(
