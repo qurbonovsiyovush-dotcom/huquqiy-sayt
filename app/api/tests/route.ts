@@ -1041,6 +1041,225 @@ async function setTestStatus(
 }
 
 
+
+/* =========================================================
+   TEST MUHARRIRI — 30 TADAN YUKLASH
+
+   Brauzerga 780/840 ta savolning hammasini yubormaydi.
+   Faqat so‘ralgan sahifadagi savollarni qaytaradi.
+========================================================= */
+
+async function loadEditorPage(
+  body: any
+) {
+  const cookieStore =
+    await cookies();
+
+  const isAdmin =
+    Boolean(
+      cookieStore.get(
+        "qurbonov_session"
+      )?.value
+    ) &&
+    cookieStore.get(
+      "qurbonov_role"
+    )?.value === "admin";
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bu amal faqat administrator uchun.",
+      },
+      {
+        status: 403,
+      }
+    );
+  }
+
+  const testId =
+    String(
+      body?.testId || ""
+    ).trim();
+
+  if (!testId) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test ID topilmadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const requestedPage =
+    Math.max(
+      1,
+      Math.floor(
+        Number(
+          body?.page
+        ) || 1
+      )
+    );
+
+  const requestedPageSize =
+    Math.floor(
+      Number(
+        body?.pageSize
+      ) || 30
+    );
+
+  /*
+    Juda katta pageSize yuborib barcha savollarni
+    qayta yuklashga yo‘l qo‘ymaymiz.
+  */
+  const pageSize =
+    Math.min(
+      50,
+      Math.max(
+        10,
+        requestedPageSize
+      )
+    );
+
+  const tests =
+    await readTests();
+
+  const test =
+    tests.find(
+      (item) =>
+        item.id === testId
+    );
+
+  if (!test) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test topilmadi.",
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  const allQuestions:
+    unknown[] =
+    Array.isArray(
+      test.questions
+    )
+      ? test.questions
+      : [];
+
+  const totalQuestions =
+    allQuestions.length;
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        totalQuestions /
+          pageSize
+      )
+    );
+
+  const page =
+    Math.min(
+      requestedPage,
+      totalPages
+    );
+
+  const startIndex =
+    (page - 1) *
+    pageSize;
+
+  const questions =
+    allQuestions.slice(
+      startIndex,
+      startIndex +
+        pageSize
+    );
+
+  return NextResponse.json(
+    {
+      success: true,
+
+      test: {
+        id:
+          test.id,
+
+        title:
+          test.title || "",
+
+        subject:
+          test.subject || "",
+
+        duration:
+          Number(
+            test.duration
+          ) || 30,
+
+        description:
+          test.description || "",
+
+        status:
+          test.status ===
+          "published"
+            ? "published"
+            : "draft",
+
+        testType:
+          test.testType,
+
+        customTestTypeName:
+          test.customTestTypeName,
+
+        attemptLimit:
+          test.attemptLimit,
+
+        createdAt:
+          test.createdAt,
+
+        updatedAt:
+          test.updatedAt,
+      },
+
+      questions,
+
+      pagination: {
+        page,
+        pageSize,
+        startIndex,
+        totalQuestions,
+        totalPages,
+        from:
+          totalQuestions === 0
+            ? 0
+            : startIndex + 1,
+        to:
+          Math.min(
+            startIndex +
+              pageSize,
+            totalQuestions
+          ),
+      },
+    },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
+}
+
+
 /* =========================================================
    KATTA TESTNI QISMAN TAHRIRLASH
 
@@ -1642,6 +1861,15 @@ export async function POST(
       "patch-test"
     ) {
       return await patchTest(
+        body
+      );
+    }
+
+    if (
+      action ===
+      "load-editor-page"
+    ) {
+      return await loadEditorPage(
         body
       );
     }
