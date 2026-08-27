@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 const dictionaries = [
   {
     icon: "EN",
@@ -36,32 +34,49 @@ const dictionaries = [
 ];
 
 export default function DictionariesPage() {
+  function goTo(href: string) {
+    window.location.href = href;
+  }
+
   return (
     <main className="page">
-      {/* YUQORI PANEL */}
       <header className="topPanel">
-        <Link href="/qollanmalar" className="backButton">
+        <button
+          type="button"
+          className="backButton"
+          onClick={() => goTo("/qollanmalar")}
+        >
           ← Qo‘llanmalarga qaytish
-        </Link>
+        </button>
 
         <div className="brand">QURBONOV.UZ</div>
       </header>
 
-      {/* ASOSIY PANEL */}
       <section className="mainPanel">
-        <div className="panelTitle">Inglizcha lug‘atlar</div>
+        <div className="panelTitle">
+          Inglizcha lug‘atlar
+        </div>
 
         <div className="cards">
           {dictionaries.map((item) => (
-            <div className="dictionaryCard" key={item.href}>
-              <div className="icon3d">{item.icon}</div>
+            <article
+              className="dictionaryCard"
+              key={item.href}
+            >
+              <div className="icon3d">
+                {item.icon}
+              </div>
 
               <h2>{item.title}</h2>
 
-              <Link href={item.href} className="openButton">
+              <button
+                type="button"
+                className="openButton"
+                onClick={() => goTo(item.href)}
+              >
                 Ochish
-              </Link>
-            </div>
+              </button>
+            </article>
           ))}
         </div>
       </section>
@@ -71,30 +86,38 @@ export default function DictionariesPage() {
           box-sizing: border-box;
         }
 
+        :global(body) {
+          margin: 0;
+        }
+
         .page {
           min-height: 100vh;
           padding: 35px 20px 70px;
 
-          font-family: "Bell MT", Georgia, "Times New Roman", serif;
+          font-family:
+            "Bell MT",
+            Georgia,
+            "Times New Roman",
+            serif;
 
           background:
             radial-gradient(
               circle at 50% 0%,
-              rgba(255, 255, 255, 1) 0%,
-              rgba(242, 247, 250, 1) 42%,
-              rgba(222, 230, 235, 1) 100%
+              #ffffff 0%,
+              #f2f7fa 43%,
+              #dee6eb 100%
             );
         }
 
-        /* ==============================
+        /* =============================================
            YUQORI PANEL
-        ============================== */
+        ============================================= */
 
         .topPanel {
           width: min(1120px, 100%);
           min-height: 92px;
 
-          margin: 0 auto 65px;
+          margin: 0 auto 66px;
           padding: 18px 25px;
 
           display: flex;
@@ -109,105 +132,103 @@ export default function DictionariesPage() {
             linear-gradient(
               180deg,
               #858b8e 0%,
-              #686f72 15%,
+              #686f72 16%,
               #50575a 60%,
               #3c4346 100%
             );
 
           box-shadow:
+            inset 0 3px 3px rgba(255, 255, 255, 0.43),
+            inset 0 -6px 8px rgba(0, 0, 0, 0.3),
             0 9px 0 #202b30,
-            0 15px 25px rgba(0, 0, 0, 0.25),
-            inset 0 3px 2px rgba(255, 255, 255, 0.45),
-            inset 0 -5px 7px rgba(0, 0, 0, 0.3);
+            0 17px 26px rgba(0, 0, 0, 0.25);
         }
 
         .brand {
           color: #ffffff;
 
           font-size: 18px;
-          font-weight: 700;
+          font-weight: 900;
           letter-spacing: 3px;
 
           text-shadow:
             0 2px 0 #164d6b,
-            0 3px 4px rgba(0, 0, 0, 0.7);
+            0 3px 4px rgba(0, 0, 0, 0.72);
         }
 
-        /* ==============================
-           ORQAGA TUGMASI
-        ============================== */
+        /* =============================================
+           ORQAGA 3D TUGMASI
+        ============================================= */
 
         .backButton {
-          min-width: 205px;
-          min-height: 48px;
+          min-width: 220px;
+          min-height: 50px;
 
-          padding: 12px 20px;
+          padding: 10px 20px;
 
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-
-          text-decoration: none;
-
-          color: #073f63;
-
-          font-size: 16px;
-          font-weight: 700;
-
-          border: 2px solid #175d80;
+          border: 2px solid #155b7d;
           border-radius: 11px;
+
+          color: #063f63;
 
           background:
             linear-gradient(
               180deg,
-              #d8f5ff 0%,
-              #a9e3f8 18%,
-              #73c9ed 52%,
-              #43a8d7 78%,
-              #2889b8 100%
+              #dff8ff 0%,
+              #b0e9fb 17%,
+              #7ccff0 47%,
+              #4bb1dc 74%,
+              #2c90be 100%
             );
 
           box-shadow:
-            0 6px 0 #164f6d,
-            0 10px 15px rgba(0, 0, 0, 0.28),
-            inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -3px 4px rgba(0, 74, 115, 0.25);
+            inset 0 3px 2px rgba(255, 255, 255, 0.97),
+            inset 0 -4px 5px rgba(0, 71, 107, 0.23),
+            0 7px 0 #164d68,
+            0 12px 16px rgba(0, 0, 0, 0.27);
+
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 900;
+
+          cursor: pointer;
 
           transition:
-            transform 0.15s ease,
-            box-shadow 0.15s ease;
+            transform 0.13s ease,
+            box-shadow 0.13s ease,
+            filter 0.13s ease;
         }
 
         .backButton:hover {
           transform: translateY(-3px);
+          filter: brightness(1.04);
 
           box-shadow:
-            0 9px 0 #164f6d,
-            0 14px 18px rgba(0, 0, 0, 0.3),
-            inset 0 3px 2px rgba(255, 255, 255, 0.95);
+            inset 0 3px 2px rgba(255, 255, 255, 0.97),
+            0 10px 0 #164d68,
+            0 16px 20px rgba(0, 0, 0, 0.3);
         }
 
         .backButton:active {
           transform: translateY(5px);
 
           box-shadow:
-            0 1px 0 #164f6d,
-            0 3px 5px rgba(0, 0, 0, 0.2),
-            inset 0 3px 6px rgba(0, 0, 0, 0.2);
+            inset 0 4px 7px rgba(0, 0, 0, 0.2),
+            0 2px 0 #164d68,
+            0 4px 6px rgba(0, 0, 0, 0.2);
         }
 
-        /* ==============================
-           ASOSIY KATTA PANEL
-        ============================== */
+        /* =============================================
+           KATTA PANEL
+        ============================================= */
 
         .mainPanel {
           position: relative;
 
           width: min(1120px, 100%);
-
           margin: 0 auto;
 
-          padding: 95px 30px 45px;
+          padding: 95px 30px 46px;
 
           border: 3px solid #263238;
           border-radius: 25px;
@@ -222,15 +243,11 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            0 10px 0 #222c30,
-            0 20px 35px rgba(0, 0, 0, 0.3),
             inset 0 3px 3px rgba(255, 255, 255, 0.4),
-            inset 0 -8px 12px rgba(0, 0, 0, 0.3);
+            inset 0 -8px 12px rgba(0, 0, 0, 0.3),
+            0 10px 0 #222c30,
+            0 20px 35px rgba(0, 0, 0, 0.3);
         }
-
-        /* ==============================
-           SARLAVHA
-        ============================== */
 
         .panelTitle {
           position: absolute;
@@ -241,7 +258,6 @@ export default function DictionariesPage() {
           transform: translateX(-50%);
 
           min-width: 320px;
-
           padding: 15px 38px;
 
           text-align: center;
@@ -249,7 +265,7 @@ export default function DictionariesPage() {
           color: #063f68;
 
           font-size: 31px;
-          font-weight: 700;
+          font-weight: 900;
 
           border: 2px solid #145b80;
           border-radius: 15px;
@@ -265,19 +281,19 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            0 8px 0 #155775,
-            0 13px 18px rgba(0, 0, 0, 0.3),
             inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -3px 5px rgba(0, 72, 110, 0.25);
+            inset 0 -3px 5px rgba(0, 72, 110, 0.25),
+            0 8px 0 #155775,
+            0 13px 18px rgba(0, 0, 0, 0.3);
 
           text-shadow:
             0 1px 0 #ffffff,
             0 2px 2px rgba(0, 0, 0, 0.15);
         }
 
-        /* ==============================
-           6 TA KARTA
-        ============================== */
+        /* =============================================
+           6 TA 3D KARTA
+        ============================================= */
 
         .cards {
           display: grid;
@@ -289,8 +305,6 @@ export default function DictionariesPage() {
         }
 
         .dictionaryCard {
-          position: relative;
-
           min-height: 260px;
 
           padding: 27px 20px 28px;
@@ -313,31 +327,27 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            0 9px 0 #3c4549,
-            0 15px 20px rgba(0, 0, 0, 0.28),
             inset 0 3px 3px rgba(255, 255, 255, 1),
-            inset 0 -4px 7px rgba(0, 0, 0, 0.12);
+            inset 0 -4px 7px rgba(0, 0, 0, 0.12),
+            0 9px 0 #3c4549,
+            0 15px 20px rgba(0, 0, 0, 0.28);
 
           transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
+            transform 0.18s ease,
+            box-shadow 0.18s ease;
         }
 
         .dictionaryCard:hover {
           transform:
-            translateY(-7px)
-            scale(1.015);
+            translateY(-6px)
+            scale(1.012);
 
           box-shadow:
-            0 15px 0 #3c4549,
-            0 24px 28px rgba(0, 0, 0, 0.32),
             inset 0 3px 3px rgba(255, 255, 255, 1),
-            inset 0 -4px 7px rgba(0, 0, 0, 0.1);
+            inset 0 -4px 7px rgba(0, 0, 0, 0.1),
+            0 14px 0 #3c4549,
+            0 23px 28px rgba(0, 0, 0, 0.31);
         }
-
-        /* ==============================
-           KICHIK BELGI
-        ============================== */
 
         .icon3d {
           min-width: 58px;
@@ -352,7 +362,7 @@ export default function DictionariesPage() {
           color: #06476f;
 
           font-size: 17px;
-          font-weight: 700;
+          font-weight: 900;
 
           border: 2px solid #145a7b;
           border-radius: 11px;
@@ -368,15 +378,11 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            0 6px 0 #164d68,
-            0 9px 12px rgba(0, 0, 0, 0.25),
             inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -3px 4px rgba(0, 65, 100, 0.2);
+            inset 0 -3px 4px rgba(0, 65, 100, 0.2),
+            0 6px 0 #164d68,
+            0 9px 12px rgba(0, 0, 0, 0.25);
         }
-
-        /* ==============================
-           KARTA NOMI
-        ============================== */
 
         .dictionaryCard h2 {
           margin: 25px 0;
@@ -387,85 +393,81 @@ export default function DictionariesPage() {
 
           font-size: 23px;
           line-height: 1.25;
-          font-weight: 700;
+          font-weight: 900;
 
           text-shadow:
             0 1px 0 #ffffff,
             0 2px 2px rgba(0, 0, 0, 0.12);
         }
 
-        /* ==============================
-           3D OCHISH TUGMASI
-        ============================== */
+        /* =============================================
+           OCHISH — HAQIQIY 3D BUTTON
+        ============================================= */
 
         .openButton {
           width: 165px;
-          min-height: 48px;
+          min-height: 50px;
 
-          padding: 12px 20px;
-
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-
-          text-decoration: none;
-
-          color: #063f63;
-
-          font-size: 17px;
-          font-weight: 700;
+          padding: 10px 20px;
 
           border: 2px solid #155b7d;
           border-radius: 11px;
 
+          color: #063f63;
+
           background:
             linear-gradient(
               180deg,
-              #d9f6ff 0%,
-              #a9e5fa 17%,
-              #75cff1 46%,
-              #4bb4e0 73%,
-              #2d91bf 100%
+              #e0f8ff 0%,
+              #afeafb 17%,
+              #78d0f1 47%,
+              #49b2df 74%,
+              #2a91c0 100%
             );
 
           box-shadow:
+            inset 0 3px 2px rgba(255, 255, 255, 0.97),
+            inset 0 -4px 5px rgba(0, 71, 107, 0.23),
             0 7px 0 #164d68,
-            0 11px 15px rgba(0, 0, 0, 0.27),
-            inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -4px 5px rgba(0, 71, 107, 0.24);
+            0 11px 15px rgba(0, 0, 0, 0.27);
+
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 900;
+
+          cursor: pointer;
 
           text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.8);
+            0 1px 0 rgba(255, 255, 255, 0.85);
 
           transition:
-            transform 0.15s ease,
-            box-shadow 0.15s ease,
-            filter 0.15s ease;
+            transform 0.13s ease,
+            box-shadow 0.13s ease,
+            filter 0.13s ease;
         }
 
         .openButton:hover {
           transform: translateY(-4px);
-
           filter: brightness(1.05);
 
           box-shadow:
+            inset 0 3px 2px rgba(255, 255, 255, 0.97),
             0 11px 0 #164d68,
-            0 16px 18px rgba(0, 0, 0, 0.3),
-            inset 0 3px 2px rgba(255, 255, 255, 0.95);
+            0 16px 18px rgba(0, 0, 0, 0.3);
         }
 
         .openButton:active {
           transform: translateY(5px);
 
           box-shadow:
+            inset 0 4px 7px rgba(0, 0, 0, 0.2),
             0 2px 0 #164d68,
-            0 4px 6px rgba(0, 0, 0, 0.22),
-            inset 0 4px 7px rgba(0, 0, 0, 0.2);
+            0 4px 6px rgba(0, 0, 0, 0.22);
         }
 
-        /* ==============================
-           PLANSHET
-        ============================== */
+        /* =============================================
+           RESPONSIVE
+        ============================================= */
 
         @media (max-width: 950px) {
           .cards {
@@ -478,10 +480,6 @@ export default function DictionariesPage() {
             padding-right: 24px;
           }
         }
-
-        /* ==============================
-           TELEFON
-        ============================== */
 
         @media (max-width: 650px) {
           .page {
@@ -525,7 +523,6 @@ export default function DictionariesPage() {
 
           .cards {
             grid-template-columns: 1fr;
-
             gap: 28px;
           }
 
