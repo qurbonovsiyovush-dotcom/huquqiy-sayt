@@ -1,119 +1,352 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-type DictionaryItem = {
-  word: string;
-  translation: string;
+type Mode = "en-uz" | "uz-en" | "mixed";
+
+type WordItem = {
+  id: number;
+  english: string;
+  uzbek: string;
 };
 
-const WORDS: DictionaryItem[] = [
-  { word: "abandon", translation: "tark etmoq" },
-  { word: "ability", translation: "qobiliyat" },
-  { word: "able", translation: "qodir" },
-  { word: "accept", translation: "qabul qilmoq" },
-  { word: "accident", translation: "baxtsiz hodisa" },
-  { word: "achieve", translation: "erishmoq" },
-  { word: "act", translation: "harakat qilmoq" },
-  { word: "active", translation: "faol" },
-  { word: "add", translation: "qo‘shmoq" },
-  { word: "afraid", translation: "qo‘rqgan" },
-  { word: "agree", translation: "rozi bo‘lmoq" },
-  { word: "allow", translation: "ruxsat bermoq" },
-  { word: "answer", translation: "javob" },
-  { word: "arrive", translation: "yetib kelmoq" },
-  { word: "attack", translation: "hujum qilmoq" },
-  { word: "beautiful", translation: "chiroyli" },
-  { word: "begin", translation: "boshlamoq" },
-  { word: "believe", translation: "ishonmoq" },
-  { word: "book", translation: "kitob" },
-  { word: "build", translation: "qurmoq" },
+/*
+  MUHIM:
+  Bu DEMO so'zlar.
+  Keyingi bosqichda bularni olib tashlab,
+  2700+ ta so'zni API/bazadan olamiz.
+*/
+const DEMO_WORDS: WordItem[] = [
+  { id: 1, english: "plate", uzbek: "tarelka" },
+  { id: 2, english: "name", uzbek: "ism, nom" },
+  { id: 3, english: "place", uzbek: "joy" },
+  { id: 4, english: "table", uzbek: "stol, jadval" },
+  { id: 5, english: "clever", uzbek: "aqlli, ziyrak" },
+  { id: 6, english: "safe", uzbek: "xavfsiz" },
+  { id: 7, english: "promise", uzbek: "va'da bermoq" },
+  { id: 8, english: "reply", uzbek: "javob bermoq" },
+  { id: 9, english: "hide", uzbek: "yashirmoq" },
+  { id: 10, english: "hunt", uzbek: "ov qilmoq" },
 ];
 
-export default function EnglishUzbekDictionaryPage() {
-  const [query, setQuery] = useState("");
+function shuffle<T>(array: T[]): T[] {
+  const result = [...array];
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
 
-    if (!q) {
-      return WORDS.slice(0, 10);
+  return result;
+}
+
+export default function EnglishUzbekLearnPage() {
+  const router = useRouter();
+
+  const [words] = useState<WordItem[]>(DEMO_WORDS);
+  const [mode, setMode] = useState<Mode>("en-uz");
+  const [index, setIndex] = useState(0);
+
+  const [options, setOptions] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [wrongWords, setWrongWords] = useState<number[]>([]);
+  const [hardWords, setHardWords] = useState<number[]>([]);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+
+  const current = words[index];
+
+  const effectiveMode = useMemo<"en-uz" | "uz-en">(() => {
+    if (mode !== "mixed") return mode;
+
+    return index % 2 === 0 ? "en-uz" : "uz-en";
+  }, [mode, index]);
+
+  const question = useMemo(() => {
+    if (!current) return "";
+
+    return effectiveMode === "en-uz"
+      ? current.english
+      : current.uzbek;
+  }, [current, effectiveMode]);
+
+  const correctAnswer = useMemo(() => {
+    if (!current) return "";
+
+    return effectiveMode === "en-uz"
+      ? current.uzbek
+      : current.english;
+  }, [current, effectiveMode]);
+
+  useEffect(() => {
+    if (!current || words.length === 0) return;
+
+    const pool = words
+      .filter((word) => word.id !== current.id)
+      .map((word) =>
+        effectiveMode === "en-uz"
+          ? word.uzbek
+          : word.english
+      );
+
+    const wrongOption =
+      pool[Math.floor(Math.random() * pool.length)];
+
+    setOptions(shuffle([correctAnswer, wrongOption]));
+    setSelected(null);
+  }, [current, effectiveMode, correctAnswer, words]);
+
+  function changeMode(newMode: Mode) {
+    setMode(newMode);
+    setIndex(0);
+    setSelected(null);
+    setCorrectCount(0);
+    setWrongCount(0);
+  }
+
+  function nextWord() {
+    setSelected(null);
+
+    if (index < words.length - 1) {
+      setIndex((old) => old + 1);
+    } else {
+      setIndex(0);
+    }
+  }
+
+  function previousWord() {
+    setSelected(null);
+
+    if (index > 0) {
+      setIndex((old) => old - 1);
+    } else {
+      setIndex(words.length - 1);
+    }
+  }
+
+  function chooseAnswer(answer: string) {
+    if (selected) return;
+
+    setSelected(answer);
+
+    if (answer === correctAnswer) {
+      setCorrectCount((old) => old + 1);
+
+      window.setTimeout(() => {
+        nextWord();
+      }, 650);
+    } else {
+      setWrongCount((old) => old + 1);
+
+      if (!wrongWords.includes(current.id)) {
+        setWrongWords((old) => [...old, current.id]);
+      }
+    }
+  }
+
+  function toggleHardWord() {
+    if (!current) return;
+
+    setHardWords((old) => {
+      if (old.includes(current.id)) {
+        return old.filter((id) => id !== current.id);
+      }
+
+      return [...old, current.id];
+    });
+  }
+
+  function showLater() {
+    if (!wrongWords.includes(current.id)) {
+      setWrongWords((old) => [...old, current.id]);
     }
 
-    return WORDS.filter((item) =>
-      item.word.toLowerCase().includes(q)
-    );
-  }, [query]);
+    nextWord();
+  }
 
-  function goBack() {
-    window.location.href =
-      "/qollanmalar/dictionaries";
+  function speakWord() {
+    if (typeof window === "undefined") return;
+
+    window.speechSynthesis.cancel();
+
+    const text =
+      effectiveMode === "en-uz"
+        ? current.english
+        : current.english;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    utterance.lang = "en-US";
+    utterance.rate = 0.82;
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  const isHard = current
+    ? hardWords.includes(current.id)
+    : false;
+
+  if (!current) {
+    return (
+      <main className="page">
+        <div className="empty">
+          Lug‘atda hozircha so‘z mavjud emas.
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="page">
-      <header className="topPanel">
+      {/* YUQORI PANEL */}
+      <section className="topPanel">
         <button
-          type="button"
-          className="backButton"
-          onClick={goBack}
+          className="small3d gray"
+          onClick={() =>
+            router.push("/qollanmalar/dictionaries")
+          }
         >
-          ← Lug‘atlarga qaytish
+          ← Lug‘atlar
         </button>
 
-        <div className="brand">
-          QURBONOV.UZ
+        <div className="modeArea">
+          <button
+            className={`modeButton ${
+              mode === "en-uz" ? "active" : ""
+            }`}
+            onClick={() => changeMode("en-uz")}
+          >
+            English → Uzbek
+          </button>
+
+          <button
+            className={`modeButton ${
+              mode === "uz-en" ? "active" : ""
+            }`}
+            onClick={() => changeMode("uz-en")}
+          >
+            Uzbek → English
+          </button>
+
+          <button
+            className={`modeButton ${
+              mode === "mixed" ? "active" : ""
+            }`}
+            onClick={() => changeMode("mixed")}
+          >
+            Aralash
+          </button>
         </div>
-      </header>
 
-      <section className="mainPanel">
-        <div className="panelTitle">
-          English–Uzbek Dictionary
-        </div>
-
-        <div className="searchBox">
-          <input
-            value={query}
-            onChange={(event) =>
-              setQuery(event.target.value)
-            }
-            placeholder="Inglizcha so‘zni kiriting..."
-          />
-        </div>
-
-        <div className="resultInfo">
-          {query.trim()
-            ? `${filtered.length} ta natija topildi`
-            : "So‘z qidirishni boshlang"}
-        </div>
-
-        <div className="wordList">
-          {filtered.length > 0 ? (
-            filtered.map((item) => (
-              <article
-                key={item.word}
-                className="wordCard"
-              >
-                <div className="englishWord">
-                  {item.word}
-                </div>
-
-                <div className="divider">
-                  →
-                </div>
-
-                <div className="uzbekWord">
-                  {item.translation}
-                </div>
-              </article>
-            ))
-          ) : (
-            <div className="emptyBox">
-              So‘z topilmadi
-            </div>
-          )}
+        <div className="counter">
+          {index + 1} / {words.length}
         </div>
       </section>
+
+      {/* STATISTIKA */}
+      <section className="stats">
+        <div>
+          <strong>{words.length}</strong>
+          <span>Jami so‘z</span>
+        </div>
+
+        <div>
+          <strong>{correctCount}</strong>
+          <span>To‘g‘ri</span>
+        </div>
+
+        <div>
+          <strong>{wrongCount}</strong>
+          <span>Xato</span>
+        </div>
+
+        <div>
+          <strong>{hardWords.length}</strong>
+          <span>Qiyin so‘z</span>
+        </div>
+      </section>
+
+      {/* ASOSIY SO'Z */}
+      <section className="questionCard">
+        {question}
+      </section>
+
+      {/* TALAFFUZ / QIYIN */}
+      <div className="actionRow">
+        <button
+          className="small3d gray"
+          onClick={speakWord}
+        >
+          🔊 Talaffuz
+        </button>
+
+        <button
+          className={`small3d ${
+            isHard ? "hardActive" : "gray"
+          }`}
+          onClick={toggleHardWord}
+        >
+          {isHard ? "★ Qiyin so‘z" : "☆ Qiyin so‘z"}
+        </button>
+      </div>
+
+      {/* JAVOB VARIANTLARI */}
+      <section className="answers">
+        {options.map((option) => {
+          let answerClass = "";
+
+          if (selected) {
+            if (option === correctAnswer) {
+              answerClass = "correct";
+            } else if (option === selected) {
+              answerClass = "wrong";
+            }
+          }
+
+          return (
+            <button
+              key={option}
+              className={`answerCard ${answerClass}`}
+              onClick={() => chooseAnswer(option)}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </section>
+
+      {/* XATO BO'LGANDA */}
+      {selected && selected !== correctAnswer && (
+        <div className="feedback wrongText">
+          ✕ Noto‘g‘ri. To‘g‘ri javob:{" "}
+          <strong>{correctAnswer}</strong>
+        </div>
+      )}
+
+      {/* PASTKI TUGMALAR */}
+      <div className="bottomActions">
+        <button
+          className="navButton"
+          onClick={previousWord}
+        >
+          ← Oldingi
+        </button>
+
+        <button
+          className="laterButton"
+          onClick={showLater}
+        >
+          ↻ Keyinroq yana ko‘rsat
+        </button>
+
+        <button
+          className="navButton"
+          onClick={nextWord}
+        >
+          Keyingi →
+        </button>
+      </div>
 
       <style jsx>{`
         * {
@@ -122,377 +355,497 @@ export default function EnglishUzbekDictionaryPage() {
 
         :global(body) {
           margin: 0;
+          background: #f4f6f7;
+        }
+
+        button {
+          font-family: "Bell MT", Georgia, serif;
         }
 
         .page {
           min-height: 100vh;
-          padding: 35px 20px 70px;
-
-          font-family:
-            "Bell MT",
-            Georgia,
-            "Times New Roman",
-            serif;
+          padding: 35px 30px 80px;
+          font-family: "Bell MT", Georgia, serif;
 
           background:
             radial-gradient(
-              circle at 50% 0%,
+              circle at top,
               #ffffff 0%,
-              #f1f6f9 45%,
-              #dfe7eb 100%
+              #f6f8f9 45%,
+              #e8eef1 100%
             );
+
+          color: #062f4b;
         }
+
+        /* =========================
+           TOP PANEL
+        ========================= */
 
         .topPanel {
-          width: min(1120px, 100%);
-          min-height: 92px;
+          width: min(1160px, 100%);
+          min-height: 125px;
 
-          margin: 0 auto 66px;
-          padding: 18px 25px;
+          margin: 0 auto 35px;
+          padding: 22px 28px;
 
-          display: flex;
+          display: grid;
+          grid-template-columns: 180px 1fr 120px;
           align-items: center;
-          justify-content: space-between;
+          gap: 20px;
 
-          border: 3px solid #253239;
-          border-radius: 22px;
+          border: 3px solid #12445f;
+          border-radius: 24px;
 
           background:
             linear-gradient(
               180deg,
-              #858b8e 0%,
-              #686f72 16%,
-              #50575a 60%,
-              #3c4346 100%
+              #9be4ff 0%,
+              #73c8ee 16%,
+              #55afe0 62%,
+              #3d98c8 100%
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.43),
-            inset 0 -6px 8px rgba(0,0,0,.3),
-            0 9px 0 #202b30,
-            0 17px 26px rgba(0,0,0,.25);
+            inset 0 4px 3px rgba(255,255,255,.75),
+            inset 0 -7px 8px rgba(0,70,110,.22),
+            0 9px 0 #164b66,
+            0 16px 25px rgba(0,0,0,.23);
         }
 
-        .brand {
-          color: white;
+        .modeArea {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 14px;
+        }
+
+        .modeButton {
+          min-width: 145px;
+          height: 46px;
+          padding: 0 18px;
+
+          border: 2px solid #626b70;
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #f4f4f4 48%,
+              #d6d6d6 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px white,
+            0 5px 0 #5a6266,
+            0 8px 11px rgba(0,0,0,.18);
+
+          color: #102e40;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .modeButton.active {
+          border-color: #0b5278;
+
+          background:
+            linear-gradient(
+              180deg,
+              #d8f6ff 0%,
+              #99dcf7 25%,
+              #58b7e2 70%,
+              #3294c3 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px white,
+            0 5px 0 #164e6b,
+            0 8px 12px rgba(0,0,0,.2);
+        }
+
+        .counter {
+          text-align: right;
           font-size: 18px;
           font-weight: 900;
-          letter-spacing: 3px;
-
-          text-shadow:
-            0 2px 0 #164d6b,
-            0 3px 4px rgba(0,0,0,.7);
+          letter-spacing: 2px;
         }
 
-        .backButton {
-          min-width: 210px;
-          min-height: 50px;
+        /* =========================
+           3D TUGMALAR
+        ========================= */
 
-          padding: 10px 20px;
+        .small3d {
+          min-height: 46px;
+          padding: 8px 18px;
 
-          border: 2px solid #155b7d;
-          border-radius: 11px;
+          border: 2px solid #596368;
+          border-radius: 9px;
 
-          color: #063f63;
-
-          background:
-            linear-gradient(
-              180deg,
-              #dff8ff 0%,
-              #b0e9fb 17%,
-              #7ccff0 47%,
-              #4bb1dc 74%,
-              #2c90be 100%
-            );
-
-          box-shadow:
-            inset 0 3px 2px rgba(255,255,255,.97),
-            inset 0 -4px 5px rgba(0,71,107,.23),
-            0 7px 0 #164d68,
-            0 12px 16px rgba(0,0,0,.27);
-
-          font-family: inherit;
           font-size: 15px;
           font-weight: 900;
 
           cursor: pointer;
+
+          transition:
+            transform .12s ease,
+            box-shadow .12s ease;
         }
 
-        .mainPanel {
-          position: relative;
-
-          width: min(1120px, 100%);
-          margin: 0 auto;
-
-          padding: 100px 30px 45px;
-
-          border: 3px solid #263238;
-          border-radius: 25px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #737a7d 0%,
-              #5d6467 28%,
-              #4b5255 65%,
-              #373e41 100%
-            );
-
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.4),
-            inset 0 -8px 12px rgba(0,0,0,.3),
-            0 10px 0 #222c30,
-            0 20px 35px rgba(0,0,0,.3);
-        }
-
-        .panelTitle {
-          position: absolute;
-
-          top: -38px;
-          left: 50%;
-
-          transform: translateX(-50%);
-
-          min-width: 390px;
-
-          padding: 15px 38px;
-
-          text-align: center;
-
-          color: #063f68;
-
-          font-size: 29px;
-          font-weight: 900;
-
-          border: 2px solid #145b80;
-          border-radius: 15px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #d5f5ff 0%,
-              #a3e3fa 16%,
-              #73ccef 48%,
-              #45afe0 76%,
-              #278dbd 100%
-            );
-
-          box-shadow:
-            inset 0 3px 2px rgba(255,255,255,.95),
-            inset 0 -3px 5px rgba(0,72,110,.25),
-            0 8px 0 #155775,
-            0 13px 18px rgba(0,0,0,.3);
-        }
-
-        .searchBox {
-          padding: 18px;
-
-          border: 2px solid #f4f4f4;
-          border-radius: 16px;
+        .gray {
+          color: #182c38;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #e7eaec 100%
+              #f2f2f2 50%,
+              #d2d2d2 100%
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255,255,255,1),
-            0 7px 0 #4b555a,
-            0 12px 17px rgba(0,0,0,.2);
+            inset 0 3px 2px white,
+            0 5px 0 #5a6266,
+            0 8px 12px rgba(0,0,0,.18);
         }
 
-        .searchBox input {
-          width: 100%;
-          min-height: 58px;
+        .small3d:active,
+        .modeButton:active,
+        .navButton:active,
+        .laterButton:active {
+          transform: translateY(4px);
+          box-shadow: none;
+        }
 
-          padding: 10px 18px;
+        .hardActive {
+          color: #684600;
+          border-color: #b37a00;
 
-          border: 2px solid #1677a7;
-          border-radius: 11px;
-
-          outline: none;
-
-          font-family: inherit;
-          font-size: 20px;
-
-          color: #123748;
-
-          background: white;
+          background:
+            linear-gradient(
+              180deg,
+              #fff9d5,
+              #ffd86b
+            );
 
           box-shadow:
-            inset 0 3px 4px rgba(0,0,0,.08),
-            0 3px 0 #7b8b93;
+            inset 0 3px 2px white,
+            0 5px 0 #a16d00,
+            0 8px 12px rgba(0,0,0,.18);
         }
 
-        .searchBox input:focus {
-          border-color: #0e9bd9;
+        /* =========================
+           STATISTIKA
+        ========================= */
+
+        .stats {
+          width: min(900px, 100%);
+          margin: 0 auto 30px;
+
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+        }
+
+        .stats > div {
+          min-height: 72px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          border: 2px solid #c9cfd2;
+          border-radius: 12px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #e7e7e7
+            );
 
           box-shadow:
-            0 0 0 4px rgba(14,155,217,.14),
-            inset 0 3px 4px rgba(0,0,0,.08),
-            0 3px 0 #47758c;
+            0 5px 0 #747d81,
+            0 9px 13px rgba(0,0,0,.12);
         }
 
-        .resultInfo {
-          margin: 24px 0 18px;
+        .stats strong {
+          font-size: 23px;
+          color: #05649a;
+        }
 
-          padding: 12px 16px;
+        .stats span {
+          margin-top: 3px;
+          font-size: 13px;
+          font-weight: 900;
+          color: #3b454a;
+        }
 
-          color: white;
+        /* =========================
+           SO'Z KARTASI
+        ========================= */
+
+        .questionCard {
+          width: min(500px, 92%);
+          min-height: 115px;
+
+          margin: 35px auto 28px;
+          padding: 20px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          text-align: center;
+
+          border: 3px solid #164d69;
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #a5e5ff 0%,
+              #70c5ed 18%,
+              #54addc 65%,
+              #4197c4 100%
+            );
+
+          box-shadow:
+            inset 0 4px 3px rgba(255,255,255,.8),
+            inset 0 -6px 6px rgba(0,60,100,.22),
+            0 8px 0 #1d536c,
+            0 14px 20px rgba(0,0,0,.22);
+
+          color: #061b29;
+          font-size: clamp(28px, 4vw, 42px);
+          font-weight: 900;
+          text-transform: none;
+        }
+
+        .actionRow {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 16px;
+
+          margin-bottom: 65px;
+        }
+
+        /* =========================
+           JAVOBLAR
+        ========================= */
+
+        .answers {
+          width: min(1050px, 100%);
+          margin: 0 auto;
+
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 55px;
+        }
+
+        .answerCard {
+          min-height: 110px;
+          padding: 18px 25px;
+
+          border: 2px solid #667075;
+          border-radius: 17px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #f4f4f4 25%,
+              #dedede 65%,
+              #c8c8c8 100%
+            );
+
+          box-shadow:
+            inset 0 4px 3px white,
+            inset 0 -5px 6px rgba(0,0,0,.08),
+            0 8px 0 #5d666a,
+            0 13px 18px rgba(0,0,0,.2);
+
+          font-size: clamp(22px, 3vw, 31px);
+          font-weight: 900;
+
+          cursor: pointer;
+
+          transition:
+            transform .12s ease,
+            box-shadow .12s ease;
+        }
+
+        .answerCard:hover {
+          transform: translateY(-2px);
+        }
+
+        .answerCard.correct {
+          border-color: #258348;
+
+          background:
+            linear-gradient(
+              180deg,
+              #effff3,
+              #bcefc8,
+              #83d89a
+            );
+
+          box-shadow:
+            inset 0 4px 3px white,
+            0 8px 0 #31804a,
+            0 13px 18px rgba(0,0,0,.18);
+
+          color: #125c2a;
+        }
+
+        .answerCard.wrong {
+          border-color: #b82e2e;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff4f4,
+              #ffc4c4,
+              #ed8888
+            );
+
+          box-shadow:
+            inset 0 4px 3px white,
+            0 8px 0 #9c3434,
+            0 13px 18px rgba(0,0,0,.18);
+
+          color: #7a1010;
+        }
+
+        /* =========================
+           FEEDBACK
+        ========================= */
+
+        .feedback {
+          width: min(700px, 95%);
+          margin: 30px auto 0;
+          padding: 15px 20px;
+
+          text-align: center;
+
+          border-radius: 12px;
 
           font-size: 17px;
           font-weight: 900;
-
-          text-align: center;
-
-          text-shadow:
-            0 2px 2px rgba(0,0,0,.35);
         }
 
-        .wordList {
-          display: grid;
-          gap: 16px;
+        .wrongText {
+          border: 2px solid #d58282;
+          background: #fff0f0;
+          color: #8b1d1d;
         }
 
-        .wordCard {
-          min-height: 86px;
+        /* =========================
+           PASTKI TUGMALAR
+        ========================= */
 
-          padding: 18px 24px;
+        .bottomActions {
+          width: min(850px, 100%);
+          margin: 45px auto 0;
 
-          display: grid;
-          grid-template-columns:
-            1fr auto 1fr;
-
+          display: flex;
+          justify-content: center;
           align-items: center;
+          flex-wrap: wrap;
           gap: 18px;
+        }
 
-          border: 2px solid #f8f8f8;
-          border-radius: 15px;
+        .navButton,
+        .laterButton {
+          min-height: 47px;
+          padding: 10px 22px;
+
+          border-radius: 22px;
+          border: 1px solid #777;
 
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #eeeeee 60%,
-              #d8d8d8 100%
+              white,
+              #e5e5e5
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255,255,255,1),
-            0 6px 0 #465056,
-            0 10px 15px rgba(0,0,0,.2);
-        }
+            0 4px 0 #777,
+            0 7px 10px rgba(0,0,0,.12);
 
-        .englishWord,
-        .uzbekWord {
-          font-size: 23px;
+          font-size: 15px;
           font-weight: 900;
+          cursor: pointer;
         }
 
-        .englishWord {
-          color: #073f68;
+        .laterButton {
+          min-width: 210px;
         }
 
-        .uzbekWord {
-          text-align: right;
-          color: #1d2c33;
-        }
-
-        .divider {
-          width: 48px;
-          height: 42px;
-
-          display: grid;
-          place-items: center;
-
-          border: 2px solid #155b7d;
-          border-radius: 10px;
-
-          color: #063f63;
-
-          background:
-            linear-gradient(
-              180deg,
-              #d9f7ff,
-              #65c3e8
-            );
-
-          box-shadow:
-            0 4px 0 #164d68;
-
-          font-size: 21px;
-          font-weight: 900;
-        }
-
-        .emptyBox {
-          padding: 35px;
-
+        .empty {
+          max-width: 600px;
+          margin: 100px auto;
+          padding: 40px;
           text-align: center;
-
-          border: 2px solid #f4f4f4;
-          border-radius: 15px;
-
-          color: #333;
-
-          background:
-            linear-gradient(
-              #ffffff,
-              #e4e4e4
-            );
-
-          box-shadow:
-            0 6px 0 #465056;
-
-          font-size: 20px;
+          background: white;
+          border-radius: 20px;
+          font-size: 22px;
           font-weight: 900;
         }
 
-        @media (max-width: 700px) {
+        /* =========================
+           TELEFON
+        ========================= */
+
+        @media (max-width: 760px) {
           .page {
-            padding:
-              20px 12px
-              50px;
+            padding: 20px 12px 60px;
           }
 
           .topPanel {
-            flex-direction: column;
-            padding: 15px;
-          }
-
-          .backButton {
-            width: 100%;
-          }
-
-          .mainPanel {
-            padding:
-              80px 15px
-              30px;
-          }
-
-          .panelTitle {
-            min-width: 250px;
-            width: 84%;
-
-            padding:
-              12px 18px;
-
-            font-size: 23px;
-          }
-
-          .wordCard {
             grid-template-columns: 1fr;
             text-align: center;
           }
 
-          .uzbekWord {
+          .counter {
             text-align: center;
           }
 
-          .divider {
-            margin: 0 auto;
-            transform: rotate(90deg);
+          .modeArea {
+            flex-direction: column;
+          }
+
+          .modeButton {
+            width: 100%;
+          }
+
+          .stats {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .answers {
+            grid-template-columns: 1fr;
+            gap: 25px;
+          }
+
+          .actionRow {
+            margin-bottom: 40px;
+          }
+
+          .answerCard {
+            min-height: 90px;
+          }
+
+          .bottomActions {
+            flex-direction: column;
+          }
+
+          .navButton,
+          .laterButton {
+            width: 100%;
           }
         }
       `}</style>
