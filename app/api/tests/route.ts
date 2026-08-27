@@ -1040,6 +1040,431 @@ async function setTestStatus(
   );
 }
 
+
+/* =========================================================
+   KATTA TESTNI QISMAN TAHRIRLASH
+
+   780/840 ta savolning hammasini brauzerdan qayta yubormaydi.
+   Faqat o‘zgargan/yangi/o‘chirilgan savollar keladi.
+========================================================= */
+
+async function patchTest(
+  body: any
+) {
+  const cookieStore =
+    await cookies();
+
+  const isAdmin =
+    Boolean(
+      cookieStore.get(
+        "qurbonov_session"
+      )?.value
+    ) &&
+    cookieStore.get(
+      "qurbonov_role"
+    )?.value === "admin";
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bu amal faqat administrator uchun.",
+      },
+      {
+        status: 403,
+      }
+    );
+  }
+
+  const testId =
+    String(
+      body?.testId || ""
+    ).trim();
+
+  if (!testId) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test ID topilmadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const tests =
+    await readTests();
+
+  const testIndex =
+    tests.findIndex(
+      (item) =>
+        item.id === testId
+    );
+
+  if (
+    testIndex < 0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test topilmadi.",
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  const currentTest =
+    tests[testIndex];
+
+  let nextQuestions:
+    any[] =
+    Array.isArray(
+      currentTest.questions
+    )
+      ? [
+          ...currentTest.questions,
+        ]
+      : [];
+
+  const changedQuestions:
+    any[] =
+    Array.isArray(
+      body?.changedQuestions
+    )
+      ? body.changedQuestions
+      : [];
+
+  const deletedQuestionIds =
+    new Set(
+      Array.isArray(
+        body?.deletedQuestionIds
+      )
+        ? body.deletedQuestionIds.map(
+            (value: unknown) =>
+              String(value)
+          )
+        : []
+    );
+
+  /*
+    1. O‘chirilgan savollar.
+  */
+  if (
+    deletedQuestionIds.size >
+    0
+  ) {
+    nextQuestions =
+      nextQuestions.filter(
+        (question: any) =>
+          !deletedQuestionIds.has(
+            String(
+              question?.id || ""
+            )
+          )
+      );
+  }
+
+  /*
+    2. O‘zgargan savollarni joyida almashtirish.
+       Yangi savol bo‘lsa oxiriga qo‘shish.
+  */
+  for (
+    const incoming of
+    changedQuestions
+  ) {
+    const incomingId =
+      String(
+        incoming?.id || ""
+      ).trim();
+
+    if (!incomingId) {
+      continue;
+    }
+
+    const questionIndex =
+      nextQuestions.findIndex(
+        (question: any) =>
+          String(
+            question?.id || ""
+          ) === incomingId
+      );
+
+    if (
+      questionIndex >= 0
+    ) {
+      nextQuestions[
+        questionIndex
+      ] = {
+        ...nextQuestions[
+          questionIndex
+        ],
+        ...incoming,
+        id: incomingId,
+      };
+    } else {
+      nextQuestions.push({
+        ...incoming,
+        id: incomingId,
+      });
+    }
+  }
+
+  /*
+    3. Agar savollar tartibi o‘zgargan bo‘lsa,
+       ID ro‘yxati asosida qayta tartiblaymiz.
+  */
+  const questionOrder =
+    Array.isArray(
+      body?.questionOrder
+    )
+      ? body.questionOrder.map(
+          (value: unknown) =>
+            String(value)
+        )
+      : [];
+
+  if (
+    questionOrder.length >
+    0
+  ) {
+    const questionMap =
+      new Map(
+        nextQuestions.map(
+          (question: any) => [
+            String(
+              question?.id || ""
+            ),
+            question,
+          ]
+        )
+      );
+
+    const ordered:
+      any[] = [];
+
+    for (
+      const id of
+      questionOrder
+    ) {
+      const question =
+        questionMap.get(
+          id
+        );
+
+      if (question) {
+        ordered.push(
+          question
+        );
+        questionMap.delete(
+          id
+        );
+      }
+    }
+
+    /*
+      Ro‘yxatda tasodifan bo‘lmagan yangi elementlar
+      yo‘qolib ketmasligi uchun oxiriga qo‘shamiz.
+    */
+    for (
+      const question of
+      questionMap.values()
+    ) {
+      ordered.push(
+        question
+      );
+    }
+
+    nextQuestions =
+      ordered;
+  }
+
+  if (
+    nextQuestions.length ===
+    0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Testda kamida bitta savol bo‘lishi kerak.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const status:
+    TestStatus =
+    body?.status ===
+    "published"
+      ? "published"
+      : body?.status ===
+        "draft"
+      ? "draft"
+      : currentTest.status ===
+        "published"
+      ? "published"
+      : "draft";
+
+  /*
+    E’lon qilinayotgan bo‘lsa barcha savollarda
+    aynan bitta to‘g‘ri javob borligini tekshiramiz.
+  */
+  if (
+    status ===
+    "published"
+  ) {
+    const invalid =
+      nextQuestions.some(
+        (question: any) => {
+          const options =
+            Array.isArray(
+              question?.options
+            )
+              ? question.options
+              : [];
+
+          return (
+            options.filter(
+              (option: any) =>
+                option?.isCorrect ===
+                  true ||
+                option?.correct ===
+                  true
+            ).length !== 1
+          );
+        }
+      );
+
+    if (invalid) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Har bir savolda aynan bitta to‘g‘ri javob bo‘lishi kerak.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const updatedTest:
+    TestData = {
+    ...currentTest,
+
+    title:
+      body?.title !==
+      undefined
+        ? String(
+            body.title
+          ).trim()
+        : currentTest.title,
+
+    subject:
+      body?.subject !==
+      undefined
+        ? String(
+            body.subject
+          ).trim()
+        : currentTest.subject,
+
+    duration:
+      body?.duration !==
+      undefined
+        ? Math.max(
+            1,
+            Number(
+              body.duration
+            ) || 30
+          )
+        : currentTest.duration,
+
+    description:
+      body?.description !==
+      undefined
+        ? String(
+            body.description
+          )
+        : currentTest.description,
+
+    status,
+
+    questions:
+      nextQuestions,
+
+    updatedAt: now,
+  };
+
+  tests[
+    testIndex
+  ] = updatedTest;
+
+  await writeTests(
+    tests
+  );
+
+  /*
+    MUHIM:
+    780/840 ta savolni response ichida qaytarmaymiz.
+  */
+  return NextResponse.json(
+    {
+      success: true,
+
+      message:
+        "Testdagi o‘zgarishlar saqlandi.",
+
+      test: {
+        id:
+          updatedTest.id,
+
+        title:
+          updatedTest.title,
+
+        subject:
+          updatedTest.subject,
+
+        duration:
+          updatedTest.duration,
+
+        status:
+          updatedTest.status,
+
+        questionCount:
+          nextQuestions.length,
+
+        updatedAt:
+          updatedTest.updatedAt,
+      },
+
+      changedCount:
+        changedQuestions.length,
+
+      deletedCount:
+        deletedQuestionIds.size,
+    },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
+}
+
 /* =========================================================
    LEGACY / NORMAL POST
 ========================================================= */
@@ -1208,6 +1633,15 @@ export async function POST(
       "set-status"
     ) {
       return await setTestStatus(
+        body
+      );
+    }
+
+    if (
+      action ===
+      "patch-test"
+    ) {
+      return await patchTest(
         body
       );
     }
