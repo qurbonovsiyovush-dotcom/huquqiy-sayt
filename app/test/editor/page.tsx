@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -171,7 +172,7 @@ function optionLetter(
    PAGE
 ========================================================= */
 
-export default function TestEditorPage() {
+function TestEditorPageContent() {
   const router =
     useRouter();
 
@@ -4309,3 +4310,22 @@ export default function TestEditorPage() {
     </main>
   );
 }
+
+/* =========================================================
+   NEXT.JS 16 — useSearchParams() UCHUN SUSPENSE WRAPPER
+========================================================= */
+
+export default function TestEditorPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="loading">
+          Test muharriri yuklanmoqda...
+        </main>
+      }
+    >
+      <TestEditorPageContent />
+    </Suspense>
+  );
+}
+
