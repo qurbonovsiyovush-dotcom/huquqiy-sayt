@@ -6,11 +6,11 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type ClipboardEvent as ReactClipboardEvent,
 } from "react";
 
 import {
   useRouter,
+  useSearchParams,
 } from "next/navigation";
 
 /* =========================================================
@@ -20,34 +20,6 @@ import {
 type TestStatus =
   | "draft"
   | "published";
-
-type TestCategory =
-  | "legislation"
-  | "thematic"
-  | "block"
-  | "national-certificate"
-  | "thirty"
-  | "custom";
-
-const TEST_CATEGORY_LABELS: Record<TestCategory, string> = {
-  legislation: "Qonunchilik hujjatlaridan test",
-  thematic: "Mavzulashtirilgan test",
-  block: "Blok test",
-  "national-certificate": "Milliy sertifikat testi",
-  thirty: "30 talik test",
-  custom: "Boshqa test",
-};
-
-function normalizeTestCategory(value: unknown): TestCategory {
-  return value === "legislation" ||
-    value === "thematic" ||
-    value === "block" ||
-    value === "national-certificate" ||
-    value === "thirty" ||
-    value === "custom"
-    ? value
-    : "custom";
-}
 
 type ShapeType =
   | "rectangle"
@@ -132,9 +104,6 @@ type TestData = {
 
   status: TestStatus;
 
-  testType?: TestCategory;
-  customTestTypeName?: string;
-
   createdAt?: string;
   updatedAt?: string;
 };
@@ -206,15 +175,11 @@ export default function TestEditorPage() {
   const router =
     useRouter();
 
-  const [
-    editingId,
-    setEditingId,
-  ] = useState<string | null>(null);
+  const searchParams =
+    useSearchParams();
 
-  const [
-    paramsReady,
-    setParamsReady,
-  ] = useState(false);
+  const editingId =
+    searchParams.get("id");
 
   const editorRef =
     useRef<HTMLDivElement | null>(
@@ -229,6 +194,13 @@ export default function TestEditorPage() {
   const imageInputRef =
     useRef<HTMLInputElement | null>(null);
 
+  /*
+    Katta testni tahrirlashda 780/840 ta savolning hammasini
+    qayta yubormaslik uchun serverdan dastlab yuklangan holatni saqlaymiz.
+  */
+  const originalQuestionsRef =
+    useRef<TestQuestion[]>([]);
+
   /* =======================================================
      STATES
   ======================================================= */
@@ -241,7 +213,9 @@ export default function TestEditorPage() {
   const [
     loadingTest,
     setLoadingTest,
-  ] = useState(false);
+  ] = useState(
+    Boolean(editingId)
+  );
 
   const [
     saving,
@@ -266,18 +240,6 @@ export default function TestEditorPage() {
   const [
     description,
     setDescription,
-  ] = useState("");
-
-  const [
-    testType,
-    setTestType,
-  ] = useState<TestCategory>(
-    "legislation"
-  );
-
-  const [
-    customTestTypeName,
-    setCustomTestTypeName,
   ] = useState("");
 
   const [
@@ -349,46 +311,6 @@ export default function TestEditorPage() {
         selectedShapeId,
       ]
     );
-
-  /* =======================================================
-     URL PARAMETRINI CLIENT TOMONDA O‘QISH
-     Vercel prerender paytida useSearchParams xatosini
-     oldini oladi.
-  ======================================================= */
-
-  useEffect(() => {
-    const params = new URLSearchParams(
-      window.location.search
-    );
-
-    setEditingId(
-      params.get("id")
-    );
-
-    const urlType =
-      params.get("testType");
-
-    if (urlType) {
-      setTestType(
-        normalizeTestCategory(
-          urlType
-        )
-      );
-    }
-
-    const customName =
-      params.get(
-        "customTestTypeName"
-      );
-
-    if (customName) {
-      setCustomTestTypeName(
-        customName
-      );
-    }
-
-    setParamsReady(true);
-  }, []);
 
   /* =======================================================
      ADMIN CHECK
@@ -506,19 +428,6 @@ export default function TestEditorPage() {
             ""
         );
 
-        setTestType(
-          normalizeTestCategory(
-            test.testType
-          )
-        );
-
-        setCustomTestTypeName(
-          String(
-            test.customTestTypeName ||
-              ""
-          )
-        );
-
         const loadedQuestions =
           Array.isArray(
             test.questions
@@ -533,6 +442,17 @@ export default function TestEditorPage() {
         setQuestions(
           loadedQuestions
         );
+
+        /*
+          Dastlabki holat nusxasi.
+          Keyin saqlashda faqat o‘zgargan/yangi/o‘chirilgan savollar yuboriladi.
+        */
+        originalQuestionsRef.current =
+          loadedQuestions.map((question) =>
+            JSON.parse(
+              JSON.stringify(question)
+            )
+          );
 
         setActiveQuestionId(
           loadedQuestions[0].id
@@ -1055,132 +975,32 @@ export default function TestEditorPage() {
     updateShape(selectedShape.id, { zIndex: minZ - 1 });
   }
 
-  function addImageFromFile(file: File) {
-    if (!activeQuestion) return;
-
+  function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !activeQuestion) return;
     if (!file.type.startsWith("image/")) {
       alert("Faqat rasm faylini tanlang.");
+      event.target.value = "";
       return;
     }
-
     const reader = new FileReader();
-
     reader.onload = () => {
       if (typeof reader.result !== "string") return;
-
-      const dataUrl = reader.result;
-      const image = new Image();
-
-      image.onload = () => {
-        /*
-          Kichik rasm — o‘zining tabiiy hajmida chiqadi.
-          Juda katta rasm — faqat editor maydoniga sig‘ishi uchun
-          proporsional ravishda kichraytiriladi.
-        */
-        const naturalWidth = Math.max(1, image.naturalWidth || 1);
-        const naturalHeight = Math.max(1, image.naturalHeight || 1);
-
-        const canvasWidth =
-          canvasRef.current?.clientWidth || 1000;
-
-        const maxWidth = Math.max(200, canvasWidth - 40);
-        const scale = Math.min(1, maxWidth / naturalWidth);
-
-        const width = Math.max(
-          1,
-          Math.round(naturalWidth * scale)
-        );
-
-        const height = Math.max(
-          1,
-          Math.round(naturalHeight * scale)
-        );
-
-        const shape: TestShape = {
-          id: makeId(),
-          type: "image",
-          x: 20,
-          y: 20,
-          width,
-          height,
-          text: "",
-          backgroundColor: "transparent",
-          borderColor: "#2f5975",
-          textColor: "#111111",
-          fontSize: 20,
-          fontFamily: "Bell MT",
-          fontWeight: "normal",
-          fontStyle: "normal",
-          textAlign: "center",
-          textDecoration: "none",
-          textTransform: "none",
-          borderWidth: 0,
-          borderRadius: 0,
-          opacity: 1,
-          imageSrc: dataUrl,
-          objectFit: "contain",
-          zIndex:
-            Math.max(
-              1,
-              ...activeQuestion.shapes.map(
-                (item) => item.zIndex ?? 1
-              )
-            ) + 1,
-        };
-
-        updateQuestion(activeQuestion.id, {
-          shapes: [
-            ...activeQuestion.shapes,
-            shape,
-          ],
-        });
-
-        setSelectedShapeId(shape.id);
+      const shape: TestShape = {
+        id: makeId(), type: "image", x: 80, y: 70, width: 360, height: 240,
+        text: "", backgroundColor: "#ffffff", borderColor: "#2f5975",
+        textColor: "#111111", fontSize: 20, fontFamily: "Bell MT",
+        fontWeight: "normal", fontStyle: "normal", textAlign: "center",
+        textDecoration: "none", textTransform: "none", borderWidth: 2,
+        borderRadius: 8, opacity: 1, imageSrc: reader.result,
+        objectFit: "contain",
+        zIndex: Math.max(1, ...activeQuestion.shapes.map(s => s.zIndex ?? 1)) + 1,
       };
-
-      image.src = dataUrl;
+      updateQuestion(activeQuestion.id, { shapes: [...activeQuestion.shapes, shape] });
+      setSelectedShapeId(shape.id);
+      event.target.value = "";
     };
-
     reader.readAsDataURL(file);
-  }
-
-  function handleImageUpload(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file = event.target.files?.[0];
-
-    if (file) {
-      addImageFromFile(file);
-    }
-
-    event.target.value = "";
-  }
-
-  function handleCanvasPaste(
-    event: ReactClipboardEvent<HTMLDivElement>
-  ) {
-    const items = Array.from(
-      event.clipboardData?.items || []
-    );
-
-    const imageItem = items.find((item) =>
-      item.type.startsWith("image/")
-    );
-
-    if (!imageItem) {
-      return;
-    }
-
-    const file = imageItem.getAsFile();
-
-    if (!file) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    addImageFromFile(file);
   }
 
   /* =======================================================
@@ -1443,53 +1263,19 @@ export default function TestEditorPage() {
   ) {
     saveEditorHtml();
 
-    if (
-      !title.trim()
-    ) {
+    if (!title.trim()) {
       alert(
         "Test nomini kiriting."
       );
-
       return;
     }
 
     if (
-      testType === "custom" &&
-      !customTestTypeName.trim()
-    ) {
-      alert(
-        "Boshqa test turi uchun test turining nomini kiriting."
-      );
-
-      return;
-    }
-
-    if (
-      questions.length ===
-      0
+      questions.length === 0
     ) {
       alert(
         "Kamida bitta savol bo‘lishi kerak."
       );
-
-      return;
-    }
-
-    const invalid =
-      questions.some(
-        (question) =>
-          question.options
-            .filter(
-              (option) =>
-                option.isCorrect
-            ).length !== 1
-      );
-
-    if (invalid) {
-      alert(
-        "Har bir savolda aynan bitta to‘g‘ri javob belgilang."
-      );
-
       return;
     }
 
@@ -1497,12 +1283,10 @@ export default function TestEditorPage() {
 
     try {
       /*
-        React state update async
-        bo‘lgani uchun aktiv
-        editor HTMLni payloadga
-        qo‘lda qo‘yamiz.
+        React state yangilanishi async bo‘lgani uchun
+        ayni paytda ochiq turgan editor HTMLini payloadga
+        qo‘lda qo‘shamiz.
       */
-
       const currentHtml =
         editorRef.current
           ?.innerHTML ??
@@ -1517,13 +1301,251 @@ export default function TestEditorPage() {
             activeQuestion?.id
               ? {
                   ...question,
-
                   questionHtml:
                     currentHtml,
                 }
               : question
         );
 
+      /*
+        E’lon qilishda har bir savolda aynan bitta
+        to‘g‘ri javob borligini tekshiramiz.
+      */
+      const invalid =
+        payloadQuestions.some(
+          (question) =>
+            question.options
+              .filter(
+                (option) =>
+                  option.isCorrect
+              ).length !== 1
+        );
+
+      if (invalid) {
+        alert(
+          "Har bir savolda aynan bitta to‘g‘ri javob belgilang."
+        );
+        return;
+      }
+
+      /*
+        =====================================================
+        MAVJUD KATTA TESTNI TAHRIRLASH
+
+        Oldingi usul:
+          780 ta savolning hammasini PUT orqali yuborardi.
+
+        Yangi usul:
+          - faqat o‘zgargan savollar;
+          - yangi savollar;
+          - o‘chirilgan savol IDlari;
+          - kerak bo‘lsa savollar tartibi;
+          - test metadata
+
+        yuboriladi.
+        =====================================================
+      */
+      if (editingId) {
+        const original =
+          originalQuestionsRef.current;
+
+        const originalMap =
+          new Map(
+            original.map(
+              (question) => [
+                String(
+                  question.id
+                ),
+                question,
+              ]
+            )
+          );
+
+        const currentIdSet =
+          new Set(
+            payloadQuestions.map(
+              (question) =>
+                String(
+                  question.id
+                )
+            )
+          );
+
+        const changedQuestions =
+          payloadQuestions.filter(
+            (question) => {
+              const before =
+                originalMap.get(
+                  String(
+                    question.id
+                  )
+                );
+
+              if (!before) {
+                return true;
+              }
+
+              return (
+                JSON.stringify(
+                  before
+                ) !==
+                JSON.stringify(
+                  question
+                )
+              );
+            }
+          );
+
+        const deletedQuestionIds =
+          original
+            .filter(
+              (question) =>
+                !currentIdSet.has(
+                  String(
+                    question.id
+                  )
+                )
+            )
+            .map(
+              (question) =>
+                String(
+                  question.id
+                )
+            );
+
+        const originalOrder =
+          original.map(
+            (question) =>
+              String(
+                question.id
+              )
+          );
+
+        const currentOrder =
+          payloadQuestions.map(
+            (question) =>
+              String(
+                question.id
+              )
+          );
+
+        const orderChanged =
+          originalOrder.length !==
+            currentOrder.length ||
+          originalOrder.some(
+            (id, index) =>
+              id !==
+              currentOrder[index]
+          );
+
+        const response =
+          await fetch(
+            "/api/tests",
+            {
+              method: "POST",
+              credentials:
+                "include",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  action:
+                    "patch-test",
+
+                  testId:
+                    editingId,
+
+                  title:
+                    title.trim(),
+
+                  subject:
+                    subject.trim(),
+
+                  duration:
+                    Math.max(
+                      1,
+                      Number(
+                        duration
+                      ) || 30
+                    ),
+
+                  description,
+
+                  status,
+
+                  changedQuestions,
+
+                  deletedQuestionIds,
+
+                  questionOrder:
+                    orderChanged
+                      ? currentOrder
+                      : undefined,
+                }),
+            }
+          );
+
+        const responseText =
+          await response.text();
+
+        let data: any = {};
+
+        if (
+          responseText.trim()
+        ) {
+          try {
+            data =
+              JSON.parse(
+                responseText
+              );
+          } catch {
+            data = {
+              success: false,
+              message:
+                `Server JSON bo‘lmagan javob qaytardi. Status: ${response.status}. ${responseText.slice(0, 180)}`,
+            };
+          }
+        }
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          alert(
+            data.message ||
+              `Test saqlanmadi. Status: ${response.status}`
+          );
+          return;
+        }
+
+        alert(
+          status ===
+            "published"
+            ? "O‘zgarishlar saqlandi va test e’lon qilindi."
+            : "O‘zgarishlar saqlandi."
+        );
+
+        router.push(
+          "/admin/tests"
+        );
+
+        router.refresh();
+
+        return;
+      }
+
+      /*
+        =====================================================
+        YANGI TEST
+
+        Yangi kichik testni editor ichidan yaratishda
+        eski POST usuli ishlashda davom etadi.
+        =====================================================
+      */
       const payload = {
         title:
           title.trim(),
@@ -1540,13 +1562,6 @@ export default function TestEditorPage() {
 
         description,
 
-        testType,
-
-        customTestTypeName:
-          testType === "custom"
-            ? customTestTypeName.trim()
-            : "",
-
         questions:
           payloadQuestions,
 
@@ -1555,16 +1570,9 @@ export default function TestEditorPage() {
 
       const response =
         await fetch(
-          editingId
-            ? `/api/tests/${encodeURIComponent(
-                editingId
-              )}`
-            : "/api/tests",
+          "/api/tests",
           {
-            method:
-              editingId
-                ? "PUT"
-                : "POST",
+            method: "POST",
 
             headers: {
               "Content-Type":
@@ -1578,8 +1586,27 @@ export default function TestEditorPage() {
           }
         );
 
-      const data =
-        await response.json();
+      const responseText =
+        await response.text();
+
+      let data: any = {};
+
+      if (
+        responseText.trim()
+      ) {
+        try {
+          data =
+            JSON.parse(
+              responseText
+            );
+        } catch {
+          data = {
+            success: false,
+            message:
+              `Server JSON bo‘lmagan javob qaytardi. Status: ${response.status}. ${responseText.slice(0, 180)}`,
+          };
+        }
+      }
 
       if (
         !response.ok ||
@@ -1589,19 +1616,14 @@ export default function TestEditorPage() {
           data.message ||
             "Test saqlanmadi."
         );
-
         return;
       }
 
       alert(
         status ===
           "published"
-          ? editingId
-            ? "Test yangilandi va e’lon qilindi."
-            : "Test yaratildi va e’lon qilindi."
-          : editingId
-            ? "O‘zgarishlar saqlandi."
-            : "Test qoralama sifatida saqlandi."
+          ? "Test yaratildi va e’lon qilindi."
+          : "Test qoralama sifatida saqlandi."
       );
 
       router.push(
@@ -1609,14 +1631,22 @@ export default function TestEditorPage() {
       );
 
       router.refresh();
-    } catch {
+    } catch (error) {
+      console.error(
+        "TEST SAVE ERROR:",
+        error
+      );
+
       alert(
-        "Testni saqlashda server xatosi yuz berdi."
+        error instanceof Error
+          ? `Testni saqlashda xato: ${error.message}`
+          : "Testni saqlashda server xatosi yuz berdi."
       );
     } finally {
       setSaving(false);
     }
   }
+
 
   /* =======================================================
      KOMPYUTERGA SAQLASH
@@ -1649,11 +1679,6 @@ export default function TestEditorPage() {
         subject: subject.trim(),
         duration: Math.max(1, Number(duration) || 30),
         description,
-        testType,
-        customTestTypeName:
-          testType === "custom"
-            ? customTestTypeName.trim()
-            : "",
         questions: exportQuestions,
         status: "draft" as TestStatus,
       },
@@ -1686,7 +1711,6 @@ export default function TestEditorPage() {
   ======================================================= */
 
   if (
-    !paramsReady ||
     !adminChecked ||
     loadingTest
   ) {
@@ -1760,74 +1784,6 @@ export default function TestEditorPage() {
         </div>
 
         <div className="infoPanel">
-
-          <label className="categoryField">
-            <span>
-              Test turi
-            </span>
-
-            <select
-              value={testType}
-              onChange={(event) =>
-                setTestType(
-                  normalizeTestCategory(
-                    event.target.value
-                  )
-                )
-              }
-            >
-              <option value="legislation">
-                Qonunchilik hujjatlaridan test
-              </option>
-              <option value="thematic">
-                Mavzulashtirilgan test
-              </option>
-              <option value="block">
-                Blok test
-              </option>
-              <option value="national-certificate">
-                Milliy sertifikat testi
-              </option>
-              <option value="thirty">
-                30 talik test
-              </option>
-              <option value="custom">
-                Boshqa test
-              </option>
-            </select>
-          </label>
-
-          {testType === "custom" && (
-            <label className="customCategoryField">
-              <span>
-                Test turining nomi
-              </span>
-
-              <input
-                value={customTestTypeName}
-                onChange={(event) =>
-                  setCustomTestTypeName(
-                    event.target.value
-                  )
-                }
-                placeholder="Masalan: Final nazorat testi"
-              />
-            </label>
-          )}
-
-          <div className="selectedTypeBanner">
-            <span>
-              Tanlangan bo‘lim
-            </span>
-            <strong>
-              {testType === "custom"
-                ? customTestTypeName.trim() ||
-                  "Boshqa test"
-                : TEST_CATEGORY_LABELS[
-                    testType
-                  ]}
-            </strong>
-          </div>
 
           <label>
             <span>
@@ -2444,9 +2400,6 @@ export default function TestEditorPage() {
           <div
             ref={canvasRef}
             className="shapeCanvas"
-            tabIndex={0}
-            onPaste={handleCanvasPaste}
-            title="Rasmni shu maydonga Ctrl+V bilan ham joylashingiz mumkin"
             onMouseDown={(
               e
             ) => {
@@ -2459,7 +2412,8 @@ export default function TestEditorPage() {
           >
 
             <div className="canvasHint">
-              Shakllarni shu maydonda joylashtiring · Rasm uchun Ctrl+V ham ishlaydi
+              Shakllarni shu maydonda
+              joylashtiring
             </div>
 
             {activeQuestion
@@ -3258,86 +3212,6 @@ export default function TestEditorPage() {
           text-align: left;
         }
 
-
-        .categoryField,
-        .customCategoryField {
-          min-width: 0;
-        }
-
-        .categoryField select {
-          width: 100%;
-          min-height: 45px;
-          padding: 8px 12px;
-          border: 2px solid #65747d;
-          border-radius: 10px;
-          color: #123548;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #e8eef1 100%
-            );
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.95),
-            0 3px 0 #6d7a81;
-          font-family: inherit;
-          font-size: 15px;
-          font-weight: 800;
-          outline: none;
-          cursor: pointer;
-        }
-
-        .categoryField select:focus {
-          border-color: #168fc8;
-          box-shadow:
-            0 0 0 3px rgba(22,143,200,.15),
-            0 3px 0 #477a92;
-        }
-
-        .customCategoryField input {
-          border-color: #bf8b24 !important;
-          background:
-            linear-gradient(
-              180deg,
-              #fffdf5 0%,
-              #fff0bd 100%
-            ) !important;
-        }
-
-        .selectedTypeBanner {
-          min-height: 72px;
-          padding: 11px 14px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 4px;
-          border: 2px solid #175275;
-          border-radius: 11px;
-          color: #073b68;
-          background:
-            linear-gradient(
-              180deg,
-              #ddf7ff 0%,
-              #8dd2ef 100%
-            );
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.9),
-            0 4px 0 #174760;
-        }
-
-        .selectedTypeBanner span {
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: .7px;
-          text-transform: uppercase;
-          opacity: .78;
-        }
-
-        .selectedTypeBanner strong {
-          font-size: 16px;
-          line-height: 1.15;
-        }
-
         .descriptionField {
           grid-column:
             1 / -1;
@@ -3897,7 +3771,7 @@ export default function TestEditorPage() {
 
         .hiddenImageInput { display: none; }
         .imageButton { min-width: 150px; }
-        .imageShapeBody { width:100%; height:100%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:transparent; border-style:solid; box-sizing:border-box; }
+        .imageShapeBody { width:100%; height:100%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#fff; border-style:solid; }
         .imageShapeBody img { width:100%; height:100%; display:block; user-select:none; pointer-events:none; }
         .settingsHeading { width:100%; font-size:20px; color:#073b68; padding-bottom:8px; border-bottom:1px solid #888; }
         .shapeSettings .activeSetting { color:#fff; background:linear-gradient(#3197d0,#17628d); }
