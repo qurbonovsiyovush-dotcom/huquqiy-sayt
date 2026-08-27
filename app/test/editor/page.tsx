@@ -278,6 +278,41 @@ function TestEditorPageContent() {
     setFontSize,
   ] = useState("18");
 
+
+  /* =======================================================
+     30 TADAN SAVOL YUKLASH
+  ======================================================= */
+
+  const PAGE_SIZE = 30;
+
+  const [
+    questionPage,
+    setQuestionPage,
+  ] = useState(1);
+
+  const [
+    totalQuestions,
+    setTotalQuestions,
+  ] = useState(0);
+
+  const [
+    totalQuestionPages,
+    setTotalQuestionPages,
+  ] = useState(1);
+
+  const [
+    pageStartIndex,
+    setPageStartIndex,
+  ] = useState(0);
+
+  const [
+    pageLoading,
+    setPageLoading,
+  ] = useState(false);
+
+  const loadedTestStatusRef =
+    useRef<TestStatus>("draft");
+
   /* =======================================================
      ACTIVE QUESTION
   ======================================================= */
@@ -359,8 +394,266 @@ function TestEditorPageContent() {
   }, [router]);
 
   /* =======================================================
-     EXISTING TEST LOAD
+     EXISTING TEST LOAD — FAQAT 30 TA SAVOL
   ======================================================= */
+
+  async function loadQuestionPage(
+    page: number,
+    options?: {
+      skipPersist?: boolean;
+    }
+  ) {
+    if (!editingId) {
+      return;
+    }
+
+    setPageLoading(true);
+
+    try {
+      /*
+        Boshqa 30 talikka o‘tishdan oldin hozirgi sahifadagi
+        o‘zgarishlarni serverga kichik patch sifatida saqlaymiz.
+      */
+      if (
+        !options?.skipPersist &&
+        originalQuestionsRef.current.length >
+          0
+      ) {
+        const currentHtml =
+          editorRef.current
+            ?.innerHTML ??
+          activeQuestion
+            ?.questionHtml ??
+          "";
+
+        const currentPageQuestions =
+          questions.map(
+            (question) =>
+              question.id ===
+              activeQuestion?.id
+                ? {
+                    ...question,
+                    questionHtml:
+                      currentHtml,
+                  }
+                : question
+          );
+
+        const originalMap =
+          new Map(
+            originalQuestionsRef.current.map(
+              (question) => [
+                String(
+                  question.id
+                ),
+                question,
+              ]
+            )
+          );
+
+        const changedQuestions =
+          currentPageQuestions.filter(
+            (question) => {
+              const before =
+                originalMap.get(
+                  String(
+                    question.id
+                  )
+                );
+
+              return (
+                !before ||
+                JSON.stringify(
+                  before
+                ) !==
+                  JSON.stringify(
+                    question
+                  )
+              );
+            }
+          );
+
+        if (
+          changedQuestions.length >
+          0
+        ) {
+          const saveResponse =
+            await fetch(
+              "/api/tests",
+              {
+                method: "POST",
+                credentials:
+                  "include",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    action:
+                      "patch-test",
+
+                    testId:
+                      editingId,
+
+                    changedQuestions,
+                  }),
+              }
+            );
+
+          const saveData =
+            await saveResponse.json();
+
+          if (
+            !saveResponse.ok ||
+            !saveData.success
+          ) {
+            throw new Error(
+              saveData.message ||
+                "Joriy sahifadagi o‘zgarishlarni saqlab bo‘lmadi."
+            );
+          }
+        }
+      }
+
+      const response =
+        await fetch(
+          "/api/tests",
+          {
+            method: "POST",
+            credentials:
+              "include",
+            cache: "no-store",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "load-editor-page",
+                testId:
+                  editingId,
+                page,
+                pageSize:
+                  PAGE_SIZE,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.test
+      ) {
+        throw new Error(
+          data.message ||
+            "Test topilmadi."
+        );
+      }
+
+      const test =
+        data.test as TestData;
+
+      setTitle(
+        test.title || ""
+      );
+
+      setSubject(
+        test.subject || ""
+      );
+
+      setDuration(
+        Number(
+          test.duration
+        ) || 30
+      );
+
+      setDescription(
+        test.description ||
+          ""
+      );
+
+      loadedTestStatusRef.current =
+        test.status ===
+        "published"
+          ? "published"
+          : "draft";
+
+      const loadedQuestions:
+        TestQuestion[] =
+        Array.isArray(
+          data.questions
+        ) &&
+        data.questions.length >
+          0
+          ? data.questions
+          : [
+              makeQuestion(),
+            ];
+
+      setQuestions(
+        loadedQuestions
+      );
+
+      originalQuestionsRef.current =
+        loadedQuestions.map(
+          (question) =>
+            JSON.parse(
+              JSON.stringify(
+                question
+              )
+            )
+        );
+
+      setActiveQuestionId(
+        loadedQuestions[0].id
+      );
+
+      setSelectedShapeId(
+        null
+      );
+
+      const pagination =
+        data.pagination || {};
+
+      setQuestionPage(
+        Number(
+          pagination.page
+        ) || page
+      );
+
+      setTotalQuestions(
+        Number(
+          pagination.totalQuestions
+        ) || 0
+      );
+
+      setTotalQuestionPages(
+        Math.max(
+          1,
+          Number(
+            pagination.totalPages
+          ) || 1
+        )
+      );
+
+      setPageStartIndex(
+        Number(
+          pagination.startIndex
+        ) || 0
+      );
+    } finally {
+      setPageLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (
@@ -370,111 +663,64 @@ function TestEditorPageContent() {
       return;
     }
 
-    async function loadTest() {
-      setLoadingTest(
-        true
-      );
+    setLoadingTest(true);
 
-      try {
-        const response =
-          await fetch(
-            `/api/tests/${encodeURIComponent(
-              editingId!
-            )}`,
-            {
-              cache:
-                "no-store",
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (
-          !response.ok ||
-          !data.success ||
-          !data.test
-        ) {
+    loadQuestionPage(
+      1,
+      {
+        skipPersist: true,
+      }
+    )
+      .catch(
+        (error) => {
           alert(
-            data.message ||
-              "Test topilmadi."
+            error instanceof Error
+              ? error.message
+              : "Testni yuklashda server xatosi."
           );
 
           router.replace(
-            "/test"
+            "/admin/tests"
           );
-
-          return;
         }
-
-        const test =
-          data.test as TestData;
-
-        setTitle(
-          test.title || ""
-        );
-
-        setSubject(
-          test.subject || ""
-        );
-
-        setDuration(
-          Number(
-            test.duration
-          ) || 30
-        );
-
-        setDescription(
-          test.description ||
-            ""
-        );
-
-        const loadedQuestions =
-          Array.isArray(
-            test.questions
-          ) &&
-          test.questions.length >
-            0
-            ? test.questions
-            : [
-                makeQuestion(),
-              ];
-
-        setQuestions(
-          loadedQuestions
-        );
-
-        /*
-          Dastlabki holat nusxasi.
-          Keyin saqlashda faqat o‘zgargan/yangi/o‘chirilgan savollar yuboriladi.
-        */
-        originalQuestionsRef.current =
-          loadedQuestions.map((question) =>
-            JSON.parse(
-              JSON.stringify(question)
-            )
-          );
-
-        setActiveQuestionId(
-          loadedQuestions[0].id
-        );
-      } catch {
-        alert(
-          "Testni yuklashda server xatosi."
-        );
-      } finally {
-        setLoadingTest(
-          false
-        );
-      }
-    }
-
-    loadTest();
+      )
+      .finally(() => {
+        setLoadingTest(false);
+      });
+    // Birinchi yuklash faqat editingId/admin o‘zgarganda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     adminChecked,
     editingId,
     router,
   ]);
+
+  async function goToQuestionPage(
+    nextPage: number
+  ) {
+    if (
+      pageLoading ||
+      nextPage < 1 ||
+      nextPage >
+        totalQuestionPages ||
+      nextPage ===
+        questionPage
+    ) {
+      return;
+    }
+
+    try {
+      await loadQuestionPage(
+        nextPage
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Savollarni yuklashda xato."
+      );
+    }
+  }
 
   /* =======================================================
      QUESTION UPDATE
@@ -1414,30 +1660,11 @@ function TestEditorPageContent() {
                 )
             );
 
-        const originalOrder =
-          original.map(
-            (question) =>
-              String(
-                question.id
-              )
-          );
-
-        const currentOrder =
-          payloadQuestions.map(
-            (question) =>
-              String(
-                question.id
-              )
-          );
-
-        const orderChanged =
-          originalOrder.length !==
-            currentOrder.length ||
-          originalOrder.some(
-            (id, index) =>
-              id !==
-              currentOrder[index]
-          );
+        /*
+          Pagination rejimida brauzerda faqat 30 ta savol bor.
+          Shu sabab 30 ta IDni global 780 ta savol tartibi deb
+          serverga yubormaymiz.
+        */
 
         const response =
           await fetch(
@@ -1483,9 +1710,7 @@ function TestEditorPageContent() {
                   deletedQuestionIds,
 
                   questionOrder:
-                    orderChanged
-                      ? currentOrder
-                      : undefined,
+                    undefined,
                 }),
             }
           );
@@ -1882,6 +2107,60 @@ function TestEditorPageContent() {
 
       <section className="questionBar">
 
+        <div className="questionPageControls">
+
+          <button
+            className="pageArrow"
+            disabled={
+              pageLoading ||
+              questionPage <= 1
+            }
+            onClick={() =>
+              goToQuestionPage(
+                questionPage - 1
+              )
+            }
+          >
+            ← Oldingi 30 ta
+          </button>
+
+          <div className="questionPageInfo">
+            <strong>
+              Jami: {totalQuestions} ta savol
+            </strong>
+
+            <span>
+              Hozir:{" "}
+              {totalQuestions === 0
+                ? 0
+                : pageStartIndex + 1}
+              –
+              {Math.min(
+                pageStartIndex +
+                  questions.length,
+                totalQuestions
+              )}
+            </span>
+          </div>
+
+          <button
+            className="pageArrow"
+            disabled={
+              pageLoading ||
+              questionPage >=
+                totalQuestionPages
+            }
+            onClick={() =>
+              goToQuestionPage(
+                questionPage + 1
+              )
+            }
+          >
+            Keyingi 30 ta →
+          </button>
+
+        </div>
+
         <div className="questionTabs">
 
           {questions.map(
@@ -1911,7 +2190,9 @@ function TestEditorPageContent() {
                   );
                 }}
               >
-                {index + 1}
+                {pageStartIndex +
+                  index +
+                  1}
               </button>
             )
           )}
@@ -3266,6 +3547,61 @@ function TestEditorPageContent() {
             );
         }
 
+        .questionPageControls {
+          width: 100%;
+          display: grid;
+          grid-template-columns:
+            minmax(160px, 1fr)
+            auto
+            minmax(160px, 1fr);
+          align-items: center;
+          gap: 14px;
+          margin-bottom: 16px;
+        }
+
+        .questionPageInfo {
+          min-width: 210px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          padding: 10px 18px;
+          border: 2px solid #777;
+          border-radius: 10px;
+          background: #f1f1f1;
+          color: #1b1b1b;
+        }
+
+        .questionPageInfo strong {
+          font-size: 17px;
+        }
+
+        .questionPageInfo span {
+          font-size: 14px;
+          font-weight: 700;
+          color: #555;
+        }
+
+        .pageArrow {
+          min-height: 46px;
+          padding: 8px 18px;
+          border: 2px solid #555;
+          border-radius: 9px;
+          background:
+            linear-gradient(
+              #ffffff,
+              #cfcfcf
+            );
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .pageArrow:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
         .questionTabs {
           display: flex;
           gap: 8px;
@@ -4199,6 +4535,12 @@ function TestEditorPageContent() {
         @media (
           max-width: 950px
         ) {
+
+          .questionPageControls {
+            grid-template-columns: 1fr;
+          }
+
+
 
           .infoPanel {
             grid-template-columns:
