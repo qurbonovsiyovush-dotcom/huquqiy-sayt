@@ -1,18 +1,12 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { get, put } from "@vercel/blob";
-import fs from "fs";
-import path from "path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const BLOB_PATH = "huquqiy-sayt/tests.json";
-
-const LEGACY_TESTS_FILE = path.join(
-  process.cwd(),
-  "data-storage",
-  "tests.json"
-);
+const TESTS_BLOB_PATH = "huquqiy-sayt/tests.json";
 
 type TestStatus = "draft" | "published";
 
@@ -24,626 +18,304 @@ type TestData = {
   description?: string;
   status?: TestStatus;
   questions?: unknown[];
+  testType?: string;
+  customTestTypeName?: string;
+  attemptLimit?: number | null;
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
 };
 
-function normalizeTests(value: unknown): TestData[] {
-  return Array.isArray(value)
-    ? (value as TestData[])
-    : [];
+async function isAdmin() {
+  const cookieStore = await cookies();
+  return Boolean(
+    cookieStore.get("qurbonov_session")?.value &&
+    cookieStore.get("qurbonov_role")?.value === "admin"
+  );
 }
 
-function readLegacyTests(): TestData[] {
-  try {
-    if (!fs.existsSync(LEGACY_TESTS_FILE)) {
-      return [];
-    }
-
-    const content = fs.readFileSync(
-      LEGACY_TESTS_FILE,
-      "utf-8"
-    );
-
-    if (!content.trim()) {
-      return [];
-    }
-
-    return normalizeTests(JSON.parse(content));
-  } catch (error) {
-    console.error(
-      "LEGACY tests.json O‘QISH XATOSI:",
-      error
-    );
-
-    return [];
-  }
-}
-
-async function writeTests(
-  tests: TestData[]
-) {
+function checkBlobToken() {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error("BLOB_READ_WRITE_TOKEN topilmadi.");
+  }
+}
+
+function normalizeTests(value: unknown): TestData[] {
+  if (!Array.isArray(value)) {
+    throw new Error("tests.json formati noto‘g‘ri.");
+  }
+  return value as TestData[];
+}
+
+async function readTests(): Promise<TestData[]> {
+  checkBlobToken();
+
+  const result = await get(TESTS_BLOB_PATH, {
+    access: "private",
+  });
+
+  if (!result || result.statusCode !== 200 || !result.stream) {
     throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
+      `tests.json o‘qilmadi. Status: ${result?.statusCode ?? "noma'lum"}`
     );
   }
+
+  const text = await new Response(result.stream).text();
+
+  if (!text.trim()) {
+    throw new Error("tests.json bo‘sh.");
+  }
+
+  return normalizeTests(JSON.parse(text));
+}
+
+async function writeTests(tests: TestData[]) {
+  checkBlobToken();
 
   await put(
-    BLOB_PATH,
-    JSON.stringify(
-      tests,
-      null,
-      2
-    ),
+    TESTS_BLOB_PATH,
+    JSON.stringify(tests, null, 2),
     {
       access: "private",
       addRandomSuffix: false,
       allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge: 60,
+      contentType: "application/json; charset=utf-8",
+      cacheControlMaxAge: 0,
     }
   );
 }
 
-async function readTests(): Promise<TestData[]> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-
-  try {
-    const result = await get(
-      BLOB_PATH,
-      {
-        access: "private",
-      }
-    );
-
-    if (
-      !result ||
-      result.statusCode !== 200 ||
-      !result.stream
-    ) {
-      const legacyTests =
-        readLegacyTests();
-
-      await writeTests(
-        legacyTests
-      );
-
-      return legacyTests;
-    }
-
-    const text =
-      await new Response(
-        result.stream
-      ).text();
-
-    if (!text.trim()) {
-      return [];
-    }
-
-    return normalizeTests(
-      JSON.parse(text)
-    );
-  } catch (error) {
-    console.error(
-      "BLOB O‘QISH XATOSI:",
-      error
-    );
-
-    /*
-      Blob hali yaratilmagan bo‘lishi mumkin.
-      Shunda eski tests.json'dan bir marta olib o'tamiz.
-    */
-    const legacyTests =
-      readLegacyTests();
-
-    try {
-      await writeTests(
-        legacyTests
-      );
-
-      return legacyTests;
-    } catch (writeError) {
-      console.error(
-        "BLOB MIGRATSIYA XATOSI:",
-        writeError
-      );
-
-      throw writeError;
-    }
-  }
-}
-
 async function getId(
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const params =
-    await context.params;
-
-  return decodeURIComponent(
-    String(
-      params.id || ""
-    )
-  ).trim();
+  const params = await context.params;
+  return decodeURIComponent(String(params?.id || "")).trim();
 }
-
-/* =========================================================
-   GET
-========================================================= */
 
 export async function GET(
-  request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id =
-      await getId(context);
+    const id = await getId(context);
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID berilmagan.",
-        },
-        {
-          status: 400,
-        }
+        { success: false, message: "Test ID topilmadi." },
+        { status: 400 }
       );
     }
 
-    const tests =
-      await readTests();
-
-    const test =
-      tests.find(
-        (item) =>
-          String(item.id) ===
-          String(id)
-      );
+    const tests = await readTests();
+    const test = tests.find((item) => item.id === id);
 
     if (!test) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test topilmadi.",
-        },
-        {
-          status: 404,
-        }
+        { success: false, message: "Test topilmadi." },
+        { status: 404 }
       );
     }
 
     return NextResponse.json(
+      { success: true, test },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("GET /api/tests/[id] ERROR:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Testni yuklashda server xatosi.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Bu amal faqat administrator uchun.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const id = await getId(context);
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "Test ID topilmadi." },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const tests = await readTests();
+
+    const index = tests.findIndex((item) => item.id === id);
+
+    if (index < 0) {
+      return NextResponse.json(
+        { success: false, message: "Test topilmadi." },
+        { status: 404 }
+      );
+    }
+
+    const current = tests[index];
+
+    const requestedStatus: TestStatus =
+      body?.status === "published"
+        ? "published"
+        : body?.status === "draft"
+        ? "draft"
+        : current.status === "published"
+        ? "published"
+        : "draft";
+
+    const nextQuestions = Array.isArray(body?.questions)
+      ? body.questions
+      : Array.isArray(current.questions)
+      ? current.questions
+      : [];
+
+    if (
+      requestedStatus === "published" &&
+      nextQuestions.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Savolsiz testni e’lon qilib bo‘lmaydi.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    const updatedTest: TestData = {
+      ...current,
+      ...body,
+      id: current.id,
+      questions: nextQuestions,
+      status: requestedStatus,
+      createdAt:
+        current.createdAt ||
+        String(body?.createdAt || now),
+      updatedAt: now,
+    };
+
+    tests[index] = updatedTest;
+
+    await writeTests(tests);
+
+    return NextResponse.json(
       {
         success: true,
-        test,
+        message:
+          requestedStatus === "published"
+            ? "Test muvaffaqiyatli e’lon qilindi."
+            : "Test qoralama holatida saqlandi.",
+        test: updatedTest,
       },
       {
         status: 200,
         headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
         },
       }
     );
   } catch (error) {
-    console.error(
-      "GET /api/tests/[id] ERROR:",
-      error
-    );
+    console.error("PUT /api/tests/[id] ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
         message:
-          "Testni yuklashda server xatosi yuz berdi.",
+          error instanceof Error
+            ? error.message
+            : "Testni yangilashda server xatosi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
-
-/* =========================================================
-   PUT
-========================================================= */
-
-export async function PUT(
-  request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
-) {
-  try {
-    const id =
-      await getId(context);
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID berilmagan.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const body =
-      await request.json();
-
-    const tests =
-      await readTests();
-
-    const index =
-      tests.findIndex(
-        (item) =>
-          String(item.id) ===
-          String(id)
-      );
-
-    if (index === -1) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const oldTest =
-      tests[index];
-
-    const title =
-      String(
-        body?.title ??
-          oldTest.title ??
-          ""
-      ).trim();
-
-    if (!title) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test nomi kiritilmagan.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const questions =
-      Array.isArray(
-        body?.questions
-      )
-        ? body.questions
-        : Array.isArray(
-            oldTest.questions
-          )
-        ? oldTest.questions
-        : [];
-
-    if (
-      questions.length === 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Kamida bitta savol bo‘lishi kerak.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const updatedTest: TestData = {
-      ...oldTest,
-      ...body,
-
-      id: oldTest.id,
-
-      title,
-
-      subject: String(
-        body?.subject ??
-          oldTest.subject ??
-          ""
-      ).trim(),
-
-      duration: Math.max(
-        1,
-        Number(
-          body?.duration ??
-            oldTest.duration
-        ) || 30
-      ),
-
-      description:
-        String(
-          body?.description ??
-            oldTest.description ??
-            ""
-        ),
-
-      questions,
-
-      status:
-        body?.status === "published"
-          ? "published"
-          : body?.status === "draft"
-          ? "draft"
-          : oldTest.status || "draft",
-
-      createdAt:
-        oldTest.createdAt ||
-        new Date().toISOString(),
-
-      updatedAt:
-        new Date().toISOString(),
-    };
-
-    tests[index] =
-      updatedTest;
-
-    await writeTests(
-      tests
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        message:
-          "Test muvaffaqiyatli yangilandi.",
-        test: updatedTest,
-      },
-      {
-        status: 200,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "PUT /api/tests/[id] ERROR:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Testni yangilashda server xatosi yuz berdi.",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-/* =========================================================
-   PATCH
-========================================================= */
-
-export async function PATCH(
-  request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
-) {
-  try {
-    const id =
-      await getId(context);
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID berilmagan.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const body =
-      await request.json();
-
-    const tests =
-      await readTests();
-
-    const index =
-      tests.findIndex(
-        (item) =>
-          String(item.id) ===
-          String(id)
-      );
-
-    if (index === -1) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
-
-    const oldTest =
-      tests[index];
-
-    const updatedTest: TestData = {
-      ...oldTest,
-      ...body,
-
-      id: oldTest.id,
-
-      createdAt:
-        oldTest.createdAt,
-
-      updatedAt:
-        new Date().toISOString(),
-    };
-
-    tests[index] =
-      updatedTest;
-
-    await writeTests(
-      tests
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        message:
-          "Test yangilandi.",
-        test: updatedTest,
-      },
-      {
-        status: 200,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "PATCH /api/tests/[id] ERROR:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Testni yangilashda xatolik yuz berdi.",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-/* =========================================================
-   DELETE
-========================================================= */
 
 export async function DELETE(
-  request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id =
-      await getId(context);
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Bu amal faqat administrator uchun.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const id = await getId(context);
 
     if (!id) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID berilmagan.",
-        },
-        {
-          status: 400,
-        }
+        { success: false, message: "Test ID topilmadi." },
+        { status: 400 }
       );
     }
 
-    const tests =
-      await readTests();
+    const tests = await readTests();
+    const index = tests.findIndex((item) => item.id === id);
 
-    const exists =
-      tests.some(
-        (item) =>
-          String(item.id) ===
-          String(id)
-      );
-
-    if (!exists) {
+    if (index < 0) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test topilmadi.",
-        },
-        {
-          status: 404,
-        }
+        { success: false, message: "Test topilmadi." },
+        { status: 404 }
       );
     }
 
-    const remainingTests =
-      tests.filter(
-        (item) =>
-          String(item.id) !==
-          String(id)
-      );
+    const deletedTest = tests[index];
+    const nextTests = tests.filter((item) => item.id !== id);
 
-    await writeTests(
-      remainingTests
-    );
+    await writeTests(nextTests);
 
     return NextResponse.json(
       {
         success: true,
-        message:
-          "Test butunlay o‘chirildi.",
+        message: "Test o‘chirildi.",
+        test: deletedTest,
       },
-      {
-        status: 200,
-      }
+      { status: 200 }
     );
   } catch (error) {
-    console.error(
-      "DELETE /api/tests/[id] ERROR:",
-      error
-    );
+    console.error("DELETE /api/tests/[id] ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
         message:
-          "Testni o‘chirishda server xatosi yuz berdi.",
+          error instanceof Error
+            ? error.message
+            : "Testni o‘chirishda server xatosi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
