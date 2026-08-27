@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { del, get, list, put } from "@vercel/blob";
 import crypto from "crypto";
 
@@ -883,6 +884,162 @@ async function finalizeChunkedTest(
   );
 }
 
+
+/* =========================================================
+   TEST STATUSINI O‘ZGARTIRISH
+
+   Katta testlarda (780/840 ta savol) butun testni qayta PUT qilmaymiz.
+   Faqat testId + status yuboriladi.
+========================================================= */
+
+async function setTestStatus(
+  body: any
+) {
+  const cookieStore =
+    await cookies();
+
+  const isAdmin =
+    Boolean(
+      cookieStore.get(
+        "qurbonov_session"
+      )?.value
+    ) &&
+    cookieStore.get(
+      "qurbonov_role"
+    )?.value === "admin";
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bu amal faqat administrator uchun.",
+      },
+      {
+        status: 403,
+      }
+    );
+  }
+
+  const testId =
+    String(
+      body?.testId || ""
+    ).trim();
+
+  if (!testId) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test ID topilmadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const status: TestStatus =
+    body?.status ===
+    "published"
+      ? "published"
+      : body?.status ===
+        "draft"
+      ? "draft"
+      : "draft";
+
+  const tests =
+    await readTests();
+
+  const index =
+    tests.findIndex(
+      (item) =>
+        item.id === testId
+    );
+
+  if (index < 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Test topilmadi.",
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  const current =
+    tests[index];
+
+  const questions =
+    Array.isArray(
+      current.questions
+    )
+      ? current.questions
+      : [];
+
+  if (
+    status === "published" &&
+    questions.length === 0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Savolsiz testni e’lon qilib bo‘lmaydi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const updatedTest: TestData = {
+    ...current,
+    status,
+    updatedAt:
+      new Date().toISOString(),
+  };
+
+  tests[index] =
+    updatedTest;
+
+  await writeTests(
+    tests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+      message:
+        status === "published"
+          ? "Test muvaffaqiyatli e’lon qilindi."
+          : "Test qoralama holatiga qaytarildi.",
+
+      /*
+        MUHIM:
+        780/840 ta savolli katta testni response ichida qaytarmaymiz.
+        Aks holda Vercel response hajmi limitiga urilishi mumkin.
+        Admin panelga faqat yangilangan metadata yetadi.
+      */
+      test: {
+        id: updatedTest.id,
+        status: updatedTest.status,
+        updatedAt: updatedTest.updatedAt,
+      },
+    },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
+}
+
 /* =========================================================
    LEGACY / NORMAL POST
 ========================================================= */
@@ -1042,6 +1199,15 @@ export async function POST(
       "finalize-chunked-test"
     ) {
       return await finalizeChunkedTest(
+        body
+      );
+    }
+
+    if (
+      action ===
+      "set-status"
+    ) {
+      return await setTestStatus(
         body
       );
     }
