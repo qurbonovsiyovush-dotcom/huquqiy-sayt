@@ -33,7 +33,7 @@ export default function QollanmalarPage() {
     {
       title: "Inglizcha lug‘atlar",
       subtitle: "English–Uzbek, Phrasal Verbs, Irregular Verbs va boshqalar",
-      href: "/dictionaries",
+      href: "/qollanmalar/dictionaries",
       badge: "L",
     },
   ];
@@ -1167,4 +1167,3 @@ export default function QollanmalarPage() {
     </main>
   );
 }
-
