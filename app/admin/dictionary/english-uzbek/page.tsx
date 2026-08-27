@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 type DictionaryWord = {
   id: string;
@@ -15,28 +20,51 @@ type ApiResponse = {
   message?: string;
   total?: number;
   words?: DictionaryWord[];
+  added?: number;
+  skipped?: number;
+  invalid?: number;
 };
 
-const API = "/api/dictionary/english-uzbek";
+const API =
+  "/api/dictionary/english-uzbek";
+
+const BULK_API =
+  "/api/dictionary/english-uzbek/bulk";
 
 export default function EnglishUzbekAdminPage() {
-  const [words, setWords] = useState<DictionaryWord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [words, setWords] =
+    useState<DictionaryWord[]>([]);
 
-  const [english, setEnglish] = useState("");
-  const [uzbek, setUzbek] = useState("");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [search, setSearch] = useState("");
+  const [english, setEnglish] =
+    useState("");
 
-  const [importText, setImportText] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState("");
+  const [uzbek, setUzbek] =
+    useState("");
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editEnglish, setEditEnglish] = useState("");
-  const [editUzbek, setEditUzbek] = useState("");
+  const [search, setSearch] =
+    useState("");
 
-  const [message, setMessage] = useState("");
+  const [importText, setImportText] =
+    useState("");
+
+  const [importing, setImporting] =
+    useState(false);
+
+  const [editingId, setEditingId] =
+    useState<string | null>(null);
+
+  const [editEnglish, setEditEnglish] =
+    useState("");
+
+  const [editUzbek, setEditUzbek] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
   const [messageType, setMessageType] =
     useState<"success" | "error" | "">("");
 
@@ -54,41 +82,47 @@ export default function EnglishUzbekAdminPage() {
     window.setTimeout(() => {
       setMessage("");
       setMessageType("");
-    }, 5000);
+    }, 6000);
   }
 
   /* =====================================================
      LUG'ATNI YUKLASH
   ===================================================== */
 
-  const loadWords = useCallback(async () => {
-    try {
-      setLoading(true);
+  const loadWords = useCallback(
+    async () => {
+      try {
+        setLoading(true);
 
-      const response = await fetch(API, {
-        cache: "no-store",
-      });
+        const response =
+          await fetch(API, {
+            cache: "no-store",
+          });
 
-      const data: ApiResponse = await response.json();
+        const data: ApiResponse =
+          await response.json();
 
-      if (!response.ok || !data.ok) {
-        throw new Error(
-          data.message || "Lug‘atni yuklab bo‘lmadi."
+        if (!response.ok || !data.ok) {
+          throw new Error(
+            data.message ||
+              "Lug‘atni yuklab bo‘lmadi."
+          );
+        }
+
+        setWords(data.words || []);
+      } catch (error) {
+        console.error(error);
+
+        showMessage(
+          "Lug‘atni yuklashda xatolik yuz berdi.",
+          "error"
         );
+      } finally {
+        setLoading(false);
       }
-
-      setWords(data.words || []);
-    } catch (error) {
-      console.error(error);
-
-      showMessage(
-        "Lug‘atni yuklashda xatolik yuz berdi.",
-        "error"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     loadWords();
@@ -119,24 +153,28 @@ export default function EnglishUzbekAdminPage() {
     }
 
     try {
-      const response = await fetch(API, {
-        method: "POST",
+      const response =
+        await fetch(API, {
+          method: "POST",
 
-        headers: {
-          "Content-Type": "application/json",
-        },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-        body: JSON.stringify({
-          english: en,
-          uzbek: uz,
-        }),
-      });
+          body: JSON.stringify({
+            english: en,
+            uzbek: uz,
+          }),
+        });
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok || !data.ok) {
         throw new Error(
-          data.message || "So‘zni qo‘shib bo‘lmadi."
+          data.message ||
+            "So‘zni qo‘shib bo‘lmadi."
         );
       }
 
@@ -150,28 +188,22 @@ export default function EnglishUzbekAdminPage() {
 
       await loadWords();
     } catch (error) {
-      const text =
+      showMessage(
         error instanceof Error
           ? error.message
-          : "Xatolik yuz berdi.";
-
-      showMessage(text, "error");
+          : "Xatolik yuz berdi.",
+        "error"
+      );
     }
   }
 
   /* =====================================================
      IMPORT MATNINI AJRATISH
-
-     QABUL QILADI:
-
-     1. plate - tarelka
-     2) name — ism
-     place = joy
-     table: stol
-     book    kitob
   ===================================================== */
 
-  function parseImportText(text: string) {
+  function parseImportText(
+    text: string
+  ) {
     const lines = text
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -186,13 +218,12 @@ export default function EnglishUzbekAdminPage() {
       let line = originalLine;
 
       /*
-        Boshidagi raqamni olib tashlaydi:
-
         1.
-        1)
-        125.
-        2700)
+        2)
+        150.
+        kabi raqamlarni olib tashlaydi.
       */
+
       line = line.replace(
         /^\s*\d+\s*[\.\)\-:]?\s*/,
         ""
@@ -201,10 +232,6 @@ export default function EnglishUzbekAdminPage() {
       let englishPart = "";
       let uzbekPart = "";
 
-      /*
-        Eng ishonchli ajratgichlar:
-        —  –  -  =  :
-      */
       const separators = [
         " — ",
         " – ",
@@ -218,7 +245,8 @@ export default function EnglishUzbekAdminPage() {
       let found = false;
 
       for (const separator of separators) {
-        const position = line.indexOf(separator);
+        const position =
+          line.indexOf(separator);
 
         if (position > 0) {
           englishPart = line
@@ -226,7 +254,10 @@ export default function EnglishUzbekAdminPage() {
             .trim();
 
           uzbekPart = line
-            .slice(position + separator.length)
+            .slice(
+              position +
+                separator.length
+            )
             .trim();
 
           found = true;
@@ -235,10 +266,13 @@ export default function EnglishUzbekAdminPage() {
       }
 
       /*
-        Agar yuqoridagi format bo'lmasa,
-        TAB bilan ajratilgan matnni tekshiradi.
+        TAB formatini ham qabul qiladi.
       */
-      if (!found && line.includes("\t")) {
+
+      if (
+        !found &&
+        line.includes("\t")
+      ) {
         const parts = line
           .split("\t")
           .map((part) => part.trim())
@@ -246,22 +280,27 @@ export default function EnglishUzbekAdminPage() {
 
         if (parts.length >= 2) {
           englishPart = parts[0];
-          uzbekPart = parts.slice(1).join(", ");
+
+          uzbekPart = parts
+            .slice(1)
+            .join(", ");
+
           found = true;
         }
       }
 
-      /*
-        Noto'g'ri satrni o'tkazib yuboramiz.
-      */
-      if (!found) {
-        continue;
-      }
+      if (!found) continue;
 
-      englishPart = englishPart.trim();
-      uzbekPart = uzbekPart.trim();
+      englishPart =
+        englishPart.trim();
 
-      if (!englishPart || !uzbekPart) {
+      uzbekPart =
+        uzbekPart.trim();
+
+      if (
+        !englishPart ||
+        !uzbekPart
+      ) {
         continue;
       }
 
@@ -274,106 +313,78 @@ export default function EnglishUzbekAdminPage() {
     return result;
   }
 
-  const parsedPreview = useMemo(
-    () => parseImportText(importText),
-    [importText]
-  );
+  /* =====================================================
+     IMPORT PREVIEW
+  ===================================================== */
+
+  const parsedPreview =
+    useMemo(() => {
+      return parseImportText(
+        importText
+      );
+    }, [importText]);
 
   /* =====================================================
-     OMMAVIY IMPORT
+     BULK IMPORT
+
+     ENDI HAMMASI BITTA REQUESTDA!
   ===================================================== */
 
   async function importWords() {
-    const parsed = parseImportText(importText);
+    const parsed =
+      parseImportText(importText);
 
     if (parsed.length === 0) {
       showMessage(
         "Import qilinadigan so‘zlar topilmadi.",
         "error"
       );
+
       return;
     }
 
-    const confirmed = window.confirm(
-      `${parsed.length} ta so‘z aniqlandi.\n\n` +
-        `Ularni lug‘atga import qilamizmi?`
-    );
+    const confirmed =
+      window.confirm(
+        `${parsed.length} ta so‘z aniqlandi.\n\n` +
+          `Hammasini lug‘atga import qilamizmi?`
+      );
 
     if (!confirmed) return;
 
     try {
       setImporting(true);
 
-      let added = 0;
-      let skipped = 0;
-      let failed = 0;
-
       /*
-        Bir vaqtning o'zida 2700 ta request
-        yubormaymiz.
+        MUHIM:
+        2700 ta alohida request EMAS.
 
-        10 tadan guruhlab yuboramiz.
-      */
-      const batchSize = 10;
-
-      for (
-        let start = 0;
-        start < parsed.length;
-        start += batchSize
-      ) {
-        const batch = parsed.slice(
-          start,
-          start + batchSize
-        );
-
-        const results = await Promise.all(
-          batch.map(async (word) => {
-            try {
-              const response = await fetch(API, {
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-
-                body: JSON.stringify(word),
-              });
-
-              const data = await response.json();
-
-              if (response.status === 409) {
-                return "skipped";
-              }
-
-              if (!response.ok || !data.ok) {
-                return "failed";
-              }
-
-              return "added";
-            } catch {
-              return "failed";
-            }
-          })
-        );
-
-        for (const result of results) {
-          if (result === "added") {
-            added++;
-          } else if (result === "skipped") {
-            skipped++;
-          } else {
-            failed++;
-          }
+        Bitta requestda:
+        {
+          words: [...]
         }
+      */
 
-        const processed = Math.min(
-          start + batchSize,
-          parsed.length
-        );
+      const response =
+        await fetch(BULK_API, {
+          method: "POST",
 
-        setImportProgress(
-          `${processed} / ${parsed.length}`
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            words: parsed,
+          }),
+        });
+
+      const data: ApiResponse =
+        await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.message ||
+            "Import amalga oshmadi."
         );
       }
 
@@ -382,22 +393,42 @@ export default function EnglishUzbekAdminPage() {
       await loadWords();
 
       showMessage(
-        `Import tugadi. Qo‘shildi: ${added} ta. ` +
-          `Mavjud bo‘lgani uchun o‘tkazildi: ${skipped} ta. ` +
-          `Xato: ${failed} ta.`,
-        failed > 0 ? "error" : "success"
+        `Import muvaffaqiyatli tugadi. ` +
+          `Qo‘shildi: ${
+            data.added ?? 0
+          } ta. ` +
+          `Takroriy: ${
+            data.skipped ?? 0
+          } ta. ` +
+          `Noto‘g‘ri satr: ${
+            data.invalid ?? 0
+          } ta. ` +
+          `Jami lug‘at: ${
+            data.total ?? 0
+          } ta.`,
+        "success"
+      );
+    } catch (error) {
+      console.error(error);
+
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : "Import vaqtida xatolik yuz berdi.",
+        "error"
       );
     } finally {
       setImporting(false);
-      setImportProgress("");
     }
   }
 
   /* =====================================================
-     TAHRIRLASHNI BOSHLASH
+     TAHRIRLASH
   ===================================================== */
 
-  function startEdit(word: DictionaryWord) {
+  function startEdit(
+    word: DictionaryWord
+  ) {
     setEditingId(word.id);
     setEditEnglish(word.english);
     setEditUzbek(word.uzbek);
@@ -409,45 +440,43 @@ export default function EnglishUzbekAdminPage() {
     setEditUzbek("");
   }
 
-  /* =====================================================
-     TAHRIRLANGAN SO'ZNI SAQLASH
-  ===================================================== */
-
   async function saveEdit() {
     if (!editingId) return;
 
-    if (!editEnglish.trim()) {
-      showMessage(
-        "Inglizcha so‘z bo‘sh bo‘lishi mumkin emas.",
-        "error"
-      );
-      return;
-    }
+    const en =
+      editEnglish.trim();
 
-    if (!editUzbek.trim()) {
+    const uz =
+      editUzbek.trim();
+
+    if (!en || !uz) {
       showMessage(
-        "Tarjima bo‘sh bo‘lishi mumkin emas.",
+        "So‘z va tarjima bo‘sh bo‘lishi mumkin emas.",
         "error"
       );
+
       return;
     }
 
     try {
-      const response = await fetch(API, {
-        method: "PUT",
+      const response =
+        await fetch(API, {
+          method: "PUT",
 
-        headers: {
-          "Content-Type": "application/json",
-        },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-        body: JSON.stringify({
-          id: editingId,
-          english: editEnglish.trim(),
-          uzbek: editUzbek.trim(),
-        }),
-      });
+          body: JSON.stringify({
+            id: editingId,
+            english: en,
+            uzbek: uz,
+          }),
+        });
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok || !data.ok) {
         throw new Error(
@@ -465,12 +494,12 @@ export default function EnglishUzbekAdminPage() {
         "success"
       );
     } catch (error) {
-      const text =
+      showMessage(
         error instanceof Error
           ? error.message
-          : "Xatolik yuz berdi.";
-
-      showMessage(text, "error");
+          : "Xatolik yuz berdi.",
+        "error"
+      );
     }
   }
 
@@ -478,32 +507,43 @@ export default function EnglishUzbekAdminPage() {
      O'CHIRISH
   ===================================================== */
 
-  async function deleteWord(word: DictionaryWord) {
-    const confirmed = window.confirm(
-      `“${word.english} — ${word.uzbek}”\n\n` +
-        `so‘zini lug‘atdan o‘chirasizmi?`
-    );
+  async function deleteWord(
+    word: DictionaryWord
+  ) {
+    const confirmed =
+      window.confirm(
+        `“${word.english} — ${word.uzbek}”\n\n` +
+          `so‘zini o‘chirasizmi?`
+      );
 
     if (!confirmed) return;
 
     try {
-      const response = await fetch(
-        `${API}?id=${encodeURIComponent(word.id)}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response =
+        await fetch(
+          `${API}?id=${encodeURIComponent(
+            word.id
+          )}`,
+          {
+            method: "DELETE",
+          }
+        );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok || !data.ok) {
         throw new Error(
-          data.message || "So‘zni o‘chirib bo‘lmadi."
+          data.message ||
+            "So‘zni o‘chirib bo‘lmadi."
         );
       }
 
       setWords((old) =>
-        old.filter((item) => item.id !== word.id)
+        old.filter(
+          (item) =>
+            item.id !== word.id
+        )
       );
 
       showMessage(
@@ -511,12 +551,12 @@ export default function EnglishUzbekAdminPage() {
         "success"
       );
     } catch (error) {
-      const text =
+      showMessage(
         error instanceof Error
           ? error.message
-          : "Xatolik yuz berdi.";
-
-      showMessage(text, "error");
+          : "Xatolik yuz berdi.",
+        "error"
+      );
     }
   }
 
@@ -524,43 +564,56 @@ export default function EnglishUzbekAdminPage() {
      QIDIRUV
   ===================================================== */
 
-  const filteredWords = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const filteredWords =
+    useMemo(() => {
+      const q = search
+        .trim()
+        .toLowerCase();
 
-    if (!q) return words;
+      if (!q) return words;
 
-    return words.filter(
-      (word) =>
-        word.english
-          .toLowerCase()
-          .includes(q) ||
-        word.uzbek
-          .toLowerCase()
-          .includes(q)
-    );
-  }, [words, search]);
+      return words.filter(
+        (word) =>
+          word.english
+            .toLowerCase()
+            .includes(q) ||
+          word.uzbek
+            .toLowerCase()
+            .includes(q)
+      );
+    }, [words, search]);
 
   return (
     <main className="page">
-      {/* =========================================
-          SARLAVHA
-      ========================================= */}
+      {/* ===========================
+          HEADER
+      =========================== */}
 
       <section className="header3d">
         <div>
-          <h1>English–Uzbek Dictionary</h1>
+          <h1>
+            English–Uzbek Dictionary
+          </h1>
+
           <div className="adminLabel">
             Lug‘at boshqaruvi
           </div>
         </div>
 
         <div className="totalBox">
-          <strong>{words.length}</strong>
-          <span>Jami so‘z</span>
+          <strong>
+            {words.length}
+          </strong>
+
+          <span>
+            Jami so‘z
+          </span>
         </div>
       </section>
 
-      {/* XABAR */}
+      {/* ===========================
+          XABAR
+      =========================== */}
 
       {message && (
         <div
@@ -574,9 +627,9 @@ export default function EnglishUzbekAdminPage() {
         </div>
       )}
 
-      {/* =========================================
-          BITTA SO'Z QO'SHISH
-      ========================================= */}
+      {/* ===========================
+          BITTA SO'Z
+      =========================== */}
 
       <section className="panel">
         <div className="panelTitle">
@@ -585,28 +638,38 @@ export default function EnglishUzbekAdminPage() {
 
         <div className="singleAdd">
           <div className="field">
-            <label>English</label>
+            <label>
+              English
+            </label>
 
             <input
               value={english}
-              onChange={(event) =>
-                setEnglish(event.target.value)
+              onChange={(e) =>
+                setEnglish(
+                  e.target.value
+                )
               }
               placeholder="Masalan: book"
             />
           </div>
 
           <div className="field">
-            <label>O‘zbekcha tarjima</label>
+            <label>
+              O‘zbekcha tarjima
+            </label>
 
             <input
               value={uzbek}
-              onChange={(event) =>
-                setUzbek(event.target.value)
+              onChange={(e) =>
+                setUzbek(
+                  e.target.value
+                )
               }
               placeholder="Masalan: kitob"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter"
+                ) {
                   addWord();
                 }
               }}
@@ -622,9 +685,9 @@ export default function EnglishUzbekAdminPage() {
         </div>
       </section>
 
-      {/* =========================================
-          OMMAVIY IMPORT
-      ========================================= */}
+      {/* ===========================
+          BULK IMPORT
+      =========================== */}
 
       <section className="panel">
         <div className="panelTitle">
@@ -634,43 +697,47 @@ export default function EnglishUzbekAdminPage() {
         <textarea
           className="importArea"
           value={importText}
-          onChange={(event) =>
-            setImportText(event.target.value)
+          disabled={importing}
+          onChange={(e) =>
+            setImportText(
+              e.target.value
+            )
           }
           placeholder={`Masalan:
 
 1. plate - tarelka
 2. name - ism, nom
-3. place - joy
+3. place - joy, joylamoq
 4. table - stol, jadval`}
         />
 
         <div className="importBottom">
           <div className="detected">
             Aniqlangan:{" "}
-            <strong>{parsedPreview.length}</strong>{" "}
+            <strong>
+              {parsedPreview.length}
+            </strong>{" "}
             ta so‘z
           </div>
 
           <button
             className="importButton"
-            disabled={importing}
+            disabled={
+              importing ||
+              parsedPreview.length === 0
+            }
             onClick={importWords}
           >
             {importing
-              ? `Import qilinmoqda ${
-                  importProgress
-                    ? `(${importProgress})`
-                    : ""
-                }`
-              : "Import qilish"}
+              ? "Import qilinmoqda..."
+              : `Import qilish (${parsedPreview.length})`}
           </button>
         </div>
       </section>
 
-      {/* =========================================
+      {/* ===========================
           LUG'AT
-      ========================================= */}
+      =========================== */}
 
       <section className="panel">
         <div className="dictionaryHeader">
@@ -681,8 +748,10 @@ export default function EnglishUzbekAdminPage() {
           <input
             className="searchInput"
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
+            onChange={(e) =>
+              setSearch(
+                e.target.value
+              )
             }
             placeholder="So‘z qidirish..."
           />
@@ -690,7 +759,9 @@ export default function EnglishUzbekAdminPage() {
 
         <div className="resultInfo">
           Ko‘rsatilmoqda:{" "}
-          <strong>{filteredWords.length}</strong>{" "}
+          <strong>
+            {filteredWords.length}
+          </strong>{" "}
           / {words.length}
         </div>
 
@@ -700,96 +771,116 @@ export default function EnglishUzbekAdminPage() {
           </div>
         ) : words.length === 0 ? (
           <div className="statusBox">
-            Lug‘at hozircha bo‘sh. Yuqoridan
-            so‘z qo‘shing yoki 2700 ta so‘zni
-            ommaviy import qiling.
+            Lug‘at hozircha bo‘sh.
+            Yuqoridagi Ommaviy import
+            orqali lug‘atni kiriting.
           </div>
-        ) : filteredWords.length === 0 ? (
+        ) : filteredWords.length ===
+          0 ? (
           <div className="statusBox">
-            Qidiruv bo‘yicha so‘z topilmadi.
+            So‘z topilmadi.
           </div>
         ) : (
           <div className="wordList">
-            {filteredWords.map((word, index) => (
-              <article
-                className="wordCard"
-                key={word.id}
-              >
-                <div className="number">
-                  {index + 1}
-                </div>
+            {filteredWords.map(
+              (word, index) => (
+                <article
+                  className="wordCard"
+                  key={word.id}
+                >
+                  <div className="number">
+                    {index + 1}
+                  </div>
 
-                {editingId === word.id ? (
-                  <>
-                    <input
-                      className="editInput"
-                      value={editEnglish}
-                      onChange={(event) =>
-                        setEditEnglish(
-                          event.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      className="editInput"
-                      value={editUzbek}
-                      onChange={(event) =>
-                        setEditUzbek(
-                          event.target.value
-                        )
-                      }
-                    />
-
-                    <div className="actions">
-                      <button
-                        className="saveButton"
-                        onClick={saveEdit}
-                      >
-                        Saqlash
-                      </button>
-
-                      <button
-                        className="cancelButton"
-                        onClick={cancelEdit}
-                      >
-                        Bekor
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="englishWord">
-                      {word.english}
-                    </div>
-
-                    <div className="uzbekWord">
-                      {word.uzbek}
-                    </div>
-
-                    <div className="actions">
-                      <button
-                        className="editButton"
-                        onClick={() =>
-                          startEdit(word)
+                  {editingId ===
+                  word.id ? (
+                    <>
+                      <input
+                        className="editInput"
+                        value={
+                          editEnglish
                         }
-                      >
-                        Tahrirlash
-                      </button>
-
-                      <button
-                        className="deleteButton"
-                        onClick={() =>
-                          deleteWord(word)
+                        onChange={(e) =>
+                          setEditEnglish(
+                            e.target
+                              .value
+                          )
                         }
-                      >
-                        O‘chirish
-                      </button>
-                    </div>
-                  </>
-                )}
-              </article>
-            ))}
+                      />
+
+                      <input
+                        className="editInput"
+                        value={
+                          editUzbek
+                        }
+                        onChange={(e) =>
+                          setEditUzbek(
+                            e.target
+                              .value
+                          )
+                        }
+                      />
+
+                      <div className="actions">
+                        <button
+                          className="saveButton"
+                          onClick={
+                            saveEdit
+                          }
+                        >
+                          Saqlash
+                        </button>
+
+                        <button
+                          className="cancelButton"
+                          onClick={
+                            cancelEdit
+                          }
+                        >
+                          Bekor
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="englishWord">
+                        {
+                          word.english
+                        }
+                      </div>
+
+                      <div className="uzbekWord">
+                        {word.uzbek}
+                      </div>
+
+                      <div className="actions">
+                        <button
+                          className="editButton"
+                          onClick={() =>
+                            startEdit(
+                              word
+                            )
+                          }
+                        >
+                          Tahrirlash
+                        </button>
+
+                        <button
+                          className="deleteButton"
+                          onClick={() =>
+                            deleteWord(
+                              word
+                            )
+                          }
+                        >
+                          O‘chirish
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              )
+            )}
           </div>
         )}
       </section>
@@ -814,7 +905,10 @@ export default function EnglishUzbekAdminPage() {
 
         .page {
           min-height: 100vh;
-          padding: 35px 25px 80px;
+
+          padding:
+            35px 25px
+            80px;
 
           font-family:
             "Bell MT",
@@ -834,17 +928,25 @@ export default function EnglishUzbekAdminPage() {
         /* HEADER */
 
         .header3d {
-          width: min(1150px, 100%);
-          margin: 0 auto 35px;
+          width:
+            min(1150px, 100%);
 
-          padding: 25px 30px;
+          margin:
+            0 auto 35px;
+
+          padding:
+            25px 30px;
 
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          justify-content:
+            space-between;
+
           gap: 20px;
 
-          border: 3px solid #174d68;
+          border:
+            3px solid #174d68;
+
           border-radius: 22px;
 
           background:
@@ -857,17 +959,31 @@ export default function EnglishUzbekAdminPage() {
 
           box-shadow:
             inset 0 4px 3px
-              rgba(255,255,255,.8),
+              rgba(
+                255,
+                255,
+                255,
+                0.8
+              ),
             0 9px 0 #194f69,
             0 15px 22px
-              rgba(0,0,0,.22);
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
         .header3d h1 {
           margin: 0;
 
           font-size:
-            clamp(25px, 4vw, 38px);
+            clamp(
+              25px,
+              4vw,
+              38px
+            );
 
           color: #073d5d;
         }
@@ -882,11 +998,14 @@ export default function EnglishUzbekAdminPage() {
         .totalBox {
           min-width: 130px;
 
-          padding: 12px 20px;
+          padding:
+            12px 20px;
 
           text-align: center;
 
-          border: 2px solid #59676e;
+          border:
+            2px solid #59676e;
+
           border-radius: 12px;
 
           background:
@@ -896,7 +1015,8 @@ export default function EnglishUzbekAdminPage() {
             );
 
           box-shadow:
-            inset 0 3px 2px white,
+            inset 0 3px 2px
+              white,
             0 6px 0 #586268;
         }
 
@@ -915,9 +1035,14 @@ export default function EnglishUzbekAdminPage() {
         /* MESSAGE */
 
         .message {
-          width: min(1150px, 100%);
-          margin: 0 auto 25px;
-          padding: 15px 20px;
+          width:
+            min(1150px, 100%);
+
+          margin:
+            0 auto 25px;
+
+          padding:
+            15px 20px;
 
           border-radius: 12px;
 
@@ -926,13 +1051,17 @@ export default function EnglishUzbekAdminPage() {
         }
 
         .successMessage {
-          border: 2px solid #49915e;
+          border:
+            2px solid #49915e;
+
           background: #eaffef;
           color: #1d6b35;
         }
 
         .errorMessage {
-          border: 2px solid #b84a4a;
+          border:
+            2px solid #b84a4a;
+
           background: #fff0f0;
           color: #922323;
         }
@@ -940,12 +1069,17 @@ export default function EnglishUzbekAdminPage() {
         /* PANELS */
 
         .panel {
-          width: min(1150px, 100%);
-          margin: 0 auto 32px;
+          width:
+            min(1150px, 100%);
+
+          margin:
+            0 auto 32px;
 
           padding: 26px;
 
-          border: 2px solid #747e83;
+          border:
+            2px solid #747e83;
+
           border-radius: 18px;
 
           background:
@@ -956,10 +1090,16 @@ export default function EnglishUzbekAdminPage() {
             );
 
           box-shadow:
-            inset 0 3px 3px white,
+            inset 0 3px 3px
+              white,
             0 8px 0 #5c666b,
             0 14px 20px
-              rgba(0,0,0,.16);
+              rgba(
+                0,
+                0,
+                0,
+                0.16
+              );
         }
 
         .panelTitle {
@@ -975,10 +1115,11 @@ export default function EnglishUzbekAdminPage() {
           margin: 0;
         }
 
-        /* SINGLE ADD */
+        /* ADD */
 
         .singleAdd {
           display: grid;
+
           grid-template-columns:
             1fr 1fr 150px;
 
@@ -988,6 +1129,7 @@ export default function EnglishUzbekAdminPage() {
 
         .field label {
           display: block;
+
           margin-bottom: 7px;
 
           font-weight: 900;
@@ -999,13 +1141,15 @@ export default function EnglishUzbekAdminPage() {
           width: 100%;
           min-height: 48px;
 
-          padding: 10px 14px;
+          padding:
+            10px 14px;
 
-          border: 2px solid #8a969c;
+          border:
+            2px solid #8a969c;
+
           border-radius: 9px;
 
           outline: none;
-
           background: white;
 
           font-size: 16px;
@@ -1019,17 +1163,26 @@ export default function EnglishUzbekAdminPage() {
 
           box-shadow:
             0 0 0 3px
-              rgba(21,138,194,.13);
+              rgba(
+                21,
+                138,
+                194,
+                0.13
+              );
         }
 
-        /* BUTTONS */
+        /* 3D BUTTON */
 
         .blueButton,
         .importButton {
           min-height: 48px;
-          padding: 10px 20px;
 
-          border: 2px solid #155b7d;
+          padding:
+            10px 20px;
+
+          border:
+            2px solid #155b7d;
+
           border-radius: 9px;
 
           background:
@@ -1040,7 +1193,8 @@ export default function EnglishUzbekAdminPage() {
             );
 
           box-shadow:
-            inset 0 3px 2px white,
+            inset 0 3px 2px
+              white,
             0 5px 0 #174f6a;
 
           color: #063f63;
@@ -1057,26 +1211,30 @@ export default function EnglishUzbekAdminPage() {
         .deleteButton:active,
         .saveButton:active,
         .cancelButton:active {
-          transform: translateY(4px);
+          transform:
+            translateY(4px);
+
           box-shadow: none;
         }
 
         .importButton:disabled {
-          opacity: .65;
-          cursor: wait;
+          opacity: 0.55;
+          cursor: not-allowed;
         }
 
         /* IMPORT */
 
         .importArea {
           width: 100%;
-          min-height: 270px;
+          min-height: 300px;
 
           resize: vertical;
 
           padding: 18px;
 
-          border: 2px solid #8a969c;
+          border:
+            2px solid #8a969c;
+
           border-radius: 12px;
 
           outline: none;
@@ -1092,7 +1250,10 @@ export default function EnglishUzbekAdminPage() {
 
           display: flex;
           align-items: center;
-          justify-content: space-between;
+
+          justify-content:
+            space-between;
+
           gap: 20px;
         }
 
@@ -1110,10 +1271,16 @@ export default function EnglishUzbekAdminPage() {
 
         .dictionaryHeader {
           display: grid;
+
           grid-template-columns:
-            1fr minmax(250px, 420px);
+            1fr
+            minmax(
+              250px,
+              420px
+            );
 
           align-items: center;
+
           gap: 20px;
 
           margin-bottom: 15px;
@@ -1127,11 +1294,15 @@ export default function EnglishUzbekAdminPage() {
         }
 
         .statusBox {
-          padding: 40px 20px;
+          padding:
+            40px 20px;
 
           text-align: center;
 
-          border: 2px dashed #a5adb1;
+          border:
+            2px dashed
+            #a5adb1;
+
           border-radius: 12px;
 
           color: #56636a;
@@ -1148,16 +1319,24 @@ export default function EnglishUzbekAdminPage() {
         .wordCard {
           min-height: 70px;
 
-          padding: 12px 15px;
+          padding:
+            12px 15px;
 
           display: grid;
+
           grid-template-columns:
-            55px 1fr 1.2fr 190px;
+            55px
+            1fr
+            1.2fr
+            190px;
 
           align-items: center;
+
           gap: 14px;
 
-          border: 2px solid #c0c6c9;
+          border:
+            2px solid #c0c6c9;
+
           border-radius: 12px;
 
           background:
@@ -1169,7 +1348,12 @@ export default function EnglishUzbekAdminPage() {
           box-shadow:
             0 4px 0 #7a8387,
             0 7px 10px
-              rgba(0,0,0,.1);
+              rgba(
+                0,
+                0,
+                0,
+                0.1
+              );
         }
 
         .number {
@@ -1187,7 +1371,8 @@ export default function EnglishUzbekAdminPage() {
               #66bee4
             );
 
-          border: 1px solid #25769b;
+          border:
+            1px solid #25769b;
 
           font-weight: 900;
           color: #064a6d;
@@ -1196,6 +1381,7 @@ export default function EnglishUzbekAdminPage() {
         .englishWord {
           font-size: 19px;
           font-weight: 900;
+
           color: #07537d;
         }
 
@@ -1214,6 +1400,7 @@ export default function EnglishUzbekAdminPage() {
         .saveButton,
         .cancelButton {
           flex: 1;
+
           min-height: 38px;
 
           border-radius: 7px;
@@ -1224,7 +1411,8 @@ export default function EnglishUzbekAdminPage() {
 
         .editButton,
         .saveButton {
-          border: 1px solid #23719a;
+          border:
+            1px solid #23719a;
 
           background:
             linear-gradient(
@@ -1239,7 +1427,8 @@ export default function EnglishUzbekAdminPage() {
         }
 
         .deleteButton {
-          border: 1px solid #a94a4a;
+          border:
+            1px solid #a94a4a;
 
           background:
             linear-gradient(
@@ -1254,7 +1443,8 @@ export default function EnglishUzbekAdminPage() {
         }
 
         .cancelButton {
-          border: 1px solid #777;
+          border:
+            1px solid #777;
 
           background:
             linear-gradient(
@@ -1268,20 +1458,22 @@ export default function EnglishUzbekAdminPage() {
 
         /* RESPONSIVE */
 
-        @media (max-width: 900px) {
+        @media (
+          max-width: 900px
+        ) {
           .singleAdd {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .dictionaryHeader {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .wordCard {
             grid-template-columns:
               50px 1fr;
-
-            gap: 12px;
           }
 
           .uzbekWord {
@@ -1294,7 +1486,9 @@ export default function EnglishUzbekAdminPage() {
           }
         }
 
-        @media (max-width: 600px) {
+        @media (
+          max-width: 600px
+        ) {
           .page {
             padding:
               20px 12px
@@ -1302,7 +1496,9 @@ export default function EnglishUzbekAdminPage() {
           }
 
           .header3d {
-            flex-direction: column;
+            flex-direction:
+              column;
+
             text-align: center;
           }
 
@@ -1311,12 +1507,16 @@ export default function EnglishUzbekAdminPage() {
           }
 
           .panel {
-            padding: 18px 14px;
+            padding:
+              18px 14px;
           }
 
           .importBottom {
-            flex-direction: column;
-            align-items: stretch;
+            flex-direction:
+              column;
+
+            align-items:
+              stretch;
           }
 
           .importButton {
@@ -1324,7 +1524,8 @@ export default function EnglishUzbekAdminPage() {
           }
 
           .wordCard {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .number {
@@ -1339,7 +1540,8 @@ export default function EnglishUzbekAdminPage() {
 
           .actions {
             grid-column: 1;
-            flex-direction: column;
+            flex-direction:
+              column;
           }
         }
       `}</style>
