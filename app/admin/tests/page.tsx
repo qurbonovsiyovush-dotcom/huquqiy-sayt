@@ -409,11 +409,14 @@ export default function AdminTestsPage() {
         return;
       }
 
-      const updatedTest = {
-        ...fullTest,
-        status: newStatus,
-      };
+      /*
+        MUHIM:
+        780/840 ta savolning HAMMASINI qayta PUT qilmaymiz.
+        Aks holda Vercel request hajmi limitiga uriladi.
 
+        Serverdagi /api/tests/[id]/route.ts mavjud testni o‘qib,
+        faqat status maydonini almashtiradi; savollar o‘z joyida qoladi.
+      */
       const response = await fetch(
         `/api/tests/${encodeURIComponent(id)}`,
         {
@@ -423,7 +426,9 @@ export default function AdminTestsPage() {
             "Content-Type": "application/json",
           },
 
-          body: JSON.stringify(updatedTest),
+          body: JSON.stringify({
+            status: newStatus,
+          }),
         }
       );
 
