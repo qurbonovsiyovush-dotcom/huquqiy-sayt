@@ -2541,21 +2541,115 @@ const pageStyles = `
     letter-spacing: 1.2px;
   }
 
-  .questionHtml {
-    margin: 0;
+.questionHtml {
+  margin: 0;
 
-    direction: ltr;
-    text-align: left;
+  direction: ltr;
+  text-align: left;
 
-    overflow-wrap: anywhere;
+  /*
+    MUHIM:
+    Admin panel/editor ichida Enter bilan yozilgan
+    yangi qatorlarni test sahifasida ham saqlaydi.
 
-    color: #111315;
-    font-size: clamp(22px, 2vw, 30px);
-    line-height: 1.72;
-    font-weight: 500;
+    Masalan:
 
-    text-shadow: 0 1px 0 rgba(255,255,255,.9);
-  }
+    I. O‘zbekiston — suveren davlat.
+    II. O‘zbekiston — huquqiy davlat.
+    III. O‘zbekiston — diniy davlat.
+    IV. O‘zbekiston — ijtimoiy davlat.
+    V. O‘zbekiston — dunyoviy davlat.
+
+    endi bitta qatorda qo‘shilib ketmaydi.
+  */
+  white-space: pre-wrap;
+
+  /*
+    Juda uzun so‘z yoki matn kartadan
+    tashqariga chiqib ketmasligi uchun.
+  */
+  overflow-wrap: anywhere;
+  word-break: normal;
+
+  color: #111315;
+
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1.72;
+  font-weight: 500;
+
+  text-shadow: 0 1px 0 rgba(255,255,255,.9);
+}
+
+
+/* HTML editor orqali yaratilgan <p> lar */
+.questionHtml :global(p) {
+  margin: 0 0 18px;
+  white-space: pre-wrap;
+}
+
+
+/* Oxirgi paragrafdan keyin ortiqcha bo‘shliq bo‘lmaydi */
+.questionHtml :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+
+/* Agar editor <div> ishlatgan bo‘lsa */
+.questionHtml :global(div) {
+  white-space: pre-wrap;
+}
+
+
+/* Agar editor <span> ishlatgan bo‘lsa */
+.questionHtml :global(span) {
+  white-space: pre-wrap;
+}
+
+
+/* <br> mavjud bo‘lsa normal ishlaydi */
+.questionHtml :global(br) {
+  display: block;
+  content: "";
+}
+
+
+/* Linklar */
+.questionHtml :global(a) {
+  color: #008b88;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0,139,136,.35);
+}
+
+
+/* Bold matn */
+.questionHtml :global(strong),
+.questionHtml :global(b) {
+  color: #082f4d;
+}
+
+
+/* Italic matn */
+.questionHtml :global(i),
+.questionHtml :global(em) {
+  font-style: italic;
+}
+
+
+/* Rasm */
+.questionHtml :global(img),
+.optionText :global(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+
+/* Jadval */
+.questionHtml :global(table),
+.optionText :global(table) {
+  max-width: 100%;
+  border-collapse: collapse;
+}
 
   .questionHtml :global(p) {
     margin: 0 0 18px;
