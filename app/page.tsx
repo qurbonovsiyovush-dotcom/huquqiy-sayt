@@ -14,11 +14,6 @@ export default function Home() {
 
   /* =========================================
      SOAT — OPTIMALLASHTIRILGAN
-
-     Muhim: vaqt har soniyada React state orqali
-     yangilanmaydi. Faqat soat va sana DOM matni
-     o‘zgaradi. Shu sabab butun 3D sahifa har
-     soniyada qayta render bo‘lmaydi.
   ========================================= */
 
   useEffect(() => {
@@ -163,6 +158,14 @@ export default function Home() {
     window.location.href = "/test-entry";
   }
 
+  /* =========================================
+     QO‘LLANMALARNI OCHISH
+  ========================================= */
+
+  function openGuides() {
+    window.location.href = "/qollanmalar";
+  }
+
   return (
     <main className="page">
       {/* ================= HEADER ================= */}
@@ -200,12 +203,10 @@ export default function Home() {
           <button
             type="button"
             className="grayButton"
-            onClick={() => scrollToSection("qollanmalar")}
+            onClick={openGuides}
           >
             Qo‘llanmalar
           </button>
-
-          {/* FAQAT ADMINDA KO‘RINADI */}
 
           {!roleLoading && role === "admin" && (
             <button
@@ -237,18 +238,12 @@ export default function Home() {
             Huquqiy ta’lim platformasi
           </div>
 
-          <div
-            ref={clockRef}
-            className="clockTime"
-          >
+          <div ref={clockRef} className="clockTime">
             --:--:--
           </div>
 
           <div className="calendarBox">
-            <div
-              ref={dateRef}
-              className="dateText"
-            >
+            <div ref={dateRef} className="dateText">
               Sana yuklanmoqda...
             </div>
           </div>
@@ -257,13 +252,8 @@ export default function Home() {
 
       {/* ================= TALABALAR ================= */}
 
-      <section
-        id="talabalar"
-        className="mainSection"
-      >
-        <div className="sectionTitle">
-          Talabalar
-        </div>
+      <section id="talabalar" className="mainSection">
+        <div className="sectionTitle">Talabalar</div>
 
         <div className="cards">
           <article className="card">
@@ -291,8 +281,7 @@ export default function Home() {
               type="button"
               className="openButton"
               onClick={() => {
-                window.location.href =
-                  "/talabalar/kazuslar";
+                window.location.href = "/talabalar/kazuslar";
               }}
             >
               Ochish
@@ -305,6 +294,7 @@ export default function Home() {
             <button
               type="button"
               className="openButton"
+              onClick={openGuides}
             >
               Ochish
             </button>
@@ -314,13 +304,8 @@ export default function Home() {
 
       {/* ================= ABITURIYENT ================= */}
 
-      <section
-        id="abituriyent"
-        className="mainSection"
-      >
-        <div className="sectionTitle">
-          Abituriyent
-        </div>
+      <section id="abituriyent" className="mainSection">
+        <div className="sectionTitle">Abituriyent</div>
 
         <div className="cards">
           <article className="card">
@@ -349,6 +334,7 @@ export default function Home() {
             <button
               type="button"
               className="openButton"
+              onClick={openGuides}
             >
               Ochish
             </button>
@@ -369,22 +355,14 @@ export default function Home() {
 
       {/* ================= SAVOL-JAVOB ================= */}
 
-      <section
-        id="savoljavob"
-        className="mainSection"
-      >
-        <div className="sectionTitle">
-          Savol-javob
-        </div>
+      <section id="savoljavob" className="mainSection">
+        <div className="sectionTitle">Savol-javob</div>
 
         <div className="cards">
           <article className="card">
             <h2>Ko‘p beriladigan savollar</h2>
 
-            <button
-              type="button"
-              className="openButton"
-            >
+            <button type="button" className="openButton">
               Ochish
             </button>
           </article>
@@ -392,10 +370,7 @@ export default function Home() {
           <article className="card">
             <h2>Savol yuborish</h2>
 
-            <button
-              type="button"
-              className="openButton"
-            >
+            <button type="button" className="openButton">
               Ochish
             </button>
           </article>
@@ -403,88 +378,18 @@ export default function Home() {
           <article className="card">
             <h2>Sud qarorlari tahlili</h2>
 
-            <button
-              type="button"
-              className="openButton"
-            >
+            <button type="button" className="openButton">
               Ochish
             </button>
           </article>
         </div>
       </section>
 
-      {/* ================= QO‘LLANMALAR ================= */}
-
-      <section
-        id="qollanmalar"
-        className="mainSection"
-      >
-        <div className="sectionTitle">
-          Qo‘llanmalar
-        </div>
-
-        <div className="cards">
-          <article className="card">
-            <h2>Kodekslar</h2>
-
-            <button
-              type="button"
-              className="openButton"
-            >
-              Ochish
-            </button>
-          </article>
-
-          <article className="card">
-            <h2>Qonun va qonunchilik hujjatlari</h2>
-
-            <button
-              type="button"
-              className="openButton"
-            >
-              Ochish
-            </button>
-          </article>
-
-          <article className="card">
-            <h2>Darsliklar</h2>
-
-            <button
-              type="button"
-              className="openButton"
-            >
-              Ochish
-            </button>
-          </article>
-
-          <article className="card">
-            <h2>English Vocabulary</h2>
-
-            <div className="vocabularySubtitle">
-              4000 Essential English Words
-            </div>
-
-            <button
-              type="button"
-              className="openButton testButton"
-              onClick={() => {
-                window.location.href =
-                  "/qollanmalar/english-vocabulary";
-              }}
-            >
-              Ochish
-            </button>
-          </article>
-        </div>
-      </section>
-
-      {/* ================= FOOTER ================= */}
+      {/* Qo‘llanmalar endi alohida /qollanmalar sahifasida */}
 
       <footer className="footerBlue">
         Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi
       </footer>
-
-      
     </main>
   );
 }
