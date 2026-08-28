@@ -2,89 +2,103 @@
 
 import { useRouter } from "next/navigation";
 
-type GuideCard = {
+type SectionItem = {
+  badge: string;
   title: string;
   href: string;
-  badge: string;
 };
 
-const cards: GuideCard[] = [
+const sections: SectionItem[] = [
   {
-    title: "Kodekslar",
-    href: "/qollanmalar/kodekslar",
     badge: "K",
+    title: "Kodekslar",
+    href: "/kodekslar",
   },
   {
-    title: "Qonun va qonunchilik hujjatlari",
-    href: "/qollanmalar/qonunlar",
     badge: "Q",
+    title: "Qonun va qonunchilik hujjatlari",
+    href: "/qonunlar",
   },
   {
-    title: "Darsliklar",
-    href: "/qollanmalar/darsliklar",
     badge: "D",
+    title: "Darsliklar",
+    href: "/darsliklar",
   },
   {
+    badge: "EN",
     title: "English Vocabulary",
     href: "/qollanmalar/english-vocabulary",
-    badge: "EN",
   },
   {
+    badge: "L",
     title: "Inglizcha lug‘atlar",
     href: "/qollanmalar/dictionaries",
-    badge: "L",
   },
 ];
 
 export default function QollanmalarPage() {
   const router = useRouter();
 
+  function goBack() {
+    /*
+      MUHIM:
+      history.back() yoki router.back() ishlatilmaydi.
+
+      Orqaga tugmasi HAR DOIM:
+      /admin
+      sahifasiga olib boradi.
+    */
+    window.location.href = "/admin";
+  }
+
   return (
     <main className="page">
-      {/* =========================
-          TEPA 3D PANEL
-      ========================== */}
+      {/* =====================================
+          TEPADAGI 3D PANEL
+      ====================================== */}
 
-      <section className="topPanel">
-        <div className="pageTitle">
+      <header className="topPanel">
+        <div className="titleBox">
           Qo‘llanmalar
         </div>
 
         <button
           type="button"
           className="backButton"
-          onClick={() => router.back()}
+          onClick={goBack}
         >
           Orqaga
         </button>
-      </section>
+      </header>
 
-      {/* =========================
-          ASOSIY 3D PANEL
-      ========================== */}
+      {/* =====================================
+          ASOSIY PANEL
+      ====================================== */}
 
       <section className="mainPanel">
-        <h1 className="heading">
+        <h1 className="sectionTitle">
           Kerakli bo‘limni tanlang
         </h1>
 
         <div className="cards">
-          {cards.map((card) => (
+          {sections.map((item) => (
             <article
+              key={item.title}
               className="card"
-              key={card.title}
             >
               <div className="badge">
-                {card.badge}
+                {item.badge}
               </div>
 
-              <h2>{card.title}</h2>
+              <h2>
+                {item.title}
+              </h2>
 
               <button
                 type="button"
                 className="openButton"
                 onClick={() =>
-                  router.push(card.href)
+                  router.push(item.href)
                 }
               >
                 Ochish
@@ -99,52 +113,60 @@ export default function QollanmalarPage() {
           box-sizing: border-box;
         }
 
+        :global(html) {
+          background: #edf3f6;
+        }
+
+        :global(body) {
+          margin: 0;
+
+          background: #edf3f6;
+        }
+
+        button {
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+        }
+
         .page {
           min-height: 100vh;
 
           padding:
-            16px
-            20px
-            60px;
+            20px 18px
+            70px;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+
+          color: #111;
 
           background:
             radial-gradient(
               circle at top,
               #ffffff 0%,
-              #f3f6f7 48%,
-              #e8edef 100%
+              #f4f8fa 48%,
+              #eaf1f4 100%
             );
-
-          color: #111;
-
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            Georgia,
-            serif;
         }
 
-        button {
-          font-family: inherit;
-        }
-
-        /* ==================================================
-           TEPA KO‘K PANEL
-        ================================================== */
+        /* =====================================
+           TEPADAGI PANEL
+        ====================================== */
 
         .topPanel {
-          width: min(1850px, 100%);
+          width: min(1570px, 100%);
 
-          min-height: 140px;
+          min-height: 125px;
 
           margin:
-            0
-            auto
-            34px;
+            0 auto 52px;
 
           padding:
-            28px
-            35px;
+            20px 35px;
 
           display: flex;
 
@@ -156,38 +178,31 @@ export default function QollanmalarPage() {
           gap: 30px;
 
           border:
-            3px solid
-            #123d52;
+            3px solid #0a405e;
 
-          border-radius:
-            30px;
+          border-radius: 27px;
 
           background:
             linear-gradient(
               180deg,
-              #8ad8fb 0%,
-              #63b8e5 50%,
-              #429dce 100%
+              #8dddfc 0%,
+              #60c3eb 46%,
+              #3ca5d3 100%
             );
 
           box-shadow:
-            inset 0 7px 7px
+            inset 0 4px 4px
               rgba(
                 255,
                 255,
                 255,
-                0.5
+                0.9
               ),
-            inset 0 -8px 8px
-              rgba(
-                0,
-                0,
-                0,
-                0.12
-              ),
-            0 11px 0
-              #123d52,
-            0 18px 25px
+            inset 0 -8px 0
+              #08759f,
+            0 10px 0
+              #063f5b,
+            0 19px 28px
               rgba(
                 0,
                 0,
@@ -196,20 +211,13 @@ export default function QollanmalarPage() {
               );
         }
 
-        /* ==================================================
-           QO‘LLANMALAR BLOKI
-        ================================================== */
+        .titleBox {
+          min-width: 460px;
 
-        .pageTitle {
-          width: 480px;
-
-          max-width: 45%;
-
-          min-height: 78px;
+          min-height: 72px;
 
           padding:
-            14px
-            30px;
+            14px 32px;
 
           display: flex;
 
@@ -219,91 +227,73 @@ export default function QollanmalarPage() {
             center;
 
           border:
-            3px solid
-            #4f5c62;
+            3px solid #626b70;
 
-          border-radius:
-            18px;
+          border-radius: 18px;
 
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #eeeeee 48%,
-              #d5d5d5 100%
+              #f7f7f7 0%,
+              #e7e7e7 50%,
+              #cccccc 100%
             );
 
           box-shadow:
-            inset 0 6px 7px
-              rgba(
-                255,
-                255,
-                255,
-                0.95
-              ),
-            inset 0 -5px 6px
+            inset 0 4px 3px
+              #ffffff,
+            inset 0 -3px 3px
               rgba(
                 0,
                 0,
                 0,
-                0.08
+                0.07
               ),
             0 8px 0
-              #4d595e,
-            0 13px 16px
+              #6e787d,
+            0 13px 17px
               rgba(
                 0,
                 0,
                 0,
-                0.2
+                0.18
               );
 
-          color: #111;
+          font-size:
+            clamp(
+              27px,
+              3vw,
+              35px
+            );
 
-          text-align: center;
-
-          font-size: 33px;
-
-          font-weight: 900;
+          font-weight: 700;
         }
 
-        /* ==================================================
-           ORQAGA TUGMASI
-        ================================================== */
-
         .backButton {
-          width: 170px;
+          min-width: 165px;
 
-          min-height: 66px;
+          min-height: 62px;
 
           padding:
-            10px
-            24px;
+            12px 25px;
 
           border:
-            3px solid
-            #4e5b61;
+            3px solid #626b70;
 
-          border-radius:
-            16px;
+          border-radius: 15px;
 
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #eeeeee 48%,
-              #d3d3d3 100%
+              #f5f5f5 0%,
+              #e2e2e2 48%,
+              #c9cdcf 100%
             );
 
           box-shadow:
-            inset 0 5px 6px
-              rgba(
-                255,
-                255,
-                255,
-                0.95
-              ),
-            inset 0 -4px 5px
+            inset 0 3px 3px
+              #ffffff,
+            inset 0 -2px 3px
               rgba(
                 0,
                 0,
@@ -311,51 +301,26 @@ export default function QollanmalarPage() {
                 0.08
               ),
             0 7px 0
-              #4e5b61,
-            0 11px 14px
+              #697378,
+            0 12px 16px
               rgba(
                 0,
                 0,
                 0,
-                0.2
+                0.16
               );
 
           color: #111;
 
-          font-size: 17px;
+          font-size: 16px;
 
-          font-weight: 900;
+          font-weight: 700;
 
           cursor: pointer;
-
-          transition:
-            transform
-            0.1s ease,
-            box-shadow
-            0.1s ease;
         }
 
         .backButton:hover {
-          transform:
-            translateY(-2px);
-
-          box-shadow:
-            inset 0 5px 6px
-              rgba(
-                255,
-                255,
-                255,
-                0.95
-              ),
-            0 9px 0
-              #4e5b61,
-            0 14px 17px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              );
+          filter: brightness(1.035);
         }
 
         .backButton:active {
@@ -363,90 +328,80 @@ export default function QollanmalarPage() {
             translateY(4px);
 
           box-shadow:
-            inset 0 4px 5px
+            inset 0 2px 3px
               rgba(
                 0,
                 0,
                 0,
-                0.08
+                0.1
               ),
             0 2px 0
-              #4e5b61;
+              #697378;
         }
 
-        /* ==================================================
-           PASTDAGI ASOSIY PANEL
-           TEPA PANEL BILAN BIR XIL KENGLIK
-        ================================================== */
+        /* =====================================
+           ASOSIY KULRANG PANEL
+        ====================================== */
 
         .mainPanel {
-          width: min(1850px, 100%);
+          width: min(1570px, 100%);
 
           margin: 0 auto;
 
           padding:
-            38px
-            34px
-            48px;
+            38px 42px
+            50px;
 
           border:
-            2px solid
-            #30383b;
+            3px solid #373e42;
 
-          border-radius:
-            26px;
+          border-radius: 26px;
 
           background:
             linear-gradient(
-              180deg,
-              #666b6d 0%,
-              #53595b 50%,
-              #3e4547 100%
+              145deg,
+              #707679 0%,
+              #5b6164 48%,
+              #454b4e 100%
             );
 
           box-shadow:
-            inset 0 6px 8px
+            inset 0 4px 3px
               rgba(
                 255,
                 255,
                 255,
-                0.12
+                0.18
               ),
-            inset 0 -9px 11px
+            inset 0 -9px 0
+              #303639,
+            0 11px 0
+              #343a3d,
+            0 19px 27px
               rgba(
                 0,
                 0,
                 0,
-                0.22
-              ),
-            0 10px 0
-              #303638,
-            0 18px 27px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
+                0.2
               );
         }
 
-        /* ==================================================
-           SARLAVHA
-        ================================================== */
-
-        .heading {
+        .sectionTitle {
           margin:
-            0
-            0
-            34px;
-
-          color: #fff;
+            0 0 38px;
 
           text-align: center;
 
-          font-size: 29px;
+          color: #ffffff;
 
-          font-weight: 900;
+          font-size:
+            clamp(
+              24px,
+              3vw,
+              29px
+            );
+
+          font-weight: 700;
 
           text-shadow:
             0 2px 2px
@@ -454,39 +409,29 @@ export default function QollanmalarPage() {
                 0,
                 0,
                 0,
-                0.7
+                0.65
               );
         }
 
-        /* ==================================================
+        /* =====================================
            KARTALAR
-        ================================================== */
+        ====================================== */
 
         .cards {
-          width: 100%;
-
           display: grid;
 
           grid-template-columns:
-            repeat(
-              3,
-              minmax(
-                0,
-                1fr
-              )
-            );
+            repeat(3, 1fr);
 
           gap:
-            32px
-            30px;
+            36px 34px;
         }
 
         .card {
-          min-height: 260px;
+          min-height: 265px;
 
           padding:
-            25px
-            24px
+            25px 24px
             24px;
 
           display: flex;
@@ -496,79 +441,52 @@ export default function QollanmalarPage() {
 
           align-items: center;
 
-          border:
-            1px solid
-            #d0d0d0;
+          justify-content:
+            space-between;
 
-          border-radius:
-            15px;
+          gap: 18px;
+
+          border:
+            2px solid #e5e5e5;
+
+          border-radius: 17px;
 
           background:
             linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #f5f5f5 55%,
-              #e4e4e4 100%
+              145deg,
+              #f8f8f8 0%,
+              #eeeeee 50%,
+              #d9dcde 100%
             );
 
           box-shadow:
-            inset 0 5px 7px
+            inset 0 4px 4px
+              #ffffff,
+            inset 0 -3px 4px
               rgba(
-                255,
-                255,
-                255,
-                0.96
+                0,
+                0,
+                0,
+                0.07
               ),
             0 8px 0
-              #858c8e,
-            0 14px 19px
+              #788287,
+            0 14px 20px
               rgba(
                 0,
                 0,
                 0,
-                0.22
-              );
-
-          text-align: center;
-
-          transition:
-            transform
-            0.15s ease,
-            box-shadow
-            0.15s ease;
-        }
-
-        .card:hover {
-          transform:
-            translateY(-3px);
-
-          box-shadow:
-            inset 0 5px 7px
-              rgba(
-                255,
-                255,
-                255,
-                0.96
-              ),
-            0 10px 0
-              #858c8e,
-            0 17px 22px
-              rgba(
-                0,
-                0,
-                0,
-                0.25
+                0.19
               );
         }
-
-        /* ==================================================
-           KICHIK KO‘K BELGI
-        ================================================== */
 
         .badge {
-          width: 58px;
+          min-width: 56px;
 
-          height: 49px;
+          height: 50px;
+
+          padding:
+            0 11px;
 
           display: flex;
 
@@ -577,142 +495,119 @@ export default function QollanmalarPage() {
           justify-content:
             center;
 
-          flex-shrink: 0;
-
           border:
-            2px solid
-            #07506d;
+            2px solid #086183;
 
-          border-radius:
-            10px;
+          border-radius: 10px;
 
           background:
             linear-gradient(
               180deg,
-              #e1f8ff 0%,
-              #78d1f0 48%,
-              #3ca8d5 100%
+              #c9f1ff 0%,
+              #79d2f2 48%,
+              #45b2df 100%
             );
 
           box-shadow:
-            inset 0 4px 4px
+            inset 0 3px 2px
+              #ffffff,
+            inset 0 -2px 2px
               rgba(
-                255,
-                255,
-                255,
-                0.8
+                0,
+                0,
+                0,
+                0.08
               ),
-            0 5px 0
-              #07506d;
+            0 6px 0
+              #075a7a;
 
-          color: #063e68;
+          color: #064c6e;
 
-          font-size: 16px;
+          font-size: 15px;
 
-          font-weight: 900;
+          font-weight: 700;
         }
 
-        /* ==================================================
-           KARTA NOMI
-        ================================================== */
-
         .card h2 {
-          width: 100%;
+          margin: 0;
 
-          margin:
-            28px
-            0
-            0;
+          min-height: 55px;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            center;
+
+          text-align: center;
 
           color: #111;
 
-          font-size: 24px;
+          font-size:
+            clamp(
+              21px,
+              2vw,
+              25px
+            );
 
-          line-height: 1.15;
+          line-height: 1.25;
 
-          font-weight: 900;
+          font-weight: 700;
         }
 
-        /* ==================================================
-           OCHISH
-        ================================================== */
-
         .openButton {
-          width: 155px;
+          min-width: 150px;
 
-          min-height: 47px;
+          min-height: 48px;
 
-          margin-top: auto;
+          padding:
+            10px 24px;
 
           border:
-            2px solid
-            #07506d;
+            2px solid #075d80;
 
-          border-radius:
-            9px;
+          border-radius: 9px;
 
           background:
             linear-gradient(
               180deg,
-              #d9f6ff 0%,
-              #75cfee 48%,
-              #38a7d5 100%
+              #c9f1ff 0%,
+              #78d1f2 48%,
+              #43b0dc 100%
             );
 
           box-shadow:
-            inset 0 4px 4px
+            inset 0 3px 2px
+              #ffffff,
+            inset 0 -2px 3px
               rgba(
-                255,
-                255,
-                255,
-                0.75
+                0,
+                0,
+                0,
+                0.07
               ),
             0 6px 0
-              #07506d,
-            0 10px 12px
+              #075878,
+            0 10px 14px
               rgba(
                 0,
                 0,
                 0,
-                0.18
+                0.14
               );
 
-          color: #073e65;
+          color: #063f5c;
 
           font-size: 14px;
 
-          font-weight: 900;
+          font-weight: 700;
 
           cursor: pointer;
-
-          transition:
-            transform
-            0.1s ease,
-            box-shadow
-            0.1s ease;
         }
 
         .openButton:hover {
-          transform:
-            translateY(-2px);
-
-          box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                0.75
-              ),
-            0 8px 0
-              #07506d,
-            0 12px 14px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
+          filter: brightness(1.035);
         }
 
         .openButton:active {
@@ -720,7 +615,7 @@ export default function QollanmalarPage() {
             translateY(4px);
 
           box-shadow:
-            inset 0 3px 4px
+            inset 0 2px 3px
               rgba(
                 0,
                 0,
@@ -728,162 +623,86 @@ export default function QollanmalarPage() {
                 0.08
               ),
             0 2px 0
-              #07506d;
+              #075878;
         }
 
-        /* ==================================================
-           KATTA MONITOR
-        ================================================== */
+        /* =====================================
+           TABLET
+        ====================================== */
 
         @media (
-          min-width: 1500px
+          max-width: 1050px
         ) {
-          .mainPanel {
-            padding:
-              40px
-              45px
-              50px;
+          .titleBox {
+            min-width: 340px;
           }
 
           .cards {
-            gap:
-              34px
-              36px;
-          }
-
-          .card {
-            min-height: 275px;
+            grid-template-columns:
+              repeat(2, 1fr);
           }
         }
 
-        /* ==================================================
-           TABLET
-        ================================================== */
+        /* =====================================
+           MOBILE
+        ====================================== */
 
         @media (
-          max-width: 1000px
+          max-width: 700px
         ) {
-          .topPanel {
-            min-height: 115px;
-
+          .page {
             padding:
-              22px
-              25px;
+              14px 9px
+              50px;
           }
 
-          .pageTitle {
-            width: 360px;
+          .topPanel {
+            width: 100%;
+
+            min-height: 0;
+
+            margin-bottom: 42px;
+
+            padding: 14px;
+
+            flex-direction:
+              column;
+          }
+
+          .titleBox,
+          .backButton {
+            width: 100%;
+
+            min-width: 0;
+          }
+
+          .titleBox {
+            min-height: 60px;
 
             font-size: 27px;
           }
 
           .mainPanel {
-            padding:
-              32px
-              24px
-              42px;
-          }
-
-          .cards {
-            grid-template-columns:
-              repeat(
-                2,
-                minmax(
-                  0,
-                  1fr
-                )
-              );
-          }
-        }
-
-        /* ==================================================
-           TELEFON
-        ================================================== */
-
-        @media (
-          max-width: 620px
-        ) {
-          .page {
-            padding:
-              10px
-              8px
-              40px;
-          }
-
-          .topPanel {
-            min-height: 96px;
-
-            padding: 14px;
-
-            border-radius:
-              18px;
-
-            gap: 12px;
-          }
-
-          .pageTitle {
-            width: auto;
-
-            max-width: none;
-
-            flex: 1;
-
-            min-height: 58px;
+            width: 100%;
 
             padding:
-              10px
-              12px;
-
-            border-radius:
-              12px;
-
-            font-size: 21px;
+              30px 14px
+              35px;
           }
 
-          .backButton {
-            width: 92px;
-
-            min-height: 52px;
-
-            padding:
-              7px
-              8px;
-
-            border-radius:
-              11px;
-
-            font-size: 13px;
-          }
-
-          .mainPanel {
-            padding:
-              28px
-              14px
-              32px;
-
-            border-radius:
-              18px;
-          }
-
-          .heading {
-            margin-bottom: 25px;
-
-            font-size: 22px;
+          .sectionTitle {
+            margin-bottom: 28px;
           }
 
           .cards {
             grid-template-columns:
               1fr;
 
-            gap: 25px;
+            gap: 28px;
           }
 
           .card {
-            min-height: 220px;
-          }
-
-          .card h2 {
-            font-size: 21px;
+            min-height: 225px;
           }
         }
       `}</style>
