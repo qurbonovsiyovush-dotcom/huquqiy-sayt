@@ -1,562 +1,106 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-type VocabularyWord = {
-  word: string;
-  translation: string;
-  example?: string;
-  exampleTranslation?: string;
+type GuideCard = {
+  title: string;
+  href: string;
+  badge: string;
 };
 
-type VocabularyResponse = {
-  success: boolean;
-  message?: string;
-  book?: number;
-  unit?: number;
-  count?: number;
-  words?: VocabularyWord[];
-};
+const cards: GuideCard[] = [
+  {
+    title: "Kodekslar",
+    href: "/qollanmalar/kodekslar",
+    badge: "K",
+  },
+  {
+    title: "Qonun va qonunchilik hujjatlari",
+    href: "/qollanmalar/qonunlar",
+    badge: "Q",
+  },
+  {
+    title: "Darsliklar",
+    href: "/qollanmalar/darsliklar",
+    badge: "D",
+  },
+  {
+    title: "English Vocabulary",
+    href: "/qollanmalar/english-vocabulary",
+    badge: "EN",
+  },
+  {
+    title: "Inglizcha lug‘atlar",
+    href: "/qollanmalar/dictionaries",
+    badge: "L",
+  },
+];
 
-export default function DictionaryAdminPage() {
-  const [book, setBook] = useState("1");
-  const [unit, setUnit] = useState("1");
-  const [text, setText] = useState("");
-
-  const [savedWords, setSavedWords] = useState<VocabularyWord[]>([]);
-
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
-  const books = Array.from({ length: 6 }, (_, i) => i + 1);
-  const units = Array.from({ length: 30 }, (_, i) => i + 1);
-
-  const parsedWords = useMemo(() => {
-    return text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line): VocabularyWord | null => {
-        const parts = line.split("|").map((part) => part.trim());
-
-        if (parts.length < 2) return null;
-
-        const word = parts[0] || "";
-        const translation = parts[1] || "";
-        const example = parts[2] || "";
-        const exampleTranslation = parts[3] || "";
-
-        if (!word || !translation) return null;
-
-        return {
-          word,
-          translation,
-          ...(example ? { example } : {}),
-          ...(exampleTranslation ? { exampleTranslation } : {}),
-        };
-      })
-      .filter((item): item is VocabularyWord => item !== null);
-  }, [text]);
-
-  const totalLines = useMemo(() => {
-    return text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean).length;
-  }, [text]);
-
-  const invalidLines = totalLines - parsedWords.length;
-
-  const exampleCount = useMemo(() => {
-    return parsedWords.filter(
-      (item) => item.example && item.exampleTranslation
-    ).length;
-  }, [parsedWords]);
-
-  async function loadWords() {
-    try {
-      setLoading(true);
-      setError("");
-      setMessage("");
-
-      const response = await fetch(
-        `/api/vocabulary?book=${book}&unit=${unit}&t=${Date.now()}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
-
-      const data = (await response.json()) as VocabularyResponse;
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || "So‘zlarni yuklashda xatolik yuz berdi."
-        );
-      }
-
-      setSavedWords(Array.isArray(data.words) ? data.words : []);
-    } catch (err) {
-      setSavedWords([]);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "So‘zlarni yuklashda xatolik yuz berdi."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadWords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book, unit]);
-
-  async function handleImport() {
-    try {
-      setError("");
-      setMessage("");
-
-      if (!text.trim()) {
-        setError("Avval so‘zlarni kiriting.");
-        return;
-      }
-
-      if (invalidLines > 0) {
-        setError(`${invalidLines} ta qator noto‘g‘ri formatda.`);
-        return;
-      }
-
-      if (parsedWords.length === 0) {
-        setError("Kamida bitta to‘g‘ri so‘z kiriting.");
-        return;
-      }
-
-      const confirmed = window.confirm(
-        `Book ${book}, Unit ${unit} uchun ${parsedWords.length} ta so‘zni saqlaysizmi?\n\n` +
-          `Misol gap bilan: ${exampleCount} ta`
-      );
-
-      if (!confirmed) return;
-
-      setSaving(true);
-
-      const response = await fetch("/api/vocabulary", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          book: Number(book),
-          unit: Number(unit),
-          words: parsedWords,
-        }),
-      });
-
-      const data = (await response.json()) as VocabularyResponse;
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || "So‘zlarni saqlashda xatolik yuz berdi."
-        );
-      }
-
-      const newlySavedWords = Array.isArray(data.words)
-        ? data.words
-        : parsedWords;
-
-      setSavedWords(newlySavedWords);
-
-      setMessage(
-        data.message ||
-          `Book ${book}, Unit ${unit} uchun ${newlySavedWords.length} ta so‘z saqlandi.`
-      );
-
-      setText("");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "So‘zlarni saqlashda xatolik yuz berdi."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function loadSavedIntoEditor() {
-    if (savedWords.length === 0) {
-      setError("Bu Unitda hali saqlangan so‘zlar yo‘q.");
-      return;
-    }
-
-    const prepared = savedWords
-      .map((item) =>
-        [
-          item.word,
-          item.translation,
-          item.example || "",
-          item.exampleTranslation || "",
-        ].join(" | ")
-      )
-      .join("\n");
-
-    setText(prepared);
-    setMessage("Saqlangan so‘zlar tahrirlash uchun yuklandi.");
-    setError("");
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  }
+export default function QollanmalarPage() {
+  const router = useRouter();
 
   function goHome() {
-    window.location.href = "/";
+    router.push("/");
   }
 
-  function goAdmin() {
-    window.location.href = "/admin";
-  }
-
-  function goEnglishUzbek() {
-    window.location.href = "/admin/dictionary/english-uzbek";
-  }
-
-  function goIrregularVerbs() {
-    window.location.href = "/admin/dictionary/irregular-verbs";
-  }
-
-  function scrollToVocabulary() {
-    document
-      .getElementById("english-vocabulary-editor")
-      ?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+  function openPage(href: string) {
+    router.push(href);
   }
 
   return (
     <main className="page">
-      <div className="wrapper">
-        {/* =====================================================
-            TOP PANEL
-        ===================================================== */}
+      {/* =========================
+          TEPA 3D PANEL
+      ========================== */}
 
-        <div className="topBar">
-          <button
-            type="button"
-            className="brandButton"
-            onClick={goAdmin}
-          >
-            Qurbonov Siyovush Jamaliddinzoda
-          </button>
-
-          <div className="topActions">
-            <button
-              type="button"
-              className="topSmallButton"
-              onClick={goHome}
-            >
-              Asosiy sahifa
-            </button>
-
-            <button
-              type="button"
-              className="topBlueButton"
-              onClick={goAdmin}
-            >
-              ← Orqaga
-            </button>
-          </div>
+      <section className="topPanel">
+        <div className="pageTitle">
+          Qo‘llanmalar
         </div>
 
-        {/* =====================================================
-            MAIN ADMIN BLOCK
-        ===================================================== */}
+        <button
+          type="button"
+          className="backButton"
+          onClick={goHome}
+        >
+          Orqaga
+        </button>
+      </section>
 
-        <section className="adminBox">
-          <div className="adminTitle">
-            Lug‘at boshqaruvi
-          </div>
+      {/* =========================
+          ASOSIY 3D PANEL
+      ========================== */}
 
-          {/* =====================================================
-              LUG‘AT BOSHQARUVI KARTALARI
-          ===================================================== */}
+      <section className="mainPanel">
+        <h1 className="heading">
+          Kerakli bo‘limni tanlang
+        </h1>
 
-          <div className="dictionaryMenu">
-            <article className="dictionaryMenuCard">
-              <div className="dictionaryBadge">EN</div>
+        <div className="cards">
+          {cards.map((card) => (
+            <article
+              className="card"
+              key={card.title}
+            >
+              <div className="badge">
+                {card.badge}
+              </div>
 
-              <h2>English Vocabulary</h2>
+              <h2>{card.title}</h2>
 
               <button
                 type="button"
-                className="dictionaryMenuButton"
-                onClick={scrollToVocabulary}
-              >
-                Boshqarish
-              </button>
-            </article>
-
-            <article className="dictionaryMenuCard">
-              <div className="dictionaryBadge">EN–UZ</div>
-
-              <h2>English–Uzbek Dictionary</h2>
-
-              <button
-                type="button"
-                className="dictionaryMenuButton"
-                onClick={goEnglishUzbek}
-              >
-                Boshqarish
-              </button>
-            </article>
-
-            <article className="dictionaryMenuCard">
-              <div className="dictionaryBadge">IV</div>
-
-              <h2>Irregular Verbs</h2>
-
-              <button
-                type="button"
-                className="dictionaryMenuButton"
-                onClick={goIrregularVerbs}
-              >
-                Boshqarish
-              </button>
-            </article>
-          </div>
-
-          {/* BOOK + UNIT CARD */}
-
-          <div className="innerCard" id="english-vocabulary-editor">
-            <h2>English Vocabulary</h2>
-
-            <p className="subtitle">
-              4000 Essential English Words — so‘zlar va misol gaplarni boshqarish
-            </p>
-
-            <div className="selectorGrid">
-              <div className="field">
-                <label>Book</label>
-
-                <select
-                  value={book}
-                  onChange={(e) => {
-                    setBook(e.target.value);
-                    setText("");
-                    setMessage("");
-                    setError("");
-                  }}
-                >
-                  {books.map((number) => (
-                    <option key={number} value={number}>
-                      Book {number}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <label>Unit</label>
-
-                <select
-                  value={unit}
-                  onChange={(e) => {
-                    setUnit(e.target.value);
-                    setText("");
-                    setMessage("");
-                    setError("");
-                  }}
-                >
-                  {units.map((number) => (
-                    <option key={number} value={number}>
-                      Unit {number}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="selectedInfo">
-              Tanlandi:
-              <strong>
-                {" "}
-                Book {book} → Unit {unit}
-              </strong>
-            </div>
-
-            {message && (
-              <div className="message success">
-                {message}
-              </div>
-            )}
-
-            {error && (
-              <div className="message error">
-                {error}
-              </div>
-            )}
-
-            <div className="editorTitle">
-              So‘zlarni kiriting
-            </div>
-
-            <div className="formatText">
-              Format:
-              <strong>
-                {" "}
-                English | Uzbek | English example | Uzbek example
-              </strong>
-            </div>
-
-            <div className="formatText">
-              Misol gap bo‘lmasa:
-              <strong> English | Uzbek</strong>
-            </div>
-
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              spellCheck={false}
-              placeholder={`afraid | qo‘rqqan | I am afraid of dogs. | Men itlardan qo‘rqaman.
-agree | rozi bo‘lmoq | I agree with you. | Men sizga qo‘shilaman.
-angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
-            />
-
-            <div className="bottomRow">
-              <div className="stats">
-                <div>
-                  Qator:
-                  <strong> {totalLines}</strong>
-                </div>
-
-                <div>
-                  To‘g‘ri:
-                  <strong className="green">
-                    {" "}
-                    {parsedWords.length}
-                  </strong>
-                </div>
-
-                <div>
-                  Xato:
-                  <strong className={invalidLines > 0 ? "red" : ""}>
-                    {" "}
-                    {invalidLines}
-                  </strong>
-                </div>
-
-                <div>
-                  Misol gap:
-                  <strong> {exampleCount}</strong>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="blueButton"
-                disabled={
-                  saving ||
-                  parsedWords.length === 0 ||
-                  invalidLines > 0
+                className="openButton"
+                onClick={() =>
+                  openPage(card.href)
                 }
-                onClick={handleImport}
               >
-                {saving ? "Saqlanmoqda..." : "Import qilish"}
+                Ochish
               </button>
-            </div>
-          </div>
-
-          {/* SAVED WORDS */}
-
-          <div className="innerCard savedCard">
-            <div className="savedTop">
-              <div>
-                <h2>Saqlangan so‘zlar</h2>
-
-                <p>
-                  Book {book} → Unit {unit}
-                </p>
-              </div>
-
-              <div className="savedButtons">
-                <button
-                  type="button"
-                  className="grayButton"
-                  onClick={loadSavedIntoEditor}
-                  disabled={savedWords.length === 0}
-                >
-                  Tahrirlash
-                </button>
-
-                <button
-                  type="button"
-                  className="blueButton small"
-                  onClick={loadWords}
-                  disabled={loading}
-                >
-                  {loading ? "Yuklanmoqda..." : "Yangilash"}
-                </button>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="emptyBox">
-                So‘zlar yuklanmoqda...
-              </div>
-            ) : savedWords.length === 0 ? (
-              <div className="emptyBox">
-                Bu Unit uchun hali so‘z saqlanmagan.
-              </div>
-            ) : (
-              <div className="wordList">
-                {savedWords.map((item, index) => (
-                  <div
-                    className="wordRow"
-                    key={`${item.word}-${index}`}
-                  >
-                    <div className="numberBox">
-                      {index + 1}
-                    </div>
-
-                    <div className="wordBody">
-                      <div className="wordMain">
-                        <strong>{item.word}</strong>
-                        <span>—</span>
-                        <span>{item.translation}</span>
-                      </div>
-
-                      {(item.example ||
-                        item.exampleTranslation) && (
-                        <div className="exampleBox">
-                          {item.example && (
-                            <div className="exampleEn">
-                              {item.example}
-                            </div>
-                          )}
-
-                          {item.exampleTranslation && (
-                            <div className="exampleUz">
-                              {item.exampleTranslation}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <style jsx>{`
         * {
@@ -566,865 +110,767 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .page {
           min-height: 100vh;
 
-          padding: 14px 20px 70px;
+          padding:
+            16px
+            20px
+            60px;
+
+          background:
+            radial-gradient(
+              circle at top,
+              #ffffff 0%,
+              #f3f6f7 48%,
+              #e8edef 100%
+            );
+
+          color: #111;
 
           font-family:
             "Bell MT",
             "Times New Roman",
+            Georgia,
             serif;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #f2f4f5 55%,
-              #e7eaec 100%
-            );
-
-          color: #111;
         }
 
-        .wrapper {
-          max-width: 1020px;
-          margin: 0 auto;
-        }
-
-        /* ========================================
-           TOP BAR
-        ======================================== */
-
-        .topBar {
-          min-height: 77px;
-
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-
-          gap: 18px;
-
-          padding: 13px 18px;
-
-          border-radius: 18px;
-
-          border: 2px solid #133f5c;
-
-          background:
-            linear-gradient(
-              180deg,
-              #79ccf2 0%,
-              #57acd7 55%,
-              #4799c6 100%
-            );
-
-          box-shadow:
-            0 7px 0 #123d59,
-            0 12px 22px rgba(0, 0, 0, 0.18),
-            inset 0 2px 0 rgba(255, 255, 255, 0.65);
-        }
-
-        .brandButton {
-          min-height: 43px;
-
-          padding: 0 18px;
-
-          border-radius: 10px;
-
-          border: 1px solid #4e5960;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #ececec 52%,
-              #cfcfcf 100%
-            );
-
-          color: #111;
-
+        button {
           font-family: inherit;
-
-          font-size: 16px;
-          font-weight: 700;
-
-          cursor: pointer;
-
-          box-shadow:
-            0 4px 0 #666,
-            inset 0 2px 0 #fff;
         }
 
-        .brandButton:active {
-          transform: translateY(3px);
-          box-shadow:
-            0 1px 0 #666;
-        }
+        /* ==================================================
+           TEPA KO‘K PANEL
+        ================================================== */
 
-        .topActions {
-          display: flex;
-          gap: 10px;
-        }
+        .topPanel {
+          width: min(1850px, 100%);
 
-        .topSmallButton,
-        .topBlueButton {
-          min-width: 94px;
-          height: 38px;
+          min-height: 140px;
 
-          border-radius: 9px;
+          margin:
+            0
+            auto
+            34px;
 
-          font-family: inherit;
-
-          font-size: 12px;
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        .topSmallButton {
-          border: 1px solid #777;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #d4d4d4
-            );
-
-          box-shadow:
-            0 4px 0 #777,
-            inset 0 2px 0 #fff;
-        }
-
-        .topBlueButton {
-          color: #07344e;
-
-          border: 1px solid #155476;
-
-          background:
-            linear-gradient(
-              180deg,
-              #69c4ed,
-              #48a7d6
-            );
-
-          box-shadow:
-            0 4px 0 #14506f,
-            inset 0 2px 0 rgba(255,255,255,.6);
-        }
-
-        .topSmallButton:active,
-        .topBlueButton:active {
-          transform: translateY(3px);
-          box-shadow: none;
-        }
-
-        /* ========================================
-           ADMIN BOX
-        ======================================== */
-
-        .adminBox {
-          position: relative;
-
-          margin: 68px auto 0;
-
-          max-width: 900px;
-
-          padding: 47px 24px 27px;
-
-          border-radius: 18px;
-
-          border: 2px solid #343a3d;
-
-          background:
-            linear-gradient(
-              180deg,
-              #666b6e 0%,
-              #555a5d 55%,
-              #44494c 100%
-            );
-
-          box-shadow:
-            0 7px 0 #282d30,
-            0 13px 25px rgba(0,0,0,.2),
-            inset 0 2px 0 rgba(255,255,255,.15);
-        }
-
-        .adminTitle {
-          position: absolute;
-
-          top: -24px;
-          left: 50%;
-
-          transform: translateX(-50%);
-
-          min-width: 230px;
-
-          padding: 11px 25px;
-
-          text-align: center;
-
-          border-radius: 11px;
-
-          border: 2px solid #145071;
-
-          background:
-            linear-gradient(
-              180deg,
-              #78cdf3,
-              #51add9
-            );
-
-          color: #143e5d;
-
-          font-size: 22px;
-          font-weight: 700;
-
-          box-shadow:
-            0 5px 0 #174d68,
-            inset 0 2px 0 rgba(255,255,255,.55);
-        }
-
-        /* ========================================
-           LUG‘AT BOSHQARUVI MENYUSI
-        ======================================== */
-
-        .dictionaryMenu {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 18px;
-          margin-bottom: 30px;
-        }
-
-        .dictionaryMenuCard {
-          min-height: 190px;
-          padding: 22px 16px 20px;
+          padding:
+            28px
+            35px;
 
           display: flex;
-          flex-direction: column;
+
           align-items: center;
 
-          border-radius: 14px;
-          border: 1px solid #d7d7d7;
+          justify-content:
+            space-between;
+
+          gap: 30px;
+
+          border:
+            3px solid
+            #123d52;
+
+          border-radius:
+            30px;
 
           background:
             linear-gradient(
-              145deg,
-              #fbfbfb 0%,
-              #ececec 45%,
-              #d1d1d1 100%
+              180deg,
+              #8ad8fb 0%,
+              #63b8e5 50%,
+              #429dce 100%
             );
 
           box-shadow:
-            0 7px 0 #777c7e,
-            0 11px 18px rgba(0, 0, 0, 0.17),
-            inset 0 2px 0 #ffffff;
-
-          text-align: center;
+            inset 0 7px 7px
+              rgba(
+                255,
+                255,
+                255,
+                0.5
+              ),
+            inset 0 -8px 8px
+              rgba(
+                0,
+                0,
+                0,
+                0.12
+              ),
+            0 11px 0
+              #123d52,
+            0 18px 25px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
         }
 
-        .dictionaryBadge {
-          min-width: 58px;
-          height: 48px;
+        /* ==================================================
+           QO‘LLANMALAR
+        ================================================== */
 
-          padding: 0 10px;
+        .pageTitle {
+          width: 480px;
+
+          max-width: 45%;
+
+          min-height: 78px;
+
+          padding:
+            14px
+            30px;
 
           display: flex;
+
           align-items: center;
+
           justify-content: center;
 
-          border-radius: 9px;
-          border: 1px solid #155476;
+          border:
+            3px solid
+            #4f5c62;
+
+          border-radius:
+            18px;
 
           background:
             linear-gradient(
               180deg,
-              #dff7ff 0%,
-              #78cdf3 48%,
-              #4aa8d6 100%
+              #ffffff 0%,
+              #eeeeee 48%,
+              #d5d5d5 100%
             );
 
-          color: #123d59;
-
-          font-size: 14px;
-          font-weight: 700;
-
           box-shadow:
-            0 5px 0 #15506e,
-            inset 0 2px 0 rgba(255, 255, 255, 0.7);
-        }
-
-        .dictionaryMenuCard h2 {
-          margin: 25px 0 20px;
+            inset 0 6px 7px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+            inset 0 -5px 6px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 8px 0
+              #4d595e,
+            0 13px 16px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
 
           color: #111;
 
-          font-size: 20px;
-          line-height: 1.15;
+          text-align: center;
+
+          font-size: 33px;
+
+          font-weight: 900;
         }
 
-        .dictionaryMenuButton {
-          min-width: 135px;
-          height: 42px;
+        /* ==================================================
+           ORQAGA
+        ================================================== */
 
-          margin-top: auto;
-          padding: 0 16px;
+        .backButton {
+          width: 170px;
 
-          border-radius: 8px;
-          border: 1px solid #155679;
+          min-height: 66px;
+
+          padding:
+            10px
+            24px;
+
+          border:
+            3px solid
+            #4e5b61;
+
+          border-radius:
+            16px;
 
           background:
             linear-gradient(
               180deg,
-              #74cff6,
-              #4eaadb
+              #ffffff 0%,
+              #eeeeee 48%,
+              #d3d3d3 100%
             );
 
-          color: #123b53;
+          box-shadow:
+            inset 0 5px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+            inset 0 -4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 7px 0
+              #4e5b61,
+            0 11px 14px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
 
-          font-family: inherit;
-          font-size: 14px;
-          font-weight: 700;
+          color: #111;
+
+          font-size: 17px;
+
+          font-weight: 900;
 
           cursor: pointer;
 
+          transition:
+            transform 0.1s ease,
+            box-shadow 0.1s ease;
+        }
+
+        .backButton:hover {
+          transform:
+            translateY(-2px);
+
           box-shadow:
-            0 5px 0 #15506e,
-            inset 0 2px 0 rgba(255,255,255,.6);
+            inset 0 5px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+            0 9px 0
+              #4e5b61,
+            0 14px 17px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
-        .dictionaryMenuButton:active {
-          transform: translateY(4px);
-          box-shadow: none;
+        .backButton:active {
+          transform:
+            translateY(4px);
+
+          box-shadow:
+            inset 0 4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 2px 0
+              #4e5b61;
         }
 
-        /* ========================================
-           INNER CARDS
-        ======================================== */
+        /* ==================================================
+           ASOSIY KULRANG PANEL
+        ================================================== */
 
-        .innerCard {
-          padding: 25px;
+        .mainPanel {
+          width: min(1850px, 100%);
 
-          border-radius: 14px;
+          margin: 0 auto;
 
-          border: 1px solid #d7d7d7;
+          padding:
+            38px
+            34px
+            48px;
+
+          border:
+            2px solid
+            #30383b;
+
+          border-radius:
+            26px;
 
           background:
             linear-gradient(
-              145deg,
-              #f9f9f9 0%,
-              #ececec 45%,
-              #d1d1d1 100%
+              180deg,
+              #666b6d 0%,
+              #53595b 50%,
+              #3e4547 100%
             );
 
           box-shadow:
-            0 7px 0 #777c7e,
-            0 10px 18px rgba(0,0,0,.16),
-            inset 0 2px 0 #ffffff;
+            inset 0 6px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.12
+              ),
+            inset 0 -9px 11px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              ),
+            0 10px 0
+              #303638,
+            0 18px 27px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
-        .innerCard h2 {
-          margin: 0;
+        /* ==================================================
+           SARLAVHA
+        ================================================== */
+
+        .heading {
+          margin:
+            0
+            0
+            34px;
+
+          color: #fff;
 
           text-align: center;
 
-          color: #111;
+          font-size: 29px;
 
-          font-size: 26px;
+          font-weight: 900;
+
+          text-shadow:
+            0 2px 2px
+              rgba(
+                0,
+                0,
+                0,
+                0.7
+              );
         }
 
-        .subtitle {
-          margin: 6px 0 24px;
+        /* ==================================================
+           KARTALAR
+        ================================================== */
 
-          text-align: center;
+        .cards {
+          width: 100%;
 
-          color: #555;
-
-          font-size: 15px;
-        }
-
-        /* ========================================
-           BOOK UNIT
-        ======================================== */
-
-        .selectorGrid {
           display: grid;
 
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
-
-          gap: 24px;
-        }
-
-        .field label {
-          display: block;
-
-          margin: 0 0 7px 5px;
-
-          font-size: 17px;
-
-          font-weight: 700;
-        }
-
-        select {
-          width: 100%;
-          height: 49px;
-
-          padding: 0 14px;
-
-          border-radius: 9px;
-
-          border: 1px solid #7a7a7a;
-
-          outline: none;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #eeeeee
+            repeat(
+              3,
+              minmax(
+                0,
+                1fr
+              )
             );
 
-          box-shadow:
-            inset 0 2px 2px #ffffff,
-            0 4px 0 #888;
-
-          font-family: inherit;
-
-          font-size: 17px;
-          font-weight: 700;
+          gap:
+            32px
+            30px;
         }
 
-        .selectedInfo {
-          margin-top: 22px;
+        .card {
+          min-height: 260px;
 
-          padding: 12px 15px;
+          padding:
+            25px
+            24px
+            24px;
 
-          border-radius: 9px;
-
-          border: 1px solid #367a9f;
-
-          background:
-            linear-gradient(
-              180deg,
-              #d8f0fb,
-              #bcdfee
-            );
-
-          color: #153d55;
-
-          box-shadow:
-            0 4px 0 #8ba7b5,
-            inset 0 2px 0 #ffffff;
-
-          font-size: 16px;
-        }
-
-        /* ========================================
-           ALERTS
-        ======================================== */
-
-        .message {
-          margin-top: 16px;
-
-          padding: 11px 14px;
-
-          border-radius: 8px;
-
-          font-weight: 700;
-        }
-
-        .success {
-          background: #dff0e5;
-          border: 1px solid #7cab8c;
-          color: #245c36;
-        }
-
-        .error {
-          background: #f2dddd;
-          border: 1px solid #b97979;
-          color: #7a2525;
-        }
-
-        /* ========================================
-           EDITOR
-        ======================================== */
-
-        .editorTitle {
-          margin-top: 28px;
-
-          font-size: 22px;
-          font-weight: 700;
-        }
-
-        .formatText {
-          margin-top: 4px;
-
-          color: #555;
-
-          font-size: 14px;
-        }
-
-        textarea {
-          width: 100%;
-          min-height: 280px;
-
-          margin-top: 12px;
-
-          resize: vertical;
-
-          padding: 15px;
-
-          border-radius: 9px;
-
-          border: 1px solid #777;
-
-          outline: none;
-
-          background: #ffffff;
-
-          box-shadow:
-            inset 3px 3px 6px rgba(0,0,0,.14),
-            inset -2px -2px 4px rgba(255,255,255,.8);
-
-          font-family: Arial, sans-serif;
-
-          font-size: 15px;
-          line-height: 1.7;
-        }
-
-        .bottomRow {
           display: flex;
 
-          justify-content: space-between;
+          flex-direction: column;
+
           align-items: center;
 
-          gap: 15px;
+          border:
+            1px solid
+            #d0d0d0;
 
-          flex-wrap: wrap;
-
-          margin-top: 18px;
-        }
-
-        .stats {
-          display: flex;
-
-          gap: 15px;
-
-          flex-wrap: wrap;
-
-          font-size: 14px;
-        }
-
-        .green {
-          color: #166b39;
-        }
-
-        .red {
-          color: #a52525;
-        }
-
-        /* ========================================
-           BUTTONS
-        ======================================== */
-
-        .blueButton,
-        .grayButton {
-          min-width: 120px;
-
-          height: 39px;
-
-          padding: 0 16px;
-
-          border-radius: 8px;
-
-          font-family: inherit;
-
-          font-size: 14px;
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        .blueButton {
-          color: #123b53;
-
-          border: 1px solid #155679;
+          border-radius:
+            15px;
 
           background:
             linear-gradient(
               180deg,
-              #74cff6,
-              #4eaadb
+              #ffffff 0%,
+              #f5f5f5 55%,
+              #e4e4e4 100%
             );
 
           box-shadow:
-            0 5px 0 #15506e,
-            inset 0 2px 0 rgba(255,255,255,.6);
-        }
-
-        .grayButton {
-          border: 1px solid #777;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #d7d7d7
-            );
-
-          box-shadow:
-            0 5px 0 #777,
-            inset 0 2px 0 #ffffff;
-        }
-
-        .blueButton:active,
-        .grayButton:active {
-          transform: translateY(4px);
-
-          box-shadow: none;
-        }
-
-        .blueButton:disabled,
-        .grayButton:disabled {
-          opacity: .45;
-
-          cursor: not-allowed;
-        }
-
-        .blueButton.small {
-          min-width: 100px;
-        }
-
-        /* ========================================
-           SAVED
-        ======================================== */
-
-        .savedCard {
-          margin-top: 28px;
-        }
-
-        .savedTop {
-          display: flex;
-
-          justify-content: space-between;
-          align-items: center;
-
-          gap: 20px;
-
-          flex-wrap: wrap;
-        }
-
-        .savedTop h2 {
-          text-align: left;
-        }
-
-        .savedTop p {
-          margin: 4px 0 0;
-          color: #555;
-        }
-
-        .savedButtons {
-          display: flex;
-          gap: 10px;
-        }
-
-        .emptyBox {
-          margin-top: 20px;
-
-          padding: 24px;
+            inset 0 5px 7px
+              rgba(
+                255,
+                255,
+                255,
+                0.96
+              ),
+            0 8px 0
+              #858c8e,
+            0 14px 19px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
 
           text-align: center;
 
-          border-radius: 9px;
-
-          border: 1px dashed #888;
-
-          background:
-            linear-gradient(
-              180deg,
-              #f4f4f4,
-              #dddddd
-            );
-
-          color: #555;
+          transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease;
         }
 
-        /* ========================================
-           WORD LIST
-        ======================================== */
-
-        .wordList {
-          display: grid;
-
-          gap: 10px;
-
-          margin-top: 20px;
-        }
-
-        .wordRow {
-          display: flex;
-
-          gap: 12px;
-
-          padding: 13px;
-
-          border-radius: 10px;
-
-          border: 1px solid #aaa;
-
-          background:
-            linear-gradient(
-              145deg,
-              #f7f7f7,
-              #d8d8d8
-            );
+        .card:hover {
+          transform:
+            translateY(-3px);
 
           box-shadow:
-            0 4px 0 #888,
-            inset 0 2px 0 #ffffff;
+            inset 0 5px 7px
+              rgba(
+                255,
+                255,
+                255,
+                0.96
+              ),
+            0 10px 0
+              #858c8e,
+            0 17px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.25
+              );
         }
 
-        .numberBox {
-          width: 34px;
-          height: 34px;
+        /* ==================================================
+           BADGE
+        ================================================== */
 
-          flex: 0 0 34px;
+        .badge {
+          width: 58px;
 
-          display: grid;
-          place-items: center;
+          height: 49px;
 
-          border-radius: 7px;
-
-          color: #143b54;
-
-          background:
-            linear-gradient(
-              180deg,
-              #73cef4,
-              #4fa9d5
-            );
-
-          border: 1px solid #18516f;
-
-          box-shadow:
-            0 3px 0 #15506d;
-
-          font-weight: 700;
-        }
-
-        .wordBody {
-          flex: 1;
-        }
-
-        .wordMain {
           display: flex;
-
-          gap: 10px;
-
-          flex-wrap: wrap;
 
           align-items: center;
 
-          font-size: 17px;
-        }
+          justify-content: center;
 
-        .wordMain strong {
-          font-size: 19px;
-        }
+          flex-shrink: 0;
 
-        .exampleBox {
-          margin-top: 8px;
+          border:
+            2px solid
+            #07506d;
 
-          padding: 10px;
+          border-radius:
+            10px;
 
-          border-radius: 7px;
+          background:
+            linear-gradient(
+              180deg,
+              #e1f8ff 0%,
+              #78d1f0 48%,
+              #3ca8d5 100%
+            );
 
-          background: rgba(255,255,255,.65);
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.8
+              ),
+            0 5px 0
+              #07506d;
 
-          border: 1px solid #c5c5c5;
-        }
-
-        .exampleEn {
-          font-style: italic;
+          color: #063e68;
 
           font-size: 16px;
 
-          font-weight: 700;
+          font-weight: 900;
         }
 
-        .exampleUz {
-          margin-top: 4px;
+        /* ==================================================
+           KARTA NOMI
+        ================================================== */
 
-          color: #9b2525;
+        .card h2 {
+          width: 100%;
 
-          font-style: italic;
+          margin:
+            28px
+            0
+            0;
 
-          font-size: 15px;
+          color: #111;
+
+          font-size: 24px;
+
+          line-height: 1.15;
+
+          font-weight: 900;
         }
 
-        /* ========================================
-           MOBILE
-        ======================================== */
+        /* ==================================================
+           OCHISH TUGMASI
+        ================================================== */
 
-        @media (max-width: 760px) {
+        .openButton {
+          width: 155px;
+
+          min-height: 47px;
+
+          margin-top: auto;
+
+          border:
+            2px solid
+            #07506d;
+
+          border-radius:
+            9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #d9f6ff 0%,
+              #75cfee 48%,
+              #38a7d5 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.75
+              ),
+            0 6px 0
+              #07506d,
+            0 10px 12px
+              rgba(
+                0,
+                0,
+                0,
+                0.18
+              );
+
+          color: #073e65;
+
+          font-size: 14px;
+
+          font-weight: 900;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.1s ease,
+            box-shadow 0.1s ease;
+        }
+
+        .openButton:hover {
+          transform:
+            translateY(-2px);
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.75
+              ),
+            0 8px 0
+              #07506d,
+            0 12px 14px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
+        }
+
+        .openButton:active {
+          transform:
+            translateY(4px);
+
+          box-shadow:
+            inset 0 3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 2px 0
+              #07506d;
+        }
+
+        /* ==================================================
+           KATTA MONITOR
+        ================================================== */
+
+        @media (min-width: 1500px) {
+          .mainPanel {
+            padding:
+              40px
+              45px
+              50px;
+          }
+
+          .cards {
+            gap:
+              34px
+              36px;
+          }
+
+          .card {
+            min-height: 275px;
+          }
+        }
+
+        /* ==================================================
+           TABLET
+        ================================================== */
+
+        @media (max-width: 1000px) {
+          .topPanel {
+            min-height: 115px;
+
+            padding:
+              22px
+              25px;
+          }
+
+          .pageTitle {
+            width: 360px;
+
+            font-size: 27px;
+          }
+
+          .mainPanel {
+            padding:
+              32px
+              24px
+              42px;
+          }
+
+          .cards {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+          }
+        }
+
+        /* ==================================================
+           TELEFON
+        ================================================== */
+
+        @media (max-width: 620px) {
           .page {
-            padding: 10px 10px 50px;
+            padding:
+              10px
+              8px
+              40px;
           }
 
-          .topBar {
-            padding: 12px;
+          .topPanel {
+            min-height: 96px;
+
+            padding: 14px;
+
+            border-radius: 18px;
+
+            gap: 12px;
           }
 
-          .brandButton {
+          .pageTitle {
+            width: auto;
+
+            max-width: none;
+
+            flex: 1;
+
+            min-height: 58px;
+
+            padding:
+              10px
+              12px;
+
+            border-radius: 12px;
+
+            font-size: 21px;
+          }
+
+          .backButton {
+            width: 92px;
+
+            min-height: 52px;
+
+            padding:
+              7px
+              8px;
+
+            border-radius: 11px;
+
             font-size: 13px;
           }
 
-          .topActions {
-            display: none;
-          }
-
-          .dictionaryMenu {
-            grid-template-columns: 1fr;
-          }
-
-          .dictionaryMenuCard {
-            min-height: 165px;
-          }
-
-          .adminBox {
-            margin-top: 55px;
-
+          .mainPanel {
             padding:
-              40px 13px 20px;
+              28px
+              14px
+              32px;
+
+            border-radius: 18px;
           }
 
-          .adminTitle {
-            min-width: 190px;
+          .heading {
+            margin-bottom: 25px;
 
-            font-size: 18px;
+            font-size: 22px;
           }
 
-          .innerCard {
-            padding: 17px;
-          }
-
-          .selectorGrid {
+          .cards {
             grid-template-columns: 1fr;
+
+            gap: 25px;
           }
 
-          .bottomRow {
-            align-items: stretch;
+          .card {
+            min-height: 220px;
           }
 
-          .blueButton {
-            width: 100%;
-          }
-
-          .savedButtons {
-            width: 100%;
-          }
-
-          .savedButtons button {
-            flex: 1;
+          .card h2 {
+            font-size: 21px;
           }
         }
       `}</style>
