@@ -1,52 +1,38 @@
 "use client";
 
 export default function DictionariesPage() {
-  /* =====================================================
-     ORQAGA QAYTISH
-  ===================================================== */
-
   function goBack() {
     window.location.href = "/qollanmalar";
   }
 
-  /* =====================================================
-     LUG‘AT BO‘LIMLARI
-  ===================================================== */
-
   const cards = [
     {
       title: "English–Uzbek Dictionary",
-      subtitle: "Inglizcha so‘zlarni yodlash va mustahkamlash",
       href: "/qollanmalar/dictionaries/english-uzbek",
       badge: "EN",
     },
     {
       title: "Phrasal Verbs",
-      subtitle: "Eng muhim inglizcha phrasal verblar",
       href: "/qollanmalar/dictionaries/phrasal-verbs",
       badge: "PV",
     },
     {
       title: "Irregular Verbs",
-      subtitle: "Noto‘g‘ri fe’llarni yodlash va mashq qilish",
       href: "/qollanmalar/dictionaries/irregular-verbs",
       badge: "IV",
     },
     {
       title: "Synonyms & Antonyms",
-      subtitle: "Sinonim va antonimlar orqali lug‘at boyligini oshirish",
       href: "/qollanmalar/dictionaries/synonyms-antonyms",
       badge: "S/A",
     },
     {
       title: "Collocations",
-      subtitle: "Ingliz tilidagi eng muhim so‘z birikmalari",
       href: "/qollanmalar/dictionaries/collocations",
       badge: "C",
     },
     {
       title: "IELTS Vocabulary",
-      subtitle: "IELTS uchun eng kerakli akademik so‘zlar",
       href: "/qollanmalar/dictionaries/ielts-vocabulary",
       badge: "IELTS",
     },
@@ -55,10 +41,6 @@ export default function DictionariesPage() {
   return (
     <main className="page">
       <div className="shell">
-        {/* =================================================
-            YUQORI PANEL
-        ================================================= */}
-
         <header className="topBar">
           <button
             type="button"
@@ -73,10 +55,6 @@ export default function DictionariesPage() {
           </div>
         </header>
 
-        {/* =================================================
-            ASOSIY PANEL
-        ================================================= */}
-
         <section className="mainPanel">
           <div className="floatingTitle">
             Inglizcha lug‘atlar
@@ -85,10 +63,6 @@ export default function DictionariesPage() {
           <div className="intro">
             <h1>Kerakli bo‘limni tanlang</h1>
           </div>
-
-          {/* =================================================
-              KARTALAR
-          ================================================= */}
 
           <div className="cardGrid">
             {cards.map((card) => (
@@ -102,8 +76,6 @@ export default function DictionariesPage() {
 
                 <div className="cardContent">
                   <h2>{card.title}</h2>
-
-                  <p>{card.subtitle}</p>
                 </div>
 
                 <button
@@ -126,17 +98,9 @@ export default function DictionariesPage() {
           box-sizing: border-box;
         }
 
-        /* =====================================================
-           SAHIFA
-        ===================================================== */
-
         .page {
           min-height: 100vh;
-
-          padding:
-            24px
-            18px
-            70px;
+          padding: 24px 18px 70px;
 
           background:
             radial-gradient(
@@ -157,7 +121,6 @@ export default function DictionariesPage() {
 
         .shell {
           width: min(1200px, 96%);
-
           margin: 0 auto;
         }
 
@@ -165,31 +128,23 @@ export default function DictionariesPage() {
           font-family: inherit;
         }
 
-        /* =====================================================
+        /* ==========================================
            YUQORI PANEL
-        ===================================================== */
+        ========================================== */
 
         .topBar {
           width: 100%;
-
           min-height: 100px;
 
-          padding:
-            18px
-            30px;
+          padding: 18px 30px;
 
           display: flex;
-
           align-items: center;
-
           justify-content: space-between;
 
           gap: 20px;
 
-          border:
-            3px solid
-            #174461;
-
+          border: 3px solid #174461;
           border-radius: 25px;
 
           background:
@@ -201,50 +156,34 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 5px 4px
-              rgba(255,255,255,.75),
-
-            inset 0 -5px 5px
-              rgba(0,0,0,.12),
-
-            0 8px 0
-              #174d6d,
-
-            0 14px 18px
-              rgba(0,0,0,.20);
+            inset 0 5px 4px rgba(255,255,255,.75),
+            inset 0 -5px 5px rgba(0,0,0,.12),
+            0 8px 0 #174d6d,
+            0 14px 18px rgba(0,0,0,.20);
         }
 
         .topTitle {
           color: #073b68;
 
           font-size: 20px;
-
           font-weight: 900;
-
           letter-spacing: 2px;
 
           text-shadow:
-            0 1px 0
-            rgba(255,255,255,.75);
+            0 1px 0 rgba(255,255,255,.75);
         }
 
-        /* =====================================================
-           ORQAGA TUGMASI
-        ===================================================== */
+        /* ==========================================
+           ORQAGA
+        ========================================== */
 
         .backButton {
           min-width: 170px;
-
           min-height: 50px;
 
-          padding:
-            9px
-            22px;
+          padding: 9px 22px;
 
-          border:
-            2px solid
-            #174461;
-
+          border: 2px solid #174461;
           border-radius: 9px;
 
           background:
@@ -256,22 +195,14 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.8),
-
-            inset 0 -3px 3px
-              rgba(0,0,0,.12),
-
-            0 5px 0
-              #17415c,
-
-            0 9px 11px
-              rgba(0,0,0,.18);
+            inset 0 4px 4px rgba(255,255,255,.8),
+            inset 0 -3px 3px rgba(0,0,0,.12),
+            0 5px 0 #17415c,
+            0 9px 11px rgba(0,0,0,.18);
 
           color: #073b68;
 
           font-size: 14px;
-
           font-weight: 700;
 
           cursor: pointer;
@@ -283,28 +214,21 @@ export default function DictionariesPage() {
         }
 
         .backButton:hover {
-          transform:
-            translateY(-2px);
-
-          filter:
-            brightness(1.04);
+          transform: translateY(-2px);
+          filter: brightness(1.04);
         }
 
         .backButton:active {
-          transform:
-            translateY(3px);
+          transform: translateY(3px);
 
           box-shadow:
-            inset 0 4px 5px
-              rgba(0,0,0,.1),
-
-            0 1px 0
-              #17415c;
+            inset 0 4px 5px rgba(0,0,0,.1),
+            0 1px 0 #17415c;
         }
 
-        /* =====================================================
+        /* ==========================================
            ASOSIY KULRANG PANEL
-        ===================================================== */
+        ========================================== */
 
         .mainPanel {
           position: relative;
@@ -316,10 +240,7 @@ export default function DictionariesPage() {
             30px
             38px;
 
-          border:
-            3px solid
-            #333a3e;
-
+          border: 3px solid #333a3e;
           border-radius: 23px;
 
           background:
@@ -331,54 +252,35 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.10),
-
-            inset 0 -7px 7px
-              rgba(0,0,0,.22),
-
-            0 6px 0
-              #30373b,
-
-            0 11px 0
-              #242a2d,
-
-            0 17px 24px
-              rgba(0,0,0,.22);
+            inset 0 5px 5px rgba(255,255,255,.10),
+            inset 0 -7px 7px rgba(0,0,0,.22),
+            0 6px 0 #30373b,
+            0 11px 0 #242a2d,
+            0 17px 24px rgba(0,0,0,.22);
         }
 
-        /* =====================================================
-           INGLIZCHA LUG‘ATLAR SARLAVHASI
-        ===================================================== */
+        /* ==========================================
+           SARLAVHA
+        ========================================== */
 
         .floatingTitle {
           position: absolute;
 
           left: 50%;
-
           top: -31px;
 
-          transform:
-            translateX(-50%);
+          transform: translateX(-50%);
 
           min-width: 350px;
-
           min-height: 60px;
 
-          padding:
-            10px
-            30px;
+          padding: 10px 30px;
 
           display: flex;
-
           align-items: center;
-
           justify-content: center;
 
-          border:
-            3px solid
-            #174461;
-
+          border: 3px solid #174461;
           border-radius: 12px;
 
           background:
@@ -390,36 +292,22 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.72),
-
-            inset 0 -5px 5px
-              rgba(0,0,0,.13),
-
-            0 6px 0
-              #17415c,
-
-            0 10px 13px
-              rgba(20,65,92,.24);
+            inset 0 6px 5px rgba(255,255,255,.72),
+            inset 0 -5px 5px rgba(0,0,0,.13),
+            0 6px 0 #17415c,
+            0 10px 13px rgba(20,65,92,.24);
 
           color: #073b68;
 
           font-size: 30px;
-
           font-weight: 700;
 
           text-align: center;
-
           white-space: nowrap;
         }
 
-        /* =====================================================
-           INTRO
-        ===================================================== */
-
         .intro {
           margin-bottom: 28px;
-
           text-align: center;
         }
 
@@ -429,32 +317,27 @@ export default function DictionariesPage() {
           color: #ffffff;
 
           font-size: 25px;
-
           font-weight: 700;
 
           text-shadow:
-            0 2px 0
-            rgba(0,0,0,.35);
+            0 2px 0 rgba(0,0,0,.35);
         }
 
-        /* =====================================================
+        /* ==========================================
            KARTALAR
-        ===================================================== */
+        ========================================== */
 
         .cardGrid {
           display: grid;
 
           grid-template-columns:
-            repeat(
-              3,
-              minmax(0, 1fr)
-            );
+            repeat(3, minmax(0, 1fr));
 
           gap: 25px;
         }
 
         .dictionaryCard {
-          min-height: 225px;
+          min-height: 205px;
 
           padding:
             22px
@@ -462,19 +345,14 @@ export default function DictionariesPage() {
             20px;
 
           display: flex;
-
           flex-direction: column;
 
           align-items: center;
-
           justify-content: center;
 
           text-align: center;
 
-          border:
-            2px solid
-            #596166;
-
+          border: 2px solid #596166;
           border-radius: 15px;
 
           background:
@@ -486,42 +364,28 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 7px 6px
-              rgba(255,255,255,.95),
-
-            inset 0 -5px 5px
-              rgba(0,0,0,.10),
-
-            0 6px 0
-              #596166,
-
-            0 11px 12px
-              rgba(0,0,0,.18);
+            inset 0 7px 6px rgba(255,255,255,.95),
+            inset 0 -5px 5px rgba(0,0,0,.10),
+            0 6px 0 #596166,
+            0 11px 12px rgba(0,0,0,.18);
         }
 
-        /* =====================================================
+        /* ==========================================
            BADGE
-        ===================================================== */
+        ========================================== */
 
         .badge {
           min-width: 58px;
-
           min-height: 44px;
 
-          padding:
-            7px
-            11px;
+          padding: 7px 11px;
 
-          margin-bottom: 15px;
+          margin-bottom: 16px;
 
           display: grid;
-
           place-items: center;
 
-          border:
-            2px solid
-            #174461;
-
+          border: 2px solid #174461;
           border-radius: 10px;
 
           color: #073b68;
@@ -535,79 +399,47 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.78),
-
-            0 4px 0
-              #17415c;
+            inset 0 4px 4px rgba(255,255,255,.78),
+            0 4px 0 #17415c;
 
           font-size: 15px;
-
           font-weight: 900;
         }
 
-        /* =====================================================
-           KARTA MATNI
-        ===================================================== */
+        /* ==========================================
+           KARTA NOMI
+        ========================================== */
 
         .cardContent {
           flex: 1;
 
           display: flex;
-
-          flex-direction: column;
-
           align-items: center;
-
           justify-content: center;
         }
 
         .dictionaryCard h2 {
-          margin:
-            0
-            0
-            8px;
+          margin: 0;
 
           color: #111;
 
-          font-size: 22px;
-
+          font-size: 23px;
           line-height: 1.15;
         }
 
-        .dictionaryCard p {
-          max-width: 300px;
-
-          margin: 0;
-
-          color: #525c62;
-
-          font-size: 13px;
-
-          line-height: 1.35;
-
-          font-weight: 700;
-        }
-
-        /* =====================================================
-           OCHISH TUGMASI
-        ===================================================== */
+        /* ==========================================
+           OCHISH
+        ========================================== */
 
         .openButton {
           min-width: 150px;
-
           min-height: 45px;
 
           margin-top: 18px;
 
-          padding:
-            8px
-            20px;
+          padding: 8px 20px;
 
-          border:
-            2px solid
-            #174461;
-
+          border: 2px solid #174461;
           border-radius: 9px;
 
           color: #073b68;
@@ -621,20 +453,12 @@ export default function DictionariesPage() {
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.8),
-
-            inset 0 -3px 3px
-              rgba(0,0,0,.12),
-
-            0 4px 0
-              #17415c,
-
-            0 8px 10px
-              rgba(0,0,0,.18);
+            inset 0 4px 4px rgba(255,255,255,.8),
+            inset 0 -3px 3px rgba(0,0,0,.12),
+            0 4px 0 #17415c,
+            0 8px 10px rgba(0,0,0,.18);
 
           font-size: 15px;
-
           font-weight: 700;
 
           cursor: pointer;
@@ -646,49 +470,36 @@ export default function DictionariesPage() {
         }
 
         .openButton:hover {
-          transform:
-            translateY(-2px);
-
-          filter:
-            brightness(1.04);
+          transform: translateY(-2px);
+          filter: brightness(1.04);
         }
 
         .openButton:active {
-          transform:
-            translateY(3px);
+          transform: translateY(3px);
 
           box-shadow:
-            inset 0 4px 5px
-              rgba(0,0,0,.10),
-
-            0 1px 0
-              #17415c;
+            inset 0 4px 5px rgba(0,0,0,.10),
+            0 1px 0 #17415c;
         }
 
-        /* =====================================================
+        /* ==========================================
            TABLET
-        ===================================================== */
+        ========================================== */
 
         @media (max-width: 1050px) {
           .cardGrid {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              );
+              repeat(2, minmax(0, 1fr));
           }
         }
 
-        /* =====================================================
+        /* ==========================================
            TELEFON
-        ===================================================== */
+        ========================================== */
 
         @media (max-width: 640px) {
           .page {
-            padding:
-              10px
-              8px
-              35px;
+            padding: 10px 8px 35px;
           }
 
           .shell {
@@ -698,26 +509,16 @@ export default function DictionariesPage() {
           .topBar {
             min-height: 68px;
 
-            padding:
-              10px
-              12px;
+            padding: 10px 12px;
 
             border-radius: 18px;
-
             border-width: 2px;
 
             box-shadow:
-              inset 0 4px 4px
-                rgba(255,255,255,.68),
-
-              inset 0 -4px 4px
-                rgba(0,0,0,.10),
-
-              0 5px 0
-                #174d6d,
-
-              0 9px 12px
-                rgba(0,0,0,.16);
+              inset 0 4px 4px rgba(255,255,255,.68),
+              inset 0 -4px 4px rgba(0,0,0,.10),
+              0 5px 0 #174d6d,
+              0 9px 12px rgba(0,0,0,.16);
           }
 
           .topTitle {
@@ -728,12 +529,9 @@ export default function DictionariesPage() {
             width: 100%;
 
             min-width: 0;
-
             min-height: 40px;
 
-            padding:
-              7px
-              15px;
+            padding: 7px 15px;
 
             font-size: 13px;
 
@@ -749,47 +547,29 @@ export default function DictionariesPage() {
               22px;
 
             border-radius: 18px;
-
             border-width: 2px;
 
             box-shadow:
-              inset 0 4px 4px
-                rgba(255,255,255,.08),
-
-              inset 0 -5px 5px
-                rgba(0,0,0,.18),
-
-              0 4px 0
-                #30373b,
-
-              0 8px 0
-                #242a2d,
-
-              0 12px 16px
-                rgba(0,0,0,.18);
+              inset 0 4px 4px rgba(255,255,255,.08),
+              inset 0 -5px 5px rgba(0,0,0,.18),
+              0 4px 0 #30373b,
+              0 8px 0 #242a2d,
+              0 12px 16px rgba(0,0,0,.18);
           }
 
           .floatingTitle {
             top: -24px;
 
-            width:
-              min(
-                86%,
-                310px
-              );
+            width: min(86%, 310px);
 
             min-width: 0;
-
             min-height: 46px;
 
-            padding:
-              7px
-              14px;
+            padding: 7px 14px;
 
             font-size: 21px;
 
             border-width: 2px;
-
             border-radius: 10px;
 
             white-space: normal;
@@ -805,16 +585,13 @@ export default function DictionariesPage() {
 
           .cardGrid {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              );
+              repeat(2, minmax(0, 1fr));
 
             gap: 12px;
           }
 
           .dictionaryCard {
-            min-height: 190px;
+            min-height: 170px;
 
             padding:
               15px
@@ -824,29 +601,19 @@ export default function DictionariesPage() {
             border-radius: 11px;
 
             box-shadow:
-              inset 0 5px 4px
-                rgba(255,255,255,.92),
-
-              inset 0 -4px 4px
-                rgba(0,0,0,.09),
-
-              0 4px 0
-                #596166,
-
-              0 7px 8px
-                rgba(0,0,0,.14);
+              inset 0 5px 4px rgba(255,255,255,.92),
+              inset 0 -4px 4px rgba(0,0,0,.09),
+              0 4px 0 #596166,
+              0 7px 8px rgba(0,0,0,.14);
           }
 
           .badge {
             min-width: 44px;
-
             min-height: 36px;
 
             margin-bottom: 10px;
 
-            padding:
-              5px
-              7px;
+            padding: 5px 7px;
 
             font-size: 12px;
           }
@@ -855,30 +622,21 @@ export default function DictionariesPage() {
             font-size: 16px;
           }
 
-          .dictionaryCard p {
-            font-size: 10px;
-
-            line-height: 1.25;
-          }
-
           .openButton {
             min-width: 105px;
-
             min-height: 38px;
 
             margin-top: 12px;
 
-            padding:
-              6px
-              10px;
+            padding: 6px 10px;
 
             font-size: 12px;
           }
         }
 
-        /* =====================================================
+        /* ==========================================
            JUDA KICHIK TELEFON
-        ===================================================== */
+        ========================================== */
 
         @media (max-width: 390px) {
           .cardGrid {
@@ -886,15 +644,11 @@ export default function DictionariesPage() {
           }
 
           .dictionaryCard {
-            min-height: 165px;
+            min-height: 155px;
           }
 
           .dictionaryCard h2 {
             font-size: 18px;
-          }
-
-          .dictionaryCard p {
-            font-size: 11px;
           }
 
           .openButton {
