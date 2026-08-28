@@ -12,6 +12,7 @@ type DictionaryWord = {
 };
 
 type Mode = "en-uz" | "uz-en" | "mixed";
+type Direction = "en-uz" | "uz-en";
 
 export default function EnglishUzbekLearnPage() {
   const router = useRouter();
@@ -21,22 +22,24 @@ export default function EnglishUzbekLearnPage() {
   const [error, setError] = useState("");
 
   const [mode, setMode] = useState<Mode>("en-uz");
+  const [mixedDirection, setMixedDirection] =
+    useState<Direction>("en-uz");
+
   const [index, setIndex] = useState(0);
 
   const [options, setOptions] = useState<string[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
   const [correctAnswer, setCorrectAnswer] = useState("");
-
-  const [mixedDirection, setMixedDirection] =
-    useState<"en-uz" | "uz-en">("en-uz");
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(
+    null
+  );
 
   const [difficultWords, setDifficultWords] = useState<Set<string>>(
     new Set()
   );
 
-  // =========================
+  // =========================================================
   // LUG‘ATNI YUKLASH
-  // =========================
+  // =========================================================
 
   useEffect(() => {
     async function loadWords() {
@@ -93,11 +96,9 @@ export default function EnglishUzbekLearnPage() {
     loadWords();
   }, []);
 
-  // =========================
-  // HOZIRGI YO‘NALISH
-  // =========================
+  const currentWord = words[index];
 
-  const currentDirection = useMemo(() => {
+  const currentDirection: Direction = useMemo(() => {
     if (mode === "mixed") {
       return mixedDirection;
     }
@@ -105,26 +106,20 @@ export default function EnglishUzbekLearnPage() {
     return mode;
   }, [mode, mixedDirection]);
 
-  const currentWord = words[index];
-
-  // =========================
-  // VARIANT YARATISH
-  // =========================
+  // =========================================================
+  // JAVOB VARIANTLARINI YARATISH
+  // =========================================================
 
   const createOptions = useCallback(() => {
-    if (!currentWord || words.length < 2) {
-      return;
-    }
+    if (!currentWord || words.length === 0) return;
 
-    const direction =
-      mode === "mixed"
-        ? Math.random() < 0.5
-          ? "en-uz"
-          : "uz-en"
-        : mode;
+    let direction: Direction;
 
     if (mode === "mixed") {
+      direction = Math.random() < 0.5 ? "en-uz" : "uz-en";
       setMixedDirection(direction);
+    } else {
+      direction = mode;
     }
 
     const correct =
@@ -147,85 +142,76 @@ export default function EnglishUzbekLearnPage() {
       );
 
     if (wrongPool.length === 0) {
-      setOptions([correct]);
       setCorrectAnswer(correct);
-      setSelected(null);
+      setOptions([correct]);
+      setSelectedAnswer(null);
       return;
     }
 
-    const randomWrong =
+    const wrong =
       wrongPool[Math.floor(Math.random() * wrongPool.length)];
 
-    const generatedOptions = [correct, randomWrong].sort(
-      () => Math.random() - 0.5
-    );
+    const generated =
+      Math.random() < 0.5 ? [correct, wrong] : [wrong, correct];
 
     setCorrectAnswer(correct);
-    setOptions(generatedOptions);
-    setSelected(null);
+    setOptions(generated);
+    setSelectedAnswer(null);
   }, [currentWord, words, mode]);
 
   useEffect(() => {
-    if (words.length > 0 && currentWord) {
+    if (currentWord && words.length > 0) {
       createOptions();
     }
-  }, [index, mode, words.length, currentWord, createOptions]);
+  }, [currentWord, words.length, index, mode, createOptions]);
 
-  // =========================
-  // JAVOBNI TANLASH
-  // =========================
+  // =========================================================
+  // JAVOB TANLASH
+  // =========================================================
 
   function handleAnswer(answer: string) {
-    if (selected !== null) return;
+    if (selectedAnswer !== null) return;
 
-    setSelected(answer);
+    setSelectedAnswer(answer);
   }
 
-  // =========================
+  // =========================================================
   // KEYINGI
-  // =========================
+  // =========================================================
 
   function nextWord() {
     if (words.length === 0) return;
 
-    setIndex((previous) => {
-      if (previous >= words.length - 1) {
-        return 0;
-      }
+    setIndex((prev) =>
+      prev >= words.length - 1 ? 0 : prev + 1
+    );
 
-      return previous + 1;
-    });
-
-    setSelected(null);
+    setSelectedAnswer(null);
   }
 
-  // =========================
+  // =========================================================
   // OLDINGI
-  // =========================
+  // =========================================================
 
   function previousWord() {
     if (words.length === 0) return;
 
-    setIndex((previous) => {
-      if (previous <= 0) {
-        return words.length - 1;
-      }
+    setIndex((prev) =>
+      prev <= 0 ? words.length - 1 : prev - 1
+    );
 
-      return previous - 1;
-    });
-
-    setSelected(null);
+    setSelectedAnswer(null);
   }
 
-  // =========================
+  // =========================================================
   // KEYINROQ YANA KO‘RSAT
-  // =========================
+  // =========================================================
 
   function showLater() {
-    if (!currentWord || words.length === 0) return;
+    if (!currentWord || words.length < 2) return;
 
-    setWords((previousWords) => {
-      const copy = [...previousWords];
+    setWords((prevWords) => {
+      const copy = [...prevWords];
 
       const [removed] = copy.splice(index, 1);
 
@@ -254,18 +240,18 @@ export default function EnglishUzbekLearnPage() {
       setIndex(0);
     }
 
-    setSelected(null);
+    setSelectedAnswer(null);
   }
 
-  // =========================
+  // =========================================================
   // QIYIN SO‘Z
-  // =========================
+  // =========================================================
 
   function toggleDifficult() {
     if (!currentWord) return;
 
-    setDifficultWords((previous) => {
-      const next = new Set(previous);
+    setDifficultWords((prev) => {
+      const next = new Set(prev);
 
       if (next.has(currentWord.id)) {
         next.delete(currentWord.id);
@@ -277,26 +263,25 @@ export default function EnglishUzbekLearnPage() {
     });
   }
 
-  // =========================
+  // =========================================================
   // TALAFFUZ
-  // =========================
+  // =========================================================
 
   function pronounce() {
     if (!currentWord) return;
 
     if (!("speechSynthesis" in window)) {
-      alert("Brauzeringiz talaffuz funksiyasini qo‘llab-quvvatlamaydi.");
+      alert(
+        "Brauzeringiz talaffuz funksiyasini qo‘llab-quvvatlamaydi."
+      );
       return;
     }
 
     window.speechSynthesis.cancel();
 
-    const text =
-      currentDirection === "en-uz"
-        ? currentWord.english
-        : currentWord.english;
-
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(
+      currentWord.english
+    );
 
     utterance.lang = "en-US";
     utterance.rate = 0.85;
@@ -305,23 +290,17 @@ export default function EnglishUzbekLearnPage() {
     window.speechSynthesis.speak(utterance);
   }
 
-  // =========================
-  // SAVOL MATNI
-  // =========================
-
   const questionText = useMemo(() => {
     if (!currentWord) return "";
 
-    if (currentDirection === "en-uz") {
-      return currentWord.english;
-    }
-
-    return currentWord.uzbek;
+    return currentDirection === "en-uz"
+      ? currentWord.english
+      : currentWord.uzbek;
   }, [currentWord, currentDirection]);
 
-  // =========================
+  // =========================================================
   // LOADING
-  // =========================
+  // =========================================================
 
   if (loading) {
     return (
@@ -332,10 +311,6 @@ export default function EnglishUzbekLearnPage() {
       </main>
     );
   }
-
-  // =========================
-  // ERROR
-  // =========================
 
   if (error || words.length === 0) {
     return (
@@ -349,7 +324,9 @@ export default function EnglishUzbekLearnPage() {
 
   return (
     <main style={styles.page}>
-      {/* ================= HEADER ================= */}
+      {/* =====================================================
+          TEPADAGI 3D PANEL
+      ===================================================== */}
 
       <section style={styles.topPanel}>
         <button
@@ -373,7 +350,7 @@ export default function EnglishUzbekLearnPage() {
             }}
             onClick={() => {
               setMode("en-uz");
-              setSelected(null);
+              setSelectedAnswer(null);
             }}
           >
             English → Uzbek
@@ -389,7 +366,7 @@ export default function EnglishUzbekLearnPage() {
             }}
             onClick={() => {
               setMode("uz-en");
-              setSelected(null);
+              setSelectedAnswer(null);
             }}
           >
             Uzbek → English
@@ -405,7 +382,7 @@ export default function EnglishUzbekLearnPage() {
             }}
             onClick={() => {
               setMode("mixed");
-              setSelected(null);
+              setSelectedAnswer(null);
             }}
           >
             Aralash
@@ -417,14 +394,18 @@ export default function EnglishUzbekLearnPage() {
         </div>
       </section>
 
-      {/* ================= SAVOL ================= */}
+      {/* =====================================================
+          ASOSIY O‘RGANISH QISMI
+      ===================================================== */}
 
       <section style={styles.studyArea}>
+        {/* SAVOL */}
+
         <div style={styles.wordCard}>
           {questionText}
         </div>
 
-        {/* ================= FUNKSIYA TUGMALARI ================= */}
+        {/* TALAFFUZ + QIYIN SO‘Z */}
 
         <div style={styles.functionButtons}>
           <button
@@ -451,24 +432,25 @@ export default function EnglishUzbekLearnPage() {
           </button>
         </div>
 
-        {/* ================= JAVOBLAR ================= */}
+        {/* =================================================
+            2 TA JAVOB
+        ================================================= */}
 
         <div style={styles.answers}>
           {options.map((option) => {
-            let optionStyle = styles.answerButton;
+            let optionStyle: React.CSSProperties = {
+              ...styles.answerButton,
+            };
 
-            if (selected !== null) {
+            if (selectedAnswer !== null) {
               if (option === correctAnswer) {
                 optionStyle = {
-                  ...styles.answerButton,
+                  ...optionStyle,
                   ...styles.correctAnswer,
                 };
-              } else if (
-                option === selected &&
-                option !== correctAnswer
-              ) {
+              } else if (option === selectedAnswer) {
                 optionStyle = {
-                  ...styles.answerButton,
+                  ...optionStyle,
                   ...styles.wrongAnswer,
                 };
               }
@@ -487,7 +469,9 @@ export default function EnglishUzbekLearnPage() {
           })}
         </div>
 
-        {/* ================= NAVIGATION ================= */}
+        {/* =================================================
+            PASTKI NAVIGATSIYA
+        ================================================= */}
 
         <div style={styles.navigation}>
           <button
@@ -519,61 +503,63 @@ export default function EnglishUzbekLearnPage() {
   );
 }
 
-// ======================================================
-// DESIGN
-// ======================================================
+// =========================================================
+// 3D DESIGN
+// =========================================================
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
+    padding: "36px 24px 80px",
     background:
-      "linear-gradient(180deg, #f7fbfd 0%, #eef5f8 100%)",
-    padding: "32px 18px 60px",
+      "radial-gradient(circle at top, #ffffff 0%, #f4f8fa 48%, #eaf2f6 100%)",
     fontFamily:
       '"Bell MT", "Times New Roman", Georgia, serif',
-    color: "#073b5c",
+    color: "#063b5a",
   },
 
   topPanel: {
-    maxWidth: "1100px",
+    width: "min(1090px, calc(100% - 20px))",
     margin: "0 auto",
-    minHeight: "88px",
+
+    minHeight: "98px",
+    padding: "17px 28px",
 
     display: "grid",
-    gridTemplateColumns: "170px 1fr 130px",
+    gridTemplateColumns: "190px 1fr 130px",
     alignItems: "center",
-    gap: "20px",
+    gap: "22px",
 
-    padding: "16px 24px",
-
+    border: "2px solid #075476",
     borderRadius: "20px",
-    border: "2px solid #075477",
 
     background:
-      "linear-gradient(180deg, #7ed6f4 0%, #45add8 72%, #2994c0 100%)",
+      "linear-gradient(180deg, #82dcf7 0%, #56bce5 38%, #2f9ecb 78%, #208bb7 100%)",
 
     boxShadow:
-      "0 10px 0 #07506d, 0 17px 24px rgba(0,0,0,0.20), inset 0 2px 3px rgba(255,255,255,0.85)",
+      "0 10px 0 #07506c, 0 16px 23px rgba(0,0,0,0.20), inset 0 3px 3px rgba(255,255,255,0.85), inset 0 -3px 4px rgba(0,78,110,0.16)",
   },
 
   backButton: {
+    minWidth: "165px",
     height: "46px",
+
     padding: "0 22px",
 
     borderRadius: "9px",
-    border: "1px solid #87939a",
+    border: "1px solid #7e8c94",
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #eeeeee 100%)",
+      "linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #e4e4e4 100%)",
 
     boxShadow:
-      "0 6px 0 #67747b, 0 8px 12px rgba(0,0,0,0.18)",
+      "0 6px 0 #68757c, 0 8px 12px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.9)",
 
     fontFamily: "inherit",
     fontSize: "16px",
     fontWeight: 700,
+    color: "#063b5b",
 
-    color: "#063c5a",
     cursor: "pointer",
   },
 
@@ -586,85 +572,89 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   modeButton: {
-    minWidth: "150px",
+    minWidth: "155px",
     height: "46px",
 
-    padding: "0 20px",
+    padding: "0 18px",
 
     borderRadius: "8px",
-    border: "1px solid #82929a",
+    border: "1px solid #839097",
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #ededed 100%)",
+      "linear-gradient(180deg, #ffffff 0%, #f1f1f1 50%, #dedede 100%)",
 
     boxShadow:
-      "0 6px 0 #66767d, 0 8px 11px rgba(0,0,0,0.15)",
+      "0 6px 0 #66757c, 0 8px 11px rgba(0,0,0,0.17), inset 0 1px 1px rgba(255,255,255,0.95)",
 
     fontFamily: "inherit",
     fontSize: "16px",
     fontWeight: 700,
 
-    color: "#073c5b",
+    color: "#063a58",
     cursor: "pointer",
   },
 
   modeButtonActive: {
     color: "#ffffff",
 
-    border: "1px solid #005179",
+    border: "1px solid #00517a",
 
     background:
-      "linear-gradient(180deg, #56c8f3 0%, #158bc1 100%)",
+      "linear-gradient(180deg, #5cd0f8 0%, #22a6df 47%, #0d7fb5 100%)",
 
     boxShadow:
-      "0 6px 0 #075372, 0 8px 11px rgba(0,0,0,0.20)",
+      "0 6px 0 #064f70, 0 9px 13px rgba(0,0,0,0.22), inset 0 2px 2px rgba(255,255,255,0.4)",
   },
 
   progress: {
     justifySelf: "end",
 
-    minWidth: "100px",
+    minWidth: "110px",
 
     textAlign: "center",
 
-    fontSize: "18px",
+    fontFamily: "inherit",
+    fontSize: "17px",
     fontWeight: 800,
-    letterSpacing: "1px",
+    letterSpacing: "2px",
 
-    color: "#063b59",
+    color: "#043c5c",
+
+    textShadow:
+      "0 1px 0 rgba(255,255,255,0.65)",
   },
 
   studyArea: {
-    maxWidth: "1050px",
-    margin: "38px auto 0",
+    width: "min(1050px, calc(100% - 20px))",
+    margin: "50px auto 0",
   },
 
   wordCard: {
-    width: "min(490px, 90vw)",
-    minHeight: "116px",
+    width: "min(500px, 92%)",
+    minHeight: "122px",
 
     margin: "0 auto",
+    padding: "22px 32px",
 
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
 
-    padding: "20px 30px",
-
     textAlign: "center",
 
-    borderRadius: "15px",
-    border: "2px solid #075579",
+    borderRadius: "16px",
+    border: "2px solid #075274",
 
     background:
-      "linear-gradient(180deg, #78d3f3 0%, #3ba8d6 100%)",
+      "linear-gradient(180deg, #81dcf7 0%, #59bee6 40%, #2fa0cf 100%)",
 
     boxShadow:
-      "0 9px 0 #07506e, 0 15px 20px rgba(0,0,0,0.18), inset 0 2px 2px rgba(255,255,255,0.7)",
+      "0 9px 0 #07506d, 0 15px 22px rgba(0,0,0,0.21), inset 0 3px 3px rgba(255,255,255,0.75), inset 0 -3px 3px rgba(0,75,110,0.16)",
 
-    color: "#062f4d",
+    color: "#062e49",
 
-    fontSize: "40px",
+    fontFamily: "inherit",
+    fontSize: "42px",
     fontWeight: 700,
 
     wordBreak: "break-word",
@@ -676,27 +666,27 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "14px",
 
+    gap: "15px",
     flexWrap: "wrap",
   },
 
   smallButton: {
-    minWidth: "120px",
-    height: "44px",
+    minWidth: "122px",
+    height: "45px",
 
-    padding: "0 18px",
+    padding: "0 19px",
 
-    border: "1px solid #88949a",
+    border: "1px solid #858f95",
     borderRadius: "8px",
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #ededed 100%)",
+      "linear-gradient(180deg, #ffffff 0%, #f1f1f1 55%, #dedede 100%)",
 
     boxShadow:
-      "0 6px 0 #65737a, 0 8px 10px rgba(0,0,0,0.15)",
+      "0 6px 0 #67747a, 0 9px 12px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.9)",
 
-    color: "#073d5c",
+    color: "#063b5a",
 
     fontFamily: "inherit",
     fontSize: "16px",
@@ -707,39 +697,40 @@ const styles: Record<string, React.CSSProperties> = {
 
   difficultActive: {
     background:
-      "linear-gradient(180deg, #fff3a8 0%, #ffd85e 100%)",
+      "linear-gradient(180deg, #fff6b6 0%, #ffd95b 100%)",
+
+    boxShadow:
+      "0 6px 0 #b28c18, 0 9px 12px rgba(0,0,0,0.18)",
   },
 
   answers: {
-    marginTop: "68px",
+    marginTop: "70px",
 
     display: "grid",
     gridTemplateColumns:
-      "repeat(auto-fit, minmax(280px, 1fr))",
+      "repeat(2, minmax(280px, 1fr))",
 
     gap: "52px",
-
-    alignItems: "stretch",
   },
 
   answerButton: {
-    minHeight: "100px",
+    minHeight: "108px",
 
-    padding: "20px 28px",
+    padding: "22px 28px",
 
     borderRadius: "13px",
-    border: "1px solid #9aa3a7",
+    border: "1px solid #90999e",
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #eeeeee 100%)",
+      "linear-gradient(180deg, #ffffff 0%, #f5f5f5 45%, #e8e8e8 100%)",
 
     boxShadow:
-      "0 8px 0 #727e84, 0 12px 17px rgba(0,0,0,0.16)",
+      "0 8px 0 #748087, 0 13px 18px rgba(0,0,0,0.19), inset 0 2px 2px rgba(255,255,255,0.9)",
 
     color: "#073951",
 
     fontFamily: "inherit",
-    fontSize: "28px",
+    fontSize: "29px",
     fontWeight: 700,
 
     cursor: "pointer",
@@ -749,49 +740,56 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   correctAnswer: {
-    background:
-      "linear-gradient(180deg, #d9ffe0 0%, #9ee7ac 100%)",
+    border: "2px solid #16883a",
 
-    border: "2px solid #168836",
-    color: "#075d20",
+    background:
+      "linear-gradient(180deg, #e3ffe8 0%, #a7e9b4 100%)",
+
+    color: "#075d23",
+
+    boxShadow:
+      "0 8px 0 #418e53, 0 13px 18px rgba(0,0,0,0.17)",
   },
 
   wrongAnswer: {
-    background:
-      "linear-gradient(180deg, #ffe1e1 0%, #ef9b9b 100%)",
+    border: "2px solid #ae2828",
 
-    border: "2px solid #b92e2e",
-    color: "#8d1414",
+    background:
+      "linear-gradient(180deg, #ffe8e8 0%, #eeaaaa 100%)",
+
+    color: "#8c1616",
+
+    boxShadow:
+      "0 8px 0 #a04d4d, 0 13px 18px rgba(0,0,0,0.17)",
   },
 
   navigation: {
-    marginTop: "48px",
+    marginTop: "50px",
 
     display: "flex",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
 
-    gap: "18px",
-
+    gap: "19px",
     flexWrap: "wrap",
   },
 
   navButton: {
-    minWidth: "110px",
+    minWidth: "112px",
     height: "46px",
 
     padding: "0 18px",
 
     borderRadius: "8px",
-    border: "1px solid #89969c",
+    border: "1px solid #858f95",
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #eeeeee 100%)",
+      "linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #e2e2e2 100%)",
 
     boxShadow:
-      "0 6px 0 #69767c, 0 8px 10px rgba(0,0,0,0.15)",
+      "0 6px 0 #66747a, 0 9px 12px rgba(0,0,0,0.17), inset 0 1px 1px rgba(255,255,255,0.9)",
 
-    color: "#073d5b",
+    color: "#063b5a",
 
     fontFamily: "inherit",
     fontSize: "15px",
@@ -801,21 +799,21 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   laterButton: {
-    minWidth: "210px",
+    minWidth: "215px",
     height: "46px",
 
     padding: "0 22px",
 
     borderRadius: "22px",
-    border: "1px solid #87949a",
+    border: "1px solid #858f95",
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #ededed 100%)",
+      "linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #e1e1e1 100%)",
 
     boxShadow:
-      "0 6px 0 #68757a, 0 8px 10px rgba(0,0,0,0.15)",
+      "0 6px 0 #66747a, 0 9px 12px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.9)",
 
-    color: "#073d5b",
+    color: "#063b5a",
 
     fontFamily: "inherit",
     fontSize: "15px",
@@ -825,20 +823,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   messageBox: {
-    maxWidth: "700px",
-    margin: "100px auto",
+    width: "min(700px, 92%)",
+    margin: "110px auto",
 
-    padding: "35px",
+    padding: "38px",
 
-    borderRadius: "15px",
+    borderRadius: "16px",
+    border: "1px solid #9aa4a9",
 
-    background: "#ffffff",
+    background:
+      "linear-gradient(180deg, #ffffff 0%, #eeeeee 100%)",
 
     boxShadow:
-      "0 8px 0 #738087, 0 15px 25px rgba(0,0,0,0.15)",
+      "0 9px 0 #718087, 0 16px 25px rgba(0,0,0,0.18)",
 
     textAlign: "center",
 
+    fontFamily: "inherit",
     fontSize: "22px",
     fontWeight: 700,
   },
