@@ -40,9 +40,7 @@ type Mode =
   | "difficult";
 
 const API = "/api/dictionary/synonyms";
-
-const STORAGE_KEY =
-  "qurbonov_synonyms_progress";
+const STORAGE_KEY = "qurbonov_synonyms_progress";
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
@@ -51,83 +49,45 @@ function normalize(value: string) {
 function shuffle<T>(items: T[]) {
   const copy = [...items];
 
-  for (
-    let i = copy.length - 1;
-    i > 0;
-    i--
-  ) {
-    const j = Math.floor(
-      Math.random() * (i + 1)
-    );
-
-    [copy[i], copy[j]] = [
-      copy[j],
-      copy[i],
-    ];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
 
   return copy;
 }
 
-export default function SynonymsLearningPage() {
-  const [words, setWords] =
-    useState<SynonymWord[]>([]);
+export default function SynonymsPage() {
+  const [words, setWords] = useState<SynonymWord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
+  const [mode, setMode] = useState<Mode>("learn");
+  const [index, setIndex] = useState(0);
 
-  const [error, setError] =
-    useState("");
+  const [progress, setProgress] = useState<ProgressMap>({});
 
-  const [mode, setMode] =
-    useState<Mode>("learn");
+  const [revealed, setRevealed] = useState(false);
 
-  const [index, setIndex] =
-    useState(0);
-
-  const [progress, setProgress] =
-    useState<ProgressMap>({});
-
-  const [revealed, setRevealed] =
-    useState(false);
-
-  const [
-    selectedAnswer,
-    setSelectedAnswer,
-  ] = useState("");
-
-  const [
-    choiceResult,
-    setChoiceResult,
-  ] = useState<
+  const [selectedAnswer, setSelectedAnswer] = useState("");
+  const [choiceResult, setChoiceResult] = useState<
     "correct" | "wrong" | ""
   >("");
 
-  const [
-    writeAnswer,
-    setWriteAnswer,
-  ] = useState("");
-
-  const [
-    writeResult,
-    setWriteResult,
-  ] = useState<
+  const [writeAnswer, setWriteAnswer] = useState("");
+  const [writeResult, setWriteResult] = useState<
     "correct" | "wrong" | ""
   >("");
 
-  const [
-    speechSupported,
-    setSpeechSupported,
-  ] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
 
-  const timerRef =
-    useRef<ReturnType<
-      typeof setTimeout
-    > | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
-  /* ==============================
-     INITIAL LOAD
-  ============================== */
+  /* =====================================================
+     INITIAL
+  ===================================================== */
 
   useEffect(() => {
     setSpeechSupported(
@@ -140,36 +100,52 @@ export default function SynonymsLearningPage() {
 
     return () => {
       if (timerRef.current) {
-        clearTimeout(
-          timerRef.current
-        );
+        clearTimeout(timerRef.current);
       }
     };
   }, []);
 
-  /* ==============================
-     PROGRESS
-  ============================== */
+  async function loadWords() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(API, {
+        cache: "no-store",
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.message || "Sinonimlarni yuklab bo‘lmadi."
+        );
+      }
+
+      setWords(data.words || []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Xatolik yuz berdi."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function loadProgress() {
     try {
-      const raw =
-        localStorage.getItem(
-          STORAGE_KEY
-        );
+      const raw = localStorage.getItem(STORAGE_KEY);
 
       if (!raw) {
         setProgress({});
         return;
       }
 
-      const parsed =
-        JSON.parse(raw);
+      const parsed = JSON.parse(raw);
 
-      if (
-        parsed &&
-        typeof parsed === "object"
-      ) {
+      if (parsed && typeof parsed === "object") {
         setProgress(parsed);
       }
     } catch {
@@ -177,9 +153,7 @@ export default function SynonymsLearningPage() {
     }
   }
 
-  function saveProgress(
-    next: ProgressMap
-  ) {
+  function saveProgress(next: ProgressMap) {
     setProgress(next);
 
     try {
@@ -192,260 +166,131 @@ export default function SynonymsLearningPage() {
     }
   }
 
-  /* ==============================
-     LOAD WORDS
-  ============================== */
-
-  async function loadWords() {
-    try {
-      setLoading(true);
-      setError("");
-
-      const response =
-        await fetch(API, {
-          cache: "no-store",
-        });
-
-      const data: ApiResponse =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !data.ok
-      ) {
-        throw new Error(
-          data.message ||
-            "Sinonimlarni yuklab bo‘lmadi."
-        );
-      }
-
-      setWords(
-        data.words || []
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Xatolik yuz berdi."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /* ==============================
+  /* =====================================================
      FILTERS
-  ============================== */
+  ===================================================== */
 
-  const wrongIds = useMemo(
-    () =>
-      new Set(
-        Object.entries(
-          progress
-        )
-          .filter(
-            ([, item]) =>
-              item.wrong > 0
-          )
-          .map(([id]) => id)
-      ),
-    [progress]
-  );
-
-  const difficultIds =
-    useMemo(
-      () =>
-        new Set(
-          Object.entries(
-            progress
-          )
-            .filter(
-              ([, item]) =>
-                item.difficult
-            )
-            .map(([id]) => id)
-        ),
-      [progress]
+  const wrongIds = useMemo(() => {
+    return new Set(
+      Object.entries(progress)
+        .filter(([, item]) => item.wrong > 0)
+        .map(([id]) => id)
     );
+  }, [progress]);
 
-  const visibleWords =
-    useMemo(() => {
-      if (mode === "wrong") {
-        return words.filter(
-          (item) =>
-            wrongIds.has(
-              item.id
-            )
-        );
-      }
+  const difficultIds = useMemo(() => {
+    return new Set(
+      Object.entries(progress)
+        .filter(([, item]) => item.difficult)
+        .map(([id]) => id)
+    );
+  }, [progress]);
 
-      if (
-        mode === "difficult"
-      ) {
-        return words.filter(
-          (item) =>
-            difficultIds.has(
-              item.id
-            )
-        );
-      }
+  const visibleWords = useMemo(() => {
+    if (mode === "wrong") {
+      return words.filter((item) => wrongIds.has(item.id));
+    }
 
-      return words;
-    }, [
-      words,
-      mode,
-      wrongIds,
-      difficultIds,
-    ]);
+    if (mode === "difficult") {
+      return words.filter((item) =>
+        difficultIds.has(item.id)
+      );
+    }
+
+    return words;
+  }, [words, mode, wrongIds, difficultIds]);
 
   const current =
     visibleWords.length > 0
       ? visibleWords[
-          Math.min(
-            index,
-            visibleWords.length -
-              1
-          )
+          Math.min(index, visibleWords.length - 1)
         ]
       : null;
 
-  const currentProgress =
-    current
-      ? progress[
-          current.id
-        ] || {
-          correct: 0,
-          wrong: 0,
-          difficult: false,
-          learned: false,
-        }
-      : null;
+  const currentProgress = current
+    ? progress[current.id] || {
+        correct: 0,
+        wrong: 0,
+        difficult: false,
+        learned: false,
+      }
+    : null;
 
-  /* ==============================
-     STATISTICS
-  ============================== */
+  /* =====================================================
+     STATS
+  ===================================================== */
 
-  const totalCorrect =
-    useMemo(
-      () =>
-        Object.values(
-          progress
-        ).reduce(
-          (sum, item) =>
-            sum +
-            item.correct,
-          0
-        ),
-      [progress]
+  const totalCorrect = useMemo(() => {
+    return Object.values(progress).reduce(
+      (sum, item) => sum + item.correct,
+      0
     );
+  }, [progress]);
 
-  const totalWrong =
-    useMemo(
-      () =>
-        Object.values(
-          progress
-        ).reduce(
-          (sum, item) =>
-            sum +
-            item.wrong,
-          0
-        ),
-      [progress]
+  const totalWrong = useMemo(() => {
+    return Object.values(progress).reduce(
+      (sum, item) => sum + item.wrong,
+      0
     );
+  }, [progress]);
 
-  const learnedCount =
-    useMemo(
-      () =>
-        Object.values(
-          progress
-        ).filter(
-          (item) =>
-            item.learned
-        ).length,
-      [progress]
-    );
+  const learnedCount = useMemo(() => {
+    return Object.values(progress).filter(
+      (item) => item.learned
+    ).length;
+  }, [progress]);
 
   const accuracy =
-    totalCorrect +
-      totalWrong >
-    0
+    totalCorrect + totalWrong > 0
       ? Math.round(
-          (totalCorrect /
-            (totalCorrect +
-              totalWrong)) *
-            100
+          (totalCorrect / (totalCorrect + totalWrong)) * 100
         )
       : 0;
 
-  /* ==============================
-     CARD STATE
-  ============================== */
+  /* =====================================================
+     TIMER / RESET
+  ===================================================== */
 
   function clearTimer() {
     if (timerRef.current) {
-      clearTimeout(
-        timerRef.current
-      );
-
-      timerRef.current =
-        null;
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
   }
 
-  function resetCardState() {
+  function resetCard() {
     clearTimer();
 
     setRevealed(false);
-
     setSelectedAnswer("");
-
     setChoiceResult("");
-
     setWriteAnswer("");
-
     setWriteResult("");
   }
 
-  function changeMode(
-    nextMode: Mode
-  ) {
-    resetCardState();
-
+  function changeMode(nextMode: Mode) {
+    resetCard();
     setMode(nextMode);
-
     setIndex(0);
   }
 
-  /* ==============================
+  /* =====================================================
      NAVIGATION
-  ============================== */
+  ===================================================== */
 
   function next() {
     clearTimer();
 
     setRevealed(false);
-
     setSelectedAnswer("");
-
     setChoiceResult("");
-
     setWriteAnswer("");
-
     setWriteResult("");
 
     setIndex((old) => {
-      if (
-        visibleWords.length ===
-        0
-      ) {
-        return 0;
-      }
+      if (visibleWords.length === 0) return 0;
 
-      if (
-        old <
-        visibleWords.length -
-          1
-      ) {
+      if (old < visibleWords.length - 1) {
         return old + 1;
       }
 
@@ -454,364 +299,222 @@ export default function SynonymsLearningPage() {
   }
 
   function previous() {
-    resetCardState();
+    resetCard();
 
     setIndex((old) => {
-      if (
-        visibleWords.length ===
-        0
-      ) {
-        return 0;
-      }
+      if (visibleWords.length === 0) return 0;
 
       if (old > 0) {
         return old - 1;
       }
 
-      return (
-        visibleWords.length -
-        1
-      );
+      return visibleWords.length - 1;
     });
   }
 
-  function autoNext(
-    delay: number
-  ) {
+  function autoNext(delay: number) {
     clearTimer();
 
-    timerRef.current =
-      setTimeout(() => {
-        next();
-      }, delay);
+    timerRef.current = setTimeout(() => {
+      next();
+    }, delay);
   }
 
-  /* ==============================
-     PROGRESS RESULT
-  ============================== */
+  /* =====================================================
+     PROGRESS
+  ===================================================== */
 
   function markResult(
     item: SynonymWord,
     correct: boolean
   ) {
-    const old =
-      progress[
-        item.id
-      ] || {
-        correct: 0,
-        wrong: 0,
-        difficult: false,
-        learned: false,
-      };
+    const old = progress[item.id] || {
+      correct: 0,
+      wrong: 0,
+      difficult: false,
+      learned: false,
+    };
 
     const nextCorrect =
-      old.correct +
-      (correct ? 1 : 0);
+      old.correct + (correct ? 1 : 0);
 
-    const nextItem: ProgressItem =
-      {
-        ...old,
+    const nextItem: ProgressItem = {
+      ...old,
 
-        correct:
-          nextCorrect,
+      correct: nextCorrect,
 
-        wrong:
-          old.wrong +
-          (correct ? 0 : 1),
+      wrong: old.wrong + (correct ? 0 : 1),
 
-        learned:
-          nextCorrect >= 3
-            ? true
-            : old.learned,
-      };
+      learned:
+        nextCorrect >= 3 ? true : old.learned,
+    };
 
     saveProgress({
       ...progress,
-
-      [item.id]:
-        nextItem,
+      [item.id]: nextItem,
     });
   }
-
-  /* ==============================
-     DIFFICULT
-  ============================== */
 
   function toggleDifficult() {
     if (!current) return;
 
-    const old =
-      progress[
-        current.id
-      ] || {
-        correct: 0,
-        wrong: 0,
-        difficult: false,
-        learned: false,
-      };
+    const old = progress[current.id] || {
+      correct: 0,
+      wrong: 0,
+      difficult: false,
+      learned: false,
+    };
 
     saveProgress({
       ...progress,
 
       [current.id]: {
         ...old,
-
-        difficult:
-          !old.difficult,
+        difficult: !old.difficult,
       },
     });
   }
 
-  /* ==============================
-     LEARNING MODE
-  ============================== */
+  /* =====================================================
+     LEARN
+  ===================================================== */
 
   function revealSynonyms() {
-    if (!current) return;
+    if (!current || revealed) return;
 
     setRevealed(true);
 
-    /*
-      Sinonimlar 2.2 soniya
-      ko‘rinadi va keyingi
-      so‘zga avtomatik o‘tadi.
-    */
-
-    autoNext(2200);
+    autoNext(2400);
   }
 
-  /* ==============================
-     CHOICE OPTIONS
-  ============================== */
+  /* =====================================================
+     CHOICE
+  ===================================================== */
 
-  const choiceOptions =
-    useMemo(() => {
-      if (!current) {
-        return [];
-      }
-
-      const correct =
-        current.synonyms[0];
-
-      const wrongPool =
-        words
-          .filter(
-            (item) =>
-              item.id !==
-              current.id
-          )
-          .flatMap(
-            (item) =>
-              item.synonyms
-          )
-          .filter(
-            (item) =>
-              normalize(
-                item
-              ) !==
-              normalize(
-                correct
-              )
-          );
-
-      const wrongAnswers =
-        shuffle(
-          Array.from(
-            new Set(
-              wrongPool
-            )
-          )
-        ).slice(0, 3);
-
-      return shuffle([
-        correct,
-        ...wrongAnswers,
-      ]);
-    }, [
-      current,
-      words,
-    ]);
-
-  function checkChoice(
-    answer: string
-  ) {
-    if (
-      !current ||
-      choiceResult
-    ) {
-      return;
+  const choiceOptions = useMemo(() => {
+    if (!current || current.synonyms.length === 0) {
+      return [];
     }
 
-    const accepted =
-      current.synonyms.map(
-        normalize
+    const correct = current.synonyms[0];
+
+    const wrongPool = words
+      .filter((item) => item.id !== current.id)
+      .flatMap((item) => item.synonyms)
+      .filter(
+        (item) =>
+          normalize(item) !== normalize(correct) &&
+          !current.synonyms
+            .map(normalize)
+            .includes(normalize(item))
       );
 
-    const correct =
-      accepted.includes(
-        normalize(answer)
-      );
-
-    setSelectedAnswer(
-      answer
+    const uniqueWrong = Array.from(
+      new Set(wrongPool)
     );
 
-    setChoiceResult(
-      correct
-        ? "correct"
-        : "wrong"
+    const wrongAnswers = shuffle(uniqueWrong).slice(0, 3);
+
+    return shuffle([correct, ...wrongAnswers]);
+  }, [current, words]);
+
+  function checkChoice(answer: string) {
+    if (!current || choiceResult) return;
+
+    const accepted = current.synonyms.map(normalize);
+
+    const correct = accepted.includes(
+      normalize(answer)
     );
 
-    markResult(
-      current,
-      correct
-    );
+    setSelectedAnswer(answer);
 
-    /*
-      Javobni 0.9 soniya
-      ko‘rsatadi va keyingiga
-      avtomatik o‘tadi.
-    */
+    setChoiceResult(correct ? "correct" : "wrong");
 
-    autoNext(900);
+    markResult(current, correct);
+
+    // To‘g‘ri javob tezroq,
+    // xato javob esa uzoqroq ko‘rinadi.
+    autoNext(correct ? 1200 : 2300);
   }
 
-  /* ==============================
-     WRITE MODE
-  ============================== */
+  /* =====================================================
+     WRITE
+  ===================================================== */
 
   function checkWrite() {
-    if (
-      !current ||
-      writeResult
-    ) {
-      return;
-    }
+    if (!current || writeResult) return;
 
-    const answer =
-      normalize(
-        writeAnswer
-      );
+    const answer = normalize(writeAnswer);
 
     if (!answer) return;
 
-    const accepted =
-      current.synonyms.map(
-        normalize
-      );
+    const accepted = current.synonyms.map(normalize);
 
-    const correct =
-      accepted.includes(
-        answer
-      );
+    const correct = accepted.includes(answer);
 
-    setWriteResult(
-      correct
-        ? "correct"
-        : "wrong"
-    );
+    setWriteResult(correct ? "correct" : "wrong");
 
-    markResult(
-      current,
-      correct
-    );
+    markResult(current, correct);
 
-    autoNext(900);
+    autoNext(correct ? 1200 : 2300);
   }
 
-  /* ==============================
+  /* =====================================================
      SPEECH
-  ============================== */
+  ===================================================== */
 
   function speakWord() {
-    if (
-      !current ||
-      !speechSupported
-    ) {
-      return;
-    }
+    if (!current || !speechSupported) return;
 
     window.speechSynthesis.cancel();
 
-    const utterance =
-      new SpeechSynthesisUtterance(
-        current.word
-      );
-
-    utterance.lang =
-      "en-US";
-
-    utterance.rate =
-      0.85;
-
-    window.speechSynthesis.speak(
-      utterance
+    const utterance = new SpeechSynthesisUtterance(
+      current.word
     );
+
+    utterance.lang = "en-US";
+    utterance.rate = 0.85;
+
+    window.speechSynthesis.speak(utterance);
   }
 
-  /* ==============================
+  /* =====================================================
      LOADING
-  ============================== */
+  ===================================================== */
 
   if (loading) {
     return (
       <main className="centerPage">
-        <div className="loading3d">
+        <div className="message3d">
           Synonyms yuklanmoqda...
         </div>
 
         <style jsx>{`
           .centerPage {
             min-height: 100vh;
-
             display: grid;
-
             place-items: center;
-
-            background:
-              #eef3f6;
-
-            font-family:
-              "Bell MT",
-              "Times New Roman",
-              serif;
+            background: #edf3f6;
+            font-family: "Bell MT", "Times New Roman", serif;
           }
 
-          .loading3d {
-            padding:
-              25px 40px;
-
-            border:
-              3px solid #075277;
-
-            border-radius:
-              16px;
-
-            background:
-              linear-gradient(
-                #c7f0ff,
-                #5dc2e9
-              );
-
+          .message3d {
+            padding: 24px 40px;
+            border: 2px solid #59666c;
+            border-radius: 14px;
+            background: linear-gradient(
+              180deg,
+              #f5f5f5,
+              #d3d6d8
+            );
             box-shadow:
-              0 8px 0
-                #075274,
-              0 15px 25px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  0.2
-                );
-
-            color:
-              #064a6d;
-
-            font-size:
-              24px;
-
-            font-weight:
-              700;
+              inset 0 3px 2px #ffffff,
+              0 7px 0 #737d82,
+              0 13px 20px rgba(0, 0, 0, 0.18);
+            font-size: 22px;
+            font-weight: 700;
+            color: #075478;
           }
         `}</style>
       </main>
@@ -821,65 +524,43 @@ export default function SynonymsLearningPage() {
   if (error) {
     return (
       <main className="centerPage">
-        <div className="error3d">
-          {error}
-        </div>
+        <div className="errorBox">{error}</div>
 
         <style jsx>{`
           .centerPage {
             min-height: 100vh;
-
             display: grid;
-
             place-items: center;
-
-            background:
-              #eef3f6;
-
-            font-family:
-              "Bell MT",
-              "Times New Roman",
-              serif;
+            background: #edf3f6;
+            font-family: "Bell MT", "Times New Roman", serif;
           }
 
-          .error3d {
-            padding:
-              22px 35px;
-
-            border:
-              2px solid
-                #a74747;
-
-            border-radius:
-              14px;
-
-            background:
-              #fff0f0;
-
-            box-shadow:
-              0 6px 0
-                #8b4545;
-
-            color:
-              #8c2020;
-
-            font-weight:
-              700;
+          .errorBox {
+            padding: 22px 35px;
+            border: 2px solid #a84b4b;
+            border-radius: 14px;
+            background: #fff0f0;
+            box-shadow: 0 6px 0 #884646;
+            color: #8d2222;
+            font-weight: 700;
           }
         `}</style>
       </main>
     );
   }
 
+  /* =====================================================
+     PAGE
+  ===================================================== */
+
   return (
     <main className="page">
-      {/* =========================
-          HEADER
-      ========================== */}
+      {/* ================= HEADER ================= */}
 
-      <header className="top3d">
+      <header className="topPanel">
         <button
-          className="back3d"
+          type="button"
+          className="grayButton backButton"
           onClick={() => {
             window.location.href =
               "/qollanmalar/dictionaries";
@@ -889,431 +570,293 @@ export default function SynonymsLearningPage() {
         </button>
 
         <div className="headerCenter">
-          <h1>
-            Synonyms
-          </h1>
-
-          <span>
-            Sinonimlarni yodlash
-          </span>
+          <h1>Synonyms</h1>
+          <div>Sinonimlarni yodlash</div>
         </div>
 
-        <div className="total3d">
-          <strong>
-            {words.length}
-          </strong>
-
-          <span>
-            Jami
-          </span>
+        <div className="totalBox">
+          <strong>{words.length}</strong>
+          <span>Jami</span>
         </div>
       </header>
 
-      {/* =========================
-          CONTROL PANEL
-      ========================== */}
+      {/* ================= CONTROL ================= */}
 
-      <section className="control3d">
+      <section className="controlPanel">
         <div className="modeRow">
           <button
+            type="button"
             className={
               mode === "learn"
-                ? "mode3d active3d"
-                : "mode3d"
+                ? "modeButton activeButton"
+                : "modeButton"
             }
-            onClick={() =>
-              changeMode(
-                "learn"
-              )
-            }
+            onClick={() => changeMode("learn")}
           >
             O‘rganish
           </button>
 
           <button
+            type="button"
             className={
               mode === "choice"
-                ? "mode3d active3d"
-                : "mode3d"
+                ? "modeButton activeButton"
+                : "modeButton"
             }
-            onClick={() =>
-              changeMode(
-                "choice"
-              )
-            }
+            onClick={() => changeMode("choice")}
           >
             Tanlash
           </button>
 
           <button
+            type="button"
             className={
               mode === "write"
-                ? "mode3d active3d"
-                : "mode3d"
+                ? "modeButton activeButton"
+                : "modeButton"
             }
-            onClick={() =>
-              changeMode(
-                "write"
-              )
-            }
+            onClick={() => changeMode("write")}
           >
             Yozish
           </button>
 
           <button
+            type="button"
             className={
               mode === "wrong"
-                ? "mode3d active3d"
-                : "mode3d"
+                ? "modeButton activeButton"
+                : "modeButton"
             }
-            onClick={() =>
-              changeMode(
-                "wrong"
-              )
-            }
+            onClick={() => changeMode("wrong")}
           >
             Xatolarim
           </button>
 
           <button
+            type="button"
             className={
-              mode ===
-              "difficult"
-                ? "mode3d active3d"
-                : "mode3d"
+              mode === "difficult"
+                ? "modeButton activeButton"
+                : "modeButton"
             }
-            onClick={() =>
-              changeMode(
-                "difficult"
-              )
-            }
+            onClick={() => changeMode("difficult")}
           >
             ★ Qiyinlar
           </button>
         </div>
 
         <div className="statsRow">
-          <div className="miniStat">
-            <span>
-              To‘g‘ri
-            </span>
-
-            <strong>
-              {totalCorrect}
-            </strong>
+          <div className="statBox">
+            <span>To‘g‘ri</span>
+            <strong>{totalCorrect}</strong>
           </div>
 
-          <div className="miniStat">
-            <span>
-              Xato
-            </span>
-
-            <strong>
-              {totalWrong}
-            </strong>
+          <div className="statBox">
+            <span>Xato</span>
+            <strong>{totalWrong}</strong>
           </div>
 
-          <div className="miniStat">
-            <span>
-              Yodlangan
-            </span>
-
-            <strong>
-              {learnedCount}
-            </strong>
+          <div className="statBox">
+            <span>Yodlangan</span>
+            <strong>{learnedCount}</strong>
           </div>
 
-          <div className="miniStat">
-            <span>
-              Natija
-            </span>
-
-            <strong>
-              {accuracy}%
-            </strong>
+          <div className="statBox">
+            <span>Natija</span>
+            <strong>{accuracy}%</strong>
           </div>
         </div>
       </section>
 
-      {/* =========================
-          EMPTY
-      ========================== */}
+      {/* ================= EMPTY ================= */}
 
-      {visibleWords.length ===
-      0 ? (
-        <section className="empty3d">
+      {visibleWords.length === 0 ? (
+        <section className="emptyPanel">
           {mode === "wrong"
             ? "Hozircha xato qilingan so‘zlar yo‘q."
-            : mode ===
-                "difficult"
-              ? "Hozircha qiyin so‘zlar yo‘q."
+            : mode === "difficult"
+              ? "Hozircha qiyin deb belgilangan so‘zlar yo‘q."
               : "So‘zlar mavjud emas."}
         </section>
       ) : current ? (
-        /* =========================
-            MAIN LEARNING BOX
-        ========================== */
+        /* ================= MAIN ================= */
 
-        <section className="learning3d">
-          <div className="progressTop">
+        <section className="learningPanel">
+          <div className="progressRow">
             <span>
-              {index + 1} /{" "}
-              {visibleWords.length}
+              {index + 1} / {visibleWords.length}
             </span>
 
             <span>
-              To‘g‘ri:{" "}
-              {currentProgress
-                ?.correct || 0}
-
+              To‘g‘ri: {currentProgress?.correct || 0}
               {" · "}
-
-              Xato:{" "}
-              {currentProgress
-                ?.wrong || 0}
+              Xato: {currentProgress?.wrong || 0}
             </span>
           </div>
 
-          <article className="card3d">
-            <div className="cardButtons">
+          <article className="wordCard">
+            <div className="iconButtons">
               <button
-                className="icon3d"
-                onClick={
-                  speakWord
-                }
-                disabled={
-                  !speechSupported
-                }
+                type="button"
+                className="smallGray3d"
+                onClick={speakWord}
+                disabled={!speechSupported}
+                title="Talaffuz"
               >
                 🔊
               </button>
 
               <button
+                type="button"
                 className={
-                  currentProgress
-                    ?.difficult
-                    ? "icon3d starOn"
-                    : "icon3d"
+                  currentProgress?.difficult
+                    ? "smallGray3d starActive"
+                    : "smallGray3d"
                 }
-                onClick={
-                  toggleDifficult
-                }
+                onClick={toggleDifficult}
+                title="Qiyin so‘z"
               >
                 ★
               </button>
             </div>
 
-            <div className="englishLabel">
+            <div className="wordLabel">
               Inglizcha so‘z
             </div>
 
-            <h2>
-              {current.word}
-            </h2>
+            <h2>{current.word}</h2>
 
-            <div className="uzbek3d">
+            <div className="translationBox">
               {current.uzbek}
             </div>
 
-            {/* LEARN */}
+            {/* ============= LEARN ============= */}
 
-            {mode ===
-              "learn" && (
-              <>
+            {mode === "learn" && (
+              <div className="contentArea">
                 {!revealed ? (
                   <button
-                    className="mainBlue3d"
-                    onClick={
-                      revealSynonyms
-                    }
+                    type="button"
+                    className="blueButton"
+                    onClick={revealSynonyms}
                   >
-                    Sinonimlarni
-                    ko‘rsatish
+                    Sinonimlarni ko‘rsatish
                   </button>
                 ) : (
                   <>
-                    <div className="synonyms3d">
+                    <div className="synonymList">
                       {current.synonyms.map(
-                        (
-                          synonym,
-                          idx
-                        ) => (
+                        (synonym, idx) => (
                           <span
                             key={`${synonym}-${idx}`}
+                            className="synonymChip"
                           >
-                            {
-                              synonym
-                            }
+                            {synonym}
                           </span>
                         )
                       )}
                     </div>
 
                     <div className="autoText">
-                      Keyingi
-                      so‘zga
-                      avtomatik
-                      o‘tilmoqda...
+                      Keyingi so‘zga avtomatik o‘tiladi...
                     </div>
                   </>
                 )}
-              </>
+              </div>
             )}
 
-            {/* CHOICE */}
+            {/* ============= CHOICE ============= */}
 
-            {mode ===
-              "choice" && (
-              <div className="testArea">
-                <p>
+            {mode === "choice" && (
+              <div className="contentArea">
+                <div className="question">
                   Qaysi biri{" "}
-                  <strong>
-                    {
-                      current.word
-                    }
-                  </strong>{" "}
-                  so‘zining
-                  sinonimi?
-                </p>
+                  <strong>{current.word}</strong>{" "}
+                  so‘zining sinonimi?
+                </div>
 
-                <div className="choiceGrid">
-                  {choiceOptions.map(
-                    (
-                      option
-                    ) => {
-                      let cls =
-                        "choice3d";
+                <div className="answersGrid">
+                  {choiceOptions.map((option) => {
+                    let className = "answerButton";
 
-                      if (
-                        choiceResult
+                    if (choiceResult) {
+                      const isCorrect =
+                        current.synonyms
+                          .map(normalize)
+                          .includes(normalize(option));
+
+                      if (isCorrect) {
+                        className += " correctAnswer";
+                      } else if (
+                        option === selectedAnswer
                       ) {
-                        const isCorrect =
-                          current.synonyms
-                            .map(
-                              normalize
-                            )
-                            .includes(
-                              normalize(
-                                option
-                              )
-                            );
-
-                        if (
-                          isCorrect
-                        ) {
-                          cls +=
-                            " choiceCorrect";
-                        } else if (
-                          option ===
-                          selectedAnswer
-                        ) {
-                          cls +=
-                            " choiceWrong";
-                        }
+                        className += " wrongAnswer";
                       }
-
-                      return (
-                        <button
-                          key={
-                            option
-                          }
-                          className={
-                            cls
-                          }
-                          onClick={() =>
-                            checkChoice(
-                              option
-                            )
-                          }
-                          disabled={
-                            Boolean(
-                              choiceResult
-                            )
-                          }
-                        >
-                          {
-                            option
-                          }
-                        </button>
-                      );
                     }
-                  )}
+
+                    return (
+                      <button
+                        type="button"
+                        key={option}
+                        className={className}
+                        disabled={Boolean(choiceResult)}
+                        onClick={() =>
+                          checkChoice(option)
+                        }
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {choiceResult && (
                   <div
                     className={
-                      choiceResult ===
-                      "correct"
-                        ? "result good"
-                        : "result bad"
+                      choiceResult === "correct"
+                        ? "resultBox correctResult"
+                        : "resultBox wrongResult"
                     }
                   >
-                    {choiceResult ===
-                    "correct"
-                      ? "✓ To‘g‘ri"
-                      : `✗ Xato — ${current.synonyms[0]}`}
+                    {choiceResult === "correct"
+                      ? "✓ To‘g‘ri!"
+                      : `✗ Xato. To‘g‘ri javoblardan biri: ${current.synonyms[0]}`}
                   </div>
                 )}
               </div>
             )}
 
-            {/* WRITE */}
+            {/* ============= WRITE ============= */}
 
-            {mode ===
-              "write" && (
-              <div className="testArea">
-                <p>
-                  <strong>
-                    {
-                      current.word
-                    }
-                  </strong>{" "}
-                  so‘zining
-                  sinonimini
-                  yozing.
-                </p>
+            {mode === "write" && (
+              <div className="contentArea">
+                <div className="question">
+                  <strong>{current.word}</strong>{" "}
+                  so‘zining sinonimini yozing.
+                </div>
 
                 <div className="writeRow">
                   <input
-                    value={
-                      writeAnswer
+                    type="text"
+                    value={writeAnswer}
+                    placeholder="Sinonim yozing..."
+                    disabled={Boolean(writeResult)}
+                    onChange={(e) =>
+                      setWriteAnswer(e.target.value)
                     }
-                    onChange={(
-                      e
-                    ) =>
-                      setWriteAnswer(
-                        e.target
-                          .value
-                      )
-                    }
-                    onKeyDown={(
-                      e
-                    ) => {
-                      if (
-                        e.key ===
-                        "Enter"
-                      ) {
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
                         checkWrite();
                       }
                     }}
-                    placeholder="Sinonim..."
-                    disabled={
-                      Boolean(
-                        writeResult
-                      )
-                    }
                   />
 
                   <button
-                    className="mainBlue3d"
-                    onClick={
-                      checkWrite
-                    }
+                    type="button"
+                    className="blueButton checkButton"
+                    onClick={checkWrite}
                     disabled={
-                      Boolean(
-                        writeResult
-                      ) ||
+                      Boolean(writeResult) ||
                       !writeAnswer.trim()
                     }
                   >
@@ -1324,16 +867,14 @@ export default function SynonymsLearningPage() {
                 {writeResult && (
                   <div
                     className={
-                      writeResult ===
-                      "correct"
-                        ? "result good"
-                        : "result bad"
+                      writeResult === "correct"
+                        ? "resultBox correctResult"
+                        : "resultBox wrongResult"
                     }
                   >
-                    {writeResult ===
-                    "correct"
-                      ? "✓ To‘g‘ri"
-                      : `✗ ${current.synonyms.join(
+                    {writeResult === "correct"
+                      ? "✓ To‘g‘ri!"
+                      : `✗ Xato. Sinonimlar: ${current.synonyms.join(
                           ", "
                         )}`}
                   </div>
@@ -1341,56 +882,62 @@ export default function SynonymsLearningPage() {
               </div>
             )}
 
-            {/* REVIEW */}
+            {/* ============= REVIEW ============= */}
 
-            {(mode ===
-              "wrong" ||
-              mode ===
-                "difficult") && (
-              <div className="synonyms3d">
-                {current.synonyms.map(
-                  (
-                    synonym,
-                    idx
-                  ) => (
-                    <span
-                      key={`${synonym}-${idx}`}
-                    >
-                      {
-                        synonym
-                      }
-                    </span>
-                  )
-                )}
+            {(mode === "wrong" ||
+              mode === "difficult") && (
+              <div className="contentArea">
+                <div className="question">
+                  Sinonimlar
+                </div>
+
+                <div className="synonymList">
+                  {current.synonyms.map(
+                    (synonym, idx) => (
+                      <span
+                        key={`${synonym}-${idx}`}
+                        className="synonymChip"
+                      >
+                        {synonym}
+                      </span>
+                    )
+                  )}
+                </div>
               </div>
             )}
           </article>
 
-          {/* NAVIGATION */}
+          {/* ================= BOTTOM ================= */}
 
-          <div className="navRow">
+          <div className="bottomNavigation">
             <button
-              className="nav3d"
-              onClick={
-                previous
-              }
+              type="button"
+              className="grayButton navButton"
+              onClick={previous}
             >
               ← Oldingi
             </button>
 
             <button
-              className="later3d"
+              type="button"
+              className="blueButton laterButton"
               onClick={() => {
-                toggleDifficult();
+                if (
+                  current &&
+                  !currentProgress?.difficult
+                ) {
+                  toggleDifficult();
+                }
+
                 next();
               }}
             >
-              ★ Keyinroq
-              yana ko‘rsat
+              ★ Keyinroq yana ko‘rsat
             </button>
 
             <button
-              className="nav3d"
+              type="button"
+              className="grayButton navButton"
               onClick={next}
             >
               Keyingi →
@@ -1404,1027 +951,897 @@ export default function SynonymsLearningPage() {
           box-sizing: border-box;
         }
 
+        :global(html) {
+          background: #edf3f6;
+        }
+
         :global(body) {
           margin: 0;
+          background: #edf3f6;
         }
 
         button,
         input {
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            serif;
+          font-family: "Bell MT", "Times New Roman", serif;
         }
 
         .page {
           min-height: 100vh;
+          padding: 26px 18px 70px;
 
-          padding:
-            28px 20px
-            70px;
+          font-family: "Bell MT", "Times New Roman", serif;
 
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            serif;
-
-          color:
-            #102f40;
+          color: #142e3c;
 
           background:
             radial-gradient(
               circle at top,
-              #ffffff,
-              #eef4f7 55%,
-              #e5ecef
+              #ffffff 0%,
+              #f3f7f9 42%,
+              #e8eff2 100%
             );
         }
 
-        /* HEADER */
+        /* =================================================
+           BARCHA ASOSIY BLOKLAR BIR XIL KENGLIKDA
+        ================================================= */
 
-        .top3d {
-          width:
-            min(1150px, 100%);
+        .topPanel,
+        .controlPanel,
+        .learningPanel,
+        .emptyPanel {
+          width: min(1150px, 100%);
+          margin-left: auto;
+          margin-right: auto;
+        }
 
-          margin:
-            0 auto 28px;
+        /* =================================================
+           HEADER
+        ================================================= */
 
-          padding:
-            20px 25px;
+        .topPanel {
+          min-height: 105px;
+
+          margin-bottom: 28px;
+
+          padding: 18px 24px;
 
           display: grid;
-
-          grid-template-columns:
-            180px 1fr
-            140px;
-
-          align-items:
-            center;
-
+          grid-template-columns: 180px 1fr 145px;
+          align-items: center;
           gap: 20px;
 
-          border:
-            3px solid
-              #0a4766;
-
-          border-radius:
-            20px;
+          border: 3px solid #0b4969;
+          border-radius: 20px;
 
           background:
             linear-gradient(
               180deg,
-              #a9eaff,
-              #5ac5ef 55%,
-              #2697c7
+              #a9eaff 0%,
+              #62c9ef 48%,
+              #319fce 100%
             );
 
           box-shadow:
-            inset 0 4px 3px
-              rgba(
-                255,
-                255,
-                255,
-                0.9
-              ),
-            inset 0 -7px 0
-              #08709b,
-            0 9px 0
-              #064d6a,
-            0 16px 25px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
+            inset 0 4px 3px rgba(255, 255, 255, 0.92),
+            inset 0 -7px 0 #08709a,
+            0 9px 0 #07506f,
+            0 16px 24px rgba(0, 0, 0, 0.2);
         }
 
         .headerCenter {
-          text-align:
-            center;
+          text-align: center;
         }
 
         .headerCenter h1 {
           margin: 0;
 
-          font-size:
-            40px;
+          color: #064d73;
 
-          color:
-            #06496f;
+          font-size: clamp(34px, 4vw, 44px);
+
+          line-height: 1;
 
           text-shadow:
-            0 2px 0
-              white;
+            0 2px 0 #ffffff,
+            0 3px 3px rgba(0, 0, 0, 0.12);
         }
 
-        .headerCenter span {
-          font-weight:
-            700;
+        .headerCenter div {
+          margin-top: 7px;
+
+          color: #164b63;
+
+          font-size: 14px;
+
+          font-weight: 700;
         }
 
-        .back3d,
-        .total3d {
-          min-height:
-            55px;
+        .totalBox {
+          min-height: 58px;
 
-          border:
-            2px solid
-              #626e74;
+          padding: 7px 14px;
 
-          border-radius:
-            11px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          border: 2px solid #737d82;
+          border-radius: 11px;
 
           background:
             linear-gradient(
-              white,
-              #dedede
+              180deg,
+              #f6f6f6 0%,
+              #e4e4e4 48%,
+              #c8ccce 100%
             );
 
           box-shadow:
-            inset 0 3px 2px
-              white,
-            0 6px 0
-              #69747a;
-
-          font-weight:
-            700;
+            inset 0 3px 2px #ffffff,
+            inset 0 -2px 3px rgba(0, 0, 0, 0.08),
+            0 6px 0 #707a7f,
+            0 10px 14px rgba(0, 0, 0, 0.15);
         }
 
-        .back3d {
-          cursor:
-            pointer;
+        .totalBox strong {
+          color: #0676aa;
+
+          font-size: 24px;
         }
 
-        .total3d {
-          display: flex;
+        .totalBox span {
+          margin-top: 1px;
 
-          flex-direction:
-            column;
+          font-size: 13px;
 
-          align-items:
-            center;
-
-          justify-content:
-            center;
+          font-weight: 700;
         }
 
-        .total3d strong {
-          font-size:
-            23px;
+        /* =================================================
+           OCH KULRANG 3D TUGMALAR
+        ================================================= */
 
-          color:
-            #0674a7;
+        .grayButton,
+        .modeButton,
+        .answerButton,
+        .smallGray3d {
+          border: 2px solid #7c878c;
+
+          color: #172d38;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f4f4f4 0%,
+              #e3e3e3 45%,
+              #c9cdcf 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px rgba(255, 255, 255, 0.95),
+            inset 0 -2px 3px rgba(0, 0, 0, 0.08),
+            0 5px 0 #717b80,
+            0 9px 12px rgba(0, 0, 0, 0.13);
+
+          font-weight: 700;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.08s ease,
+            box-shadow 0.08s ease,
+            filter 0.12s ease;
         }
 
-        /* CONTROL */
+        .grayButton:hover,
+        .modeButton:hover,
+        .answerButton:hover,
+        .smallGray3d:hover {
+          filter: brightness(1.025);
+        }
 
-        .control3d {
-          width:
-            min(1150px, 100%);
+        .grayButton:active,
+        .modeButton:active,
+        .answerButton:active,
+        .smallGray3d:active,
+        .blueButton:active {
+          transform: translateY(4px);
 
-          margin:
-            0 auto 30px;
+          box-shadow:
+            inset 0 2px 3px rgba(0, 0, 0, 0.08),
+            0 1px 0 #697378;
+        }
 
-          padding:
-            17px;
+        .backButton {
+          min-height: 55px;
 
-          border:
-            3px solid
-              #3f474b;
+          padding: 10px 16px;
 
-          border-radius:
-            18px;
+          border-radius: 11px;
+
+          font-size: 14px;
+        }
+
+        /* =================================================
+           CONTROL PANEL
+        ================================================= */
+
+        .controlPanel {
+          margin-bottom: 28px;
+
+          padding: 17px;
+
+          border: 3px solid #40484c;
+          border-radius: 18px;
 
           background:
             linear-gradient(
               145deg,
-              #676d70,
-              #454b4e
+              #6b7174 0%,
+              #555b5e 50%,
+              #43494c 100%
             );
 
           box-shadow:
-            inset 0 3px 3px
-              rgba(
-                255,
-                255,
-                255,
-                0.2
-              ),
-            inset 0 -6px 0
-              #303639,
-            0 8px 0
-              #303639,
-            0 14px 20px
-              rgba(
-                0,
-                0,
-                0,
-                0.18
-              );
+            inset 0 3px 3px rgba(255, 255, 255, 0.18),
+            inset 0 -7px 0 #303639,
+            0 8px 0 #303639,
+            0 14px 20px rgba(0, 0, 0, 0.18);
         }
 
         .modeRow {
           display: grid;
 
-          grid-template-columns:
-            repeat(
-              5,
-              1fr
-            );
+          grid-template-columns: repeat(5, 1fr);
 
-          gap: 12px;
+          gap: 13px;
         }
 
-        .mode3d {
-          min-height:
-            48px;
+        .modeButton {
+          min-height: 49px;
 
-          border:
-            2px solid
-              #90999d;
+          border-radius: 9px;
 
-          border-radius:
-            9px;
+          font-size: 14px;
+        }
+
+        .activeButton {
+          border-color: #126487;
+
+          color: #064d70;
 
           background:
             linear-gradient(
-              #ffffff,
-              #d8d8d8
+              180deg,
+              #caf2ff 0%,
+              #79d4f4 45%,
+              #43b2df 100%
             );
 
           box-shadow:
-            inset 0 2px 2px
-              white,
-            0 5px 0
-              #747d81;
-
-          font-weight:
-            700;
-
-          cursor:
-            pointer;
-        }
-
-        .active3d {
-          color:
-            #064d70;
-
-          border-color:
-            #106487;
-
-          background:
-            linear-gradient(
-              #caf2ff,
-              #65c9ef
-            );
-
-          box-shadow:
-            inset 0 2px 2px
-              white,
-            0 5px 0
-              #0f6485;
+            inset 0 3px 2px #ffffff,
+            inset 0 -2px 3px rgba(0, 0, 0, 0.07),
+            0 5px 0 #126181,
+            0 9px 12px rgba(0, 0, 0, 0.14);
         }
 
         .statsRow {
-          margin-top:
-            15px;
+          margin-top: 15px;
 
           display: grid;
 
-          grid-template-columns:
-            repeat(
-              4,
-              1fr
+          grid-template-columns: repeat(4, 1fr);
+
+          gap: 13px;
+        }
+
+        .statBox {
+          min-height: 68px;
+
+          padding: 9px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          border: 2px solid #9aa3a7;
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f2f2f2 0%,
+              #dedede 50%,
+              #c7cbcd 100%
             );
+
+          box-shadow:
+            inset 0 3px 2px #ffffff,
+            inset 0 -2px 3px rgba(0, 0, 0, 0.07),
+            0 5px 0 #798388;
+        }
+
+        .statBox span {
+          font-size: 13px;
+
+          font-weight: 700;
+        }
+
+        .statBox strong {
+          margin-top: 4px;
+
+          color: #0877aa;
+
+          font-size: 22px;
+        }
+
+        /* =================================================
+           MAIN PANEL — 1150PX
+        ================================================= */
+
+        .learningPanel {
+          padding: 20px;
+
+          border: 3px solid #3b4347;
+          border-radius: 20px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #6b7174 0%,
+              #545a5d 48%,
+              #41474a 100%
+            );
+
+          box-shadow:
+            inset 0 3px 3px rgba(255, 255, 255, 0.17),
+            inset 0 -8px 0 #2e3437,
+            0 10px 0 #2e3437,
+            0 17px 26px rgba(0, 0, 0, 0.22);
+        }
+
+        .progressRow {
+          min-height: 30px;
+
+          padding: 0 5px 8px;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          color: #ffffff;
+
+          font-size: 14px;
+
+          font-weight: 700;
+
+          text-shadow: 0 2px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        /* =================================================
+           WORD CARD
+        ================================================= */
+
+        .wordCard {
+          position: relative;
+
+          min-height: 410px;
+
+          padding: 28px 42px 32px;
+
+          text-align: center;
+
+          border: 3px solid #c5cbce;
+          border-radius: 17px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #f8f8f8 0%,
+              #eeeeee 52%,
+              #d9dcde 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px rgba(255, 255, 255, 0.98),
+            inset 0 -4px 5px rgba(0, 0, 0, 0.07),
+            0 8px 0 #7b858a,
+            0 13px 18px rgba(0, 0, 0, 0.18);
+        }
+
+        .iconButtons {
+          position: absolute;
+
+          top: 18px;
+          right: 22px;
+
+          display: flex;
+
+          gap: 11px;
+        }
+
+        .smallGray3d {
+          width: 48px;
+          height: 45px;
+
+          border-radius: 9px;
+
+          font-size: 17px;
+        }
+
+        .starActive {
+          border-color: #b18a21;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff8c9,
+              #f2d76d 55%,
+              #d9b83e
+            );
+
+          box-shadow:
+            inset 0 3px 2px #ffffff,
+            0 5px 0 #a98b30;
+        }
+
+        .wordLabel {
+          margin-top: 2px;
+
+          color: #667176;
+
+          font-size: 15px;
+
+          font-weight: 700;
+        }
+
+        .wordCard h2 {
+          margin: 8px 0 21px;
+
+          color: #0875aa;
+
+          font-size: clamp(43px, 6vw, 61px);
+
+          line-height: 1;
+
+          text-shadow:
+            0 2px 0 #ffffff,
+            0 3px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .translationBox {
+          width: min(800px, 90%);
+
+          margin: 0 auto;
+
+          min-height: 58px;
+
+          padding: 13px 20px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border: 2px solid #6daac6;
+          border-radius: 10px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #edfaff 0%,
+              #d7effb 50%,
+              #bddfee 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px #ffffff,
+            0 5px 0 #6e9eb3;
+
+          color: #17546f;
+
+          font-size: 21px;
+
+          font-weight: 700;
+        }
+
+        .contentArea {
+          width: min(900px, 100%);
+
+          margin: 24px auto 0;
+        }
+
+        .question {
+          margin-bottom: 18px;
+
+          color: #263b45;
+
+          font-size: 19px;
+
+          font-weight: 700;
+        }
+
+        /* =================================================
+           BLUE 3D
+        ================================================= */
+
+        .blueButton {
+          min-height: 48px;
+
+          padding: 10px 24px;
+
+          border: 2px solid #116184;
+          border-radius: 9px;
+
+          color: #074d70;
+
+          background:
+            linear-gradient(
+              180deg,
+              #c9f1ff 0%,
+              #79d2f2 48%,
+              #45b3df 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px #ffffff,
+            inset 0 -2px 3px rgba(0, 0, 0, 0.07),
+            0 5px 0 #115f7e,
+            0 9px 12px rgba(0, 0, 0, 0.13);
+
+          font-weight: 700;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.08s ease,
+            box-shadow 0.08s ease;
+        }
+
+        /* =================================================
+           SYNONYMS
+        ================================================= */
+
+        .synonymList {
+          display: flex;
+
+          flex-wrap: wrap;
+
+          justify-content: center;
 
           gap: 12px;
         }
 
-        .miniStat {
-          padding:
-            10px;
+        .synonymChip {
+          min-width: 115px;
 
-          text-align:
-            center;
+          padding: 10px 16px;
 
-          border:
-            2px solid
-              #b4bcc0;
-
-          border-radius:
-            9px;
+          border: 2px solid #669ab1;
+          border-radius: 8px;
 
           background:
             linear-gradient(
-              white,
-              #dedede
+              180deg,
+              #f3f3f3,
+              #d6dadc
             );
 
           box-shadow:
-            0 4px 0
-              #7c8589;
-        }
+            inset 0 2px 2px #ffffff,
+            0 4px 0 #7c898f;
 
-        .miniStat span {
-          display:
-            block;
+          color: #075779;
 
-          font-size:
-            13px;
-
-          font-weight:
-            700;
-        }
-
-        .miniStat strong {
-          display:
-            block;
-
-          margin-top:
-            2px;
-
-          color:
-            #0877aa;
-
-          font-size:
-            21px;
-        }
-
-        /* LEARNING */
-
-        .learning3d {
-          width:
-            min(850px, 100%);
-
-          margin:
-            auto;
-
-          padding:
-            22px;
-
-          border:
-            3px solid
-              #363e42;
-
-          border-radius:
-            20px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #666c6f,
-              #43494c
-            );
-
-          box-shadow:
-            inset 0 3px 3px
-              rgba(
-                255,
-                255,
-                255,
-                0.16
-              ),
-            inset 0 -8px 0
-              #2e3437,
-            0 10px 0
-              #2d3336,
-            0 17px 26px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              );
-        }
-
-        .progressTop {
-          margin-bottom:
-            16px;
-
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          color:
-            white;
-
-          font-weight:
-            700;
-        }
-
-        .card3d {
-          position:
-            relative;
-
-          padding:
-            35px 32px
-            32px;
-
-          text-align:
-            center;
-
-          border:
-            3px solid
-              #d5dadd;
-
-          border-radius:
-            17px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #ffffff,
-              #eeeeee
-            );
-
-          box-shadow:
-            inset 0 4px 4px
-              white,
-            inset 0 -4px 4px
-              rgba(
-                0,
-                0,
-                0,
-                0.06
-              ),
-            0 8px 0
-              #858e92,
-            0 13px 17px
-              rgba(
-                0,
-                0,
-                0,
-                0.18
-              );
-        }
-
-        .cardButtons {
-          position:
-            absolute;
-
-          top: 18px;
-
-          right: 20px;
-
-          display: flex;
-
-          gap: 9px;
-        }
-
-        .icon3d {
-          width: 45px;
-
-          height: 42px;
-
-          border:
-            2px solid
-              #69747a;
-
-          border-radius:
-            9px;
-
-          background:
-            linear-gradient(
-              white,
-              #d8d8d8
-            );
-
-          box-shadow:
-            0 4px 0
-              #707a7f;
-
-          cursor:
-            pointer;
-        }
-
-        .starOn {
-          background:
-            linear-gradient(
-              #fff5ad,
-              #efc343
-            );
-        }
-
-        .englishLabel {
-          color:
-            #687379;
-
-          font-weight:
-            700;
-        }
-
-        .card3d h2 {
-          margin:
-            8px 0 24px;
-
-          color:
-            #0570a6;
-
-          font-size:
-            clamp(
-              44px,
-              7vw,
-              62px
-            );
-
-          text-shadow:
-            0 2px 0
-              white;
-        }
-
-        .uzbek3d {
-          width:
-            min(620px, 100%);
-
-          margin:
-            auto;
-
-          padding:
-            15px 20px;
-
-          border:
-            2px solid
-              #6eacc9;
-
-          border-radius:
-            10px;
-
-          background:
-            linear-gradient(
-              #eefaff,
-              #cbeafd
-            );
-
-          box-shadow:
-            inset 0 2px 3px
-              white,
-            0 5px 0
-              #78a7bb;
-
-          color:
-            #15526f;
-
-          font-size:
-            22px;
-
-          font-weight:
-            700;
-        }
-
-        .mainBlue3d {
-          margin-top:
-            25px;
-
-          min-height:
-            48px;
-
-          padding:
-            10px 25px;
-
-          border:
-            2px solid
-              #116084;
-
-          border-radius:
-            9px;
-
-          background:
-            linear-gradient(
-              #c8f0ff,
-              #60c4ea
-            );
-
-          box-shadow:
-            inset 0 2px 2px
-              white,
-            0 5px 0
-              #125e7c;
-
-          color:
-            #074d70;
-
-          font-weight:
-            700;
-
-          cursor:
-            pointer;
-        }
-
-        .synonyms3d {
-          margin-top:
-            28px;
-
-          display: flex;
-
-          flex-wrap:
-            wrap;
-
-          justify-content:
-            center;
-
-          gap: 10px;
-        }
-
-        .synonyms3d span {
-          padding:
-            10px 15px;
-
-          border:
-            2px solid
-              #4d9bc0;
-
-          border-radius:
-            8px;
-
-          background:
-            linear-gradient(
-              white,
-              #d4effd
-            );
-
-          box-shadow:
-            0 4px 0
-              #70a2b7;
-
-          color:
-            #06557c;
-
-          font-weight:
-            700;
+          font-weight: 700;
         }
 
         .autoText {
-          margin-top:
-            18px;
+          margin-top: 18px;
 
-          color:
-            #667176;
+          color: #687277;
 
-          font-size:
-            13px;
+          font-size: 13px;
 
-          font-weight:
-            700;
+          font-weight: 700;
         }
 
-        /* TEST */
+        /* =================================================
+           ANSWERS — OCH KULRANG 3D
+        ================================================= */
 
-        .testArea {
-          margin-top:
-            27px;
-        }
-
-        .testArea p {
-          font-size:
-            18px;
-
-          font-weight:
-            700;
-        }
-
-        .choiceGrid {
+        .answersGrid {
           display: grid;
 
-          grid-template-columns:
-            repeat(
-              2,
-              1fr
-            );
+          grid-template-columns: repeat(2, 1fr);
 
-          gap: 12px;
-
-          margin-top:
-            18px;
+          gap: 16px;
         }
 
-        .choice3d {
-          min-height:
-            52px;
+        .answerButton {
+          min-height: 60px;
 
-          border:
-            2px solid
-              #828d92;
+          padding: 12px 18px;
 
-          border-radius:
-            9px;
+          border-radius: 10px;
+
+          font-size: 17px;
+        }
+
+        .correctAnswer {
+          border-color: #34824c;
+
+          color: #175c2b;
 
           background:
             linear-gradient(
-              white,
-              #dddddd
+              180deg,
+              #f1fff4,
+              #bceac8 50%,
+              #8bd29d
             );
 
           box-shadow:
-            0 5px 0
-              #798388;
-
-          font-weight:
-            700;
-
-          cursor:
-            pointer;
+            inset 0 3px 2px #ffffff,
+            0 5px 0 #4e9b62;
         }
 
-        .choiceCorrect {
+        .wrongAnswer {
+          border-color: #a44c4c;
+
+          color: #812323;
+
           background:
             linear-gradient(
-              #effff2,
-              #9ee0af
+              180deg,
+              #fff5f5,
+              #f2c0c0 50%,
+              #e59595
             );
 
-          border-color:
-            #3a8a52;
+          box-shadow:
+            inset 0 3px 2px #ffffff,
+            0 5px 0 #a75959;
         }
 
-        .choiceWrong {
-          background:
-            linear-gradient(
-              #fff0f0,
-              #ee9e9e
-            );
-
-          border-color:
-            #a44747;
-        }
+        /* =================================================
+           WRITE
+        ================================================= */
 
         .writeRow {
           display: grid;
 
-          grid-template-columns:
-            1fr auto;
+          grid-template-columns: 1fr 180px;
 
-          gap: 12px;
-
-          margin-top:
-            15px;
+          gap: 15px;
         }
 
         .writeRow input {
-          min-height:
-            49px;
+          width: 100%;
 
-          padding:
-            10px 15px;
+          min-height: 52px;
 
-          border:
-            2px solid
-              #899499;
+          padding: 10px 16px;
 
-          border-radius:
-            9px;
+          border: 2px solid #838e93;
+          border-radius: 9px;
 
           outline: none;
 
-          font-size:
-            17px;
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #f0f0f0
+            );
 
           box-shadow:
-            inset 0 2px 4px
-              rgba(
-                0,
-                0,
-                0,
-                0.08
-              );
+            inset 0 3px 5px rgba(0, 0, 0, 0.09),
+            0 3px 0 #9aa2a6;
+
+          color: #203844;
+
+          font-size: 17px;
+
+          font-weight: 700;
         }
 
-        .writeRow .mainBlue3d {
-          margin-top: 0;
+        .checkButton {
+          margin: 0;
         }
 
-        .result {
-          margin-top:
-            16px;
+        /* =================================================
+           RESULT
+        ================================================= */
 
-          padding:
-            11px;
+        .resultBox {
+          margin-top: 18px;
 
-          border-radius:
-            8px;
+          padding: 12px 16px;
 
-          font-weight:
-            700;
+          border-radius: 9px;
+
+          font-size: 15px;
+
+          font-weight: 700;
         }
 
-        .good {
-          color:
-            #216837;
+        .correctResult {
+          border: 2px solid #68a978;
 
-          background:
-            #e9ffed;
+          color: #216535;
 
-          border:
-            1px solid
-              #65aa78;
+          background: #e9ffed;
         }
 
-        .bad {
-          color:
-            #8b2424;
+        .wrongResult {
+          border: 2px solid #bf7272;
 
-          background:
-            #fff0f0;
+          color: #8b2626;
 
-          border:
-            1px solid
-              #c67a7a;
+          background: #fff0f0;
         }
 
-        /* NAV */
+        /* =================================================
+           BOTTOM NAVIGATION
+           TEPA BILAN MOS 3D
+        ================================================= */
 
-        .navRow {
-          margin-top:
-            22px;
+        .bottomNavigation {
+          margin-top: 22px;
 
           display: grid;
 
-          grid-template-columns:
-            1fr 1.4fr
-            1fr;
+          grid-template-columns: 1fr 1.35fr 1fr;
 
-          gap: 12px;
+          gap: 15px;
         }
 
-        .nav3d,
-        .later3d {
-          min-height:
-            49px;
+        .navButton,
+        .laterButton {
+          width: 100%;
 
-          border-radius:
-            9px;
+          min-height: 52px;
 
-          font-weight:
-            700;
+          border-radius: 10px;
 
-          cursor:
-            pointer;
+          font-size: 14px;
         }
 
-        .nav3d {
-          border:
-            2px solid
-              #6f797e;
+        .laterButton {
+          margin: 0;
+        }
+
+        /* =================================================
+           EMPTY
+        ================================================= */
+
+        .emptyPanel {
+          padding: 35px;
+
+          text-align: center;
+
+          border: 3px solid #3e464a;
+          border-radius: 18px;
+
+          color: #ffffff;
 
           background:
             linear-gradient(
-              white,
-              #d5d5d5
+              145deg,
+              #686e71,
+              #444a4d
             );
 
           box-shadow:
-            0 5px 0
-              #747e82;
-        }
+            inset 0 3px 3px rgba(255, 255, 255, 0.17),
+            0 9px 0 #303639,
+            0 15px 20px rgba(0, 0, 0, 0.18);
 
-        .later3d {
-          border:
-            2px solid
-              #126083;
+          font-size: 18px;
 
-          background:
-            linear-gradient(
-              #c8efff,
-              #61c4e9
-            );
-
-          box-shadow:
-            0 5px 0
-              #115d7b;
-
-          color:
-            #064d6e;
-        }
-
-        .empty3d {
-          width:
-            min(850px, 100%);
-
-          margin:
-            auto;
-
-          padding:
-            35px;
-
-          text-align:
-            center;
-
-          color:
-            white;
-
-          border:
-            3px solid
-              #383f43;
-
-          border-radius:
-            18px;
-
-          background:
-            linear-gradient(
-              #656b6e,
-              #464c4f
-            );
-
-          box-shadow:
-            0 9px 0
-              #303639;
-
-          font-weight:
-            700;
-        }
-
-        button:active {
-          transform:
-            translateY(3px);
-
-          box-shadow:
-            none;
+          font-weight: 700;
         }
 
         button:disabled {
-          opacity:
-            0.6;
+          cursor: not-allowed;
 
-          cursor:
-            not-allowed;
+          opacity: 0.72;
         }
 
-        /* MOBILE */
+        /* =================================================
+           TABLET
+        ================================================= */
 
-        @media (
-          max-width: 760px
-        ) {
-          .page {
-            padding:
-              16px 10px
-              50px;
-          }
-
-          .top3d {
-            grid-template-columns:
-              1fr;
-
-            text-align:
-              center;
-          }
-
-          .back3d,
-          .total3d {
-            width: 100%;
+        @media (max-width: 900px) {
+          .topPanel {
+            grid-template-columns: 150px 1fr 120px;
           }
 
           .modeRow {
-            grid-template-columns:
-              repeat(
-                2,
-                1fr
-              );
+            grid-template-columns: repeat(3, 1fr);
+          }
+
+          .wordCard {
+            padding-left: 25px;
+            padding-right: 25px;
+          }
+        }
+
+        /* =================================================
+           MOBILE
+        ================================================= */
+
+        @media (max-width: 650px) {
+          .page {
+            padding: 15px 9px 50px;
+          }
+
+          .topPanel {
+            grid-template-columns: 1fr;
+
+            padding: 14px;
+          }
+
+          .backButton,
+          .totalBox {
+            width: 100%;
+          }
+
+          .headerCenter {
+            order: -1;
+          }
+
+          .controlPanel {
+            padding: 12px;
+          }
+
+          .modeRow {
+            grid-template-columns: repeat(2, 1fr);
           }
 
           .statsRow {
-            grid-template-columns:
-              repeat(
-                2,
-                1fr
-              );
+            grid-template-columns: repeat(2, 1fr);
           }
 
-          .learning3d {
-            padding:
-              14px;
+          .learningPanel {
+            padding: 12px;
           }
 
-          .card3d {
-            padding:
-              75px 15px
-              25px;
+          .progressRow {
+            font-size: 12px;
           }
 
-          .cardButtons {
-            left: 50%;
+          .wordCard {
+            min-height: 0;
 
-            right: auto;
-
-            transform:
-              translateX(
-                -50%
-              );
+            padding: 75px 13px 24px;
           }
 
-          .choiceGrid {
-            grid-template-columns:
-              1fr;
+          .iconButtons {
+            top: 14px;
+
+            right: 50%;
+
+            transform: translateX(50%);
+          }
+
+          .translationBox {
+            width: 100%;
+          }
+
+          .answersGrid {
+            grid-template-columns: 1fr;
           }
 
           .writeRow {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
 
-          .navRow {
-            grid-template-columns:
-              1fr;
+          .bottomNavigation {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
