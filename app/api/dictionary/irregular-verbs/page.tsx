@@ -1,1 +1,1912 @@
+"use client";
 
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+type IrregularVerb = {
+  id: string;
+  v1: string;
+  v2: string;
+  v3: string;
+  uzbek: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ApiResponse = {
+  ok?: boolean;
+  message?: string;
+  verbs?: IrregularVerb[];
+  total?: number;
+
+  added?: number;
+  duplicates?: number;
+  invalid?: number;
+  invalidLines?: string[];
+};
+
+const API_URL =
+  "/api/dictionary/irregular-verbs";
+
+const BULK_API_URL =
+  "/api/dictionary/irregular-verbs/bulk";
+
+export default function IrregularVerbsAdminPage() {
+  const [verbs, setVerbs] =
+    useState<IrregularVerb[]>([]);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [editingVerb, setEditingVerb] =
+    useState<IrregularVerb | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [bulkText, setBulkText] =
+    useState("");
+
+  const [bulkLoading, setBulkLoading] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const [bulkResult, setBulkResult] =
+    useState<{
+      added: number;
+      duplicates: number;
+      invalid: number;
+      total: number;
+    } | null>(null);
+
+  /* =====================================================
+     BAZADAN YUKLASH
+  ===================================================== */
+
+  const loadVerbs =
+    useCallback(async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          API_URL,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+        const data: ApiResponse =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.ok
+        ) {
+          throw new Error(
+            data.message ||
+              "Fe’llarni yuklashda xatolik yuz berdi."
+          );
+        }
+
+        setVerbs(
+          Array.isArray(data.verbs)
+            ? data.verbs
+            : []
+        );
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Fe’llarni yuklashda xatolik yuz berdi."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
+  useEffect(() => {
+    void loadVerbs();
+  }, [loadVerbs]);
+
+  /* =====================================================
+     QIDIRUV
+  ===================================================== */
+
+  const filteredVerbs =
+    useMemo(() => {
+      const q = search
+        .trim()
+        .toLowerCase();
+
+      if (!q) {
+        return verbs;
+      }
+
+      return verbs.filter(
+        (verb) =>
+          verb.v1
+            .toLowerCase()
+            .includes(q) ||
+          verb.v2
+            .toLowerCase()
+            .includes(q) ||
+          verb.v3
+            .toLowerCase()
+            .includes(q) ||
+          verb.uzbek
+            .toLowerCase()
+            .includes(q)
+      );
+    }, [verbs, search]);
+
+  /* =====================================================
+     XABARLARNI TOZALASH
+  ===================================================== */
+
+  function clearMessages() {
+    setMessage("");
+    setError("");
+  }
+
+  /* =====================================================
+     QO‘SHISH / TAHRIRLASH
+  ===================================================== */
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (saving) return;
+
+    clearMessages();
+
+    const form =
+      event.currentTarget;
+
+    const formData =
+      new FormData(form);
+
+    const v1 = String(
+      formData.get("v1") ?? ""
+    ).trim();
+
+    const v2 = String(
+      formData.get("v2") ?? ""
+    ).trim();
+
+    const v3 = String(
+      formData.get("v3") ?? ""
+    ).trim();
+
+    const uzbek = String(
+      formData.get("uzbek") ?? ""
+    ).trim();
+
+    if (
+      !v1 ||
+      !v2 ||
+      !v3 ||
+      !uzbek
+    ) {
+      setError(
+        "V1, V2, V3 va tarjimani to‘liq kiriting."
+      );
+
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const isEditing =
+        editingVerb !== null;
+
+      const response =
+        await fetch(API_URL, {
+          method: isEditing
+            ? "PUT"
+            : "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            ...(isEditing
+              ? {
+                  id:
+                    editingVerb.id,
+                }
+              : {}),
+
+            v1,
+            v2,
+            v3,
+            uzbek,
+          }),
+        });
+
+      const data: ApiResponse =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.ok
+      ) {
+        throw new Error(
+          data.message ||
+            "Fe’lni saqlashda xatolik yuz berdi."
+        );
+      }
+
+      if (
+        Array.isArray(data.verbs)
+      ) {
+        setVerbs(data.verbs);
+      } else {
+        await loadVerbs();
+      }
+
+      form.reset();
+
+      setEditingVerb(null);
+
+      setMessage(
+        data.message ||
+          (isEditing
+            ? "Fe’l muvaffaqiyatli tahrirlandi."
+            : "Yangi fe’l muvaffaqiyatli qo‘shildi.")
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Fe’lni saqlashda xatolik yuz berdi."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* =====================================================
+     TAHRIRLASH
+  ===================================================== */
+
+  function startEdit(
+    verb: IrregularVerb
+  ) {
+    clearMessages();
+
+    setEditingVerb(verb);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  function cancelEdit() {
+    clearMessages();
+
+    setEditingVerb(null);
+  }
+
+  /* =====================================================
+     O‘CHIRISH
+  ===================================================== */
+
+  async function deleteVerb(
+    verb: IrregularVerb
+  ) {
+    const confirmed =
+      window.confirm(
+        `"${verb.v1} — ${verb.v2} — ${verb.v3}" fe’lini o‘chirmoqchimisiz?`
+      );
+
+    if (!confirmed) return;
+
+    clearMessages();
+
+    try {
+      setSaving(true);
+
+      const response =
+        await fetch(API_URL, {
+          method: "DELETE",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            id: verb.id,
+          }),
+        });
+
+      const data: ApiResponse =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.ok
+      ) {
+        throw new Error(
+          data.message ||
+            "Fe’lni o‘chirishda xatolik yuz berdi."
+        );
+      }
+
+      if (
+        Array.isArray(data.verbs)
+      ) {
+        setVerbs(data.verbs);
+      } else {
+        await loadVerbs();
+      }
+
+      if (
+        editingVerb?.id ===
+        verb.id
+      ) {
+        setEditingVerb(null);
+      }
+
+      setMessage(
+        data.message ||
+          "Fe’l muvaffaqiyatli o‘chirildi."
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Fe’lni o‘chirishda xatolik yuz berdi."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* =====================================================
+     OMMAVIY IMPORT
+  ===================================================== */
+
+  async function importBulk() {
+    const text =
+      bulkText.trim();
+
+    clearMessages();
+
+    setBulkResult(null);
+
+    if (!text) {
+      setError(
+        "Import qilish uchun fe’llar ro‘yxatini kiriting."
+      );
+
+      return;
+    }
+
+    try {
+      setBulkLoading(true);
+
+      const response =
+        await fetch(
+          BULK_API_URL,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              text,
+            }),
+          }
+        );
+
+      const data: ApiResponse =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.ok
+      ) {
+        throw new Error(
+          data.message ||
+            "Ommaviy importda xatolik yuz berdi."
+        );
+      }
+
+      if (
+        Array.isArray(data.verbs)
+      ) {
+        setVerbs(data.verbs);
+      } else {
+        await loadVerbs();
+      }
+
+      setBulkResult({
+        added:
+          data.added ?? 0,
+
+        duplicates:
+          data.duplicates ?? 0,
+
+        invalid:
+          data.invalid ?? 0,
+
+        total:
+          data.total ??
+          verbs.length,
+      });
+
+      setBulkText("");
+
+      setMessage(
+        data.message ||
+          "Ommaviy import muvaffaqiyatli tugadi."
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ommaviy importda xatolik yuz berdi."
+      );
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  /* =====================================================
+     SAHIFA
+  ===================================================== */
+
+  return (
+    <main className="page">
+      <div className="container">
+        {/* HEADER */}
+
+        <section className="headerPanel">
+          <button
+            type="button"
+            className="backButton"
+            onClick={() => {
+              window.location.href =
+                "/admin/dictionary";
+            }}
+          >
+            ← Lug‘at boshqaruvi
+          </button>
+
+          <div className="headerCenter">
+            <div className="smallTitle">
+              ADMIN PANEL
+            </div>
+
+            <h1>
+              Irregular Verbs
+            </h1>
+          </div>
+
+          <div className="totalBox">
+            <strong>
+              {verbs.length}
+            </strong>
+
+            <span>
+              Jami fe’l
+            </span>
+          </div>
+        </section>
+
+        {/* XABARLAR */}
+
+        {message && (
+          <div className="message success">
+            ✓ {message}
+          </div>
+        )}
+
+        {error && (
+          <div className="message error">
+            ✕ {error}
+          </div>
+        )}
+
+        {/* YANGI FE’L */}
+
+        <section className="panel">
+          <div className="panelHeader">
+            <div className="panelTitle">
+              {editingVerb
+                ? "Fe’lni tahrirlash"
+                : "Yangi fe’l qo‘shish"}
+            </div>
+
+            {editingVerb && (
+              <div className="editingBadge">
+                TAHRIRLASH
+              </div>
+            )}
+          </div>
+
+          <form
+            key={
+              editingVerb
+                ? editingVerb.id
+                : "new"
+            }
+            onSubmit={handleSubmit}
+          >
+            <div className="formGrid">
+              <label>
+                <span>V1</span>
+
+                <input
+                  name="v1"
+                  defaultValue={
+                    editingVerb?.v1 ??
+                    ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="go"
+                />
+              </label>
+
+              <label>
+                <span>V2</span>
+
+                <input
+                  name="v2"
+                  defaultValue={
+                    editingVerb?.v2 ??
+                    ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="went"
+                />
+              </label>
+
+              <label>
+                <span>V3</span>
+
+                <input
+                  name="v3"
+                  defaultValue={
+                    editingVerb?.v3 ??
+                    ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="gone"
+                />
+              </label>
+
+              <label>
+                <span>
+                  Tarjimasi
+                </span>
+
+                <input
+                  name="uzbek"
+                  defaultValue={
+                    editingVerb?.uzbek ??
+                    ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="bormoq"
+                />
+              </label>
+            </div>
+
+            <div className="formActions">
+              <button
+                type="submit"
+                className="primaryButton"
+                disabled={saving}
+              >
+                {saving
+                  ? "Saqlanmoqda..."
+                  : editingVerb
+                  ? "✓ Saqlash"
+                  : "+ Qo‘shish"}
+              </button>
+
+              {editingVerb && (
+                <button
+                  type="button"
+                  className="grayButton"
+                  disabled={saving}
+                  onClick={
+                    cancelEdit
+                  }
+                >
+                  Bekor qilish
+                </button>
+              )}
+            </div>
+          </form>
+        </section>
+
+        {/* OMMAVIY IMPORT */}
+
+        <section className="panel">
+          <div className="panelHeader">
+            <div className="panelTitle">
+              Ommaviy import
+            </div>
+
+            <div className="importBadge">
+              BULK
+            </div>
+          </div>
+
+          <div className="importHelp">
+            Har bir fe’l yangi
+            qatorda bo‘lsin.
+            Format:
+          </div>
+
+          <div className="formatExample">
+            go | went | gone |
+            bormoq
+            <br />
+            see | saw | seen |
+            ko‘rmoq
+            <br />
+            write | wrote |
+            written | yozmoq
+            <br />
+            take | took | taken |
+            olmoq
+          </div>
+
+          <textarea
+            className="bulkTextarea"
+            value={bulkText}
+            disabled={bulkLoading}
+            onChange={(event) =>
+              setBulkText(
+                event.target.value
+              )
+            }
+            placeholder={
+              "go | went | gone | bormoq\nsee | saw | seen | ko‘rmoq\nwrite | wrote | written | yozmoq"
+            }
+          />
+
+          <button
+            type="button"
+            className="primaryButton"
+            disabled={bulkLoading}
+            onClick={() =>
+              void importBulk()
+            }
+          >
+            {bulkLoading
+              ? "Import qilinmoqda..."
+              : "⬆ Import qilish"}
+          </button>
+
+          {bulkResult && (
+            <div className="bulkResult">
+              <div>
+                <strong>
+                  {
+                    bulkResult.added
+                  }
+                </strong>
+
+                <span>
+                  Qo‘shildi
+                </span>
+              </div>
+
+              <div>
+                <strong>
+                  {
+                    bulkResult.duplicates
+                  }
+                </strong>
+
+                <span>
+                  Takroriy
+                </span>
+              </div>
+
+              <div>
+                <strong>
+                  {
+                    bulkResult.invalid
+                  }
+                </strong>
+
+                <span>
+                  Noto‘g‘ri
+                </span>
+              </div>
+
+              <div>
+                <strong>
+                  {
+                    bulkResult.total
+                  }
+                </strong>
+
+                <span>
+                  Jami
+                </span>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* RO‘YXAT */}
+
+        <section className="panel">
+          <div className="listHeader">
+            <div className="panelTitle noMargin">
+              Irregular Verbs
+              ro‘yxati
+            </div>
+
+            <div className="resultCount">
+              {
+                filteredVerbs.length
+              }
+              {" / "}
+              {verbs.length}
+            </div>
+          </div>
+
+          <div className="searchRow">
+            <input
+              className="searchInput"
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder="V1, V2, V3 yoki tarjima bo‘yicha qidirish..."
+            />
+
+            <button
+              type="button"
+              className="refreshButton"
+              disabled={
+                loading ||
+                saving ||
+                bulkLoading
+              }
+              onClick={() =>
+                void loadVerbs()
+              }
+            >
+              ↻ Yangilash
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="emptyState">
+              Ma’lumotlar
+              yuklanmoqda...
+            </div>
+          ) : filteredVerbs.length ===
+            0 ? (
+            <div className="emptyState">
+              {verbs.length === 0
+                ? "Hozircha fe’llar yo‘q."
+                : "Qidiruv bo‘yicha fe’l topilmadi."}
+            </div>
+          ) : (
+            <div className="tableWrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>V1</th>
+                    <th>V2</th>
+                    <th>V3</th>
+                    <th>
+                      Tarjimasi
+                    </th>
+                    <th>
+                      Amallar
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredVerbs.map(
+                    (
+                      verb,
+                      index
+                    ) => (
+                      <tr
+                        key={
+                          verb.id
+                        }
+                      >
+                        <td className="numberCell">
+                          {index + 1}
+                        </td>
+
+                        <td className="verbCell">
+                          {verb.v1}
+                        </td>
+
+                        <td className="verbCell">
+                          {verb.v2}
+                        </td>
+
+                        <td className="verbCell">
+                          {verb.v3}
+                        </td>
+
+                        <td className="translationCell">
+                          {
+                            verb.uzbek
+                          }
+                        </td>
+
+                        <td>
+                          <div className="actionButtons">
+                            <button
+                              type="button"
+                              className="editButton"
+                              disabled={
+                                saving ||
+                                bulkLoading
+                              }
+                              onClick={() =>
+                                startEdit(
+                                  verb
+                                )
+                              }
+                            >
+                              Tahrirlash
+                            </button>
+
+                            <button
+                              type="button"
+                              className="deleteButton"
+                              disabled={
+                                saving ||
+                                bulkLoading
+                              }
+                              onClick={() =>
+                                void deleteVerb(
+                                  verb
+                                )
+                              }
+                            >
+                              O‘chirish
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <style jsx>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        .page {
+          min-height: 100vh;
+          padding: 25px 16px 70px;
+
+          background:
+            radial-gradient(
+              circle at top,
+              #ffffff 0%,
+              #f2f6f8 50%,
+              #e4ebef 100%
+            );
+
+          color: #111;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            Georgia,
+            serif;
+        }
+
+        .container {
+          width: min(
+            1180px,
+            100%
+          );
+
+          margin: 0 auto;
+        }
+
+        button,
+        input,
+        textarea {
+          font-family: inherit;
+        }
+
+        button:disabled,
+        input:disabled,
+        textarea:disabled {
+          cursor: not-allowed;
+          opacity: 0.65;
+        }
+
+        /* HEADER */
+
+        .headerPanel {
+          min-height: 105px;
+
+          padding: 17px 25px;
+
+          display: grid;
+
+          grid-template-columns:
+            220px
+            1fr
+            150px;
+
+          align-items: center;
+
+          gap: 20px;
+
+          border:
+            3px solid
+            #174461;
+
+          border-radius: 22px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #91e1fb 0%,
+              #5bc1e8 45%,
+              #2e98c5 100%
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .75
+              ),
+
+            inset 0 -5px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .13
+              ),
+
+            0 8px 0
+              #174d6d,
+
+            0 14px 19px
+              rgba(
+                0,
+                0,
+                0,
+                .20
+              );
+        }
+
+        .headerCenter {
+          text-align: center;
+        }
+
+        .smallTitle {
+          margin-bottom: 4px;
+
+          color: #145277;
+
+          font-size: 12px;
+
+          font-weight: 900;
+
+          letter-spacing: 2px;
+        }
+
+        .headerCenter h1 {
+          margin: 0;
+
+          color: #073b68;
+
+          font-size: 34px;
+
+          text-shadow:
+            0 1px 0
+              rgba(
+                255,
+                255,
+                255,
+                .8
+              );
+        }
+
+        .backButton {
+          min-height: 47px;
+
+          padding: 8px 15px;
+
+          border:
+            2px solid
+            #174461;
+
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #c0efff 0%,
+              #77c9ec 52%,
+              #469fd0 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .8
+              ),
+            0 4px 0
+              #17415c;
+
+          color: #073b68;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .totalBox {
+          min-height: 66px;
+
+          padding: 8px;
+
+          display: flex;
+
+          flex-direction: column;
+
+          align-items: center;
+
+          justify-content: center;
+
+          border:
+            2px solid
+            #174461;
+
+          border-radius: 11px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #e4f8ff 0%,
+              #a7dcf2 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+            0 4px 0
+              #17415c;
+        }
+
+        .totalBox strong {
+          color: #073b68;
+          font-size: 25px;
+        }
+
+        .totalBox span {
+          color: #35576b;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        /* MESSAGE */
+
+        .message {
+          margin-top: 25px;
+
+          padding: 14px 18px;
+
+          border-radius: 10px;
+
+          font-weight: 700;
+
+          box-shadow:
+            0 4px 8px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              );
+        }
+
+        .success {
+          border:
+            1px solid
+            #65a57b;
+
+          background: #e3f7e9;
+
+          color: #27613a;
+        }
+
+        .error {
+          border:
+            1px solid
+            #c77676;
+
+          background: #ffe7e7;
+
+          color: #842d2d;
+        }
+
+        /* PANEL */
+
+        .panel {
+          margin-top: 30px;
+
+          padding: 25px;
+
+          border:
+            2px solid
+            #4d5559;
+
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f7f7f7 0%,
+              #e5e5e5 100%
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            inset 0 -5px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              ),
+
+            0 6px 0
+              #596166,
+
+            0 11px 16px
+              rgba(
+                0,
+                0,
+                0,
+                .16
+              );
+        }
+
+        .panelHeader {
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          gap: 15px;
+
+          margin-bottom: 20px;
+        }
+
+        .panelTitle {
+          color: #073b68;
+
+          font-size: 24px;
+
+          font-weight: 900;
+        }
+
+        .editingBadge,
+        .importBadge {
+          padding: 6px 10px;
+
+          border:
+            1px solid
+            #237aa0;
+
+          border-radius: 7px;
+
+          background: #d9f2fc;
+
+          color: #175978;
+
+          font-size: 11px;
+
+          font-weight: 900;
+        }
+
+        /* FORM */
+
+        .formGrid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              4,
+              minmax(
+                0,
+                1fr
+              )
+            );
+
+          gap: 15px;
+        }
+
+        label {
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 7px;
+        }
+
+        label span {
+          color: #384a54;
+
+          font-size: 13px;
+
+          font-weight: 900;
+        }
+
+        input,
+        textarea {
+          outline: none;
+
+          border:
+            2px solid
+            #a2adb2;
+
+          color: #111;
+
+          background: #fff;
+
+          box-shadow:
+            inset 0 2px 4px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              );
+        }
+
+        input:focus,
+        textarea:focus {
+          border-color:
+            #359bc7;
+
+          box-shadow:
+            0 0 0 3px
+              rgba(
+                53,
+                155,
+                199,
+                .15
+              );
+        }
+
+        label input {
+          width: 100%;
+
+          min-height: 48px;
+
+          padding: 10px 12px;
+
+          border-radius: 8px;
+
+          font-size: 16px;
+        }
+
+        .formActions {
+          margin-top: 20px;
+
+          display: flex;
+
+          gap: 12px;
+
+          flex-wrap: wrap;
+        }
+
+        /* BUTTON */
+
+        .primaryButton {
+          min-width: 155px;
+
+          min-height: 45px;
+
+          padding: 8px 18px;
+
+          border:
+            2px solid
+            #174461;
+
+          border-radius: 8px;
+
+          color: #073b68;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ace9ff 0%,
+              #6bc2e8 55%,
+              #429bca 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .8
+              ),
+
+            0 4px 0
+              #17415c;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .grayButton {
+          min-height: 45px;
+
+          padding: 8px 18px;
+
+          border:
+            2px solid
+            #6f787d;
+
+          border-radius: 8px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f6f6f6 0%,
+              #d1d1d1 100%
+            );
+
+          box-shadow:
+            0 4px 0
+              #747c80;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        /* BULK */
+
+        .importHelp {
+          margin-bottom: 10px;
+
+          color: #44555e;
+
+          font-weight: 700;
+        }
+
+        .formatExample {
+          margin-bottom: 15px;
+
+          padding: 13px 15px;
+
+          border-radius: 8px;
+
+          background: #dce5e9;
+
+          color: #253e4a;
+
+          font-family:
+            Consolas,
+            monospace;
+
+          font-size: 13px;
+
+          line-height: 1.7;
+        }
+
+        .bulkTextarea {
+          width: 100%;
+
+          min-height: 190px;
+
+          margin-bottom: 15px;
+
+          padding: 14px;
+
+          resize: vertical;
+
+          border-radius: 10px;
+
+          font-size: 15px;
+
+          line-height: 1.6;
+        }
+
+        .bulkResult {
+          margin-top: 22px;
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              4,
+              minmax(
+                0,
+                1fr
+              )
+            );
+
+          gap: 12px;
+        }
+
+        .bulkResult > div {
+          min-height: 70px;
+
+          padding: 10px;
+
+          display: flex;
+
+          flex-direction: column;
+
+          align-items: center;
+
+          justify-content: center;
+
+          border:
+            1px solid
+            #8b989e;
+
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #edf5f8,
+              #d6e1e5
+            );
+
+          box-shadow:
+            0 3px 0
+              #8a9499;
+        }
+
+        .bulkResult strong {
+          color: #073b68;
+
+          font-size: 23px;
+        }
+
+        .bulkResult span {
+          margin-top: 3px;
+
+          color: #4f616b;
+
+          font-size: 11px;
+
+          font-weight: 700;
+        }
+
+        /* LIST */
+
+        .listHeader {
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          gap: 15px;
+
+          margin-bottom: 18px;
+        }
+
+        .noMargin {
+          margin: 0;
+        }
+
+        .resultCount {
+          padding: 8px 14px;
+
+          border:
+            1px solid
+            #8a969c;
+
+          border-radius: 8px;
+
+          background: #dbe3e7;
+
+          color: #344b57;
+
+          font-weight: 900;
+        }
+
+        .searchRow {
+          margin-bottom: 20px;
+
+          display: grid;
+
+          grid-template-columns:
+            1fr
+            135px;
+
+          gap: 10px;
+        }
+
+        .searchInput {
+          width: 100%;
+
+          min-height: 48px;
+
+          padding: 10px 14px;
+
+          border-radius: 9px;
+
+          font-size: 15px;
+        }
+
+        .refreshButton {
+          min-height: 48px;
+
+          border:
+            2px solid
+            #67757c;
+
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f6f6f6 0%,
+              #d3d8da 100%
+            );
+
+          color: #354c58;
+
+          box-shadow:
+            0 3px 0
+              #747e83;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .tableWrapper {
+          overflow-x: auto;
+
+          border:
+            1px solid
+            #a7afb3;
+
+          border-radius: 10px;
+        }
+
+        table {
+          width: 100%;
+
+          border-collapse:
+            collapse;
+
+          background: #fff;
+        }
+
+        th,
+        td {
+          padding: 13px 12px;
+
+          border-bottom:
+            1px solid
+            #d5dadd;
+
+          text-align: left;
+
+          white-space: nowrap;
+        }
+
+        th {
+          background:
+            linear-gradient(
+              180deg,
+              #dbeef6 0%,
+              #bfdce8 100%
+            );
+
+          color: #163f55;
+
+          font-size: 13px;
+        }
+
+        td {
+          font-size: 14px;
+        }
+
+        tbody tr:hover {
+          background: #f3f8fa;
+        }
+
+        .verbCell {
+          color: #073b68;
+
+          font-size: 16px;
+
+          font-weight: 900;
+        }
+
+        .translationCell {
+          font-weight: 700;
+        }
+
+        .actionButtons {
+          display: flex;
+
+          gap: 8px;
+        }
+
+        .editButton,
+        .deleteButton {
+          min-height: 34px;
+
+          padding: 5px 10px;
+
+          border-radius: 7px;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+
+        .editButton {
+          border:
+            1px solid
+            #267fa5;
+
+          background: #d5f1fc;
+
+          color: #14516d;
+        }
+
+        .deleteButton {
+          border:
+            1px solid
+            #a25b5b;
+
+          background: #ffe2e2;
+
+          color: #7d2424;
+        }
+
+        .emptyState {
+          padding: 45px 15px;
+
+          border:
+            2px dashed
+            #a6b0b5;
+
+          border-radius: 10px;
+
+          text-align: center;
+
+          color: #66767e;
+
+          font-weight: 700;
+        }
+
+        /* TABLET */
+
+        @media (
+          max-width: 900px
+        ) {
+          .headerPanel {
+            grid-template-columns:
+              170px
+              1fr
+              110px;
+          }
+
+          .formGrid {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+          }
+        }
+
+        /* MOBILE */
+
+        @media (
+          max-width: 620px
+        ) {
+          .page {
+            padding:
+              10px
+              8px
+              40px;
+          }
+
+          .headerPanel {
+            padding: 12px;
+
+            grid-template-columns:
+              1fr
+              80px;
+
+            gap: 10px;
+          }
+
+          .backButton {
+            grid-column:
+              1 / -1;
+
+            width: 100%;
+          }
+
+          .headerCenter {
+            text-align: left;
+          }
+
+          .headerCenter h1 {
+            font-size: 23px;
+          }
+
+          .panel {
+            margin-top: 22px;
+
+            padding:
+              17px
+              12px;
+          }
+
+          .panelTitle {
+            font-size: 20px;
+          }
+
+          .formGrid {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+
+            gap: 10px;
+          }
+
+          .bulkResult {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+          }
+
+          .searchRow {
+            grid-template-columns:
+              1fr;
+          }
+
+          .primaryButton,
+          .grayButton,
+          .refreshButton {
+            width: 100%;
+          }
+
+          .listHeader {
+            flex-direction:
+              column;
+
+            align-items:
+              flex-start;
+          }
+
+          th,
+          td {
+            padding: 10px 9px;
+
+            font-size: 12px;
+          }
+        }
+
+        @media (
+          max-width: 390px
+        ) {
+          .formGrid {
+            grid-template-columns:
+              1fr;
+          }
+
+          .bulkResult {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+          }
+        }
+      `}</style>
+    </main>
+  );
+}
