@@ -224,10 +224,6 @@ export default function DictionaryAdminPage() {
     window.location.href = "/admin";
   }
 
-  function logout() {
-    window.location.href = "/logout";
-  }
-
   return (
     <main className="page">
       <div className="wrapper">
@@ -256,9 +252,9 @@ export default function DictionaryAdminPage() {
             <button
               type="button"
               className="topBlueButton"
-              onClick={logout}
+              onClick={goAdmin}
             >
-              Chiqish
+              ← Orqaga
             </button>
           </div>
         </div>
