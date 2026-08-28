@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 type DictionaryWord = {
@@ -29,6 +35,7 @@ export default function EnglishUzbekLearnPage() {
 
   const [options, setOptions] = useState<string[]>([]);
   const [correctAnswer, setCorrectAnswer] = useState("");
+
   const [selectedAnswer, setSelectedAnswer] =
     useState<string | null>(null);
 
@@ -37,6 +44,27 @@ export default function EnglishUzbekLearnPage() {
 
   const [difficultWords, setDifficultWords] =
     useState<Set<string>>(new Set());
+
+  const autoNextTimer = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  // =====================================================
+  // TIMERNI TOZALASH
+  // =====================================================
+
+  function clearAutoNextTimer() {
+    if (autoNextTimer.current) {
+      clearTimeout(autoNextTimer.current);
+      autoNextTimer.current = null;
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      clearAutoNextTimer();
+    };
+  }, []);
 
   // =====================================================
   // LUG‘ATNI YUKLASH
@@ -88,7 +116,10 @@ export default function EnglishUzbekLearnPage() {
         }
       } catch (err) {
         console.error(err);
-        setError("Lug‘atni yuklashda xatolik yuz berdi.");
+
+        setError(
+          "Lug‘atni yuklashda xatolik yuz berdi."
+        );
       } finally {
         setLoading(false);
       }
@@ -98,6 +129,10 @@ export default function EnglishUzbekLearnPage() {
   }, []);
 
   const currentWord = words[index];
+
+  // =====================================================
+  // HOZIRGI YO‘NALISH
+  // =====================================================
 
   const currentDirection: Direction = useMemo(() => {
     if (mode === "mixed") {
@@ -117,7 +152,9 @@ export default function EnglishUzbekLearnPage() {
     let direction: Direction;
 
     if (mode === "mixed") {
-      direction = Math.random() < 0.5 ? "en-uz" : "uz-en";
+      direction =
+        Math.random() < 0.5 ? "en-uz" : "uz-en";
+
       setMixedDirection(direction);
     } else {
       direction = mode;
@@ -150,7 +187,9 @@ export default function EnglishUzbekLearnPage() {
     }
 
     const wrong =
-      wrongPool[Math.floor(Math.random() * wrongPool.length)];
+      wrongPool[
+        Math.floor(Math.random() * wrongPool.length)
+      ];
 
     const generated =
       Math.random() < 0.5
@@ -166,10 +205,34 @@ export default function EnglishUzbekLearnPage() {
     if (currentWord && words.length > 0) {
       createOptions();
     }
-  }, [currentWord, words.length, index, mode, createOptions]);
+  }, [
+    currentWord,
+    words.length,
+    index,
+    mode,
+    createOptions,
+  ]);
 
   // =====================================================
-  // JAVOB
+  // AVTOMATIK KEYINGI SO‘Z
+  // =====================================================
+
+  function goToNextAutomatically() {
+    clearAutoNextTimer();
+
+    autoNextTimer.current = setTimeout(() => {
+      setIndex((prev) =>
+        prev >= words.length - 1 ? 0 : prev + 1
+      );
+
+      setSelectedAnswer(null);
+
+      autoNextTimer.current = null;
+    }, 700);
+  }
+
+  // =====================================================
+  // JAVOBNI TANLASH
   // =====================================================
 
   function handleAnswer(answer: string) {
@@ -182,6 +245,8 @@ export default function EnglishUzbekLearnPage() {
     } else {
       setWrongCount((prev) => prev + 1);
     }
+
+    goToNextAutomatically();
   }
 
   // =====================================================
@@ -190,6 +255,8 @@ export default function EnglishUzbekLearnPage() {
 
   function nextWord() {
     if (words.length === 0) return;
+
+    clearAutoNextTimer();
 
     setIndex((prev) =>
       prev >= words.length - 1 ? 0 : prev + 1
@@ -205,6 +272,8 @@ export default function EnglishUzbekLearnPage() {
   function previousWord() {
     if (words.length === 0) return;
 
+    clearAutoNextTimer();
+
     setIndex((prev) =>
       prev <= 0 ? words.length - 1 : prev - 1
     );
@@ -213,18 +282,24 @@ export default function EnglishUzbekLearnPage() {
   }
 
   // =====================================================
-  // KEYINROQ
+  // KEYINROQ YANA KO‘RSAT
   // =====================================================
 
   function showLater() {
     if (!currentWord || words.length < 2) return;
 
+    clearAutoNextTimer();
+
     setWords((prevWords) => {
       const copy = [...prevWords];
+
       const [removed] = copy.splice(index, 1);
 
       const minDistance = 5;
-      const maxDistance = Math.min(20, copy.length);
+      const maxDistance = Math.min(
+        20,
+        copy.length
+      );
 
       let newPosition = index + minDistance;
 
@@ -238,7 +313,10 @@ export default function EnglishUzbekLearnPage() {
           );
       }
 
-      newPosition = Math.min(newPosition, copy.length);
+      newPosition = Math.min(
+        newPosition,
+        copy.length
+      );
 
       copy.splice(newPosition, 0, removed);
 
@@ -283,14 +361,16 @@ export default function EnglishUzbekLearnPage() {
       alert(
         "Brauzeringiz talaffuz funksiyasini qo‘llab-quvvatlamaydi."
       );
+
       return;
     }
 
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(
-      currentWord.english
-    );
+    const utterance =
+      new SpeechSynthesisUtterance(
+        currentWord.english
+      );
 
     utterance.lang = "en-US";
     utterance.rate = 0.85;
@@ -298,6 +378,10 @@ export default function EnglishUzbekLearnPage() {
 
     window.speechSynthesis.speak(utterance);
   }
+
+  // =====================================================
+  // SAVOL MATNI
+  // =====================================================
 
   const questionText = useMemo(() => {
     if (!currentWord) return "";
@@ -323,11 +407,16 @@ export default function EnglishUzbekLearnPage() {
     );
   }
 
+  // =====================================================
+  // ERROR
+  // =====================================================
+
   if (error || words.length === 0) {
     return (
       <main className="page">
         <div className="messageBox">
-          {error || "Lug‘atda so‘z mavjud emas."}
+          {error ||
+            "Lug‘atda so‘z mavjud emas."}
         </div>
 
         <style jsx>{css}</style>
@@ -337,15 +426,21 @@ export default function EnglishUzbekLearnPage() {
 
   return (
     <main className="page">
-      {/* ================= TOP PANEL ================= */}
+      {/* ==============================================
+          TEPADAGI PANEL
+      ============================================== */}
 
       <section className="topPanel">
         <button
           type="button"
           className="backButton"
-          onClick={() =>
-            router.push("/qollanmalar/dictionaries")
-          }
+          onClick={() => {
+            clearAutoNextTimer();
+
+            router.push(
+              "/qollanmalar/dictionaries"
+            );
+          }}
         >
           ← Lug‘atlar
         </button>
@@ -354,9 +449,13 @@ export default function EnglishUzbekLearnPage() {
           <button
             type="button"
             className={`modeButton ${
-              mode === "en-uz" ? "activeMode" : ""
+              mode === "en-uz"
+                ? "activeMode"
+                : ""
             }`}
             onClick={() => {
+              clearAutoNextTimer();
+
               setMode("en-uz");
               setSelectedAnswer(null);
             }}
@@ -367,9 +466,13 @@ export default function EnglishUzbekLearnPage() {
           <button
             type="button"
             className={`modeButton ${
-              mode === "uz-en" ? "activeMode" : ""
+              mode === "uz-en"
+                ? "activeMode"
+                : ""
             }`}
             onClick={() => {
+              clearAutoNextTimer();
+
               setMode("uz-en");
               setSelectedAnswer(null);
             }}
@@ -380,9 +483,13 @@ export default function EnglishUzbekLearnPage() {
           <button
             type="button"
             className={`modeButton ${
-              mode === "mixed" ? "activeMode" : ""
+              mode === "mixed"
+                ? "activeMode"
+                : ""
             }`}
             onClick={() => {
+              clearAutoNextTimer();
+
               setMode("mixed");
               setSelectedAnswer(null);
             }}
@@ -396,14 +503,18 @@ export default function EnglishUzbekLearnPage() {
         </div>
       </section>
 
-      {/* ================= STUDY ================= */}
+      {/* ==============================================
+          ASOSIY O‘RGANISH QISMI
+      ============================================== */}
 
       <section className="studyArea">
+        {/* SAVOL */}
+
         <div className="wordCard">
           {questionText}
         </div>
 
-        {/* TALAFFUZ VA QIYIN SO‘Z */}
+        {/* TALAFFUZ + QIYIN SO‘Z */}
 
         <div className="functionButtons">
           <button
@@ -429,7 +540,9 @@ export default function EnglishUzbekLearnPage() {
           </button>
         </div>
 
-        {/* ================= JAVOBLAR ================= */}
+        {/* ==========================================
+            2 TA JAVOB VARIANTI
+        ========================================== */}
 
         <div className="answers">
           {options.map((option) => {
@@ -437,9 +550,13 @@ export default function EnglishUzbekLearnPage() {
 
             if (selectedAnswer !== null) {
               if (option === correctAnswer) {
-                className += " correctAnswer";
-              } else if (option === selectedAnswer) {
-                className += " wrongAnswer";
+                className +=
+                  " correctAnswer";
+              } else if (
+                option === selectedAnswer
+              ) {
+                className +=
+                  " wrongAnswer";
               }
             }
 
@@ -448,7 +565,12 @@ export default function EnglishUzbekLearnPage() {
                 key={option}
                 type="button"
                 className={className}
-                onClick={() => handleAnswer(option)}
+                disabled={
+                  selectedAnswer !== null
+                }
+                onClick={() =>
+                  handleAnswer(option)
+                }
               >
                 {option}
               </button>
@@ -456,19 +578,33 @@ export default function EnglishUzbekLearnPage() {
           })}
         </div>
 
-        {/* ================= KICHIK STATISTIKA ================= */}
+        {/* ==========================================
+            KICHIK STATISTIKA
+        ========================================== */}
 
         <div className="miniStats">
           <div className="miniStat correctStat">
-            <span>✓</span>
+            <span className="statIcon">
+              ✓
+            </span>
+
             <span>To‘g‘ri</span>
-            <strong>{correctCount}</strong>
+
+            <strong>
+              {correctCount}
+            </strong>
           </div>
 
           <div className="miniStat wrongStat">
-            <span>✕</span>
+            <span className="statIcon">
+              ✕
+            </span>
+
             <span>Xato</span>
-            <strong>{wrongCount}</strong>
+
+            <strong>
+              {wrongCount}
+            </strong>
           </div>
 
           <button
@@ -476,13 +612,21 @@ export default function EnglishUzbekLearnPage() {
             className="miniStat difficultStat"
             onClick={toggleDifficult}
           >
-            <span>★</span>
+            <span className="statIcon">
+              ★
+            </span>
+
             <span>Qiyin so‘z</span>
-            <strong>{difficultWords.size}</strong>
+
+            <strong>
+              {difficultWords.size}
+            </strong>
           </button>
         </div>
 
-        {/* ================= NAVIGATION ================= */}
+        {/* ==========================================
+            PASTKI TUGMALAR
+        ========================================== */}
 
         <div className="navigation">
           <button
@@ -523,7 +667,11 @@ export default function EnglishUzbekLearnPage() {
 const css = `
   .page {
     min-height: 100vh;
-    padding: 36px 24px 80px;
+
+    padding:
+      36px
+      24px
+      80px;
 
     background:
       radial-gradient(
@@ -546,21 +694,42 @@ const css = `
     font-family: inherit;
   }
 
-  /* ================= TOP PANEL ================= */
+  /* ===============================================
+     TOP PANEL
+  =============================================== */
 
   .topPanel {
-    width: min(1090px, calc(100% - 20px));
+    width:
+      min(
+        1090px,
+        calc(100% - 20px)
+      );
+
     margin: 0 auto;
 
     min-height: 98px;
-    padding: 17px 28px;
+
+    box-sizing: border-box;
+
+    padding:
+      17px
+      28px;
 
     display: grid;
-    grid-template-columns: 190px 1fr 130px;
+
+    grid-template-columns:
+      190px
+      1fr
+      130px;
+
     align-items: center;
+
     gap: 22px;
 
-    border: 2px solid #075476;
+    border:
+      2px solid
+      #075476;
+
     border-radius: 20px;
 
     background:
@@ -584,7 +753,9 @@ const css = `
   .smallButton,
   .navButton,
   .laterButton {
-    border: 1px solid #858f95;
+    border:
+      1px solid
+      #858f95;
 
     background:
       linear-gradient(
@@ -608,6 +779,7 @@ const css = `
 
   .backButton {
     min-width: 165px;
+
     height: 46px;
 
     padding: 0 22px;
@@ -619,7 +791,9 @@ const css = `
 
   .modeGroup {
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     gap: 16px;
@@ -627,6 +801,7 @@ const css = `
 
   .modeButton {
     min-width: 155px;
+
     height: 46px;
 
     padding: 0 18px;
@@ -663,6 +838,7 @@ const css = `
     text-align: center;
 
     font-size: 17px;
+
     font-weight: 800;
 
     letter-spacing: 2px;
@@ -670,31 +846,49 @@ const css = `
     color: #043c5c;
   }
 
-  /* ================= STUDY ================= */
+  /* ===============================================
+     STUDY
+  =============================================== */
 
   .studyArea {
-    width: min(1050px, calc(100% - 20px));
+    width:
+      min(
+        1050px,
+        calc(100% - 20px)
+      );
 
-    margin: 50px auto 0;
+    margin:
+      50px
+      auto
+      0;
   }
 
   .wordCard {
     width: min(500px, 92%);
+
     min-height: 122px;
 
     margin: 0 auto;
-    padding: 22px 32px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding:
+      22px
+      32px;
 
     box-sizing: border-box;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
 
     text-align: center;
 
     border-radius: 16px;
-    border: 2px solid #075274;
+
+    border:
+      2px solid
+      #075274;
 
     background:
       linear-gradient(
@@ -713,16 +907,23 @@ const css = `
     color: #062e49;
 
     font-size: 42px;
+
     font-weight: 700;
 
     overflow-wrap: anywhere;
   }
 
+  /* ===============================================
+     FUNCTION BUTTONS
+  =============================================== */
+
   .functionButtons {
     margin-top: 30px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     gap: 15px;
@@ -730,6 +931,7 @@ const css = `
 
   .smallButton {
     min-width: 122px;
+
     height: 45px;
 
     padding: 0 19px;
@@ -752,14 +954,20 @@ const css = `
       0 9px 12px rgba(0,0,0,.18);
   }
 
-  /* ================= ANSWERS ================= */
+  /* ===============================================
+     ANSWERS
+  =============================================== */
 
   .answers {
     margin-top: 70px;
 
     display: grid;
+
     grid-template-columns:
-      repeat(2, minmax(280px, 1fr));
+      repeat(
+        2,
+        minmax(280px, 1fr)
+      );
 
     gap: 52px;
   }
@@ -767,14 +975,16 @@ const css = `
   .answerButton {
     min-height: 108px;
 
-    padding: 22px 28px;
+    padding:
+      22px
+      28px;
 
     border-radius: 13px;
-    border: 1px solid #8c969b;
 
-    /*
-      OLDINGIDAN BIR OZ KULRANGROQ
-    */
+    border:
+      1px solid
+      #8c969b;
+
     background:
       linear-gradient(
         180deg,
@@ -791,6 +1001,7 @@ const css = `
     color: #073951;
 
     font-size: 29px;
+
     font-weight: 700;
 
     cursor: pointer;
@@ -801,18 +1012,29 @@ const css = `
       background .15s ease;
   }
 
-  .answerButton:hover {
+  .answerButton:hover:not(:disabled) {
+    transform:
+      translateY(-2px);
+
     background:
       linear-gradient(
         180deg,
-        #f2f2f2 0%,
+        #f3f3f3 0%,
         #e9e9e9 50%,
-        #dedede 100%
+        #dddddd 100%
       );
   }
 
+  .answerButton:disabled {
+    cursor: default;
+
+    opacity: 1;
+  }
+
   .correctAnswer {
-    border: 2px solid #16883a;
+    border:
+      2px solid
+      #16883a;
 
     background:
       linear-gradient(
@@ -829,7 +1051,9 @@ const css = `
   }
 
   .wrongAnswer {
-    border: 2px solid #ae2828;
+    border:
+      2px solid
+      #ae2828;
 
     background:
       linear-gradient(
@@ -845,13 +1069,17 @@ const css = `
       0 13px 18px rgba(0,0,0,.17);
   }
 
-  /* ================= MINI STATS ================= */
+  /* ===============================================
+     MINI STATISTIKA
+  =============================================== */
 
   .miniStats {
     margin-top: 34px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     gap: 14px;
@@ -861,14 +1089,19 @@ const css = `
 
   .miniStat {
     min-width: 118px;
+
     height: 40px;
 
-    padding: 0 13px;
+    padding:
+      0
+      13px;
 
     box-sizing: border-box;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     gap: 7px;
@@ -876,6 +1109,7 @@ const css = `
     border-radius: 8px;
 
     font-size: 14px;
+
     font-weight: 700;
 
     box-shadow:
@@ -888,8 +1122,14 @@ const css = `
     font-size: 15px;
   }
 
+  .statIcon {
+    font-weight: 900;
+  }
+
   .correctStat {
-    border: 1px solid #8dbd94;
+    border:
+      1px solid
+      #8dbd94;
 
     background:
       linear-gradient(
@@ -902,7 +1142,9 @@ const css = `
   }
 
   .wrongStat {
-    border: 1px solid #d4a0a0;
+    border:
+      1px solid
+      #d4a0a0;
 
     background:
       linear-gradient(
@@ -915,7 +1157,9 @@ const css = `
   }
 
   .difficultStat {
-    border: 1px solid #d4b66e;
+    border:
+      1px solid
+      #d4b66e;
 
     background:
       linear-gradient(
@@ -931,13 +1175,17 @@ const css = `
     font-family: inherit;
   }
 
-  /* ================= NAVIGATION ================= */
+  /* ===============================================
+     NAVIGATION
+  =============================================== */
 
   .navigation {
     margin-top: 38px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     gap: 19px;
@@ -947,6 +1195,7 @@ const css = `
 
   .navButton {
     min-width: 112px;
+
     height: 46px;
 
     padding: 0 18px;
@@ -958,6 +1207,7 @@ const css = `
 
   .laterButton {
     min-width: 215px;
+
     height: 46px;
 
     padding: 0 22px;
@@ -966,6 +1216,10 @@ const css = `
 
     font-size: 15px;
   }
+
+  /* ===============================================
+     MESSAGE
+  =============================================== */
 
   .messageBox {
     width: min(700px, 92%);
@@ -977,7 +1231,10 @@ const css = `
     box-sizing: border-box;
 
     border-radius: 16px;
-    border: 1px solid #9aa4a9;
+
+    border:
+      1px solid
+      #9aa4a9;
 
     background:
       linear-gradient(
@@ -993,6 +1250,7 @@ const css = `
     text-align: center;
 
     font-size: 22px;
+
     font-weight: 700;
   }
 
@@ -1003,19 +1261,23 @@ const css = `
   @media (max-width: 760px) {
     .page {
       padding:
-        18px 10px
-        calc(45px + env(safe-area-inset-bottom));
+        18px
+        10px
+        calc(
+          45px +
+          env(safe-area-inset-bottom)
+        );
     }
 
     .topPanel {
       width: 100%;
-      min-height: auto;
 
-      box-sizing: border-box;
+      min-height: auto;
 
       padding: 14px;
 
       display: flex;
+
       flex-direction: column;
 
       gap: 14px;
@@ -1025,7 +1287,9 @@ const css = `
 
     .backButton {
       min-width: 0;
+
       width: 150px;
+
       height: 42px;
 
       order: 3;
@@ -1035,7 +1299,10 @@ const css = `
       width: 100%;
 
       display: grid;
-      grid-template-columns: 1fr 1fr;
+
+      grid-template-columns:
+        1fr
+        1fr;
 
       gap: 9px;
 
@@ -1044,17 +1311,21 @@ const css = `
 
     .modeButton {
       min-width: 0;
+
       width: 100%;
 
       height: 42px;
 
-      padding: 0 7px;
+      padding:
+        0
+        7px;
 
       font-size: 13px;
     }
 
     .modeButton:last-child {
-      grid-column: 1 / -1;
+      grid-column:
+        1 / -1;
 
       width: 50%;
 
@@ -1063,8 +1334,6 @@ const css = `
 
     .progress {
       min-width: 0;
-
-      justify-self: auto;
 
       order: 2;
 
@@ -1079,11 +1348,19 @@ const css = `
 
     .wordCard {
       width: 94%;
+
       min-height: 105px;
 
-      padding: 18px 16px;
+      padding:
+        18px
+        16px;
 
-      font-size: clamp(29px, 9vw, 38px);
+      font-size:
+        clamp(
+          29px,
+          9vw,
+          38px
+        );
     }
 
     .functionButtons {
@@ -1099,7 +1376,9 @@ const css = `
 
       height: 42px;
 
-      padding: 0 13px;
+      padding:
+        0
+        13px;
 
       font-size: 14px;
     }
@@ -1107,16 +1386,20 @@ const css = `
     .answers {
       margin-top: 48px;
 
-      grid-template-columns: 1fr;
+      grid-template-columns:
+        1fr;
 
       gap: 22px;
     }
 
     .answerButton {
       width: 100%;
+
       min-height: 88px;
 
-      padding: 18px 15px;
+      padding:
+        18px
+        15px;
 
       font-size: 24px;
     }
@@ -1127,18 +1410,26 @@ const css = `
       margin-top: 30px;
 
       display: grid;
+
       grid-template-columns:
-        repeat(3, minmax(0, 1fr));
+        repeat(
+          3,
+          minmax(0, 1fr)
+        );
 
       gap: 8px;
     }
 
     .miniStat {
       min-width: 0;
+
       width: 100%;
+
       height: 42px;
 
-      padding: 0 5px;
+      padding:
+        0
+        5px;
 
       gap: 4px;
 
@@ -1157,46 +1448,65 @@ const css = `
       margin-top: 34px;
 
       display: grid;
-      grid-template-columns: 1fr 1fr;
+
+      grid-template-columns:
+        1fr
+        1fr;
 
       gap: 13px;
     }
 
     .navButton {
       min-width: 0;
+
       width: 100%;
 
-      padding: 0 8px;
+      padding:
+        0
+        8px;
 
       font-size: 13px;
     }
 
     .laterButton {
-      grid-column: 1 / -1;
+      grid-column:
+        1 / -1;
 
       grid-row: 1;
 
       min-width: 0;
-      width: min(240px, 100%);
+
+      width:
+        min(
+          240px,
+          100%
+        );
 
       justify-self: center;
 
-      padding: 0 12px;
+      padding:
+        0
+        12px;
 
       font-size: 13px;
     }
   }
 
-  /* JUDA KICHIK TELEFON */
+  /* ===============================================
+     JUDA KICHIK TELEFON
+  =============================================== */
 
   @media (max-width: 390px) {
     .page {
       padding-left: 7px;
+
       padding-right: 7px;
     }
 
     .topPanel {
-      padding: 12px 9px;
+      padding:
+        12px
+        9px;
     }
 
     .modeButton {
