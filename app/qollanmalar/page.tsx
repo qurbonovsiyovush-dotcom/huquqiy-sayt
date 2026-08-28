@@ -41,7 +41,10 @@ export default function QollanmalarPage() {
 
   return (
     <main className="page">
-      {/* TEPA 3D PANEL */}
+      {/* =========================
+          TEPA 3D PANEL
+      ========================== */}
+
       <section className="topPanel">
         <div className="pageTitle">
           Qo‘llanmalar
@@ -56,7 +59,10 @@ export default function QollanmalarPage() {
         </button>
       </section>
 
-      {/* ASOSIY PANEL */}
+      {/* =========================
+          ASOSIY 3D PANEL
+      ========================== */}
+
       <section className="mainPanel">
         <h1 className="heading">
           Kerakli bo‘limni tanlang
@@ -98,8 +104,8 @@ export default function QollanmalarPage() {
 
           padding:
             16px
-            18px
-            55px;
+            20px
+            60px;
 
           background:
             radial-gradient(
@@ -122,16 +128,19 @@ export default function QollanmalarPage() {
           font-family: inherit;
         }
 
-        /* =========================
-           TEPA PANEL
-        ========================= */
+        /* ==================================================
+           TEPA KO‘K PANEL
+        ================================================== */
 
         .topPanel {
           width: min(1850px, 100%);
 
           min-height: 140px;
 
-          margin: 0 auto 35px;
+          margin:
+            0
+            auto
+            34px;
 
           padding:
             28px
@@ -141,7 +150,8 @@ export default function QollanmalarPage() {
 
           align-items: center;
 
-          justify-content: space-between;
+          justify-content:
+            space-between;
 
           gap: 30px;
 
@@ -149,7 +159,8 @@ export default function QollanmalarPage() {
             3px solid
             #123d52;
 
-          border-radius: 30px;
+          border-radius:
+            30px;
 
           background:
             linear-gradient(
@@ -185,24 +196,27 @@ export default function QollanmalarPage() {
               );
         }
 
-        /* =========================
-           CHAP SARLAVHA
-        ========================= */
+        /* ==================================================
+           QO‘LLANMALAR BLOKI
+        ================================================== */
 
         .pageTitle {
-          min-width: 480px;
+          width: 480px;
+
+          max-width: 45%;
 
           min-height: 78px;
 
           padding:
-            15px
-            35px;
+            14px
+            30px;
 
           display: flex;
 
           align-items: center;
 
-          justify-content: center;
+          justify-content:
+            center;
 
           border:
             3px solid
@@ -215,8 +229,8 @@ export default function QollanmalarPage() {
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #ececec 48%,
-              #d4d4d4 100%
+              #eeeeee 48%,
+              #d5d5d5 100%
             );
 
           box-shadow:
@@ -225,7 +239,7 @@ export default function QollanmalarPage() {
                 255,
                 255,
                 255,
-                0.9
+                0.95
               ),
             inset 0 -5px 6px
               rgba(
@@ -246,23 +260,25 @@ export default function QollanmalarPage() {
 
           color: #111;
 
+          text-align: center;
+
           font-size: 33px;
 
           font-weight: 900;
         }
 
-        /* =========================
-           ORQAGA
-        ========================= */
+        /* ==================================================
+           ORQAGA TUGMASI
+        ================================================== */
 
         .backButton {
-          min-width: 165px;
+          width: 170px;
 
           min-height: 66px;
 
           padding:
             10px
-            25px;
+            24px;
 
           border:
             3px solid
@@ -275,8 +291,8 @@ export default function QollanmalarPage() {
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #ececec 48%,
-              #d1d1d1 100%
+              #eeeeee 48%,
+              #d3d3d3 100%
             );
 
           box-shadow:
@@ -285,7 +301,7 @@ export default function QollanmalarPage() {
                 255,
                 255,
                 255,
-                0.9
+                0.95
               ),
             inset 0 -4px 5px
               rgba(
@@ -329,7 +345,7 @@ export default function QollanmalarPage() {
                 255,
                 255,
                 255,
-                0.9
+                0.95
               ),
             0 9px 0
               #4e5b61,
@@ -358,44 +374,45 @@ export default function QollanmalarPage() {
               #4e5b61;
         }
 
-        /* =========================
-           ASOSIY PANEL
-        ========================= */
+        /* ==================================================
+           PASTDAGI ASOSIY PANEL
+           TEPA PANEL BILAN BIR XIL KENGLIK
+        ================================================== */
 
         .mainPanel {
-          width: min(1160px, 100%);
+          width: min(1850px, 100%);
 
           margin: 0 auto;
 
           padding:
-            35px
-            30px
-            45px;
+            38px
+            34px
+            48px;
 
           border:
             2px solid
             #30383b;
 
           border-radius:
-            22px;
+            26px;
 
           background:
             linear-gradient(
               180deg,
-              #656a6c 0%,
+              #666b6d 0%,
               #53595b 50%,
-              #3f4648 100%
+              #3e4547 100%
             );
 
           box-shadow:
-            inset 0 5px 7px
+            inset 0 6px 8px
               rgba(
                 255,
                 255,
                 255,
                 0.12
               ),
-            inset 0 -8px 10px
+            inset 0 -9px 11px
               rgba(
                 0,
                 0,
@@ -404,7 +421,7 @@ export default function QollanmalarPage() {
               ),
             0 10px 0
               #303638,
-            0 17px 26px
+            0 18px 27px
               rgba(
                 0,
                 0,
@@ -413,17 +430,21 @@ export default function QollanmalarPage() {
               );
         }
 
+        /* ==================================================
+           SARLAVHA
+        ================================================== */
+
         .heading {
           margin:
             0
             0
-            32px;
+            34px;
 
           color: #fff;
 
           text-align: center;
 
-          font-size: 28px;
+          font-size: 29px;
 
           font-weight: 900;
 
@@ -433,15 +454,17 @@ export default function QollanmalarPage() {
                 0,
                 0,
                 0,
-                0.65
+                0.7
               );
         }
 
-        /* =========================
+        /* ==================================================
            KARTALAR
-        ========================= */
+        ================================================== */
 
         .cards {
+          width: 100%;
+
           display: grid;
 
           grid-template-columns:
@@ -454,17 +477,17 @@ export default function QollanmalarPage() {
             );
 
           gap:
-            30px
-            28px;
+            32px
+            30px;
         }
 
         .card {
-          min-height: 245px;
+          min-height: 260px;
 
           padding:
-            23px
-            20px
-            22px;
+            25px
+            24px
+            24px;
 
           display: flex;
 
@@ -478,14 +501,14 @@ export default function QollanmalarPage() {
             #d0d0d0;
 
           border-radius:
-            14px;
+            15px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
               #f5f5f5 55%,
-              #e5e5e5 100%
+              #e4e4e4 100%
             );
 
           box-shadow:
@@ -494,11 +517,11 @@ export default function QollanmalarPage() {
                 255,
                 255,
                 255,
-                0.95
+                0.96
               ),
             0 8px 0
               #858c8e,
-            0 13px 18px
+            0 14px 19px
               rgba(
                 0,
                 0,
@@ -506,22 +529,55 @@ export default function QollanmalarPage() {
                 0.22
               );
 
-          text-align:
-            center;
+          text-align: center;
+
+          transition:
+            transform
+            0.15s ease,
+            box-shadow
+            0.15s ease;
         }
 
-        .badge {
-          width: 56px;
+        .card:hover {
+          transform:
+            translateY(-3px);
 
-          height: 47px;
+          box-shadow:
+            inset 0 5px 7px
+              rgba(
+                255,
+                255,
+                255,
+                0.96
+              ),
+            0 10px 0
+              #858c8e,
+            0 17px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.25
+              );
+        }
+
+        /* ==================================================
+           KICHIK KO‘K BELGI
+        ================================================== */
+
+        .badge {
+          width: 58px;
+
+          height: 49px;
 
           display: flex;
 
-          align-items:
-            center;
+          align-items: center;
 
           justify-content:
             center;
+
+          flex-shrink: 0;
 
           border:
             2px solid
@@ -556,27 +612,35 @@ export default function QollanmalarPage() {
           font-weight: 900;
         }
 
+        /* ==================================================
+           KARTA NOMI
+        ================================================== */
+
         .card h2 {
           width: 100%;
 
           margin:
-            26px
+            28px
             0
             0;
 
           color: #111;
 
-          font-size: 23px;
+          font-size: 24px;
 
           line-height: 1.15;
 
           font-weight: 900;
         }
 
-        .openButton {
-          width: 145px;
+        /* ==================================================
+           OCHISH
+        ================================================== */
 
-          min-height: 44px;
+        .openButton {
+          width: 155px;
+
+          min-height: 47px;
 
           margin-top: auto;
 
@@ -620,14 +684,84 @@ export default function QollanmalarPage() {
           font-weight: 900;
 
           cursor: pointer;
+
+          transition:
+            transform
+            0.1s ease,
+            box-shadow
+            0.1s ease;
         }
 
-        /* =========================
-           TABLET
-        ========================= */
+        .openButton:hover {
+          transform:
+            translateY(-2px);
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.75
+              ),
+            0 8px 0
+              #07506d,
+            0 12px 14px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
+        }
+
+        .openButton:active {
+          transform:
+            translateY(4px);
+
+          box-shadow:
+            inset 0 3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 2px 0
+              #07506d;
+        }
+
+        /* ==================================================
+           KATTA MONITOR
+        ================================================== */
 
         @media (
-          max-width: 900px
+          min-width: 1500px
+        ) {
+          .mainPanel {
+            padding:
+              40px
+              45px
+              50px;
+          }
+
+          .cards {
+            gap:
+              34px
+              36px;
+          }
+
+          .card {
+            min-height: 275px;
+          }
+        }
+
+        /* ==================================================
+           TABLET
+        ================================================== */
+
+        @media (
+          max-width: 1000px
         ) {
           .topPanel {
             min-height: 115px;
@@ -638,9 +772,16 @@ export default function QollanmalarPage() {
           }
 
           .pageTitle {
-            min-width: 350px;
+            width: 360px;
 
             font-size: 27px;
+          }
+
+          .mainPanel {
+            padding:
+              32px
+              24px
+              42px;
           }
 
           .cards {
@@ -655,12 +796,12 @@ export default function QollanmalarPage() {
           }
         }
 
-        /* =========================
-           MOBILE
-        ========================= */
+        /* ==================================================
+           TELEFON
+        ================================================== */
 
         @media (
-          max-width: 600px
+          max-width: 620px
         ) {
           .page {
             padding:
@@ -670,10 +811,9 @@ export default function QollanmalarPage() {
           }
 
           .topPanel {
-            min-height: 100px;
+            min-height: 96px;
 
-            padding:
-              15px;
+            padding: 14px;
 
             border-radius:
               18px;
@@ -682,7 +822,9 @@ export default function QollanmalarPage() {
           }
 
           .pageTitle {
-            min-width: 0;
+            width: auto;
+
+            max-width: none;
 
             flex: 1;
 
@@ -692,37 +834,40 @@ export default function QollanmalarPage() {
               10px
               12px;
 
-            font-size: 21px;
-
             border-radius:
               12px;
+
+            font-size: 21px;
           }
 
           .backButton {
-            min-width: 90px;
+            width: 92px;
 
             min-height: 52px;
 
             padding:
-              8px
-              10px;
-
-            font-size: 13px;
+              7px
+              8px;
 
             border-radius:
               11px;
+
+            font-size: 13px;
           }
 
           .mainPanel {
             padding:
-              30px
-              15px;
+              28px
+              14px
+              32px;
 
             border-radius:
-              17px;
+              18px;
           }
 
           .heading {
+            margin-bottom: 25px;
+
             font-size: 22px;
           }
 
@@ -734,7 +879,7 @@ export default function QollanmalarPage() {
           }
 
           .card {
-            min-height: 215px;
+            min-height: 220px;
           }
 
           .card h2 {
