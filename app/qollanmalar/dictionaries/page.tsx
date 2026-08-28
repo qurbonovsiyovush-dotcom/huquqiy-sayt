@@ -1,97 +1,107 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
+type DictionaryCard = {
+  title: string;
+  badge: string;
+  href: string;
+};
+
+const dictionaries: DictionaryCard[] = [
+  {
+    title: "English–Uzbek Dictionary",
+    badge: "EN",
+    href: "/qollanmalar/dictionaries/english-uzbek",
+  },
+  {
+    title: "Phrasal Verbs",
+    badge: "PV",
+    href: "/qollanmalar/dictionaries/phrasal-verbs",
+  },
+  {
+    title: "Irregular Verbs",
+    badge: "IV",
+    href: "/qollanmalar/dictionaries/irregular-verbs",
+  },
+  {
+    title: "Synonyms & Antonyms",
+    badge: "S/A",
+    href: "/qollanmalar/dictionaries/synonyms-antonyms",
+  },
+  {
+    title: "Collocations",
+    badge: "C",
+    href: "/qollanmalar/dictionaries/collocations",
+  },
+  {
+    title: "IELTS Vocabulary",
+    badge: "IELTS",
+    href: "/qollanmalar/dictionaries/ielts-vocabulary",
+  },
+];
+
 export default function DictionariesPage() {
-  function goBack() {
-    window.location.href = "/qollanmalar";
+  const router = useRouter();
+
+  function goToAdmin() {
+    window.location.href = "/admin";
   }
 
-  const cards = [
-    {
-      title: "English–Uzbek Dictionary",
-      href: "/qollanmalar/dictionaries/english-uzbek",
-      badge: "EN",
-    },
-    {
-      title: "Phrasal Verbs",
-      href: "/qollanmalar/dictionaries/phrasal-verbs",
-      badge: "PV",
-    },
-    {
-      title: "Irregular Verbs",
-      href: "/qollanmalar/dictionaries/irregular-verbs",
-      badge: "IV",
-    },
-    {
-      title: "Synonyms & Antonyms",
-      href: "/qollanmalar/dictionaries/synonyms-antonyms",
-      badge: "S/A",
-    },
-    {
-      title: "Collocations",
-      href: "/qollanmalar/dictionaries/collocations",
-      badge: "C",
-    },
-    {
-      title: "IELTS Vocabulary",
-      href: "/qollanmalar/dictionaries/ielts-vocabulary",
-      badge: "IELTS",
-    },
-  ];
+  function openDictionary(href: string) {
+    router.push(href);
+  }
 
   return (
     <main className="page">
-      <div className="shell">
-        <header className="topBar">
-          <button
-            type="button"
-            className="backButton"
-            onClick={goBack}
-          >
-            ← Qo‘llanmalar
-          </button>
+      {/* TEPA PANEL */}
+      <section className="topPanel">
+        <button
+          type="button"
+          className="backButton"
+          onClick={goToAdmin}
+        >
+          ← Orqaga
+        </button>
 
-          <div className="topTitle">
-            QURBONOV.UZ
-          </div>
-        </header>
+        <div className="siteName">QURBONOV.UZ</div>
+      </section>
 
-        <section className="mainPanel">
-          <div className="floatingTitle">
-            Inglizcha lug‘atlar
-          </div>
+      {/* ASOSIY PANEL */}
+      <section className="mainPanel">
+        <div className="panelTitle">
+          Inglizcha lug‘atlar
+        </div>
 
-          <div className="intro">
-            <h1>Kerakli bo‘limni tanlang</h1>
-          </div>
+        <h1 className="heading">
+          Kerakli bo‘limni tanlang
+        </h1>
 
-          <div className="cardGrid">
-            {cards.map((card) => (
-              <article
-                key={card.href}
-                className="dictionaryCard"
+        <div className="cards">
+          {dictionaries.map((item) => (
+            <article
+              className="card"
+              key={item.title}
+            >
+              <div className="badge">
+                {item.badge}
+              </div>
+
+              <h2>{item.title}</h2>
+
+              <button
+                type="button"
+                className="openButton"
+                onClick={() =>
+                  openDictionary(item.href)
+                }
               >
-                <div className="badge">
-                  {card.badge}
-                </div>
-
-                <div className="cardContent">
-                  <h2>{card.title}</h2>
-                </div>
-
-                <button
-                  type="button"
-                  className="openButton"
-                  onClick={() => {
-                    window.location.href = card.href;
-                  }}
-                >
-                  Ochish
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-      </div>
+                Ochish
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <style jsx>{`
         * {
@@ -100,559 +110,487 @@ export default function DictionariesPage() {
 
         .page {
           min-height: 100vh;
-          padding: 24px 18px 70px;
+          padding: 26px 20px 70px;
 
           background:
             radial-gradient(
               circle at top,
               #ffffff 0%,
-              #f4f8fa 50%,
-              #e8f0f4 100%
+              #f4f7f8 50%,
+              #e9eef0 100%
             );
+
+          color: #111;
 
           font-family:
             "Bell MT",
             "Times New Roman",
             Georgia,
             serif;
-
-          color: #111;
-        }
-
-        .shell {
-          width: min(1200px, 96%);
-          margin: 0 auto;
         }
 
         button {
           font-family: inherit;
         }
 
-        /* ==========================================
-           YUQORI PANEL
-        ========================================== */
+        /* ==============================
+           TEPA KO‘K PANEL
+        ============================== */
 
-        .topBar {
-          width: 100%;
-          min-height: 100px;
+        .topPanel {
+          width: min(1400px, 100%);
+          min-height: 110px;
 
-          padding: 18px 30px;
+          margin: 0 auto 78px;
+
+          padding: 22px 34px;
 
           display: flex;
           align-items: center;
           justify-content: space-between;
 
-          gap: 20px;
+          gap: 30px;
 
-          border: 3px solid #174461;
-          border-radius: 25px;
+          border: 3px solid #123d52;
+          border-radius: 27px;
 
           background:
             linear-gradient(
               180deg,
               #8bdcff 0%,
-              #62bee9 47%,
-              #399bc9 100%
+              #62bae6 48%,
+              #409dce 100%
             );
 
           box-shadow:
-            inset 0 5px 4px rgba(255,255,255,.75),
-            inset 0 -5px 5px rgba(0,0,0,.12),
-            0 8px 0 #174d6d,
-            0 14px 18px rgba(0,0,0,.20);
+            inset 0 7px 7px rgba(255, 255, 255, 0.48),
+            inset 0 -7px 8px rgba(0, 0, 0, 0.13),
+            0 10px 0 #123d52,
+            0 17px 23px rgba(0, 0, 0, 0.19);
         }
 
-        .topTitle {
-          color: #073b68;
-
-          font-size: 20px;
-          font-weight: 900;
-          letter-spacing: 2px;
-
-          text-shadow:
-            0 1px 0 rgba(255,255,255,.75);
-        }
-
-        /* ==========================================
+        /* ==============================
            ORQAGA
-        ========================================== */
+        ============================== */
 
         .backButton {
-          min-width: 170px;
-          min-height: 50px;
+          width: 195px;
+          min-height: 58px;
 
-          padding: 9px 22px;
+          padding: 10px 20px;
 
-          border: 2px solid #174461;
-          border-radius: 9px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #b8edff 0%,
-              #72c7ed 52%,
-              #439ed0 100%
-            );
-
-          box-shadow:
-            inset 0 4px 4px rgba(255,255,255,.8),
-            inset 0 -3px 3px rgba(0,0,0,.12),
-            0 5px 0 #17415c,
-            0 9px 11px rgba(0,0,0,.18);
-
-          color: #073b68;
-
-          font-size: 14px;
-          font-weight: 700;
-
-          cursor: pointer;
-
-          transition:
-            transform .1s ease,
-            filter .1s ease,
-            box-shadow .1s ease;
-        }
-
-        .backButton:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
-        }
-
-        .backButton:active {
-          transform: translateY(3px);
-
-          box-shadow:
-            inset 0 4px 5px rgba(0,0,0,.1),
-            0 1px 0 #17415c;
-        }
-
-        /* ==========================================
-           ASOSIY KULRANG PANEL
-        ========================================== */
-
-        .mainPanel {
-          position: relative;
-
-          margin-top: 70px;
-
-          padding:
-            68px
-            30px
-            38px;
-
-          border: 3px solid #333a3e;
-          border-radius: 23px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #62686b 0%,
-              #505659 46%,
-              #3d4346 100%
-            );
-
-          box-shadow:
-            inset 0 5px 5px rgba(255,255,255,.10),
-            inset 0 -7px 7px rgba(0,0,0,.22),
-            0 6px 0 #30373b,
-            0 11px 0 #242a2d,
-            0 17px 24px rgba(0,0,0,.22);
-        }
-
-        /* ==========================================
-           SARLAVHA
-        ========================================== */
-
-        .floatingTitle {
-          position: absolute;
-
-          left: 50%;
-          top: -31px;
-
-          transform: translateX(-50%);
-
-          min-width: 350px;
-          min-height: 60px;
-
-          padding: 10px 30px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border: 3px solid #174461;
+          border: 2px solid #315968;
           border-radius: 12px;
 
           background:
             linear-gradient(
               180deg,
-              #b1ebff 0%,
-              #73c8ef 47%,
-              #3d9dce 100%
+              #f9fdff 0%,
+              #bfe8f7 40%,
+              #69c5e8 100%
             );
 
           box-shadow:
-            inset 0 6px 5px rgba(255,255,255,.72),
-            inset 0 -5px 5px rgba(0,0,0,.13),
-            0 6px 0 #17415c,
-            0 10px 13px rgba(20,65,92,.24);
+            inset 0 5px 5px rgba(255, 255, 255, 0.8),
+            0 6px 0 #315968,
+            0 10px 13px rgba(0, 0, 0, 0.18);
 
-          color: #073b68;
+          color: #063d61;
 
-          font-size: 30px;
-          font-weight: 700;
+          font-size: 16px;
+          font-weight: 900;
 
-          text-align: center;
-          white-space: nowrap;
+          cursor: pointer;
+
+          transition:
+            transform 0.1s ease,
+            box-shadow 0.1s ease;
         }
 
-        .intro {
-          margin-bottom: 28px;
-          text-align: center;
+        .backButton:hover {
+          transform: translateY(-2px);
+
+          box-shadow:
+            inset 0 5px 5px rgba(255, 255, 255, 0.8),
+            0 8px 0 #315968,
+            0 13px 15px rgba(0, 0, 0, 0.2);
         }
 
-        .intro h1 {
-          margin: 0;
+        .backButton:active {
+          transform: translateY(4px);
 
-          color: #ffffff;
+          box-shadow:
+            inset 0 3px 5px rgba(0, 0, 0, 0.1),
+            0 2px 0 #315968;
+        }
 
-          font-size: 25px;
-          font-weight: 700;
+        /* ==============================
+           SAYT NOMI
+        ============================== */
+
+        .siteName {
+          color: #063c67;
+
+          font-size: 23px;
+          font-weight: 900;
+
+          letter-spacing: 1px;
 
           text-shadow:
-            0 2px 0 rgba(0,0,0,.35);
+            0 1px 0 rgba(255, 255, 255, 0.75);
         }
 
-        /* ==========================================
-           KARTALAR
-        ========================================== */
+        /* ==============================
+           ASOSIY PANEL
+        ============================== */
 
-        .cardGrid {
-          display: grid;
+        .mainPanel {
+          position: relative;
 
-          grid-template-columns:
-            repeat(3, minmax(0, 1fr));
+          width: min(1400px, 100%);
 
-          gap: 25px;
+          margin: 0 auto;
+
+          padding: 80px 38px 50px;
+
+          border: 2px solid #30383b;
+          border-radius: 25px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #666b6d 0%,
+              #53595b 50%,
+              #404749 100%
+            );
+
+          box-shadow:
+            inset 0 6px 8px rgba(255, 255, 255, 0.12),
+            inset 0 -9px 11px rgba(0, 0, 0, 0.22),
+            0 10px 0 #303638,
+            0 18px 27px rgba(0, 0, 0, 0.22);
         }
 
-        .dictionaryCard {
-          min-height: 205px;
+        /* ==============================
+           INGLIZCHA LUG‘ATLAR SARLAVHASI
+        ============================== */
 
-          padding:
-            22px
-            18px
-            20px;
+        .panelTitle {
+          position: absolute;
+
+          top: -35px;
+          left: 50%;
+
+          transform: translateX(-50%);
+
+          min-width: 400px;
+          min-height: 72px;
+
+          padding: 12px 35px;
 
           display: flex;
-          flex-direction: column;
-
           align-items: center;
           justify-content: center;
 
-          text-align: center;
-
-          border: 2px solid #596166;
+          border: 3px solid #07506d;
           border-radius: 15px;
 
           background:
             linear-gradient(
               180deg,
-              #f8f8f8 0%,
-              #e9e9e9 45%,
-              #c9c9c9 100%
+              #d8f6ff 0%,
+              #79d0ef 42%,
+              #3ca8d5 100%
             );
 
           box-shadow:
-            inset 0 7px 6px rgba(255,255,255,.95),
-            inset 0 -5px 5px rgba(0,0,0,.10),
-            0 6px 0 #596166,
-            0 11px 12px rgba(0,0,0,.18);
+            inset 0 5px 5px rgba(255, 255, 255, 0.72),
+            0 8px 0 #07506d,
+            0 13px 17px rgba(0, 0, 0, 0.22);
+
+          color: #06436c;
+
+          font-size: 32px;
+          font-weight: 900;
+
+          text-align: center;
         }
 
-        /* ==========================================
-           BADGE
-        ========================================== */
+        /* ==============================
+           SARLAVHA
+        ============================== */
 
-        .badge {
-          min-width: 58px;
-          min-height: 44px;
+        .heading {
+          margin: 0 0 38px;
 
-          padding: 7px 11px;
+          color: #fff;
 
-          margin-bottom: 16px;
+          text-align: center;
+
+          font-size: 27px;
+          font-weight: 900;
+
+          text-shadow:
+            0 2px 2px rgba(0, 0, 0, 0.65);
+        }
+
+        /* ==============================
+           KARTALAR
+        ============================== */
+
+        .cards {
+          width: 100%;
 
           display: grid;
-          place-items: center;
 
-          border: 2px solid #174461;
-          border-radius: 10px;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
 
-          color: #073b68;
+          gap: 34px 32px;
+        }
+
+        .card {
+          min-height: 235px;
+
+          padding: 26px 22px 24px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          border: 1px solid #d1d1d1;
+          border-radius: 15px;
 
           background:
             linear-gradient(
               180deg,
-              #c5f0ff 0%,
-              #76c5ec 50%,
-              #4da2d3 100%
+              #ffffff 0%,
+              #f4f4f4 55%,
+              #e2e2e2 100%
             );
 
           box-shadow:
-            inset 0 4px 4px rgba(255,255,255,.78),
-            0 4px 0 #17415c;
+            inset 0 5px 7px rgba(255, 255, 255, 0.95),
+            0 8px 0 #858c8e,
+            0 14px 19px rgba(0, 0, 0, 0.22);
 
-          font-size: 15px;
-          font-weight: 900;
+          text-align: center;
+
+          transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease;
         }
 
-        /* ==========================================
-           KARTA NOMI
-        ========================================== */
+        .card:hover {
+          transform: translateY(-3px);
 
-        .cardContent {
-          flex: 1;
+          box-shadow:
+            inset 0 5px 7px rgba(255, 255, 255, 0.95),
+            0 10px 0 #858c8e,
+            0 17px 22px rgba(0, 0, 0, 0.25);
+        }
+
+        /* ==============================
+           BADGE
+        ============================== */
+
+        .badge {
+          min-width: 58px;
+          height: 48px;
+
+          padding: 0 10px;
 
           display: flex;
           align-items: center;
           justify-content: center;
+
+          border: 2px solid #07506d;
+          border-radius: 10px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #e2f9ff 0%,
+              #7bd2f0 48%,
+              #3ca8d5 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px rgba(255, 255, 255, 0.8),
+            0 5px 0 #07506d;
+
+          color: #063e68;
+
+          font-size: 16px;
+          font-weight: 900;
         }
 
-        .dictionaryCard h2 {
-          margin: 0;
+        /* ==============================
+           KARTA NOMI
+        ============================== */
+
+        .card h2 {
+          width: 100%;
+
+          margin: 28px 0 0;
 
           color: #111;
 
           font-size: 23px;
           line-height: 1.15;
+
+          font-weight: 900;
         }
 
-        /* ==========================================
-           OCHISH
-        ========================================== */
+        /* ==============================
+           OCHISH TUGMASI
+        ============================== */
 
         .openButton {
-          min-width: 150px;
-          min-height: 45px;
+          width: 170px;
+          min-height: 48px;
 
-          margin-top: 18px;
+          margin-top: auto;
 
-          padding: 8px 20px;
-
-          border: 2px solid #174461;
+          border: 2px solid #07506d;
           border-radius: 9px;
-
-          color: #073b68;
 
           background:
             linear-gradient(
               180deg,
-              #a8e7ff 0%,
-              #72c3eb 55%,
-              #4b9dcd 100%
+              #dcf7ff 0%,
+              #78d0ef 48%,
+              #3ba8d5 100%
             );
 
           box-shadow:
-            inset 0 4px 4px rgba(255,255,255,.8),
-            inset 0 -3px 3px rgba(0,0,0,.12),
-            0 4px 0 #17415c,
-            0 8px 10px rgba(0,0,0,.18);
+            inset 0 4px 4px rgba(255, 255, 255, 0.76),
+            0 6px 0 #07506d,
+            0 10px 12px rgba(0, 0, 0, 0.18);
+
+          color: #073e65;
 
           font-size: 15px;
-          font-weight: 700;
+          font-weight: 900;
 
           cursor: pointer;
 
           transition:
-            transform .1s ease,
-            filter .1s ease,
-            box-shadow .1s ease;
+            transform 0.1s ease,
+            box-shadow 0.1s ease;
         }
 
         .openButton:hover {
           transform: translateY(-2px);
-          filter: brightness(1.04);
+
+          box-shadow:
+            inset 0 4px 4px rgba(255, 255, 255, 0.76),
+            0 8px 0 #07506d,
+            0 12px 14px rgba(0, 0, 0, 0.2);
         }
 
         .openButton:active {
-          transform: translateY(3px);
+          transform: translateY(4px);
 
           box-shadow:
-            inset 0 4px 5px rgba(0,0,0,.10),
-            0 1px 0 #17415c;
+            inset 0 3px 4px rgba(0, 0, 0, 0.08),
+            0 2px 0 #07506d;
         }
 
-        /* ==========================================
+        /* ==============================
            TABLET
-        ========================================== */
+        ============================== */
 
-        @media (max-width: 1050px) {
-          .cardGrid {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-          }
-        }
-
-        /* ==========================================
-           TELEFON
-        ========================================== */
-
-        @media (max-width: 640px) {
-          .page {
-            padding: 10px 8px 35px;
-          }
-
-          .shell {
-            width: 100%;
-          }
-
-          .topBar {
-            min-height: 68px;
-
-            padding: 10px 12px;
-
-            border-radius: 18px;
-            border-width: 2px;
-
-            box-shadow:
-              inset 0 4px 4px rgba(255,255,255,.68),
-              inset 0 -4px 4px rgba(0,0,0,.10),
-              0 5px 0 #174d6d,
-              0 9px 12px rgba(0,0,0,.16);
-          }
-
-          .topTitle {
-            display: none;
-          }
-
-          .backButton {
-            width: 100%;
-
-            min-width: 0;
-            min-height: 40px;
-
-            padding: 7px 15px;
-
-            font-size: 13px;
-
-            border-radius: 8px;
+        @media (max-width: 1000px) {
+          .topPanel {
+            margin-bottom: 70px;
           }
 
           .mainPanel {
-            margin-top: 55px;
-
-            padding:
-              48px
-              12px
-              22px;
-
-            border-radius: 18px;
-            border-width: 2px;
-
-            box-shadow:
-              inset 0 4px 4px rgba(255,255,255,.08),
-              inset 0 -5px 5px rgba(0,0,0,.18),
-              0 4px 0 #30373b,
-              0 8px 0 #242a2d,
-              0 12px 16px rgba(0,0,0,.18);
+            padding: 75px 25px 42px;
           }
 
-          .floatingTitle {
-            top: -24px;
-
-            width: min(86%, 310px);
-
-            min-width: 0;
-            min-height: 46px;
-
-            padding: 7px 14px;
-
-            font-size: 21px;
-
-            border-width: 2px;
-            border-radius: 10px;
-
-            white-space: normal;
-          }
-
-          .intro {
-            margin-bottom: 18px;
-          }
-
-          .intro h1 {
-            font-size: 20px;
-          }
-
-          .cardGrid {
+          .cards {
             grid-template-columns:
               repeat(2, minmax(0, 1fr));
+          }
+
+          .panelTitle {
+            min-width: 340px;
+
+            font-size: 28px;
+          }
+        }
+
+        /* ==============================
+           TELEFON
+        ============================== */
+
+        @media (max-width: 620px) {
+          .page {
+            padding: 10px 8px 45px;
+          }
+
+          .topPanel {
+            min-height: 92px;
+
+            margin-bottom: 62px;
+
+            padding: 14px;
+
+            border-radius: 18px;
 
             gap: 12px;
           }
 
-          .dictionaryCard {
-            min-height: 170px;
+          .backButton {
+            width: 120px;
+            min-height: 50px;
 
-            padding:
-              15px
-              8px
-              14px;
+            padding: 7px 8px;
 
-            border-radius: 11px;
-
-            box-shadow:
-              inset 0 5px 4px rgba(255,255,255,.92),
-              inset 0 -4px 4px rgba(0,0,0,.09),
-              0 4px 0 #596166,
-              0 7px 8px rgba(0,0,0,.14);
+            font-size: 13px;
           }
 
-          .badge {
-            min-width: 44px;
-            min-height: 36px;
-
-            margin-bottom: 10px;
-
-            padding: 5px 7px;
-
-            font-size: 12px;
-          }
-
-          .dictionaryCard h2 {
+          .siteName {
             font-size: 16px;
           }
 
-          .openButton {
-            min-width: 105px;
-            min-height: 38px;
+          .mainPanel {
+            padding: 65px 14px 32px;
 
-            margin-top: 12px;
-
-            padding: 6px 10px;
-
-            font-size: 12px;
+            border-radius: 18px;
           }
-        }
 
-        /* ==========================================
-           JUDA KICHIK TELEFON
-        ========================================== */
+          .panelTitle {
+            top: -29px;
 
-        @media (max-width: 390px) {
-          .cardGrid {
+            min-width: 250px;
+            min-height: 58px;
+
+            padding: 8px 15px;
+
+            font-size: 23px;
+          }
+
+          .heading {
+            margin-bottom: 27px;
+
+            font-size: 21px;
+          }
+
+          .cards {
             grid-template-columns: 1fr;
+
+            gap: 26px;
           }
 
-          .dictionaryCard {
-            min-height: 155px;
+          .card {
+            min-height: 215px;
           }
 
-          .dictionaryCard h2 {
-            font-size: 18px;
-          }
-
-          .openButton {
-            min-width: 125px;
+          .card h2 {
+            font-size: 21px;
           }
         }
       `}</style>
