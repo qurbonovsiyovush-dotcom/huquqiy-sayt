@@ -85,10 +85,6 @@ export default function SynonymsPage() {
     null
   );
 
-  /* =====================================================
-     INITIAL
-  ===================================================== */
-
   useEffect(() => {
     setSpeechSupported(
       typeof window !== "undefined" &&
@@ -166,10 +162,6 @@ export default function SynonymsPage() {
     }
   }
 
-  /* =====================================================
-     FILTERS
-  ===================================================== */
-
   const wrongIds = useMemo(() => {
     return new Set(
       Object.entries(progress)
@@ -216,10 +208,6 @@ export default function SynonymsPage() {
       }
     : null;
 
-  /* =====================================================
-     STATS
-  ===================================================== */
-
   const totalCorrect = useMemo(() => {
     return Object.values(progress).reduce(
       (sum, item) => sum + item.correct,
@@ -247,10 +235,6 @@ export default function SynonymsPage() {
         )
       : 0;
 
-  /* =====================================================
-     TIMER / RESET
-  ===================================================== */
-
   function clearTimer() {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -273,10 +257,6 @@ export default function SynonymsPage() {
     setMode(nextMode);
     setIndex(0);
   }
-
-  /* =====================================================
-     NAVIGATION
-  ===================================================== */
 
   function next() {
     clearTimer();
@@ -320,10 +300,6 @@ export default function SynonymsPage() {
     }, delay);
   }
 
-  /* =====================================================
-     PROGRESS
-  ===================================================== */
-
   function markResult(
     item: SynonymWord,
     correct: boolean
@@ -340,11 +316,8 @@ export default function SynonymsPage() {
 
     const nextItem: ProgressItem = {
       ...old,
-
       correct: nextCorrect,
-
       wrong: old.wrong + (correct ? 0 : 1),
-
       learned:
         nextCorrect >= 3 ? true : old.learned,
     };
@@ -375,10 +348,6 @@ export default function SynonymsPage() {
     });
   }
 
-  /* =====================================================
-     LEARN
-  ===================================================== */
-
   function revealSynonyms() {
     if (!current || revealed) return;
 
@@ -386,10 +355,6 @@ export default function SynonymsPage() {
 
     autoNext(2400);
   }
-
-  /* =====================================================
-     CHOICE
-  ===================================================== */
 
   const choiceOptions = useMemo(() => {
     if (!current || current.synonyms.length === 0) {
@@ -433,14 +398,8 @@ export default function SynonymsPage() {
 
     markResult(current, correct);
 
-    // To‘g‘ri javob tezroq,
-    // xato javob esa uzoqroq ko‘rinadi.
     autoNext(correct ? 1200 : 2300);
   }
-
-  /* =====================================================
-     WRITE
-  ===================================================== */
 
   function checkWrite() {
     if (!current || writeResult) return;
@@ -460,10 +419,6 @@ export default function SynonymsPage() {
     autoNext(correct ? 1200 : 2300);
   }
 
-  /* =====================================================
-     SPEECH
-  ===================================================== */
-
   function speakWord() {
     if (!current || !speechSupported) return;
 
@@ -478,10 +433,6 @@ export default function SynonymsPage() {
 
     window.speechSynthesis.speak(utterance);
   }
-
-  /* =====================================================
-     LOADING
-  ===================================================== */
 
   if (loading) {
     return (
@@ -549,13 +500,9 @@ export default function SynonymsPage() {
     );
   }
 
-  /* =====================================================
-     PAGE
-  ===================================================== */
-
   return (
     <main className="page">
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
 
       <header className="topPanel">
         <button
@@ -580,7 +527,7 @@ export default function SynonymsPage() {
         </div>
       </header>
 
-      {/* ================= CONTROL ================= */}
+      {/* CONTROL */}
 
       <section className="controlPanel">
         <div className="modeRow">
@@ -668,8 +615,6 @@ export default function SynonymsPage() {
         </div>
       </section>
 
-      {/* ================= EMPTY ================= */}
-
       {visibleWords.length === 0 ? (
         <section className="emptyPanel">
           {mode === "wrong"
@@ -679,8 +624,6 @@ export default function SynonymsPage() {
               : "So‘zlar mavjud emas."}
         </section>
       ) : current ? (
-        /* ================= MAIN ================= */
-
         <section className="learningPanel">
           <div className="progressRow">
             <span>
@@ -701,7 +644,6 @@ export default function SynonymsPage() {
                 className="smallGray3d"
                 onClick={speakWord}
                 disabled={!speechSupported}
-                title="Talaffuz"
               >
                 🔊
               </button>
@@ -714,7 +656,6 @@ export default function SynonymsPage() {
                     : "smallGray3d"
                 }
                 onClick={toggleDifficult}
-                title="Qiyin so‘z"
               >
                 ★
               </button>
@@ -729,8 +670,6 @@ export default function SynonymsPage() {
             <div className="translationBox">
               {current.uzbek}
             </div>
-
-            {/* ============= LEARN ============= */}
 
             {mode === "learn" && (
               <div className="contentArea">
@@ -764,8 +703,6 @@ export default function SynonymsPage() {
                 )}
               </div>
             )}
-
-            {/* ============= CHOICE ============= */}
 
             {mode === "choice" && (
               <div className="contentArea">
@@ -826,8 +763,6 @@ export default function SynonymsPage() {
               </div>
             )}
 
-            {/* ============= WRITE ============= */}
-
             {mode === "write" && (
               <div className="contentArea">
                 <div className="question">
@@ -882,8 +817,6 @@ export default function SynonymsPage() {
               </div>
             )}
 
-            {/* ============= REVIEW ============= */}
-
             {(mode === "wrong" ||
               mode === "difficult") && (
               <div className="contentArea">
@@ -906,8 +839,6 @@ export default function SynonymsPage() {
               </div>
             )}
           </article>
-
-          {/* ================= BOTTOM ================= */}
 
           <div className="bottomNavigation">
             <button
@@ -951,10 +882,7 @@ export default function SynonymsPage() {
           box-sizing: border-box;
         }
 
-        :global(html) {
-          background: #edf3f6;
-        }
-
+        :global(html),
         :global(body) {
           margin: 0;
           background: #edf3f6;
@@ -968,9 +896,7 @@ export default function SynonymsPage() {
         .page {
           min-height: 100vh;
           padding: 26px 18px 70px;
-
           font-family: "Bell MT", "Times New Roman", serif;
-
           color: #142e3c;
 
           background:
@@ -982,10 +908,6 @@ export default function SynonymsPage() {
             );
         }
 
-        /* =================================================
-           BARCHA ASOSIY BLOKLAR BIR XIL KENGLIKDA
-        ================================================= */
-
         .topPanel,
         .controlPanel,
         .learningPanel,
@@ -995,15 +917,13 @@ export default function SynonymsPage() {
           margin-right: auto;
         }
 
-        /* =================================================
-           HEADER
-        ================================================= */
+        /* ===========================
+           TOP
+        =========================== */
 
         .topPanel {
           min-height: 105px;
-
           margin-bottom: 28px;
-
           padding: 18px 24px;
 
           display: grid;
@@ -1035,11 +955,8 @@ export default function SynonymsPage() {
 
         .headerCenter h1 {
           margin: 0;
-
           color: #064d73;
-
           font-size: clamp(34px, 4vw, 44px);
-
           line-height: 1;
 
           text-shadow:
@@ -1049,17 +966,13 @@ export default function SynonymsPage() {
 
         .headerCenter div {
           margin-top: 7px;
-
           color: #164b63;
-
           font-size: 14px;
-
           font-weight: 700;
         }
 
         .totalBox {
           min-height: 58px;
-
           padding: 7px 14px;
 
           display: flex;
@@ -1073,42 +986,35 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #f6f6f6 0%,
+              #f6f6f6,
               #e4e4e4 48%,
-              #c8ccce 100%
+              #c8ccce
             );
 
           box-shadow:
             inset 0 3px 2px #ffffff,
-            inset 0 -2px 3px rgba(0, 0, 0, 0.08),
-            0 6px 0 #707a7f,
-            0 10px 14px rgba(0, 0, 0, 0.15);
+            0 6px 0 #707a7f;
         }
 
         .totalBox strong {
           color: #0676aa;
-
           font-size: 24px;
         }
 
         .totalBox span {
-          margin-top: 1px;
-
           font-size: 13px;
-
           font-weight: 700;
         }
 
-        /* =================================================
-           OCH KULRANG 3D TUGMALAR
-        ================================================= */
+        /* ===========================
+           GRAY 3D
+        =========================== */
 
         .grayButton,
         .modeButton,
         .answerButton,
         .smallGray3d {
           border: 2px solid #7c878c;
-
           color: #172d38;
 
           background:
@@ -1126,51 +1032,20 @@ export default function SynonymsPage() {
             0 9px 12px rgba(0, 0, 0, 0.13);
 
           font-weight: 700;
-
           cursor: pointer;
-
-          transition:
-            transform 0.08s ease,
-            box-shadow 0.08s ease,
-            filter 0.12s ease;
-        }
-
-        .grayButton:hover,
-        .modeButton:hover,
-        .answerButton:hover,
-        .smallGray3d:hover {
-          filter: brightness(1.025);
-        }
-
-        .grayButton:active,
-        .modeButton:active,
-        .answerButton:active,
-        .smallGray3d:active,
-        .blueButton:active {
-          transform: translateY(4px);
-
-          box-shadow:
-            inset 0 2px 3px rgba(0, 0, 0, 0.08),
-            0 1px 0 #697378;
         }
 
         .backButton {
           min-height: 55px;
-
-          padding: 10px 16px;
-
           border-radius: 11px;
-
-          font-size: 14px;
         }
 
-        /* =================================================
-           CONTROL PANEL
-        ================================================= */
+        /* ===========================
+           CONTROL
+        =========================== */
 
         .controlPanel {
           margin-bottom: 28px;
-
           padding: 17px;
 
           border: 3px solid #40484c;
@@ -1179,9 +1054,9 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               145deg,
-              #6b7174 0%,
+              #6b7174,
               #555b5e 50%,
-              #43494c 100%
+              #43494c
             );
 
           box-shadow:
@@ -1193,53 +1068,42 @@ export default function SynonymsPage() {
 
         .modeRow {
           display: grid;
-
           grid-template-columns: repeat(5, 1fr);
-
           gap: 13px;
         }
 
         .modeButton {
           min-height: 49px;
-
           border-radius: 9px;
-
-          font-size: 14px;
         }
 
         .activeButton {
           border-color: #126487;
-
           color: #064d70;
 
           background:
             linear-gradient(
               180deg,
-              #caf2ff 0%,
+              #caf2ff,
               #79d4f4 45%,
-              #43b2df 100%
+              #43b2df
             );
 
           box-shadow:
             inset 0 3px 2px #ffffff,
-            inset 0 -2px 3px rgba(0, 0, 0, 0.07),
-            0 5px 0 #126181,
-            0 9px 12px rgba(0, 0, 0, 0.14);
+            0 5px 0 #126181;
         }
 
         .statsRow {
           margin-top: 15px;
 
           display: grid;
-
           grid-template-columns: repeat(4, 1fr);
-
           gap: 13px;
         }
 
         .statBox {
           min-height: 68px;
-
           padding: 9px;
 
           display: flex;
@@ -1253,34 +1117,30 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #f2f2f2 0%,
+              #f2f2f2,
               #dedede 50%,
-              #c7cbcd 100%
+              #c7cbcd
             );
 
           box-shadow:
             inset 0 3px 2px #ffffff,
-            inset 0 -2px 3px rgba(0, 0, 0, 0.07),
             0 5px 0 #798388;
         }
 
         .statBox span {
           font-size: 13px;
-
           font-weight: 700;
         }
 
         .statBox strong {
           margin-top: 4px;
-
           color: #0877aa;
-
           font-size: 22px;
         }
 
-        /* =================================================
-           MAIN PANEL — 1150PX
-        ================================================= */
+        /* ===========================
+           LEARNING PANEL
+        =========================== */
 
         .learningPanel {
           padding: 20px;
@@ -1291,9 +1151,9 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               145deg,
-              #6b7174 0%,
+              #6b7174,
               #545a5d 48%,
-              #41474a 100%
+              #41474a
             );
 
           box-shadow:
@@ -1305,25 +1165,15 @@ export default function SynonymsPage() {
 
         .progressRow {
           min-height: 30px;
-
           padding: 0 5px 8px;
 
           display: flex;
-          align-items: center;
           justify-content: space-between;
 
           color: #ffffff;
-
           font-size: 14px;
-
           font-weight: 700;
-
-          text-shadow: 0 2px 2px rgba(0, 0, 0, 0.35);
         }
-
-        /* =================================================
-           WORD CARD
-        ================================================= */
 
         .wordCard {
           position: relative;
@@ -1340,13 +1190,13 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               145deg,
-              #f8f8f8 0%,
+              #f8f8f8,
               #eeeeee 52%,
-              #d9dcde 100%
+              #d9dcde
             );
 
           box-shadow:
-            inset 0 4px 4px rgba(255, 255, 255, 0.98),
+            inset 0 4px 4px #ffffff,
             inset 0 -4px 5px rgba(0, 0, 0, 0.07),
             0 8px 0 #7b858a,
             0 13px 18px rgba(0, 0, 0, 0.18);
@@ -1354,47 +1204,31 @@ export default function SynonymsPage() {
 
         .iconButtons {
           position: absolute;
-
           top: 18px;
           right: 22px;
 
           display: flex;
-
           gap: 11px;
         }
 
         .smallGray3d {
           width: 48px;
           height: 45px;
-
           border-radius: 9px;
-
-          font-size: 17px;
         }
 
         .starActive {
-          border-color: #b18a21;
-
           background:
             linear-gradient(
-              180deg,
               #fff8c9,
               #f2d76d 55%,
               #d9b83e
             );
-
-          box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #a98b30;
         }
 
         .wordLabel {
-          margin-top: 2px;
-
           color: #667176;
-
           font-size: 15px;
-
           font-weight: 700;
         }
 
@@ -1430,10 +1264,9 @@ export default function SynonymsPage() {
 
           background:
             linear-gradient(
-              180deg,
-              #edfaff 0%,
+              #edfaff,
               #d7effb 50%,
-              #bddfee 100%
+              #bddfee
             );
 
           box-shadow:
@@ -1443,7 +1276,6 @@ export default function SynonymsPage() {
           color: #17546f;
 
           font-size: 21px;
-
           font-weight: 700;
         }
 
@@ -1456,21 +1288,18 @@ export default function SynonymsPage() {
         .question {
           margin-bottom: 18px;
 
-          color: #263b45;
-
           font-size: 19px;
-
           font-weight: 700;
         }
 
-        /* =================================================
-           BLUE 3D
-        ================================================= */
+        /* ===========================
+           BLUE BUTTON
+        =========================== */
 
         .blueButton {
-          min-height: 48px;
+          min-height: 50px;
 
-          padding: 10px 24px;
+          padding: 11px 26px;
 
           border: 2px solid #116184;
           border-radius: 9px;
@@ -1479,84 +1308,95 @@ export default function SynonymsPage() {
 
           background:
             linear-gradient(
-              180deg,
-              #c9f1ff 0%,
+              #c9f1ff,
               #79d2f2 48%,
-              #45b3df 100%
+              #45b3df
             );
 
           box-shadow:
             inset 0 3px 2px #ffffff,
-            inset 0 -2px 3px rgba(0, 0, 0, 0.07),
             0 5px 0 #115f7e,
             0 9px 12px rgba(0, 0, 0, 0.13);
 
           font-weight: 700;
-
           cursor: pointer;
-
-          transition:
-            transform 0.08s ease,
-            box-shadow 0.08s ease;
         }
 
         /* =================================================
-           SYNONYMS
+           KATTALASHTIRILGAN SINONIMLAR
         ================================================= */
 
         .synonymList {
           display: flex;
-
           flex-wrap: wrap;
 
           justify-content: center;
+          align-items: center;
 
-          gap: 12px;
+          gap: 18px;
+
+          margin-top: 10px;
         }
 
         .synonymChip {
-          min-width: 115px;
+          min-width: 155px;
+          min-height: 60px;
 
-          padding: 10px 16px;
+          padding: 14px 25px;
 
-          border: 2px solid #669ab1;
-          border-radius: 8px;
+          display: inline-flex;
+
+          align-items: center;
+          justify-content: center;
+
+          border: 2px solid #648fa3;
+
+          border-radius: 10px;
+
+          color: #075779;
 
           background:
             linear-gradient(
               180deg,
-              #f3f3f3,
-              #d6dadc
+              #f5f5f5 0%,
+              #e4e4e4 45%,
+              #c9cdcf 100%
             );
 
           box-shadow:
-            inset 0 2px 2px #ffffff,
-            0 4px 0 #7c898f;
+            inset 0 3px 2px rgba(255, 255, 255, 0.98),
+            inset 0 -2px 3px rgba(0, 0, 0, 0.08),
+            0 6px 0 #74848b,
+            0 11px 15px rgba(0, 0, 0, 0.14);
 
-          color: #075779;
+          font-size: 20px;
+
+          line-height: 1.1;
 
           font-weight: 700;
+
+          letter-spacing: 0.2px;
+
+          text-shadow: 0 1px 0 #ffffff;
         }
 
         .autoText {
-          margin-top: 18px;
+          margin-top: 22px;
 
           color: #687277;
 
-          font-size: 13px;
+          font-size: 14px;
 
           font-weight: 700;
         }
 
-        /* =================================================
-           ANSWERS — OCH KULRANG 3D
-        ================================================= */
+        /* ===========================
+           ANSWERS
+        =========================== */
 
         .answersGrid {
           display: grid;
-
           grid-template-columns: repeat(2, 1fr);
-
           gap: 16px;
         }
 
@@ -1577,7 +1417,6 @@ export default function SynonymsPage() {
 
           background:
             linear-gradient(
-              180deg,
               #f1fff4,
               #bceac8 50%,
               #8bd29d
@@ -1595,7 +1434,6 @@ export default function SynonymsPage() {
 
           background:
             linear-gradient(
-              180deg,
               #fff5f5,
               #f2c0c0 50%,
               #e59595
@@ -1606,9 +1444,9 @@ export default function SynonymsPage() {
             0 5px 0 #a75959;
         }
 
-        /* =================================================
+        /* ===========================
            WRITE
-        ================================================= */
+        =========================== */
 
         .writeRow {
           display: grid;
@@ -1626,35 +1464,24 @@ export default function SynonymsPage() {
           padding: 10px 16px;
 
           border: 2px solid #838e93;
+
           border-radius: 9px;
 
           outline: none;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff,
-              #f0f0f0
-            );
+          background: linear-gradient(
+            #ffffff,
+            #f0f0f0
+          );
 
           box-shadow:
             inset 0 3px 5px rgba(0, 0, 0, 0.09),
             0 3px 0 #9aa2a6;
 
-          color: #203844;
-
           font-size: 17px;
 
           font-weight: 700;
         }
-
-        .checkButton {
-          margin: 0;
-        }
-
-        /* =================================================
-           RESULT
-        ================================================= */
 
         .resultBox {
           margin-top: 18px;
@@ -1663,31 +1490,24 @@ export default function SynonymsPage() {
 
           border-radius: 9px;
 
-          font-size: 15px;
-
           font-weight: 700;
         }
 
         .correctResult {
           border: 2px solid #68a978;
-
           color: #216535;
-
           background: #e9ffed;
         }
 
         .wrongResult {
           border: 2px solid #bf7272;
-
           color: #8b2626;
-
           background: #fff0f0;
         }
 
-        /* =================================================
-           BOTTOM NAVIGATION
-           TEPA BILAN MOS 3D
-        ================================================= */
+        /* ===========================
+           BOTTOM
+        =========================== */
 
         .bottomNavigation {
           margin-top: 22px;
@@ -1702,21 +1522,9 @@ export default function SynonymsPage() {
         .navButton,
         .laterButton {
           width: 100%;
-
           min-height: 52px;
-
           border-radius: 10px;
-
-          font-size: 14px;
         }
-
-        .laterButton {
-          margin: 0;
-        }
-
-        /* =================================================
-           EMPTY
-        ================================================= */
 
         .emptyPanel {
           padding: 35px;
@@ -1724,36 +1532,35 @@ export default function SynonymsPage() {
           text-align: center;
 
           border: 3px solid #3e464a;
+
           border-radius: 18px;
 
           color: #ffffff;
 
           background:
             linear-gradient(
-              145deg,
               #686e71,
               #444a4d
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 0.17),
-            0 9px 0 #303639,
-            0 15px 20px rgba(0, 0, 0, 0.18);
-
-          font-size: 18px;
+            0 9px 0 #303639;
 
           font-weight: 700;
         }
 
+        button:active {
+          transform: translateY(3px);
+        }
+
         button:disabled {
           cursor: not-allowed;
-
           opacity: 0.72;
         }
 
-        /* =================================================
+        /* ===========================
            TABLET
-        ================================================= */
+        =========================== */
 
         @media (max-width: 900px) {
           .topPanel {
@@ -1768,11 +1575,18 @@ export default function SynonymsPage() {
             padding-left: 25px;
             padding-right: 25px;
           }
+
+          .synonymChip {
+            min-width: 140px;
+            min-height: 56px;
+
+            font-size: 18px;
+          }
         }
 
-        /* =================================================
+        /* ===========================
            MOBILE
-        ================================================= */
+        =========================== */
 
         @media (max-width: 650px) {
           .page {
@@ -1781,17 +1595,16 @@ export default function SynonymsPage() {
 
           .topPanel {
             grid-template-columns: 1fr;
-
             padding: 14px;
+          }
+
+          .headerCenter {
+            order: -1;
           }
 
           .backButton,
           .totalBox {
             width: 100%;
-          }
-
-          .headerCenter {
-            order: -1;
           }
 
           .controlPanel {
@@ -1808,10 +1621,6 @@ export default function SynonymsPage() {
 
           .learningPanel {
             padding: 12px;
-          }
-
-          .progressRow {
-            font-size: 12px;
           }
 
           .wordCard {
@@ -1832,14 +1641,21 @@ export default function SynonymsPage() {
             width: 100%;
           }
 
-          .answersGrid {
-            grid-template-columns: 1fr;
+          .synonymList {
+            gap: 13px;
           }
 
-          .writeRow {
-            grid-template-columns: 1fr;
+          .synonymChip {
+            min-width: 130px;
+            min-height: 54px;
+
+            padding: 12px 18px;
+
+            font-size: 17px;
           }
 
+          .answersGrid,
+          .writeRow,
           .bottomNavigation {
             grid-template-columns: 1fr;
           }
