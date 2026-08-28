@@ -1,100 +1,79 @@
 "use client";
 
-export default function QollanmalarPage() {
-  function goHome() {
-    window.location.href = "/";
-  }
+import { useRouter } from "next/navigation";
 
-  const cards = [
-    {
-      title: "Kodekslar",
-      subtitle: "O‘zbekiston Respublikasi kodekslari",
-      href: "/qollanmalar/kodekslar",
-      badge: "K",
-    },
-    {
-      title: "Qonun va qonunchilik hujjatlari",
-      subtitle: "Qonunlar va boshqa normativ-huquqiy hujjatlar",
-      href: "/qollanmalar/qonunlar",
-      badge: "Q",
-    },
-    {
-      title: "Darsliklar",
-      subtitle: "Huquqiy fanlar bo‘yicha darslik va o‘quv materiallari",
-      href: "/qollanmalar/darsliklar",
-      badge: "D",
-    },
-    {
-      title: "English Vocabulary",
-      subtitle: "4000 Essential English Words",
-      href: "/qollanmalar/english-vocabulary",
-      badge: "EN",
-    },
-    {
-      title: "Inglizcha lug‘atlar",
-      subtitle: "English–Uzbek, Phrasal Verbs, Irregular Verbs va boshqalar",
-      href: "/qollanmalar/dictionaries",
-      badge: "L",
-    },
-  ];
+type GuideCard = {
+  title: string;
+  href: string;
+  badge: string;
+};
+
+const cards: GuideCard[] = [
+  {
+    title: "Kodekslar",
+    href: "/qollanmalar/kodekslar",
+    badge: "K",
+  },
+  {
+    title: "Qonun va qonunchilik hujjatlari",
+    href: "/qollanmalar/qonunlar",
+    badge: "Q",
+  },
+  {
+    title: "Darsliklar",
+    href: "/qollanmalar/darsliklar",
+    badge: "D",
+  },
+  {
+    title: "English Vocabulary",
+    href: "/qollanmalar/english-vocabulary",
+    badge: "EN",
+  },
+  {
+    title: "Inglizcha lug‘atlar",
+    href: "/qollanmalar/dictionaries",
+    badge: "L",
+  },
+];
+
+export default function QollanmalarPage() {
+  const router = useRouter();
 
   return (
     <main className="page">
-      <div className="shell">
-        <header className="guideBar">
-          <button
-            type="button"
-            className="backButton"
-            onClick={goHome}
-          >
-            ← Asosiy sahifa
-          </button>
+      <section className="panel">
+        <div className="titlePlate">
+          Qo‘llanmalar
+        </div>
 
-          <div className="guideBarTitle">
-            QURBONOV.UZ
-          </div>
-        </header>
+        <h1 className="heading">
+          Kerakli bo‘limni tanlang
+        </h1>
 
-        <section className="mainPanel">
-          <div className="floatingTitle">
-            Qo‘llanmalar
-          </div>
+        <div className="cards">
+          {cards.map((card) => (
+            <article
+              className="card"
+              key={card.title}
+            >
+              <div className="badge">
+                {card.badge}
+              </div>
 
-          <div className="intro">
-            <h1>Kerakli bo‘limni tanlang</h1>
-          </div>
+              <h2>{card.title}</h2>
 
-          <div className="cardGrid">
-            {cards.map((card) => (
-              <article
-                key={card.href}
-                className="guideCard"
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(card.href)
+                }
               >
-                <div className="badge">
-                  {card.badge}
-                </div>
-
-                <div className="cardContent">
-                  <h2>{card.title}</h2>
-
-                  <p>{card.subtitle}</p>
-                </div>
-
-                <button
-                  type="button"
-                  className="openButton"
-                  onClick={() => {
-                    window.location.href =
-                      card.href;
-                  }}
-                >
-                  Ochish
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-      </div>
+                Ochish
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <style jsx>{`
         * {
@@ -103,1064 +82,306 @@ export default function QollanmalarPage() {
 
         .page {
           min-height: 100vh;
+          padding: 20px 18px 55px;
 
-          padding:
-            24px 18px
-            70px;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
 
           background:
-            linear-gradient(
-              180deg,
+            radial-gradient(
+              circle at top,
               #ffffff 0%,
-              #f5f7f8 60%,
-              #e9edef 100%
+              #f3f6f7 48%,
+              #e8edef 100%
             );
+
+          color: #111;
 
           font-family:
             "Bell MT",
             "Times New Roman",
+            Georgia,
             serif;
-
-          color:
-            #111;
         }
 
-        .shell {
-          width:
-            min(
-              1200px,
-              96%
-            );
+        .panel {
+          position: relative;
 
-          margin:
-            0 auto;
-        }
+          width: min(1160px, 100%);
 
-        /* =====================================================
-           YUQORI PANEL
-        ===================================================== */
-
-        .guideBar {
-          position:
-            relative;
-
-          width:
-            100%;
-
-          min-height:
-            112px;
-
-          display:
-            flex;
-
-          align-items:
-            center;
-
-          justify-content:
-            space-between;
-
-          gap:
-            18px;
+          margin-top: 5px;
 
           padding:
-            20px 32px;
+            65px
+            30px
+            45px;
 
-          border:
-            3px solid
-            #174461;
-
-          border-radius:
-            28px;
+          border: 2px solid #30383b;
+          border-radius: 22px;
 
           background:
             linear-gradient(
               180deg,
-              #8bd4fa 0%,
-              #68bae8 48%,
-              #4da2d3 100%
+              #656a6c 0%,
+              #53595b 50%,
+              #3f4648 100%
             );
 
           box-shadow:
-            inset 0 5px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .72
-              ),
-
-            inset 0 -6px 6px
-              rgba(
-                0,
-                0,
-                0,
-                .10
-              ),
-
-            0 8px 0
-              #174d6d,
-
-            0 14px 18px
-              rgba(
-                0,
-                0,
-                0,
-                .20
-              );
-
-          margin-bottom:
-            34px;
+            inset 0 5px 7px
+              rgba(255, 255, 255, 0.12),
+            inset 0 -8px 10px
+              rgba(0, 0, 0, 0.22),
+            0 10px 0 #303638,
+            0 17px 26px
+              rgba(0, 0, 0, 0.22);
         }
 
-        .guideBarTitle {
-          color:
-            #073b68;
+        .titlePlate {
+          position: absolute;
 
-          font-size:
-            20px;
+          top: -25px;
+          left: 50%;
 
-          font-weight:
-            900;
+          transform: translateX(-50%);
 
-          letter-spacing:
-            2px;
+          min-width: 330px;
 
-          text-shadow:
-            0 1px 0
-              rgba(
-                255,
-                255,
-                255,
-                .7
-              );
-        }
+          padding: 11px 35px;
 
-        .backButton {
-          min-width:
-            168px;
-
-          min-height:
-            52px;
-
-          padding:
-            10px 24px;
-
-          border:
-            2px solid
-            #174461;
-
-          border-radius:
-            9px;
+          border: 2px solid #07506d;
+          border-radius: 0 0 11px 11px;
 
           background:
             linear-gradient(
               180deg,
-              #a8e7ff 0%,
-              #72c3eb 55%,
-              #4b9dcd 100%
-            );
-
-          box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              ),
-
-            inset 0 -3px 3px
-              rgba(
-                0,
-                0,
-                0,
-                .12
-              ),
-
-            0 4px 0
-              #17415c,
-
-            0 8px 10px
-              rgba(
-                0,
-                0,
-                0,
-                .18
-              );
-
-          color:
-            #073b68;
-
-          font-family:
-            inherit;
-
-          font-size:
-            14px;
-
-          font-weight:
-            700;
-
-          cursor:
-            pointer;
-
-          transition:
-            transform .10s ease,
-            filter .10s ease,
-            box-shadow .10s ease;
-        }
-
-        .backButton:hover {
-          transform:
-            translateY(
-              -2px
-            );
-
-          filter:
-            brightness(
-              1.035
-            );
-        }
-
-        .backButton:active {
-          transform:
-            translateY(
-              3px
-            );
-
-          box-shadow:
-            inset 0 4px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .10
-              ),
-
-            0 1px 0
-              #17415c;
-        }
-
-        /* =====================================================
-           ASOSIY PANEL
-        ===================================================== */
-
-        .mainPanel {
-          position:
-            relative;
-
-          margin-top:
-            76px;
-
-          padding:
-            70px 30px
-            38px;
-
-          border:
-            3px solid
-            #333a3e;
-
-          border-radius:
-            23px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #62686b 0%,
-              #505659 46%,
-              #3d4346 100%
+              #8ae0fa 0%,
+              #58bfe7 52%,
+              #319dcc 100%
             );
 
           box-shadow:
             inset 0 5px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .10
-              ),
+              rgba(255, 255, 255, 0.65),
+            0 7px 0 #07506d,
+            0 11px 14px
+              rgba(0, 0, 0, 0.22);
 
-            inset 0 -7px 7px
-              rgba(
-                0,
-                0,
-                0,
-                .22
-              ),
+          color: #073f6d;
 
-            0 6px 0
-              #30373b,
+          text-align: center;
 
-            0 11px 0
-              #242a2d,
-
-            0 17px 24px
-              rgba(
-                0,
-                0,
-                0,
-                .22
-              );
+          font-size: 31px;
+          font-weight: 900;
         }
 
-        .floatingTitle {
-          position:
-            absolute;
+        .heading {
+          margin: 0 0 32px;
 
-          left:
-            50%;
+          color: #fff;
 
-          top:
-            -31px;
+          text-align: center;
 
-          transform:
-            translateX(
-              -50%
-            );
-
-          min-width:
-            340px;
-
-          min-height:
-            58px;
-
-          padding:
-            10px 28px;
-
-          display:
-            flex;
-
-          align-items:
-            center;
-
-          justify-content:
-            center;
-
-          border:
-            3px solid
-            #174461;
-
-          border-radius:
-            12px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #a9e7ff 0%,
-              #75c5ed 47%,
-              #4a9dce 100%
-            );
-
-          box-shadow:
-            inset 0 6px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .70
-              ),
-
-            inset 0 -5px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .13
-              ),
-
-            0 6px 0
-              #17415c,
-
-            0 10px 13px
-              rgba(
-                20,
-                65,
-                92,
-                .24
-              );
-
-          color:
-            #073b68;
-
-          font-size:
-            30px;
-
-          font-weight:
-            700;
-
-          text-align:
-            center;
-
-          white-space:
-            nowrap;
-        }
-
-        .intro {
-          margin-bottom:
-            30px;
-
-          text-align:
-            center;
-        }
-
-        .intro h1 {
-          margin:
-            0;
-
-          color:
-            #ffffff;
-
-          font-size:
-            28px;
-
-          font-weight:
-            700;
+          font-size: 28px;
+          font-weight: 900;
 
           text-shadow:
-            0 2px 0
-              rgba(
-                0,
-                0,
-                0,
-                .35
-              );
+            0 2px 2px
+              rgba(0, 0, 0, 0.65);
         }
 
-        /* =====================================================
-           KARTALAR
-        ===================================================== */
-
-        .cardGrid {
-          display:
-            grid;
+        .cards {
+          display: grid;
 
           grid-template-columns:
-            repeat(
-              3,
-              minmax(
-                0,
-                1fr
-              )
-            );
+            repeat(3, minmax(0, 1fr));
 
-          gap:
-            26px;
+          gap: 30px 28px;
         }
 
-        .guideCard {
-          min-height:
-            230px;
+        .card {
+          min-height: 245px;
 
-          padding:
-            24px 20px
-            22px;
+          padding: 23px 20px 22px;
 
-          display:
-            flex;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
 
-          flex-direction:
-            column;
-
-          align-items:
-            center;
-
-          justify-content:
-            center;
-
-          text-align:
-            center;
-
-          border:
-            2px solid
-            #596166;
-
-          border-radius:
-            15px;
+          border: 1px solid #d0d0d0;
+          border-radius: 14px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #ededed 42%,
-              #c8c8c8 100%
+              #f5f5f5 55%,
+              #e5e5e5 100%
             );
 
           box-shadow:
-            inset 0 7px 6px
-              rgba(
-                255,
-                255,
-                255,
-                .95
-              ),
+            inset 0 5px 7px
+              rgba(255, 255, 255, 0.95),
+            0 8px 0 #858c8e,
+            0 13px 18px
+              rgba(0, 0, 0, 0.22);
 
-            inset 0 -5px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .10
-              ),
-
-            0 6px 0
-              #596166,
-
-            0 11px 12px
-              rgba(
-                0,
-                0,
-                0,
-                .18
-              );
+          text-align: center;
         }
 
         .badge {
-          min-width:
-            58px;
+          width: 56px;
+          height: 47px;
 
-          min-height:
-            44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
 
-          padding:
-            7px 11px;
+          flex-shrink: 0;
 
-          margin-bottom:
-            15px;
-
-          display:
-            grid;
-
-          place-items:
-            center;
-
-          border:
-            2px solid
-            #174461;
-
-          border-radius:
-            10px;
-
-          color:
-            #073b68;
+          border: 2px solid #07506d;
+          border-radius: 10px;
 
           background:
             linear-gradient(
               180deg,
-              #c5f0ff 0%,
-              #76c5ec 50%,
-              #4da2d3 100%
+              #e1f8ff 0%,
+              #78d1f0 48%,
+              #3ca8d5 100%
             );
 
           box-shadow:
             inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .78
-              ),
+              rgba(255, 255, 255, 0.8),
+            0 5px 0 #07506d;
 
-            0 4px 0
-              #17415c;
+          color: #063e68;
 
-          font-size:
-            16px;
-
-          font-weight:
-            900;
+          font-size: 16px;
+          font-weight: 900;
         }
 
-        .cardContent {
-          flex:
-            1;
+        .card h2 {
+          width: 100%;
 
-          display:
-            flex;
+          margin: 26px 0 0;
 
-          flex-direction:
-            column;
+          color: #111;
 
-          align-items:
-            center;
-
-          justify-content:
-            center;
+          font-size: 23px;
+          line-height: 1.15;
+          font-weight: 900;
         }
 
-        .guideCard h2 {
-          margin:
-            0 0 8px;
+        .card button {
+          width: 145px;
+          min-height: 44px;
 
-          color:
-            #111;
+          margin-top: auto;
 
-          font-size:
-            24px;
-
-          line-height:
-            1.15;
-        }
-
-        .guideCard p {
-          max-width:
-            300px;
-
-          margin:
-            0;
-
-          color:
-            #525c62;
-
-          font-size:
-            14px;
-
-          line-height:
-            1.35;
-
-          font-weight:
-            700;
-        }
-
-        .openButton {
-          min-width:
-            150px;
-
-          min-height:
-            45px;
-
-          margin-top:
-            20px;
-
-          padding:
-            8px 20px;
-
-          border:
-            2px solid
-            #174461;
-
-          border-radius:
-            9px;
-
-          color:
-            #073b68;
+          border: 2px solid #07506d;
+          border-radius: 9px;
 
           background:
             linear-gradient(
               180deg,
-              #a8e7ff 0%,
-              #72c3eb 55%,
-              #4b9dcd 100%
+              #d9f6ff 0%,
+              #75cfee 48%,
+              #38a7d5 100%
             );
 
           box-shadow:
             inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              ),
+              rgba(255, 255, 255, 0.75),
+            0 6px 0 #07506d,
+            0 10px 12px
+              rgba(0, 0, 0, 0.18);
 
-            inset 0 -3px 3px
-              rgba(
-                0,
-                0,
-                0,
-                .12
-              ),
+          color: #073e65;
 
-            0 4px 0
-              #17415c,
+          font-size: 14px;
+          font-weight: 900;
 
-            0 8px 10px
-              rgba(
-                0,
-                0,
-                0,
-                .18
-              );
-
-          font-family:
-            inherit;
-
-          font-size:
-            15px;
-
-          font-weight:
-            700;
-
-          cursor:
-            pointer;
+          cursor: pointer;
 
           transition:
-            transform .10s ease,
-            filter .10s ease,
-            box-shadow .10s ease;
+            transform 0.12s ease,
+            box-shadow 0.12s ease;
         }
 
-        .openButton:hover {
-          transform:
-            translateY(
-              -2px
-            );
-
-          filter:
-            brightness(
-              1.04
-            );
-        }
-
-        .openButton:active {
-          transform:
-            translateY(
-              3px
-            );
+        .card button:hover {
+          transform: translateY(-2px);
 
           box-shadow:
-            inset 0 4px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .10
-              ),
-
-            0 1px 0
-              #17415c;
+            inset 0 4px 4px
+              rgba(255, 255, 255, 0.75),
+            0 8px 0 #07506d,
+            0 12px 14px
+              rgba(0, 0, 0, 0.2);
         }
 
-        /* =====================================================
-           TABLET
-        ===================================================== */
+        .card button:active {
+          transform: translateY(4px);
 
-        @media (
-          max-width:
-            1050px
-        ) {
-          .cardGrid {
+          box-shadow:
+            inset 0 3px 4px
+              rgba(0, 0, 0, 0.08),
+            0 2px 0 #07506d;
+        }
+
+        @media (max-width: 900px) {
+          .cards {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(
-                  0,
-                  1fr
-                )
-              );
+              repeat(2, minmax(0, 1fr));
           }
         }
 
-        /* =====================================================
-           MOBILE
-        ===================================================== */
-
-        @media (
-          max-width:
-            640px
-        ) {
+        @media (max-width: 600px) {
           .page {
             padding:
-              10px 8px
-              34px;
+              30px
+              10px
+              35px;
           }
 
-          .shell {
-            width:
-              100%;
+          .panel {
+            padding:
+              60px
+              15px
+              30px;
+
+            border-radius: 17px;
           }
 
-          .guideBar {
-            min-height:
-              68px;
+          .titlePlate {
+            min-width: 230px;
 
             padding:
-              10px 12px;
+              9px
+              20px;
 
-            margin-bottom:
-              22px;
-
-            border-radius:
-              18px;
-
-            border-width:
-              2px;
-
-            box-shadow:
-              inset 0 4px 4px
-                rgba(
-                  255,
-                  255,
-                  255,
-                  .68
-                ),
-
-              inset 0 -4px 4px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .10
-                ),
-
-              0 5px 0
-                #174d6d,
-
-              0 9px 12px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .16
-                );
+            font-size: 25px;
           }
 
-          .guideBarTitle {
-            display:
-              none;
+          .heading {
+            margin-bottom: 25px;
+
+            font-size: 22px;
           }
 
-          .backButton {
-            width:
-              100%;
+          .cards {
+            grid-template-columns: 1fr;
 
-            min-width:
-              0;
-
-            min-height:
-              40px;
-
-            padding:
-              7px 15px;
-
-            font-size:
-              13px;
-
-            border-radius:
-              8px;
+            gap: 25px;
           }
 
-          .mainPanel {
-            margin-top:
-              55px;
-
-            padding:
-              48px 14px
-              22px;
-
-            border-radius:
-              18px;
-
-            border-width:
-              2px;
-
-            box-shadow:
-              inset 0 4px 4px
-                rgba(
-                  255,
-                  255,
-                  255,
-                  .08
-                ),
-
-              inset 0 -5px 5px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .18
-                ),
-
-              0 4px 0
-                #30373b,
-
-              0 8px 0
-                #242a2d,
-
-              0 12px 16px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .18
-                );
+          .card {
+            min-height: 215px;
           }
 
-          .floatingTitle {
-            top:
-              -24px;
-
-            width:
-              min(
-                82%,
-                300px
-              );
-
-            min-width:
-              0;
-
-            min-height:
-              46px;
-
-            padding:
-              7px 16px;
-
-            font-size:
-              22px;
-
-            border-width:
-              2px;
-
-            border-radius:
-              10px;
-
-            box-shadow:
-              inset 0 4px 4px
-                rgba(
-                  255,
-                  255,
-                  255,
-                  .68
-                ),
-
-              inset 0 -4px 4px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .12
-                ),
-
-              0 4px 0
-                #17415c,
-
-              0 7px 9px
-                rgba(
-                  20,
-                  65,
-                  92,
-                  .20
-                );
-          }
-
-          .intro {
-            margin-bottom:
-              18px;
-          }
-
-          .intro h1 {
-            font-size:
-              21px;
-          }
-
-          .cardGrid {
-            grid-template-columns:
-              repeat(
-                2,
-                minmax(
-                  0,
-                  1fr
-                )
-              );
-
-            gap:
-              12px;
-          }
-
-          .guideCard {
-            min-height:
-              180px;
-
-            padding:
-              16px 9px
-              14px;
-
-            border-radius:
-              11px;
-
-            box-shadow:
-              inset 0 5px 4px
-                rgba(
-                  255,
-                  255,
-                  255,
-                  .92
-                ),
-
-              inset 0 -4px 4px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .09
-                ),
-
-              0 4px 0
-                #596166,
-
-              0 7px 8px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  .14
-                );
-          }
-
-          .badge {
-            min-width:
-              44px;
-
-            min-height:
-              36px;
-
-            margin-bottom:
-              9px;
-
-            font-size:
-              13px;
-          }
-
-          .guideCard h2 {
-            font-size:
-              17px;
-          }
-
-          .guideCard p {
-            font-size:
-              11px;
-
-            line-height:
-              1.25;
-          }
-
-          .openButton {
-            min-width:
-              110px;
-
-            min-height:
-              38px;
-
-            margin-top:
-              13px;
-
-            padding:
-              6px 12px;
-
-            font-size:
-              12px;
-          }
-        }
-
-        @media (
-          max-width:
-            390px
-        ) {
-          .cardGrid {
-            grid-template-columns:
-              1fr;
-          }
-
-          .guideCard {
-            min-height:
-              165px;
+          .card h2 {
+            font-size: 21px;
           }
         }
       `}</style>
