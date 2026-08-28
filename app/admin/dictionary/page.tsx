@@ -39,12 +39,12 @@ const cards: GuideCard[] = [
 export default function QollanmalarPage() {
   const router = useRouter();
 
-  function goAdmin() {
-    router.push("/admin");
-  }
-
   function openPage(href: string) {
     router.push(href);
+  }
+
+  function goToAdmin() {
+    window.location.href = "/admin";
   }
 
   return (
@@ -52,25 +52,21 @@ export default function QollanmalarPage() {
       {/* =========================
           TEPA 3D PANEL
       ========================== */}
-
       <section className="topPanel">
-        <div className="pageTitle">
-          Qo‘llanmalar
-        </div>
+        <div className="pageTitle">Qo‘llanmalar</div>
 
         <button
           type="button"
           className="backButton"
-          onClick={goAdmin}
+          onClick={goToAdmin}
         >
-          ← Orqaga
+          Orqaga
         </button>
       </section>
 
       {/* =========================
-          ASOSIY 3D PANEL
+          ASOSIY PANEL
       ========================== */}
-
       <section className="mainPanel">
         <h1 className="heading">
           Kerakli bo‘limni tanlang
@@ -130,9 +126,9 @@ export default function QollanmalarPage() {
           font-family: inherit;
         }
 
-        /* ==================================================
-           TEPA KO‘K PANEL
-        ================================================== */
+        /* ==========================================
+           TEPA KO‘K 3D PANEL
+        ========================================== */
 
         .topPanel {
           width: min(1850px, 100%);
@@ -165,9 +161,9 @@ export default function QollanmalarPage() {
             0 18px 25px rgba(0, 0, 0, 0.2);
         }
 
-        /* ==================================================
-           SAHIFA NOMI
-        ================================================== */
+        /* ==========================================
+           QO‘LLANMALAR NOMI
+        ========================================== */
 
         .pageTitle {
           width: 480px;
@@ -205,9 +201,10 @@ export default function QollanmalarPage() {
           font-weight: 900;
         }
 
-        /* ==================================================
+        /* ==========================================
            ORQAGA TUGMASI
-        ================================================== */
+           BOSILGANDA /admin GA O‘TADI
+        ========================================== */
 
         .backButton {
           width: 170px;
@@ -261,9 +258,9 @@ export default function QollanmalarPage() {
             0 2px 0 #4e5b61;
         }
 
-        /* ==================================================
-           ASOSIY KULRANG PANEL
-        ================================================== */
+        /* ==========================================
+           ASOSIY KULRANG 3D PANEL
+        ========================================== */
 
         .mainPanel {
           width: min(1850px, 100%);
@@ -290,9 +287,9 @@ export default function QollanmalarPage() {
             0 18px 27px rgba(0, 0, 0, 0.22);
         }
 
-        /* ==================================================
+        /* ==========================================
            SARLAVHA
-        ================================================== */
+        ========================================== */
 
         .heading {
           margin: 0 0 34px;
@@ -308,9 +305,9 @@ export default function QollanmalarPage() {
             0 2px 2px rgba(0, 0, 0, 0.7);
         }
 
-        /* ==================================================
+        /* ==========================================
            KARTALAR
-        ================================================== */
+        ========================================== */
 
         .cards {
           width: 100%;
@@ -364,9 +361,9 @@ export default function QollanmalarPage() {
             0 17px 22px rgba(0, 0, 0, 0.25);
         }
 
-        /* ==================================================
+        /* ==========================================
            BADGE
-        ================================================== */
+        ========================================== */
 
         .badge {
           width: 58px;
@@ -399,9 +396,9 @@ export default function QollanmalarPage() {
           font-weight: 900;
         }
 
-        /* ==================================================
+        /* ==========================================
            KARTA NOMI
-        ================================================== */
+        ========================================== */
 
         .card h2 {
           width: 100%;
@@ -415,9 +412,9 @@ export default function QollanmalarPage() {
           font-weight: 900;
         }
 
-        /* ==================================================
+        /* ==========================================
            OCHISH TUGMASI
-        ================================================== */
+        ========================================== */
 
         .openButton {
           width: 155px;
@@ -470,9 +467,9 @@ export default function QollanmalarPage() {
             0 2px 0 #07506d;
         }
 
-        /* ==================================================
+        /* ==========================================
            KATTA MONITOR
-        ================================================== */
+        ========================================== */
 
         @media (min-width: 1500px) {
           .mainPanel {
@@ -488,9 +485,9 @@ export default function QollanmalarPage() {
           }
         }
 
-        /* ==================================================
+        /* ==========================================
            TABLET
-        ================================================== */
+        ========================================== */
 
         @media (max-width: 1000px) {
           .topPanel {
@@ -515,9 +512,9 @@ export default function QollanmalarPage() {
           }
         }
 
-        /* ==================================================
+        /* ==========================================
            TELEFON
-        ================================================== */
+        ========================================== */
 
         @media (max-width: 620px) {
           .page {
