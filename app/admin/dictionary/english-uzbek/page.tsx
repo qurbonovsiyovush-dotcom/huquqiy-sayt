@@ -590,24 +590,24 @@ export default function EnglishUzbekAdminPage() {
       =========================== */}
 
       <section className="header3d">
-        <div>
-          <h1>
-            English–Uzbek Dictionary
-          </h1>
+        <button
+          type="button"
+          className="backButton"
+          onClick={() => {
+            window.location.href = "/admin/dictionary";
+          }}
+        >
+          ← Orqaga
+        </button>
 
-          <div className="adminLabel">
-            Lug‘at boshqaruvi
-          </div>
+        <div className="headerTitle">
+          <h1>English–Uzbek Dictionary</h1>
+          <div className="adminLabel">Lug‘at boshqaruvi</div>
         </div>
 
         <div className="totalBox">
-          <strong>
-            {words.length}
-          </strong>
-
-          <span>
-            Jami so‘z
-          </span>
+          <strong>{words.length}</strong>
+          <span>Jami so‘z</span>
         </div>
       </section>
 
@@ -973,6 +973,37 @@ export default function EnglishUzbekAdminPage() {
                 0,
                 0.22
               );
+        }
+
+        .headerTitle {
+          flex: 1;
+        }
+
+        .backButton {
+          min-width: 145px;
+          min-height: 52px;
+          padding: 10px 20px;
+          border: 2px solid #4f5c62;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #ffffff 0%, #f3f3f3 40%, #d6d6d6 100%);
+          box-shadow:
+            inset 0 3px 3px rgba(255, 255, 255, 0.95),
+            0 6px 0 #586268,
+            0 10px 14px rgba(0, 0, 0, 0.18);
+          color: #111;
+          font-family: "Bell MT", Georgia, serif;
+          font-size: 15px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .backButton:hover {
+          background: linear-gradient(180deg, #ffffff 0%, #eaf8ff 45%, #b9e7f8 100%);
+        }
+
+        .backButton:active {
+          transform: translateY(4px);
+          box-shadow: 0 2px 0 #586268;
         }
 
         .header3d h1 {
@@ -1499,6 +1530,15 @@ export default function EnglishUzbekAdminPage() {
             flex-direction:
               column;
 
+            text-align: center;
+          }
+
+          .backButton {
+            width: 100%;
+          }
+
+          .headerTitle {
+            width: 100%;
             text-align: center;
           }
 
