@@ -39,8 +39,8 @@ const cards: GuideCard[] = [
 export default function QollanmalarPage() {
   const router = useRouter();
 
-  function goHome() {
-    router.push("/");
+  function goAdmin() {
+    router.push("/admin");
   }
 
   function openPage(href: string) {
@@ -61,9 +61,9 @@ export default function QollanmalarPage() {
         <button
           type="button"
           className="backButton"
-          onClick={goHome}
+          onClick={goAdmin}
         >
-          Orqaga
+          ← Orqaga
         </button>
       </section>
 
@@ -91,9 +91,7 @@ export default function QollanmalarPage() {
               <button
                 type="button"
                 className="openButton"
-                onClick={() =>
-                  openPage(card.href)
-                }
+                onClick={() => openPage(card.href)}
               >
                 Ochish
               </button>
@@ -109,11 +107,7 @@ export default function QollanmalarPage() {
 
         .page {
           min-height: 100vh;
-
-          padding:
-            16px
-            20px
-            60px;
+          padding: 16px 20px 60px;
 
           background:
             radial-gradient(
@@ -142,33 +136,19 @@ export default function QollanmalarPage() {
 
         .topPanel {
           width: min(1850px, 100%);
-
           min-height: 140px;
 
-          margin:
-            0
-            auto
-            34px;
+          margin: 0 auto 34px;
 
-          padding:
-            28px
-            35px;
+          padding: 28px 35px;
 
           display: flex;
-
           align-items: center;
-
-          justify-content:
-            space-between;
-
+          justify-content: space-between;
           gap: 30px;
 
-          border:
-            3px solid
-            #123d52;
-
-          border-radius:
-            30px;
+          border: 3px solid #123d52;
+          border-radius: 30px;
 
           background:
             linear-gradient(
@@ -179,58 +159,29 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 7px 7px
-              rgba(
-                255,
-                255,
-                255,
-                0.5
-              ),
-            inset 0 -8px 8px
-              rgba(
-                0,
-                0,
-                0,
-                0.12
-              ),
-            0 11px 0
-              #123d52,
-            0 18px 25px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
+            inset 0 7px 7px rgba(255, 255, 255, 0.5),
+            inset 0 -8px 8px rgba(0, 0, 0, 0.12),
+            0 11px 0 #123d52,
+            0 18px 25px rgba(0, 0, 0, 0.2);
         }
 
         /* ==================================================
-           QO‘LLANMALAR
+           SAHIFA NOMI
         ================================================== */
 
         .pageTitle {
           width: 480px;
-
           max-width: 45%;
-
           min-height: 78px;
 
-          padding:
-            14px
-            30px;
+          padding: 14px 30px;
 
           display: flex;
-
           align-items: center;
-
           justify-content: center;
 
-          border:
-            3px solid
-            #4f5c62;
-
-          border-radius:
-            18px;
+          border: 3px solid #4f5c62;
+          border-radius: 18px;
 
           background:
             linear-gradient(
@@ -241,58 +192,31 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 6px 7px
-              rgba(
-                255,
-                255,
-                255,
-                0.95
-              ),
-            inset 0 -5px 6px
-              rgba(
-                0,
-                0,
-                0,
-                0.08
-              ),
-            0 8px 0
-              #4d595e,
-            0 13px 16px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
+            inset 0 6px 7px rgba(255, 255, 255, 0.95),
+            inset 0 -5px 6px rgba(0, 0, 0, 0.08),
+            0 8px 0 #4d595e,
+            0 13px 16px rgba(0, 0, 0, 0.2);
 
           color: #111;
 
           text-align: center;
 
           font-size: 33px;
-
           font-weight: 900;
         }
 
         /* ==================================================
-           ORQAGA
+           ORQAGA TUGMASI
         ================================================== */
 
         .backButton {
           width: 170px;
-
           min-height: 66px;
 
-          padding:
-            10px
-            24px;
+          padding: 10px 24px;
 
-          border:
-            3px solid
-            #4e5b61;
-
-          border-radius:
-            16px;
+          border: 3px solid #4e5b61;
+          border-radius: 16px;
 
           background:
             linear-gradient(
@@ -303,34 +227,14 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 5px 6px
-              rgba(
-                255,
-                255,
-                255,
-                0.95
-              ),
-            inset 0 -4px 5px
-              rgba(
-                0,
-                0,
-                0,
-                0.08
-              ),
-            0 7px 0
-              #4e5b61,
-            0 11px 14px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
+            inset 0 5px 6px rgba(255, 255, 255, 0.95),
+            inset 0 -4px 5px rgba(0, 0, 0, 0.08),
+            0 7px 0 #4e5b61,
+            0 11px 14px rgba(0, 0, 0, 0.2);
 
           color: #111;
 
           font-size: 17px;
-
           font-weight: 900;
 
           cursor: pointer;
@@ -341,42 +245,20 @@ export default function QollanmalarPage() {
         }
 
         .backButton:hover {
-          transform:
-            translateY(-2px);
+          transform: translateY(-2px);
 
           box-shadow:
-            inset 0 5px 6px
-              rgba(
-                255,
-                255,
-                255,
-                0.95
-              ),
-            0 9px 0
-              #4e5b61,
-            0 14px 17px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              );
+            inset 0 5px 6px rgba(255, 255, 255, 0.95),
+            0 9px 0 #4e5b61,
+            0 14px 17px rgba(0, 0, 0, 0.22);
         }
 
         .backButton:active {
-          transform:
-            translateY(4px);
+          transform: translateY(4px);
 
           box-shadow:
-            inset 0 4px 5px
-              rgba(
-                0,
-                0,
-                0,
-                0.08
-              ),
-            0 2px 0
-              #4e5b61;
+            inset 0 4px 5px rgba(0, 0, 0, 0.08),
+            0 2px 0 #4e5b61;
         }
 
         /* ==================================================
@@ -388,17 +270,10 @@ export default function QollanmalarPage() {
 
           margin: 0 auto;
 
-          padding:
-            38px
-            34px
-            48px;
+          padding: 38px 34px 48px;
 
-          border:
-            2px solid
-            #30383b;
-
-          border-radius:
-            26px;
+          border: 2px solid #30383b;
+          border-radius: 26px;
 
           background:
             linear-gradient(
@@ -409,29 +284,10 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 6px 8px
-              rgba(
-                255,
-                255,
-                255,
-                0.12
-              ),
-            inset 0 -9px 11px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              ),
-            0 10px 0
-              #303638,
-            0 18px 27px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              );
+            inset 0 6px 8px rgba(255, 255, 255, 0.12),
+            inset 0 -9px 11px rgba(0, 0, 0, 0.22),
+            0 10px 0 #303638,
+            0 18px 27px rgba(0, 0, 0, 0.22);
         }
 
         /* ==================================================
@@ -439,27 +295,17 @@ export default function QollanmalarPage() {
         ================================================== */
 
         .heading {
-          margin:
-            0
-            0
-            34px;
+          margin: 0 0 34px;
 
           color: #fff;
 
           text-align: center;
 
           font-size: 29px;
-
           font-weight: 900;
 
           text-shadow:
-            0 2px 2px
-              rgba(
-                0,
-                0,
-                0,
-                0.7
-              );
+            0 2px 2px rgba(0, 0, 0, 0.7);
         }
 
         /* ==================================================
@@ -472,39 +318,22 @@ export default function QollanmalarPage() {
           display: grid;
 
           grid-template-columns:
-            repeat(
-              3,
-              minmax(
-                0,
-                1fr
-              )
-            );
+            repeat(3, minmax(0, 1fr));
 
-          gap:
-            32px
-            30px;
+          gap: 32px 30px;
         }
 
         .card {
           min-height: 260px;
 
-          padding:
-            25px
-            24px
-            24px;
+          padding: 25px 24px 24px;
 
           display: flex;
-
           flex-direction: column;
-
           align-items: center;
 
-          border:
-            1px solid
-            #d0d0d0;
-
-          border-radius:
-            15px;
+          border: 1px solid #d0d0d0;
+          border-radius: 15px;
 
           background:
             linear-gradient(
@@ -515,22 +344,9 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 5px 7px
-              rgba(
-                255,
-                255,
-                255,
-                0.96
-              ),
-            0 8px 0
-              #858c8e,
-            0 14px 19px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              );
+            inset 0 5px 7px rgba(255, 255, 255, 0.96),
+            0 8px 0 #858c8e,
+            0 14px 19px rgba(0, 0, 0, 0.22);
 
           text-align: center;
 
@@ -540,26 +356,12 @@ export default function QollanmalarPage() {
         }
 
         .card:hover {
-          transform:
-            translateY(-3px);
+          transform: translateY(-3px);
 
           box-shadow:
-            inset 0 5px 7px
-              rgba(
-                255,
-                255,
-                255,
-                0.96
-              ),
-            0 10px 0
-              #858c8e,
-            0 17px 22px
-              rgba(
-                0,
-                0,
-                0,
-                0.25
-              );
+            inset 0 5px 7px rgba(255, 255, 255, 0.96),
+            0 10px 0 #858c8e,
+            0 17px 22px rgba(0, 0, 0, 0.25);
         }
 
         /* ==================================================
@@ -568,23 +370,16 @@ export default function QollanmalarPage() {
 
         .badge {
           width: 58px;
-
           height: 49px;
 
           display: flex;
-
           align-items: center;
-
           justify-content: center;
 
           flex-shrink: 0;
 
-          border:
-            2px solid
-            #07506d;
-
-          border-radius:
-            10px;
+          border: 2px solid #07506d;
+          border-radius: 10px;
 
           background:
             linear-gradient(
@@ -595,20 +390,12 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                0.8
-              ),
-            0 5px 0
-              #07506d;
+            inset 0 4px 4px rgba(255, 255, 255, 0.8),
+            0 5px 0 #07506d;
 
           color: #063e68;
 
           font-size: 16px;
-
           font-weight: 900;
         }
 
@@ -619,17 +406,12 @@ export default function QollanmalarPage() {
         .card h2 {
           width: 100%;
 
-          margin:
-            28px
-            0
-            0;
+          margin: 28px 0 0;
 
           color: #111;
 
           font-size: 24px;
-
           line-height: 1.15;
-
           font-weight: 900;
         }
 
@@ -639,17 +421,12 @@ export default function QollanmalarPage() {
 
         .openButton {
           width: 155px;
-
           min-height: 47px;
 
           margin-top: auto;
 
-          border:
-            2px solid
-            #07506d;
-
-          border-radius:
-            9px;
+          border: 2px solid #07506d;
+          border-radius: 9px;
 
           background:
             linear-gradient(
@@ -660,27 +437,13 @@ export default function QollanmalarPage() {
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                0.75
-              ),
-            0 6px 0
-              #07506d,
-            0 10px 12px
-              rgba(
-                0,
-                0,
-                0,
-                0.18
-              );
+            inset 0 4px 4px rgba(255, 255, 255, 0.75),
+            0 6px 0 #07506d,
+            0 10px 12px rgba(0, 0, 0, 0.18);
 
           color: #073e65;
 
           font-size: 14px;
-
           font-weight: 900;
 
           cursor: pointer;
@@ -691,42 +454,20 @@ export default function QollanmalarPage() {
         }
 
         .openButton:hover {
-          transform:
-            translateY(-2px);
+          transform: translateY(-2px);
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                0.75
-              ),
-            0 8px 0
-              #07506d,
-            0 12px 14px
-              rgba(
-                0,
-                0,
-                0,
-                0.2
-              );
+            inset 0 4px 4px rgba(255, 255, 255, 0.75),
+            0 8px 0 #07506d,
+            0 12px 14px rgba(0, 0, 0, 0.2);
         }
 
         .openButton:active {
-          transform:
-            translateY(4px);
+          transform: translateY(4px);
 
           box-shadow:
-            inset 0 3px 4px
-              rgba(
-                0,
-                0,
-                0,
-                0.08
-              ),
-            0 2px 0
-              #07506d;
+            inset 0 3px 4px rgba(0, 0, 0, 0.08),
+            0 2px 0 #07506d;
         }
 
         /* ==================================================
@@ -735,16 +476,11 @@ export default function QollanmalarPage() {
 
         @media (min-width: 1500px) {
           .mainPanel {
-            padding:
-              40px
-              45px
-              50px;
+            padding: 40px 45px 50px;
           }
 
           .cards {
-            gap:
-              34px
-              36px;
+            gap: 34px 36px;
           }
 
           .card {
@@ -760,9 +496,7 @@ export default function QollanmalarPage() {
           .topPanel {
             min-height: 115px;
 
-            padding:
-              22px
-              25px;
+            padding: 22px 25px;
           }
 
           .pageTitle {
@@ -772,21 +506,12 @@ export default function QollanmalarPage() {
           }
 
           .mainPanel {
-            padding:
-              32px
-              24px
-              42px;
+            padding: 32px 24px 42px;
           }
 
           .cards {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(
-                  0,
-                  1fr
-                )
-              );
+              repeat(2, minmax(0, 1fr));
           }
         }
 
@@ -796,10 +521,7 @@ export default function QollanmalarPage() {
 
         @media (max-width: 620px) {
           .page {
-            padding:
-              10px
-              8px
-              40px;
+            padding: 10px 8px 40px;
           }
 
           .topPanel {
@@ -814,16 +536,13 @@ export default function QollanmalarPage() {
 
           .pageTitle {
             width: auto;
-
             max-width: none;
 
             flex: 1;
 
             min-height: 58px;
 
-            padding:
-              10px
-              12px;
+            padding: 10px 12px;
 
             border-radius: 12px;
 
@@ -831,13 +550,10 @@ export default function QollanmalarPage() {
           }
 
           .backButton {
-            width: 92px;
-
+            width: 100px;
             min-height: 52px;
 
-            padding:
-              7px
-              8px;
+            padding: 7px 8px;
 
             border-radius: 11px;
 
@@ -845,10 +561,7 @@ export default function QollanmalarPage() {
           }
 
           .mainPanel {
-            padding:
-              28px
-              14px
-              32px;
+            padding: 28px 14px 32px;
 
             border-radius: 18px;
           }
