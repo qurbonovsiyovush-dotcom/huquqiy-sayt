@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put, list } from "@vercel/blob";
+import { put, list, get } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,29 @@ function emptyData(): DictionaryData {
 }
 
 /* =========================================================
-   BLOB'DAN MA'LUMOTNI O'QISH
+   MATNNI TOZALASH
+========================================================= */
+
+function cleanText(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim().replace(/\s+/g, " ");
+}
+
+/* =========================================================
+   ID YARATISH
+========================================================= */
+
+function createId(): string {
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+/* =========================================================
+   PRIVATE BLOB'DAN MA'LUMOTNI O'QISH
 ========================================================= */
 
 async function readDictionary(): Promise<DictionaryData> {
@@ -44,25 +66,38 @@ async function readDictionary(): Promise<DictionaryData> {
       return emptyData();
     }
 
-    /*
-      Bir xil nom bilan bir nechta versiya paydo bo'lsa,
-      eng oxirgi yuklanganini olamiz.
-    */
     const latest = [...result.blobs].sort(
       (a, b) =>
         new Date(b.uploadedAt).getTime() -
         new Date(a.uploadedAt).getTime()
     )[0];
 
-    const response = await fetch(latest.url, {
-      cache: "no-store",
+    /*
+      Store PRIVATE bo'lgani uchun oddiy:
+      fetch(latest.url)
+      ishlatmaymiz.
+
+      @vercel/blob get() orqali o'qiymiz.
+    */
+    const blob = await get(latest.pathname, {
+      access: "private",
     });
 
-    if (!response.ok) {
+    if (!blob || blob.statusCode !== 200 || !blob.stream) {
+      console.error(
+        "Dictionary blob topilmadi yoki o'qib bo'lmadi."
+      );
+
       return emptyData();
     }
 
-    const data = await response.json();
+    const text = await new Response(blob.stream).text();
+
+    if (!text.trim()) {
+      return emptyData();
+    }
+
+    const data = JSON.parse(text);
 
     if (!data || !Array.isArray(data.words)) {
       return emptyData();
@@ -83,48 +118,21 @@ async function readDictionary(): Promise<DictionaryData> {
 }
 
 /* =========================================================
-   BLOB'GA SAQLASH
+   PRIVATE BLOB'GA SAQLASH
 ========================================================= */
 
-async function saveDictionary(data: DictionaryData) {
-  const result = await put(
+async function saveDictionary(
+  data: DictionaryData
+) {
+  return put(
     BLOB_PATH,
     JSON.stringify(data, null, 2),
     {
-      access: "public",
-
-      /*
-        Xuddi shu faylni qayta yangilashga ruxsat beradi.
-      */
+      access: "private",
       allowOverwrite: true,
-
       contentType: "application/json",
     }
   );
-
-  return result;
-}
-
-/* =========================================================
-   SO'ZNI TOZALASH
-========================================================= */
-
-function cleanText(value: unknown) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
-  return value.trim().replace(/\s+/g, " ");
-}
-
-/* =========================================================
-   ID YARATISH
-========================================================= */
-
-function createId() {
-  return `${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}`;
 }
 
 /* =========================================================
@@ -133,19 +141,18 @@ function createId() {
 
    /api/dictionary/english-uzbek
 
-   Qidirish ham mumkin:
+   QIDIRISH:
    /api/dictionary/english-uzbek?q=book
 ========================================================= */
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
   try {
     const data = await readDictionary();
 
-    const searchParams =
-      request.nextUrl.searchParams;
-
     const q = cleanText(
-      searchParams.get("q")
+      request.nextUrl.searchParams.get("q")
     ).toLowerCase();
 
     let words = data.words;
@@ -153,12 +160,8 @@ export async function GET(request: NextRequest) {
     if (q) {
       words = words.filter((word) => {
         return (
-          word.english
-            .toLowerCase()
-            .includes(q) ||
-          word.uzbek
-            .toLowerCase()
-            .includes(q)
+          word.english.toLowerCase().includes(q) ||
+          word.uzbek.toLowerCase().includes(q)
         );
       });
     }
@@ -166,23 +169,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-
-        /*
-          Bu jami asosiy bazadagi so'zlar soni.
-          2700 ta import qilsak 2700 bo'ladi.
-          Yangi so'z qo'shilsa avtomatik oshadi.
-        */
         total: data.words.length,
-
         resultCount: words.length,
-
         words,
-
         updatedAt: data.updatedAt,
       },
       {
         status: 200,
-
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate",
@@ -190,7 +183,10 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("GET dictionary error:", error);
+    console.error(
+      "GET dictionary error:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -207,9 +203,7 @@ export async function GET(request: NextRequest) {
 
 /* =========================================================
    POST
-   YANGI SO'Z QO'SHISH
-
-   JSON:
+   BITTA YANGI SO'Z QO'SHISH
 
    {
      "english": "book",
@@ -217,16 +211,14 @@ export async function GET(request: NextRequest) {
    }
 ========================================================= */
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest
+) {
   try {
     const body = await request.json();
 
-    const english = cleanText(body.english);
-    const uzbek = cleanText(body.uzbek);
-
-    /* -----------------------------
-       TEKSHIRISH
-    ----------------------------- */
+    const english = cleanText(body?.english);
+    const uzbek = cleanText(body?.uzbek);
 
     if (!english) {
       return NextResponse.json(
@@ -256,10 +248,6 @@ export async function POST(request: NextRequest) {
 
     const data = await readDictionary();
 
-    /* -----------------------------
-       DUBLIKATNI TEKSHIRISH
-    ----------------------------- */
-
     const duplicate = data.words.find(
       (word) =>
         word.english.toLowerCase() ===
@@ -282,10 +270,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* -----------------------------
-       YANGI SO'Z
-    ----------------------------- */
-
     const now = new Date().toISOString();
 
     const newWord: DictionaryWord = {
@@ -298,9 +282,6 @@ export async function POST(request: NextRequest) {
 
     data.words.push(newWord);
 
-    /*
-      Inglizcha so'z bo'yicha alifbo tartibi.
-    */
     data.words.sort((a, b) =>
       a.english.localeCompare(
         b.english,
@@ -318,12 +299,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-
         message:
           "Yangi so‘z lug‘atga qo‘shildi.",
-
         word: newWord,
-
         total: data.words.length,
       },
       {
@@ -331,7 +309,10 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("POST dictionary error:", error);
+    console.error(
+      "POST dictionary error:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -350,8 +331,6 @@ export async function POST(request: NextRequest) {
    PUT
    SO'ZNI TAHRIRLASH
 
-   JSON:
-
    {
      "id": "...",
      "english": "book",
@@ -359,19 +338,22 @@ export async function POST(request: NextRequest) {
    }
 ========================================================= */
 
-export async function PUT(request: NextRequest) {
+export async function PUT(
+  request: NextRequest
+) {
   try {
     const body = await request.json();
 
-    const id = cleanText(body.id);
-    const english = cleanText(body.english);
-    const uzbek = cleanText(body.uzbek);
+    const id = cleanText(body?.id);
+    const english = cleanText(body?.english);
+    const uzbek = cleanText(body?.uzbek);
 
     if (!id) {
       return NextResponse.json(
         {
           ok: false,
-          message: "So‘z ID topilmadi.",
+          message:
+            "So‘z ID topilmadi.",
         },
         {
           status: 400,
@@ -402,7 +384,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          message: "So‘z topilmadi.",
+          message:
+            "So‘z topilmadi.",
         },
         {
           status: 404,
@@ -410,10 +393,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    /*
-      Boshqa yozuv bilan aynan bir xil
-      bo'lib qolmasligini tekshiramiz.
-    */
     const duplicate = data.words.find(
       (word) =>
         word.id !== id &&
@@ -440,10 +419,8 @@ export async function PUT(request: NextRequest) {
 
     data.words[index] = {
       ...data.words[index],
-
       english,
       uzbek,
-
       updatedAt: now,
     };
 
@@ -463,18 +440,18 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-
       message:
         "So‘z muvaffaqiyatli tahrirlandi.",
-
       word: data.words.find(
         (word) => word.id === id
       ),
-
       total: data.words.length,
     });
   } catch (error) {
-    console.error("PUT dictionary error:", error);
+    console.error(
+      "PUT dictionary error:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -527,7 +504,8 @@ export async function DELETE(
       return NextResponse.json(
         {
           ok: false,
-          message: "So‘z topilmadi.",
+          message:
+            "So‘z topilmadi.",
         },
         {
           status: 404,
@@ -546,12 +524,9 @@ export async function DELETE(
 
     return NextResponse.json({
       ok: true,
-
       message:
         "So‘z lug‘atdan o‘chirildi.",
-
       deletedWord: word,
-
       total: data.words.length,
     });
   } catch (error) {
