@@ -52,7 +52,9 @@ export default function DictionaryAdminPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Lug‘at ma’lumotlarini yuklab bo‘lmadi.");
+        throw new Error(
+          "Lug‘at ma’lumotlarini yuklab bo‘lmadi."
+        );
       }
 
       const data = await response.json();
@@ -96,6 +98,7 @@ export default function DictionaryAdminPage() {
       setText(formatted);
     } catch (err) {
       console.error(err);
+
       setError(
         err instanceof Error
           ? err.message
@@ -125,9 +128,15 @@ export default function DictionaryAdminPage() {
       const words: VocabularyWord[] = [];
 
       for (const line of lines) {
-        const parts = line.split("|").map((part) => part.trim());
+        const parts = line
+          .split("|")
+          .map((part) => part.trim());
 
-        if (parts.length < 2 || !parts[0] || !parts[1]) {
+        if (
+          parts.length < 2 ||
+          !parts[0] ||
+          !parts[1]
+        ) {
           throw new Error(
             `Noto‘g‘ri format: "${line}". Format: English | Uzbek`
           );
@@ -143,9 +152,11 @@ export default function DictionaryAdminPage() {
 
       const response = await fetch("/api/vocabulary", {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           book,
           unit,
@@ -153,7 +164,9 @@ export default function DictionaryAdminPage() {
         }),
       });
 
-      const data = await response.json().catch(() => null);
+      const data = await response
+        .json()
+        .catch(() => null);
 
       if (!response.ok) {
         throw new Error(
@@ -170,6 +183,7 @@ export default function DictionaryAdminPage() {
       await loadUnit();
     } catch (err) {
       console.error(err);
+
       setError(
         err instanceof Error
           ? err.message
@@ -199,7 +213,9 @@ export default function DictionaryAdminPage() {
         }
       );
 
-      const data = await response.json().catch(() => null);
+      const data = await response
+        .json()
+        .catch(() => null);
 
       if (!response.ok) {
         throw new Error(
@@ -210,9 +226,13 @@ export default function DictionaryAdminPage() {
       }
 
       setText("");
-      setMessage(`✓ ${selectedLabel} muvaffaqiyatli o‘chirildi.`);
+
+      setMessage(
+        `✓ ${selectedLabel} muvaffaqiyatli o‘chirildi.`
+      );
     } catch (err) {
       console.error(err);
+
       setError(
         err instanceof Error
           ? err.message
@@ -228,6 +248,7 @@ export default function DictionaryAdminPage() {
       {/* =========================
           TEPADAGI 3D PANEL
       ========================== */}
+
       <header className="topPanel">
         <div className="namePlate">
           Qurbonov Siyovush Jamaliddinzoda
@@ -253,37 +274,80 @@ export default function DictionaryAdminPage() {
       {/* =========================
           ASOSIY LUG‘AT BOSHQARUVI
       ========================== */}
+
       <section className="mainPanel">
-        <div className="titlePlate">Lug‘at boshqaruvi</div>
+        <div className="titlePlate">
+          Lug‘at boshqaruvi
+        </div>
 
         {/* =========================
-            BOSHQA LUG‘ATLAR
+            LUG‘ATLAR
         ========================== */}
-        <div className="dictionaryCards">
-          <div className="dictionaryCard">
-            <div className="miniBadge">EN</div>
 
-            <h2>English–Uzbek Dictionary</h2>
+        <div className="dictionaryCards">
+          {/* ENGLISH UZBEK */}
+
+          <div className="dictionaryCard">
+            <div className="miniBadge">
+              EN
+            </div>
+
+            <h2>
+              English–Uzbek Dictionary
+            </h2>
 
             <button
               className="manageButton"
               onClick={() =>
-                router.push("/admin/dictionary/english-uzbek")
+                router.push(
+                  "/admin/dictionary/english-uzbek"
+                )
               }
             >
               Boshqarish
             </button>
           </div>
 
-          <div className="dictionaryCard">
-            <div className="miniBadge">IV</div>
+          {/* IRREGULAR VERBS */}
 
-            <h2>Irregular Verbs</h2>
+          <div className="dictionaryCard">
+            <div className="miniBadge">
+              IV
+            </div>
+
+            <h2>
+              Irregular Verbs
+            </h2>
 
             <button
               className="manageButton"
               onClick={() =>
-                router.push("/admin/dictionary/irregular-verbs")
+                router.push(
+                  "/admin/dictionary/irregular-verbs"
+                )
+              }
+            >
+              Boshqarish
+            </button>
+          </div>
+
+          {/* SYNONYMS */}
+
+          <div className="dictionaryCard">
+            <div className="miniBadge">
+              S
+            </div>
+
+            <h2>
+              Synonyms
+            </h2>
+
+            <button
+              className="manageButton"
+              onClick={() =>
+                router.push(
+                  "/admin/dictionary/synonyms"
+                )
               }
             >
               Boshqarish
@@ -294,30 +358,47 @@ export default function DictionaryAdminPage() {
         {/* =========================
             ENGLISH VOCABULARY
         ========================== */}
+
         <div className="vocabularyBox">
           <div className="vocabularyHeading">
-            <div className="bigBadge">4000</div>
+            <div className="bigBadge">
+              4000
+            </div>
 
             <div>
-              <h1>English Vocabulary</h1>
+              <h1>
+                English Vocabulary
+              </h1>
+
               <p>
-                4000 Essential English Words — so‘zlar va misol
-                gaplarni boshqarish
+                4000 Essential English Words — so‘zlar
+                va misol gaplarni boshqarish
               </p>
             </div>
           </div>
 
           <div className="selectors">
             <div className="field">
-              <label>Book</label>
+              <label>
+                Book
+              </label>
 
               <select
                 value={book}
-                onChange={(e) => setBook(Number(e.target.value))}
+                onChange={(e) =>
+                  setBook(
+                    Number(
+                      e.target.value
+                    )
+                  )
+                }
                 disabled={loading}
               >
                 {BOOKS.map((item) => (
-                  <option key={item} value={item}>
+                  <option
+                    key={item}
+                    value={item}
+                  >
                     Book {item}
                   </option>
                 ))}
@@ -325,15 +406,26 @@ export default function DictionaryAdminPage() {
             </div>
 
             <div className="field">
-              <label>Unit</label>
+              <label>
+                Unit
+              </label>
 
               <select
                 value={unit}
-                onChange={(e) => setUnit(Number(e.target.value))}
+                onChange={(e) =>
+                  setUnit(
+                    Number(
+                      e.target.value
+                    )
+                  )
+                }
                 disabled={loading}
               >
                 {UNITS.map((item) => (
-                  <option key={item} value={item}>
+                  <option
+                    key={item}
+                    value={item}
+                  >
                     Unit {item}
                   </option>
                 ))}
@@ -342,23 +434,39 @@ export default function DictionaryAdminPage() {
           </div>
 
           <div className="selectedBox">
-            Tanlandi: <strong>{selectedLabel}</strong>
+            Tanlandi:{" "}
+            <strong>
+              {selectedLabel}
+            </strong>
           </div>
 
           <div className="inputSection">
-            <h2>So‘zlarni kiriting</h2>
+            <h2>
+              So‘zlarni kiriting
+            </h2>
 
             <p>
-              Format: <strong>English | Uzbek | English example | Uzbek example</strong>
+              Format:{" "}
+              <strong>
+                English | Uzbek | English example |
+                Uzbek example
+              </strong>
             </p>
 
             <p>
-              Misol gap bo‘lmasa: <strong>English | Uzbek</strong>
+              Misol gap bo‘lmasa:{" "}
+              <strong>
+                English | Uzbek
+              </strong>
             </p>
 
             <textarea
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) =>
+                setText(
+                  e.target.value
+                )
+              }
               placeholder={`afraid | qo‘rqqan | I am afraid of dogs. | Men itlardan qo‘rqaman.
 agree | rozi bo‘lmoq | I agree with you. | Men sizga qo‘shilaman.
 angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
@@ -366,9 +474,17 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
             />
           </div>
 
-          {error && <div className="errorBox">{error}</div>}
+          {error && (
+            <div className="errorBox">
+              {error}
+            </div>
+          )}
 
-          {message && <div className="successBox">{message}</div>}
+          {message && (
+            <div className="successBox">
+              {message}
+            </div>
+          )}
 
           <div className="bottomActions">
             <button
@@ -376,7 +492,9 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
               onClick={saveUnit}
               disabled={loading}
             >
-              {loading ? "Kutilmoqda..." : "Saqlash"}
+              {loading
+                ? "Kutilmoqda..."
+                : "Saqlash"}
             </button>
 
             <button
@@ -406,6 +524,7 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .page {
           min-height: 100vh;
           padding: 26px 28px 60px;
+
           background:
             radial-gradient(
               circle at top,
@@ -413,8 +532,13 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
               #f4f8fa 45%,
               #edf3f5 100%
             );
+
           color: #062f50;
-          font-family: "Bell MT", "Times New Roman", serif;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
         }
 
         /* =====================
@@ -424,54 +548,92 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .topPanel {
           width: min(1500px, 96%);
           min-height: 108px;
-          margin: 0 auto 75px;
-          padding: 18px 25px;
+
+          margin:
+            0 auto 75px;
+
+          padding:
+            18px 25px;
 
           display: flex;
+
           align-items: center;
-          justify-content: space-between;
+
+          justify-content:
+            space-between;
+
           gap: 20px;
 
-          border: 3px solid #0a3b58;
+          border:
+            3px solid #0a3b58;
+
           border-radius: 25px;
 
-          background: linear-gradient(
-            180deg,
-            #83d8fb 0%,
-            #54bce8 45%,
-            #3198c8 100%
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #83d8fb 0%,
+              #54bce8 45%,
+              #3198c8 100%
+            );
 
           box-shadow:
-            inset 0 3px 4px rgba(255, 255, 255, 0.85),
-            inset 0 -7px 0 #086184,
+            inset 0 3px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.85
+              ),
+            inset 0 -7px 0
+              #086184,
             0 12px 0 #073b55,
-            0 20px 28px rgba(0, 0, 0, 0.18);
+            0 20px 28px
+              rgba(
+                0,
+                0,
+                0,
+                0.18
+              );
         }
 
         .namePlate {
           min-width: 410px;
-          padding: 20px 26px;
+
+          padding:
+            20px 26px;
 
           text-align: center;
+
           font-size: 25px;
           font-weight: 700;
+
           color: #111;
 
-          border: 3px solid #59636a;
+          border:
+            3px solid #59636a;
+
           border-radius: 18px;
 
-          background: linear-gradient(
-            180deg,
-            #ffffff,
-            #e7e7e7 60%,
-            #cccccc
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #e7e7e7 60%,
+              #cccccc
+            );
 
           box-shadow:
-            inset 0 3px 4px #ffffff,
+            inset 0 3px 4px
+              #ffffff,
             0 8px 0 #657077,
-            0 12px 18px rgba(0, 0, 0, 0.2);
+            0 12px 18px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
         }
 
         .topActions {
@@ -494,40 +656,52 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .whiteButton,
         .blueButton {
           min-width: 140px;
-          padding: 18px 20px;
+
+          padding:
+            18px 20px;
+
           border-radius: 15px;
+
           font-size: 15px;
         }
 
         .whiteButton {
           color: #111;
-          border: 2px solid #5a646a;
 
-          background: linear-gradient(
-            180deg,
-            #ffffff,
-            #e9e9e9 60%,
-            #cfcfcf
-          );
+          border:
+            2px solid #5a646a;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #e9e9e9 60%,
+              #cfcfcf
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 7px 0 #687278;
         }
 
         .blueButton {
           color: #063453;
-          border: 2px solid #075278;
 
-          background: linear-gradient(
-            180deg,
-            #b8ebff,
-            #65c9f0 55%,
-            #36a7d5
-          );
+          border:
+            2px solid #075278;
+
+          background:
+            linear-gradient(
+              180deg,
+              #b8ebff,
+              #65c9f0 55%,
+              #36a7d5
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 7px 0 #075274;
         }
 
@@ -537,7 +711,9 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .saveButton:active,
         .reloadButton:active,
         .deleteButton:active {
-          transform: translateY(4px);
+          transform:
+            translateY(4px);
+
           box-shadow: none;
         }
 
@@ -548,53 +724,89 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .mainPanel {
           position: relative;
 
-          width: min(1150px, 96%);
-          margin: 0 auto;
-          padding: 75px 35px 42px;
+          width:
+            min(1150px, 96%);
 
-          border: 3px solid #343b3f;
+          margin: 0 auto;
+
+          padding:
+            75px 35px 42px;
+
+          border:
+            3px solid #343b3f;
+
           border-radius: 26px;
 
-          background: linear-gradient(
-            145deg,
-            #686e71 0%,
-            #555b5e 45%,
-            #3f4548 100%
-          );
+          background:
+            linear-gradient(
+              145deg,
+              #686e71 0%,
+              #555b5e 45%,
+              #3f4548 100%
+            );
 
           box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 0.2),
-            inset 0 -8px 0 #292e31,
-            0 14px 24px rgba(0, 0, 0, 0.22);
+            inset 0 3px 3px
+              rgba(
+                255,
+                255,
+                255,
+                0.2
+              ),
+            inset 0 -8px 0
+              #292e31,
+            0 14px 24px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
         .titlePlate {
           position: absolute;
+
           top: -45px;
           left: 50%;
-          transform: translateX(-50%);
+
+          transform:
+            translateX(-50%);
 
           min-width: 300px;
-          padding: 17px 35px;
+
+          padding:
+            17px 35px;
 
           text-align: center;
+
           font-size: 30px;
           font-weight: 700;
 
-          border: 3px solid #07527a;
+          border:
+            3px solid #07527a;
+
           border-radius: 18px;
 
-          background: linear-gradient(
-            180deg,
-            #a3e6ff,
-            #60c5ee 55%,
-            #329dcc
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #a3e6ff,
+              #60c5ee 55%,
+              #329dcc
+            );
 
           box-shadow:
-            inset 0 3px 3px white,
+            inset 0 3px 3px
+              white,
             0 8px 0 #075274,
-            0 12px 18px rgba(0, 0, 0, 0.25);
+            0 12px 18px
+              rgba(
+                0,
+                0,
+                0,
+                0.25
+              );
         }
 
         /* =====================
@@ -603,92 +815,132 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
 
         .dictionaryCards {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+
+          grid-template-columns:
+            repeat(3, 1fr);
+
           gap: 25px;
+
           margin-bottom: 30px;
         }
 
         .dictionaryCard {
           min-height: 220px;
+
           padding: 26px;
 
           display: flex;
-          flex-direction: column;
+
+          flex-direction:
+            column;
+
           align-items: center;
-          justify-content: center;
+
+          justify-content:
+            center;
+
           gap: 22px;
 
           color: #111;
 
-          border: 2px solid #e9e9e9;
+          border:
+            2px solid #e9e9e9;
+
           border-radius: 20px;
 
-          background: linear-gradient(
-            145deg,
-            #ffffff 0%,
-            #eeeeee 55%,
-            #d5d5d5 100%
-          );
+          background:
+            linear-gradient(
+              145deg,
+              #ffffff 0%,
+              #eeeeee 55%,
+              #d5d5d5 100%
+            );
 
           box-shadow:
-            inset 0 4px 5px white,
+            inset 0 4px 5px
+              white,
             0 9px 0 #747d80,
-            0 14px 20px rgba(0, 0, 0, 0.22);
+            0 14px 20px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
         .dictionaryCard h2 {
           margin: 0;
+
           text-align: center;
+
           font-size: 27px;
         }
 
         .miniBadge {
           min-width: 58px;
           height: 52px;
-          padding: 0 12px;
+
+          padding:
+            0 12px;
 
           display: flex;
+
           align-items: center;
-          justify-content: center;
+
+          justify-content:
+            center;
 
           font-size: 17px;
           font-weight: 700;
+
           color: #063554;
 
-          border: 2px solid #075277;
+          border:
+            2px solid #075277;
+
           border-radius: 12px;
 
-          background: linear-gradient(
-            180deg,
-            #c7f0ff,
-            #69c9ee 55%,
-            #35a4d2
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #c7f0ff,
+              #69c9ee 55%,
+              #35a4d2
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 6px 0 #075274;
         }
 
         .manageButton {
           min-width: 160px;
-          padding: 14px 22px;
+
+          padding:
+            14px 22px;
 
           color: #063554;
+
           font-size: 16px;
 
-          border: 2px solid #075277;
+          border:
+            2px solid #075277;
+
           border-radius: 12px;
 
-          background: linear-gradient(
-            180deg,
-            #bcecff,
-            #65c8ef 55%,
-            #35a4d2
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #bcecff,
+              #65c8ef 55%,
+              #35a4d2
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 6px 0 #075274;
         }
 
@@ -698,41 +950,62 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
 
         .vocabularyBox {
           padding: 30px;
+
           color: #111;
 
-          border: 2px solid #e8e8e8;
+          border:
+            2px solid #e8e8e8;
+
           border-radius: 20px;
 
-          background: linear-gradient(
-            145deg,
-            #ffffff,
-            #eeeeee 60%,
-            #d8d8d8
-          );
+          background:
+            linear-gradient(
+              145deg,
+              #ffffff,
+              #eeeeee 60%,
+              #d8d8d8
+            );
 
           box-shadow:
-            inset 0 4px 5px white,
+            inset 0 4px 5px
+              white,
             0 9px 0 #737c80,
-            0 14px 20px rgba(0, 0, 0, 0.22);
+            0 14px 20px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
         .vocabularyHeading {
           display: flex;
-          justify-content: center;
+
+          justify-content:
+            center;
+
           align-items: center;
+
           gap: 20px;
+
           margin-bottom: 30px;
+
           text-align: center;
         }
 
         .vocabularyHeading h1 {
-          margin: 0 0 5px;
+          margin:
+            0 0 5px;
+
           font-size: 31px;
         }
 
         .vocabularyHeading p {
           margin: 0;
+
           font-size: 15px;
+
           color: #424242;
         }
 
@@ -741,79 +1014,112 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
           height: 55px;
 
           display: flex;
+
           align-items: center;
-          justify-content: center;
+
+          justify-content:
+            center;
 
           color: #063554;
+
           font-weight: 700;
 
-          border: 2px solid #075277;
+          border:
+            2px solid #075277;
+
           border-radius: 12px;
 
-          background: linear-gradient(
-            180deg,
-            #c7f0ff,
-            #69c9ee 55%,
-            #35a4d2
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #c7f0ff,
+              #69c9ee 55%,
+              #35a4d2
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 6px 0 #075274;
         }
 
         .selectors {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+
+          grid-template-columns:
+            1fr 1fr;
+
           gap: 24px;
         }
 
         .field {
           display: flex;
-          flex-direction: column;
+
+          flex-direction:
+            column;
+
           gap: 8px;
         }
 
         .field label {
           font-size: 18px;
+
           font-weight: 700;
         }
 
         select {
           width: 100%;
-          padding: 16px 18px;
+
+          padding:
+            16px 18px;
 
           font-family: inherit;
+
           font-size: 17px;
           font-weight: 700;
 
-          border: 1px solid #8c969b;
+          border:
+            1px solid #8c969b;
+
           border-radius: 12px;
 
           background: #fff;
 
           box-shadow:
-            inset 0 2px 3px rgba(0, 0, 0, 0.05),
+            inset 0 2px 3px
+              rgba(
+                0,
+                0,
+                0,
+                0.05
+              ),
             0 5px 0 #8b9498;
         }
 
         .selectedBox {
           margin-top: 24px;
-          padding: 15px 18px;
+
+          padding:
+            15px 18px;
 
           font-size: 17px;
+
           color: #073c5d;
 
-          border: 1px solid #4b9ec3;
+          border:
+            1px solid #4b9ec3;
+
           border-radius: 10px;
 
-          background: linear-gradient(
-            180deg,
-            #d9f4ff,
-            #b7e3f5
-          );
+          background:
+            linear-gradient(
+              180deg,
+              #d9f4ff,
+              #b7e3f5
+            );
 
-          box-shadow: 0 5px 0 #76a9bd;
+          box-shadow:
+            0 5px 0 #76a9bd;
         }
 
         .inputSection {
@@ -821,71 +1127,119 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         }
 
         .inputSection h2 {
-          margin: 0 0 7px;
+          margin:
+            0 0 7px;
+
           font-size: 25px;
         }
 
         .inputSection p {
-          margin: 4px 0;
+          margin:
+            4px 0;
+
           color: #444;
+
           font-size: 15px;
         }
 
         textarea {
           width: 100%;
+
           min-height: 330px;
+
           margin-top: 15px;
+
           padding: 18px;
 
           resize: vertical;
 
-          font-family: "Bell MT", "Times New Roman", serif;
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+
           font-size: 17px;
+
           line-height: 1.65;
 
-          border: 1px solid #8d969b;
+          border:
+            1px solid #8d969b;
+
           border-radius: 12px;
+
           outline: none;
 
           background: #fff;
 
           box-shadow:
-            inset 0 3px 6px rgba(0, 0, 0, 0.08),
+            inset 0 3px 6px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
             0 4px 0 #91999d;
         }
 
         textarea:focus {
           border-color: #1987b6;
+
           box-shadow:
-            inset 0 3px 6px rgba(0, 0, 0, 0.08),
-            0 0 0 3px rgba(51, 174, 224, 0.18),
+            inset 0 3px 6px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 0 0 3px
+              rgba(
+                51,
+                174,
+                224,
+                0.18
+              ),
             0 4px 0 #4d91ad;
         }
 
         .successBox,
         .errorBox {
           margin-top: 20px;
-          padding: 15px 18px;
+
+          padding:
+            15px 18px;
+
           border-radius: 10px;
+
           font-weight: 700;
         }
 
         .successBox {
           color: #155f2a;
+
           background: #e3f7e8;
-          border: 1px solid #74ba85;
+
+          border:
+            1px solid #74ba85;
         }
 
         .errorBox {
           color: #8a1c1c;
+
           background: #fdeaea;
-          border: 1px solid #d88b8b;
+
+          border:
+            1px solid #d88b8b;
         }
 
         .bottomActions {
           display: flex;
+
           gap: 15px;
+
           flex-wrap: wrap;
+
           margin-top: 25px;
         }
 
@@ -893,79 +1247,116 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
         .reloadButton,
         .deleteButton {
           min-width: 150px;
-          padding: 14px 22px;
+
+          padding:
+            14px 22px;
 
           border-radius: 11px;
+
           font-size: 16px;
         }
 
         .saveButton {
           color: #063554;
-          border: 2px solid #075277;
 
-          background: linear-gradient(
-            180deg,
-            #bcecff,
-            #65c8ef 55%,
-            #35a4d2
-          );
+          border:
+            2px solid #075277;
+
+          background:
+            linear-gradient(
+              180deg,
+              #bcecff,
+              #65c8ef 55%,
+              #35a4d2
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 6px 0 #075274;
         }
 
         .reloadButton {
           color: #222;
-          border: 2px solid #6c7579;
 
-          background: linear-gradient(
-            180deg,
-            #ffffff,
-            #e8e8e8,
-            #cfcfcf
-          );
+          border:
+            2px solid #6c7579;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #e8e8e8,
+              #cfcfcf
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 6px 0 #737b7f;
         }
 
         .deleteButton {
           color: #7b1111;
-          border: 2px solid #a84e4e;
 
-          background: linear-gradient(
-            180deg,
-            #fff7f7,
-            #f3dede,
-            #e5bcbc
-          );
+          border:
+            2px solid #a84e4e;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff7f7,
+              #f3dede,
+              #e5bcbc
+            );
 
           box-shadow:
-            inset 0 2px 3px white,
+            inset 0 2px 3px
+              white,
             0 6px 0 #9e5c5c;
+        }
+
+        /* =====================
+           TABLET
+        ====================== */
+
+        @media (
+          max-width: 1050px
+        ) {
+          .dictionaryCards {
+            grid-template-columns:
+              repeat(2, 1fr);
+          }
         }
 
         /* =====================
            MOBILE
         ====================== */
 
-        @media (max-width: 850px) {
+        @media (
+          max-width: 850px
+        ) {
           .page {
-            padding: 16px 12px 40px;
+            padding:
+              16px 12px
+              40px;
           }
 
           .topPanel {
             width: 100%;
+
             margin-bottom: 65px;
+
             padding: 14px;
-            flex-direction: column;
+
+            flex-direction:
+              column;
           }
 
           .namePlate {
             width: 100%;
             min-width: 0;
+
             font-size: 20px;
           }
 
@@ -981,16 +1372,21 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
 
           .mainPanel {
             width: 100%;
-            padding: 65px 15px 25px;
+
+            padding:
+              65px 15px
+              25px;
           }
 
           .titlePlate {
             min-width: 240px;
+
             font-size: 24px;
           }
 
           .dictionaryCards {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .dictionaryCard {
@@ -998,15 +1394,18 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
           }
 
           .selectors {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
           }
 
           .vocabularyBox {
-            padding: 20px 15px;
+            padding:
+              20px 15px;
           }
 
           .vocabularyHeading {
-            flex-direction: column;
+            flex-direction:
+              column;
           }
 
           .vocabularyHeading h1 {
@@ -1018,7 +1417,8 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
           }
 
           .bottomActions {
-            flex-direction: column;
+            flex-direction:
+              column;
           }
 
           .saveButton,
