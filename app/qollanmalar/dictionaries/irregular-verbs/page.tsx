@@ -22,46 +22,43 @@ type ApiResponse = {
   ok?: boolean;
   message?: string;
   verbs?: IrregularVerb[];
-  total?: number;
 };
 
-type Mode =
+type StudyMode =
+  | "learn"
+  | "choice"
+  | "write"
+  | "mistakes"
+  | "difficult";
+
+type Direction =
   | "v1"
   | "v2"
   | "v3"
   | "mixed";
 
-type QuestionMode =
+type QuestionDirection =
   | "v1"
   | "v2"
   | "v3";
 
-type Question = {
-  verb: IrregularVerb;
-  mode: QuestionMode;
-  prompt: string;
-  correctAnswer: string;
-  wrongAnswer: string;
-  options: string[];
-};
-
 const API_URL =
   "/api/dictionary/irregular-verbs";
 
+const DIFFICULT_KEY =
+  "irregular-verbs-difficult";
+
+const MISTAKES_KEY =
+  "irregular-verbs-mistakes";
+
 /* =========================================================
-   ARRAY ARALASHTIRISH
+   HELPERS
 ========================================================= */
 
-function shuffleArray<T>(
-  array: T[]
-): T[] {
+function shuffleArray<T>(array: T[]) {
   const copy = [...array];
 
-  for (
-    let i = copy.length - 1;
-    i > 0;
-    i--
-  ) {
+  for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(
       Math.random() * (i + 1)
     );
@@ -75,93 +72,128 @@ function shuffleArray<T>(
   return copy;
 }
 
-/* =========================================================
-   SAVOL REJIMI
-========================================================= */
+function normalize(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
 
-function getQuestionMode(
-  mode: Mode
-): QuestionMode {
-  if (mode !== "mixed") {
-    return mode;
+function getQuestionDirection(
+  direction: Direction
+): QuestionDirection {
+  if (direction !== "mixed") {
+    return direction;
   }
 
-  const modes: QuestionMode[] = [
+  const directions: QuestionDirection[] = [
     "v1",
     "v2",
     "v3",
   ];
 
-  return modes[
+  return directions[
     Math.floor(
       Math.random() *
-        modes.length
+        directions.length
     )
   ];
 }
 
-/* =========================================================
-   JAVOB MATNI
-========================================================= */
-
-function getAnswer(
-  verb: IrregularVerb,
-  mode: QuestionMode
-) {
-  if (mode === "v1") {
-    return `${verb.v2} — ${verb.v3}`;
-  }
-
-  if (mode === "v2") {
-    return `${verb.v1} — ${verb.v3}`;
-  }
-
-  return `${verb.v1} — ${verb.v2}`;
-}
-
-/* =========================================================
-   PROMPT
-========================================================= */
-
 function getPrompt(
   verb: IrregularVerb,
-  mode: QuestionMode
+  direction: QuestionDirection
 ) {
-  if (mode === "v1") {
+  if (direction === "v1") {
     return verb.v1;
   }
 
-  if (mode === "v2") {
+  if (direction === "v2") {
     return verb.v2;
   }
 
   return verb.v3;
 }
 
-/* =========================================================
-   LABEL
-========================================================= */
-
-function getModeLabel(
-  mode: QuestionMode
+function getChoiceAnswer(
+  verb: IrregularVerb,
+  direction: QuestionDirection
 ) {
-  if (mode === "v1") {
+  if (direction === "v1") {
+    return `${verb.v2} — ${verb.v3}`;
+  }
+
+  if (direction === "v2") {
+    return `${verb.v1} — ${verb.v3}`;
+  }
+
+  return `${verb.v1} — ${verb.v2}`;
+}
+
+function getDirectionLabel(
+  direction: QuestionDirection
+) {
+  if (direction === "v1") {
     return "V1 → V2 + V3";
   }
 
-  if (mode === "v2") {
+  if (direction === "v2") {
     return "V2 → V1 + V3";
   }
 
   return "V3 → V1 + V2";
 }
 
+function readSavedIds(key: string) {
+  if (typeof window === "undefined") {
+    return new Set<string>();
+  }
+
+  try {
+    const raw =
+      window.localStorage.getItem(key);
+
+    if (!raw) {
+      return new Set<string>();
+    }
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) {
+      return new Set<string>();
+    }
+
+    return new Set<string>(
+      parsed.filter(
+        (item): item is string =>
+          typeof item === "string"
+      )
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveIds(
+  key: string,
+  ids: Set<string>
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    key,
+    JSON.stringify([...ids])
+  );
+}
+
 /* =========================================================
    PAGE
 ========================================================= */
 
-export default function IrregularVerbsLearnPage() {
-  const [verbs, setVerbs] =
+export default function IrregularVerbsPage() {
+  const [allVerbs, setAllVerbs] =
     useState<IrregularVerb[]>([]);
 
   const [loading, setLoading] =
@@ -170,21 +202,44 @@ export default function IrregularVerbsLearnPage() {
   const [error, setError] =
     useState("");
 
-  const [mode, setMode] =
-    useState<Mode>("v1");
+  const [studyMode, setStudyMode] =
+    useState<StudyMode>("choice");
+
+  const [direction, setDirection] =
+    useState<Direction>("v1");
 
   const [index, setIndex] =
     useState(0);
 
-  const [question, setQuestion] =
-    useState<Question | null>(null);
+  const [
+    questionDirection,
+    setQuestionDirection,
+  ] =
+    useState<QuestionDirection>("v1");
 
   const [
     selectedAnswer,
     setSelectedAnswer,
-  ] = useState<string | null>(
-    null
-  );
+  ] = useState<string | null>(null);
+
+  const [options, setOptions] =
+    useState<string[]>([]);
+
+  const [writeOne, setWriteOne] =
+    useState("");
+
+  const [writeTwo, setWriteTwo] =
+    useState("");
+
+  const [
+    writeChecked,
+    setWriteChecked,
+  ] = useState(false);
+
+  const [
+    writeCorrect,
+    setWriteCorrect,
+  ] = useState(false);
 
   const [
     correctCount,
@@ -199,9 +254,23 @@ export default function IrregularVerbsLearnPage() {
   const [
     difficultIds,
     setDifficultIds,
-  ] = useState<Set<string>>(
-    new Set()
-  );
+  ] =
+    useState<Set<string>>(
+      new Set()
+    );
+
+  const [
+    mistakeIds,
+    setMistakeIds,
+  ] =
+    useState<Set<string>>(
+      new Set()
+    );
+
+  const [
+    storageLoaded,
+    setStorageLoaded,
+  ] = useState(false);
 
   const autoNextTimer =
     useRef<ReturnType<
@@ -209,30 +278,67 @@ export default function IrregularVerbsLearnPage() {
     > | null>(null);
 
   /* =====================================================
+     LOCAL STORAGE
+  ===================================================== */
+
+  useEffect(() => {
+    setDifficultIds(
+      readSavedIds(DIFFICULT_KEY)
+    );
+
+    setMistakeIds(
+      readSavedIds(MISTAKES_KEY)
+    );
+
+    setStorageLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+
+    saveIds(
+      DIFFICULT_KEY,
+      difficultIds
+    );
+  }, [
+    difficultIds,
+    storageLoaded,
+  ]);
+
+  useEffect(() => {
+    if (!storageLoaded) return;
+
+    saveIds(
+      MISTAKES_KEY,
+      mistakeIds
+    );
+  }, [
+    mistakeIds,
+    storageLoaded,
+  ]);
+
+  /* =====================================================
      TIMER
   ===================================================== */
 
-  function clearAutoNextTimer() {
-    if (
-      autoNextTimer.current
-    ) {
+  function clearAutoTimer() {
+    if (autoNextTimer.current) {
       clearTimeout(
         autoNextTimer.current
       );
 
-      autoNextTimer.current =
-        null;
+      autoNextTimer.current = null;
     }
   }
 
   useEffect(() => {
     return () => {
-      clearAutoNextTimer();
+      clearAutoTimer();
     };
   }, []);
 
   /* =====================================================
-     API
+     LOAD DATA
   ===================================================== */
 
   const loadVerbs =
@@ -261,13 +367,11 @@ export default function IrregularVerbsLearnPage() {
         }
 
         const loaded =
-          Array.isArray(
-            data.verbs
-          )
+          Array.isArray(data.verbs)
             ? data.verbs
             : [];
 
-        setVerbs(
+        setAllVerbs(
           shuffleArray(loaded)
         );
       } catch (err) {
@@ -288,269 +392,530 @@ export default function IrregularVerbsLearnPage() {
   }, [loadVerbs]);
 
   /* =====================================================
-     SAVOL YARATISH
+     ACTIVE VERBS
   ===================================================== */
 
-  const createQuestion =
-    useCallback(
-      (
-        currentIndex: number,
-        currentMode: Mode
-      ) => {
-        if (
-          verbs.length < 2
-        ) {
-          setQuestion(null);
-          return;
-        }
-
-        const verb =
-          verbs[
-            currentIndex %
-              verbs.length
-          ];
-
-        const qMode =
-          getQuestionMode(
-            currentMode
-          );
-
-        const correctAnswer =
-          getAnswer(
-            verb,
-            qMode
-          );
-
-        /*
-          Noto‘g‘ri javob uchun
-          boshqa fe’l tanlaymiz.
-        */
-
-        let wrongVerb =
-          verbs[
-            Math.floor(
-              Math.random() *
-                verbs.length
+  const activeVerbs =
+    useMemo(() => {
+      if (
+        studyMode === "difficult"
+      ) {
+        return allVerbs.filter(
+          (verb) =>
+            difficultIds.has(
+              verb.id
             )
-          ];
-
-        let guard = 0;
-
-        while (
-          wrongVerb.id ===
-            verb.id &&
-          guard < 50
-        ) {
-          wrongVerb =
-            verbs[
-              Math.floor(
-                Math.random() *
-                  verbs.length
-              )
-            ];
-
-          guard++;
-        }
-
-        const wrongAnswer =
-          getAnswer(
-            wrongVerb,
-            qMode
-          );
-
-        const options =
-          Math.random() > 0.5
-            ? [
-                correctAnswer,
-                wrongAnswer,
-              ]
-            : [
-                wrongAnswer,
-                correctAnswer,
-              ];
-
-        setQuestion({
-          verb,
-          mode: qMode,
-          prompt:
-            getPrompt(
-              verb,
-              qMode
-            ),
-          correctAnswer,
-          wrongAnswer,
-          options,
-        });
-
-        setSelectedAnswer(
-          null
         );
-      },
-      [verbs]
-    );
+      }
 
-  useEffect(() => {
-    if (
-      verbs.length >= 2
-    ) {
-      createQuestion(
-        index,
-        mode
-      );
-    }
-  }, [
-    verbs,
-    index,
-    mode,
-    createQuestion,
-  ]);
+      if (
+        studyMode === "mistakes"
+      ) {
+        return allVerbs.filter(
+          (verb) =>
+            mistakeIds.has(
+              verb.id
+            )
+        );
+      }
+
+      return allVerbs;
+    }, [
+      allVerbs,
+      studyMode,
+      difficultIds,
+      mistakeIds,
+    ]);
+
+  const currentVerb =
+    activeVerbs.length > 0
+      ? activeVerbs[
+          index %
+            activeVerbs.length
+        ]
+      : null;
 
   /* =====================================================
-     KEYINGI
+     RESET QUESTION
+  ===================================================== */
+
+  const prepareQuestion =
+    useCallback(() => {
+      if (!currentVerb) {
+        setOptions([]);
+        return;
+      }
+
+      clearAutoTimer();
+
+      const qDirection =
+        getQuestionDirection(
+          direction
+        );
+
+      setQuestionDirection(
+        qDirection
+      );
+
+      setSelectedAnswer(null);
+      setWriteOne("");
+      setWriteTwo("");
+      setWriteChecked(false);
+      setWriteCorrect(false);
+
+      if (
+        studyMode !== "choice" &&
+        studyMode !== "mistakes" &&
+        studyMode !== "difficult"
+      ) {
+        setOptions([]);
+        return;
+      }
+
+      if (
+        activeVerbs.length < 2
+      ) {
+        setOptions([]);
+        return;
+      }
+
+      const correct =
+        getChoiceAnswer(
+          currentVerb,
+          qDirection
+        );
+
+      const candidates =
+        activeVerbs.filter(
+          (verb) =>
+            verb.id !==
+            currentVerb.id
+        );
+
+      const source =
+        candidates.length > 0
+          ? candidates
+          : allVerbs.filter(
+              (verb) =>
+                verb.id !==
+                currentVerb.id
+            );
+
+      if (source.length === 0) {
+        setOptions([correct]);
+        return;
+      }
+
+      /*
+        Noto‘g‘ri variantni imkon qadar
+        shakli o‘xshash fe’llardan olish.
+      */
+
+      const scored =
+        source.map((verb) => {
+          const wrong =
+            getChoiceAnswer(
+              verb,
+              qDirection
+            );
+
+          let score = 0;
+
+          const correctParts =
+            correct.split("—");
+
+          const wrongParts =
+            wrong.split("—");
+
+          const c1 =
+            normalize(
+              correctParts[0] || ""
+            );
+
+          const c2 =
+            normalize(
+              correctParts[1] || ""
+            );
+
+          const w1 =
+            normalize(
+              wrongParts[0] || ""
+            );
+
+          const w2 =
+            normalize(
+              wrongParts[1] || ""
+            );
+
+          if (
+            c1.slice(-2) ===
+            w1.slice(-2)
+          ) {
+            score += 2;
+          }
+
+          if (
+            c2.slice(-2) ===
+            w2.slice(-2)
+          ) {
+            score += 2;
+          }
+
+          if (
+            Math.abs(
+              c1.length -
+                w1.length
+            ) <= 2
+          ) {
+            score += 1;
+          }
+
+          if (
+            Math.abs(
+              c2.length -
+                w2.length
+            ) <= 2
+          ) {
+            score += 1;
+          }
+
+          return {
+            verb,
+            score,
+          };
+        });
+
+      scored.sort(
+        (a, b) =>
+          b.score - a.score
+      );
+
+      const topScore =
+        scored[0]?.score ?? 0;
+
+      const best =
+        scored
+          .filter(
+            (item) =>
+              item.score >=
+              Math.max(
+                0,
+                topScore - 1
+              )
+          )
+          .slice(0, 10);
+
+      const selectedWrong =
+        best[
+          Math.floor(
+            Math.random() *
+              best.length
+          )
+        ]?.verb ||
+        source[
+          Math.floor(
+            Math.random() *
+              source.length
+          )
+        ];
+
+      const wrong =
+        getChoiceAnswer(
+          selectedWrong,
+          qDirection
+        );
+
+      setOptions(
+        shuffleArray([
+          correct,
+          wrong,
+        ])
+      );
+    }, [
+      currentVerb,
+      direction,
+      studyMode,
+      activeVerbs,
+      allVerbs,
+    ]);
+
+  useEffect(() => {
+    prepareQuestion();
+  }, [prepareQuestion]);
+
+  /* =====================================================
+     NAVIGATION
   ===================================================== */
 
   function goNext() {
-    clearAutoNextTimer();
+    clearAutoTimer();
 
-    if (!verbs.length) {
+    if (
+      activeVerbs.length === 0
+    ) {
       return;
     }
 
     setIndex((prev) =>
       prev >=
-      verbs.length - 1
+      activeVerbs.length - 1
         ? 0
         : prev + 1
     );
-
-    setSelectedAnswer(null);
   }
 
-  /* =====================================================
-     OLDINGI
-  ===================================================== */
-
   function goPrevious() {
-    clearAutoNextTimer();
+    clearAutoTimer();
 
-    if (!verbs.length) {
+    if (
+      activeVerbs.length === 0
+    ) {
       return;
     }
 
     setIndex((prev) =>
       prev <= 0
-        ? verbs.length - 1
+        ? activeVerbs.length - 1
         : prev - 1
     );
-
-    setSelectedAnswer(null);
   }
 
-  /* =====================================================
-     AVTOMATIK KEYINGI
-  ===================================================== */
-
-  function goNextAutomatically() {
-    clearAutoNextTimer();
+  function autoNext() {
+    clearAutoTimer();
 
     autoNextTimer.current =
       setTimeout(() => {
         setIndex((prev) =>
           prev >=
-          verbs.length - 1
+          activeVerbs.length - 1
             ? 0
             : prev + 1
         );
 
-        setSelectedAnswer(
-          null
-        );
-
         autoNextTimer.current =
           null;
-      }, 700);
+      }, 850);
   }
 
   /* =====================================================
-     JAVOB
+     MISTAKES
   ===================================================== */
 
-  function handleAnswer(
+  function addMistake(id: string) {
+    setMistakeIds((previous) => {
+      const next =
+        new Set(previous);
+
+      next.add(id);
+
+      return next;
+    });
+  }
+
+  function removeMistake(
+    id: string
+  ) {
+    setMistakeIds((previous) => {
+      const next =
+        new Set(previous);
+
+      next.delete(id);
+
+      return next;
+    });
+  }
+
+  /* =====================================================
+     CHOICE ANSWER
+  ===================================================== */
+
+  function handleChoice(
     answer: string
   ) {
     if (
-      !question ||
+      !currentVerb ||
       selectedAnswer !== null
     ) {
       return;
     }
 
+    const correct =
+      getChoiceAnswer(
+        currentVerb,
+        questionDirection
+      );
+
     setSelectedAnswer(answer);
 
-    if (
-      answer ===
-      question.correctAnswer
-    ) {
+    if (answer === correct) {
       setCorrectCount(
         (prev) => prev + 1
+      );
+
+      if (
+        studyMode ===
+        "mistakes"
+      ) {
+        removeMistake(
+          currentVerb.id
+        );
+      }
+    } else {
+      setWrongCount(
+        (prev) => prev + 1
+      );
+
+      addMistake(
+        currentVerb.id
+      );
+    }
+
+    autoNext();
+  }
+
+  /* =====================================================
+     WRITING ANSWERS
+  ===================================================== */
+
+  function getWritingAnswers() {
+    if (!currentVerb) {
+      return {
+        first: "",
+        second: "",
+        firstLabel: "",
+        secondLabel: "",
+      };
+    }
+
+    if (
+      questionDirection === "v1"
+    ) {
+      return {
+        first: currentVerb.v2,
+        second: currentVerb.v3,
+        firstLabel: "V2",
+        secondLabel: "V3",
+      };
+    }
+
+    if (
+      questionDirection === "v2"
+    ) {
+      return {
+        first: currentVerb.v1,
+        second: currentVerb.v3,
+        firstLabel: "V1",
+        secondLabel: "V3",
+      };
+    }
+
+    return {
+      first: currentVerb.v1,
+      second: currentVerb.v2,
+      firstLabel: "V1",
+      secondLabel: "V2",
+    };
+  }
+
+  function answerMatches(
+    userAnswer: string,
+    correctAnswer: string
+  ) {
+    const user =
+      normalize(userAnswer);
+
+    const accepted =
+      correctAnswer
+        .split("/")
+        .map(normalize);
+
+    return accepted.includes(user);
+  }
+
+  function checkWriting() {
+    if (
+      !currentVerb ||
+      writeChecked
+    ) {
+      return;
+    }
+
+    const expected =
+      getWritingAnswers();
+
+    if (
+      !writeOne.trim() ||
+      !writeTwo.trim()
+    ) {
+      return;
+    }
+
+    const firstCorrect =
+      answerMatches(
+        writeOne,
+        expected.first
+      );
+
+    const secondCorrect =
+      answerMatches(
+        writeTwo,
+        expected.second
+      );
+
+    const isCorrect =
+      firstCorrect &&
+      secondCorrect;
+
+    setWriteChecked(true);
+    setWriteCorrect(
+      isCorrect
+    );
+
+    if (isCorrect) {
+      setCorrectCount(
+        (prev) => prev + 1
+      );
+
+      removeMistake(
+        currentVerb.id
       );
     } else {
       setWrongCount(
         (prev) => prev + 1
       );
+
+      addMistake(
+        currentVerb.id
+      );
     }
 
-    goNextAutomatically();
+    autoNext();
   }
 
   /* =====================================================
-     KEYINROQ KO‘RSATISH
-  ===================================================== */
-
-  function showLater() {
-    clearAutoNextTimer();
-
-    if (!verbs.length) {
-      return;
-    }
-
-    const current =
-      verbs[index];
-
-    const newList = [
-      ...verbs
-        .slice(index + 1),
-      ...verbs.slice(
-        0,
-        index
-      ),
-      current,
-    ];
-
-    setVerbs(newList);
-    setIndex(0);
-    setSelectedAnswer(null);
-  }
-
-  /* =====================================================
-     QIYIN FE’L
+     DIFFICULT
   ===================================================== */
 
   function toggleDifficult() {
-    if (!question) return;
-
-    const id =
-      question.verb.id;
+    if (!currentVerb) return;
 
     setDifficultIds(
       (previous) => {
         const next =
           new Set(previous);
 
-        if (next.has(id)) {
-          next.delete(id);
+        if (
+          next.has(
+            currentVerb.id
+          )
+        ) {
+          next.delete(
+            currentVerb.id
+          );
         } else {
-          next.add(id);
+          next.add(
+            currentVerb.id
+          );
         }
 
         return next;
@@ -559,28 +924,12 @@ export default function IrregularVerbsLearnPage() {
   }
 
   /* =====================================================
-     REJIM
+     SPEAK
   ===================================================== */
 
-  function changeMode(
-    newMode: Mode
-  ) {
-    clearAutoNextTimer();
-
-    setMode(newMode);
-    setIndex(0);
-    setSelectedAnswer(null);
-    setCorrectCount(0);
-    setWrongCount(0);
-  }
-
-  /* =====================================================
-     TALAFFUZ
-  ===================================================== */
-
-  function speakWord() {
+  function speak() {
     if (
-      !question ||
+      !currentVerb ||
       typeof window ===
         "undefined" ||
       !(
@@ -595,10 +944,15 @@ export default function IrregularVerbsLearnPage() {
 
     const utterance =
       new SpeechSynthesisUtterance(
-        question.prompt
+        getPrompt(
+          currentVerb,
+          questionDirection
+        )
       );
 
-    utterance.lang = "en-US";
+    utterance.lang =
+      "en-US";
+
     utterance.rate = 0.85;
 
     window.speechSynthesis.speak(
@@ -607,20 +961,49 @@ export default function IrregularVerbsLearnPage() {
   }
 
   /* =====================================================
-     CURRENT
+     CHANGE MODE
   ===================================================== */
 
-  const isDifficult =
-    question
+  function changeStudyMode(
+    newMode: StudyMode
+  ) {
+    clearAutoTimer();
+
+    setStudyMode(newMode);
+    setIndex(0);
+    setSelectedAnswer(null);
+    setWriteChecked(false);
+    setCorrectCount(0);
+    setWrongCount(0);
+  }
+
+  function changeDirection(
+    newDirection: Direction
+  ) {
+    clearAutoTimer();
+
+    setDirection(
+      newDirection
+    );
+
+    setIndex(0);
+    setSelectedAnswer(null);
+    setWriteChecked(false);
+  }
+
+  /* =====================================================
+     VALUES
+  ===================================================== */
+
+  const difficult =
+    currentVerb
       ? difficultIds.has(
-          question.verb.id
+          currentVerb.id
         )
       : false;
 
-  const currentNumber =
-    verbs.length
-      ? index + 1
-      : 0;
+  const writing =
+    getWritingAnswers();
 
   const totalAnswered =
     correctCount +
@@ -636,7 +1019,7 @@ export default function IrregularVerbsLearnPage() {
       : 0;
 
   /* =====================================================
-     LOADING
+     LOADING / ERROR
   ===================================================== */
 
   if (loading) {
@@ -667,12 +1050,7 @@ export default function IrregularVerbsLearnPage() {
             box-shadow:
               0 7px 0 #69767c,
               0 13px 20px
-                rgba(
-                  0,
-                  0,
-                  0,
-                  0.18
-                );
+                rgba(0,0,0,.18);
             font-size: 22px;
             font-weight: 800;
           }
@@ -681,20 +1059,11 @@ export default function IrregularVerbsLearnPage() {
     );
   }
 
-  /* =====================================================
-     ERROR
-  ===================================================== */
-
-  if (
-    error ||
-    verbs.length < 2 ||
-    !question
-  ) {
+  if (error) {
     return (
       <main className="statePage">
         <div className="stateCard">
-          {error ||
-            "Mashq qilish uchun kamida 2 ta fe’l kerak."}
+          <strong>{error}</strong>
 
           <button
             onClick={() =>
@@ -722,7 +1091,6 @@ export default function IrregularVerbsLearnPage() {
             display: flex;
             flex-direction: column;
             gap: 20px;
-            text-align: center;
             border: 2px solid #536269;
             border-radius: 15px;
             background: #eee;
@@ -730,7 +1098,6 @@ export default function IrregularVerbsLearnPage() {
 
           button {
             min-height: 42px;
-            cursor: pointer;
           }
         `}</style>
       </main>
@@ -743,13 +1110,10 @@ export default function IrregularVerbsLearnPage() {
 
   return (
     <main className="page">
-      {/* ===============================================
-          TOP PANEL
-      =============================================== */}
+      {/* TOP */}
 
       <section className="topPanel">
         <button
-          type="button"
           className="backButton"
           onClick={() => {
             window.location.href =
@@ -759,260 +1123,510 @@ export default function IrregularVerbsLearnPage() {
           ← Lug‘atlar
         </button>
 
-        <div className="modeArea">
+        <div className="studyModes">
           <button
-            type="button"
             className={
-              mode === "v1"
-                ? "modeButton active"
-                : "modeButton"
+              studyMode === "learn"
+                ? "studyButton active"
+                : "studyButton"
             }
             onClick={() =>
-              changeMode("v1")
+              changeStudyMode(
+                "learn"
+              )
             }
           >
-            V1 → V2 + V3
+            O‘rganish
           </button>
 
           <button
-            type="button"
             className={
-              mode === "v2"
-                ? "modeButton active"
-                : "modeButton"
+              studyMode === "choice"
+                ? "studyButton active"
+                : "studyButton"
             }
             onClick={() =>
-              changeMode("v2")
+              changeStudyMode(
+                "choice"
+              )
             }
           >
-            V2 → V1 + V3
+            Tanlash
           </button>
 
           <button
-            type="button"
             className={
-              mode === "v3"
-                ? "modeButton active"
-                : "modeButton"
+              studyMode === "write"
+                ? "studyButton active"
+                : "studyButton"
             }
             onClick={() =>
-              changeMode("v3")
+              changeStudyMode(
+                "write"
+              )
             }
           >
-            V3 → V1 + V2
+            Yozish
           </button>
 
           <button
-            type="button"
             className={
-              mode === "mixed"
-                ? "modeButton active"
-                : "modeButton"
+              studyMode ===
+              "mistakes"
+                ? "studyButton active"
+                : "studyButton"
             }
             onClick={() =>
-              changeMode("mixed")
+              changeStudyMode(
+                "mistakes"
+              )
             }
           >
-            Aralash
+            Xatolarim
+            <span className="countBadge">
+              {mistakeIds.size}
+            </span>
+          </button>
+
+          <button
+            className={
+              studyMode ===
+              "difficult"
+                ? "studyButton active"
+                : "studyButton"
+            }
+            onClick={() =>
+              changeStudyMode(
+                "difficult"
+              )
+            }
+          >
+            ★ Qiyinlar
+            <span className="countBadge">
+              {difficultIds.size}
+            </span>
           </button>
         </div>
 
-        <div className="progressBox">
+        <div className="progress">
           <strong>
-            {currentNumber}
+            {activeVerbs.length
+              ? index + 1
+              : 0}
           </strong>
 
           <span>
-            / {verbs.length}
+            / {activeVerbs.length}
           </span>
         </div>
       </section>
 
-      {/* ===============================================
-          CONTENT
-      =============================================== */}
+      {/* DIRECTIONS */}
 
-      <section className="content">
-        <div className="modeLabel">
-          {getModeLabel(
-            question.mode
-          )}
-        </div>
-
-        {/* WORD */}
-
-        <div className="wordCard">
-          {question.prompt}
-        </div>
-
-        {/* TRANSLATION */}
-
-        <div className="translation">
-          {question.verb.uzbek}
-        </div>
-
-        {/* TOOLS */}
-
-        <div className="tools">
-          <button
-            type="button"
-            className="toolButton"
-            onClick={speakWord}
-          >
-            🔊 Talaffuz
-          </button>
-
-          <button
-            type="button"
-            className={
-              isDifficult
-                ? "toolButton difficultActive"
-                : "toolButton"
-            }
-            onClick={
-              toggleDifficult
-            }
-          >
-            {isDifficult
-              ? "★ Qiyin fe’l"
-              : "☆ Qiyin fe’l"}
-          </button>
-        </div>
-
-        {/* ANSWERS */}
-
-        <div className="answers">
-          {question.options.map(
-            (answer) => {
-              let className =
-                "answerButton";
-
-              if (
-                selectedAnswer !==
-                null
-              ) {
-                if (
-                  answer ===
-                  question.correctAnswer
-                ) {
-                  className +=
-                    " correct";
-                } else if (
-                  answer ===
-                  selectedAnswer
-                ) {
-                  className +=
-                    " wrong";
+      {studyMode !== "learn" && (
+        <section className="directions">
+          {(
+            [
+              ["v1", "V1 → V2 + V3"],
+              ["v2", "V2 → V1 + V3"],
+              ["v3", "V3 → V1 + V2"],
+              ["mixed", "Aralash"],
+            ] as const
+          ).map(
+            ([value, label]) => (
+              <button
+                key={value}
+                className={
+                  direction ===
+                  value
+                    ? "directionButton active"
+                    : "directionButton"
                 }
-              }
+                onClick={() =>
+                  changeDirection(
+                    value
+                  )
+                }
+              >
+                {label}
+              </button>
+            )
+          )}
+        </section>
+      )}
 
-              return (
-                <button
-                  key={answer}
-                  type="button"
-                  className={
-                    className
-                  }
-                  disabled={
+      {/* EMPTY MODE */}
+
+      {!currentVerb ? (
+        <section className="emptyCard">
+          {studyMode ===
+          "mistakes"
+            ? "Hozircha xato qilingan fe’llar yo‘q."
+            : studyMode ===
+              "difficult"
+            ? "Hozircha qiyin fe’l belgilanmagan."
+            : "Fe’llar topilmadi."}
+
+          <button
+            onClick={() =>
+              changeStudyMode(
+                "choice"
+              )
+            }
+          >
+            Tanlash rejimiga qaytish
+          </button>
+        </section>
+      ) : (
+        <section className="content">
+          {/* LEARN MODE */}
+
+          {studyMode ===
+          "learn" ? (
+            <>
+              <div className="learnTitle">
+                Fe’lni yodlab oling
+              </div>
+
+              <div className="learnCard">
+                <div>
+                  <span>V1</span>
+                  <strong>
+                    {currentVerb.v1}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>V2</span>
+                  <strong>
+                    {currentVerb.v2}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>V3</span>
+                  <strong>
+                    {currentVerb.v3}
+                  </strong>
+                </div>
+
+                <p>
+                  {currentVerb.uzbek}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="questionLabel">
+                {getDirectionLabel(
+                  questionDirection
+                )}
+              </div>
+
+              <div className="wordCard">
+                {getPrompt(
+                  currentVerb,
+                  questionDirection
+                )}
+              </div>
+
+              <div className="translation">
+                {currentVerb.uzbek}
+              </div>
+            </>
+          )}
+
+          {/* TOOLS */}
+
+          <div className="tools">
+            <button
+              className="toolButton"
+              onClick={speak}
+            >
+              🔊 Talaffuz
+            </button>
+
+            <button
+              className={
+                difficult
+                  ? "toolButton difficultActive"
+                  : "toolButton"
+              }
+              onClick={
+                toggleDifficult
+              }
+            >
+              {difficult
+                ? "★ Qiyin fe’l"
+                : "☆ Qiyin fe’l"}
+            </button>
+          </div>
+
+          {/* CHOICE */}
+
+          {(studyMode ===
+            "choice" ||
+            studyMode ===
+              "mistakes" ||
+            studyMode ===
+              "difficult") && (
+            <div className="answers">
+              {options.map(
+                (answer) => {
+                  const correct =
+                    getChoiceAnswer(
+                      currentVerb,
+                      questionDirection
+                    );
+
+                  let className =
+                    "answerButton";
+
+                  if (
                     selectedAnswer !==
                     null
+                  ) {
+                    if (
+                      answer ===
+                      correct
+                    ) {
+                      className +=
+                        " correct";
+                    } else if (
+                      answer ===
+                      selectedAnswer
+                    ) {
+                      className +=
+                        " wrong";
+                    }
                   }
-                  onClick={() =>
-                    handleAnswer(
-                      answer
-                    )
+
+                  return (
+                    <button
+                      key={answer}
+                      className={
+                        className
+                      }
+                      disabled={
+                        selectedAnswer !==
+                        null
+                      }
+                      onClick={() =>
+                        handleChoice(
+                          answer
+                        )
+                      }
+                    >
+                      {answer}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          {/* WRITING */}
+
+          {studyMode ===
+            "write" && (
+            <div className="writeArea">
+              <div className="writeInputs">
+                <label>
+                  <span>
+                    {
+                      writing.firstLabel
+                    }
+                  </span>
+
+                  <input
+                    value={
+                      writeOne
+                    }
+                    disabled={
+                      writeChecked
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={`${writing.firstLabel} ni yozing`}
+                    onChange={(e) =>
+                      setWriteOne(
+                        e.target
+                          .value
+                      )
+                    }
+                    onKeyDown={(
+                      e
+                    ) => {
+                      if (
+                        e.key ===
+                        "Enter"
+                      ) {
+                        checkWriting();
+                      }
+                    }}
+                  />
+                </label>
+
+                <label>
+                  <span>
+                    {
+                      writing.secondLabel
+                    }
+                  </span>
+
+                  <input
+                    value={
+                      writeTwo
+                    }
+                    disabled={
+                      writeChecked
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={`${writing.secondLabel} ni yozing`}
+                    onChange={(e) =>
+                      setWriteTwo(
+                        e.target
+                          .value
+                      )
+                    }
+                    onKeyDown={(
+                      e
+                    ) => {
+                      if (
+                        e.key ===
+                        "Enter"
+                      ) {
+                        checkWriting();
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
+              {!writeChecked ? (
+                <button
+                  className="checkButton"
+                  onClick={
+                    checkWriting
                   }
                 >
-                  {answer}
+                  Tekshirish
                 </button>
-              );
-            }
+              ) : (
+                <div
+                  className={
+                    writeCorrect
+                      ? "writeResult success"
+                      : "writeResult fail"
+                  }
+                >
+                  {writeCorrect ? (
+                    <>
+                      ✓ To‘g‘ri!
+                    </>
+                  ) : (
+                    <>
+                      ✕ To‘g‘ri
+                      javob:{" "}
+                      <strong>
+                        {
+                          writing.first
+                        }{" "}
+                        —{" "}
+                        {
+                          writing.second
+                        }
+                      </strong>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
-        </div>
 
-        {/* MINI STATS */}
+          {/* STATS */}
 
-        <div className="miniStats">
-          <div className="miniStat">
-            <span>✓</span>
+          {studyMode !==
+            "learn" && (
+            <div className="stats">
+              <div>
+                <strong>
+                  {correctCount}
+                </strong>
+                <span>
+                  ✓ To‘g‘ri
+                </span>
+              </div>
 
-            <strong>
-              {correctCount}
-            </strong>
+              <div>
+                <strong>
+                  {wrongCount}
+                </strong>
+                <span>
+                  ✕ Xato
+                </span>
+              </div>
 
-            <small>
-              To‘g‘ri
-            </small>
-          </div>
+              <div>
+                <strong>
+                  {
+                    mistakeIds.size
+                  }
+                </strong>
+                <span>
+                  Xatolarim
+                </span>
+              </div>
 
-          <div className="miniStat">
-            <span>✕</span>
+              <div>
+                <strong>
+                  {accuracy}%
+                </strong>
+                <span>
+                  Natija
+                </span>
+              </div>
+            </div>
+          )}
 
-            <strong>
-              {wrongCount}
-            </strong>
+          {/* NAV */}
 
-            <small>
-              Xato
-            </small>
-          </div>
-
-          <div className="miniStat">
-            <span>★</span>
-
-            <strong>
-              {
-                difficultIds.size
+          <div className="navigation">
+            <button
+              onClick={
+                goPrevious
               }
-            </strong>
+            >
+              ← Oldingi
+            </button>
 
-            <small>
-              Qiyin
-            </small>
+            <button
+              className="later"
+              onClick={() => {
+                if (
+                  currentVerb
+                ) {
+                  addMistake(
+                    currentVerb.id
+                  );
+                }
+
+                goNext();
+              }}
+            >
+              ↻ Keyinroq yana
+              ko‘rsat
+            </button>
+
+            <button
+              onClick={goNext}
+            >
+              Keyingi →
+            </button>
           </div>
-
-          <div className="miniStat accuracy">
-            <span>%</span>
-
-            <strong>
-              {accuracy}
-            </strong>
-
-            <small>
-              Natija
-            </small>
-          </div>
-        </div>
-
-        {/* NAVIGATION */}
-
-        <div className="navigation">
-          <button
-            type="button"
-            className="navButton"
-            onClick={goPrevious}
-          >
-            ← Oldingi
-          </button>
-
-          <button
-            type="button"
-            className="laterButton"
-            onClick={showLater}
-          >
-            ↻ Keyinroq yana
-            ko‘rsat
-          </button>
-
-          <button
-            type="button"
-            className="navButton"
-            onClick={goNext}
-          >
-            Keyingi →
-          </button>
-        </div>
-      </section>
+        </section>
+      )}
 
       <style jsx>{`
         * {
@@ -1021,21 +1635,17 @@ export default function IrregularVerbsLearnPage() {
 
         .page {
           min-height: 100vh;
-
-          padding:
-            24px
-            12px
-            60px;
+          padding: 22px 14px 60px;
 
           background:
             radial-gradient(
               circle at top,
-              #ffffff 0%,
+              #fff 0%,
               #f3f6f7 45%,
               #e7ecef 100%
             );
 
-          color: #111;
+          color: #142d38;
 
           font-family:
             "Bell MT",
@@ -1044,964 +1654,742 @@ export default function IrregularVerbsLearnPage() {
             serif;
         }
 
-        button {
+        button,
+        input {
           font-family: inherit;
         }
 
-        /* =========================================
-           TOP PANEL
-        ========================================= */
+        button {
+          cursor: pointer;
+        }
+
+        /* TOP */
 
         .topPanel {
-          width:
-            min(
-              1090px,
-              calc(
-                100% - 20px
-              )
-            );
+          width: min(
+            1180px,
+            calc(100% - 10px)
+          );
 
-          min-height: 105px;
+          margin: auto;
 
-          margin: 0 auto;
-
-          padding:
-            16px
-            25px;
+          padding: 16px 20px;
 
           display: grid;
 
           grid-template-columns:
-            175px
-            1fr
-            110px;
+            145px 1fr 95px;
 
           align-items: center;
 
-          gap: 20px;
+          gap: 16px;
 
-          border:
-            3px solid
-            #074d6c;
-
-          border-radius: 20px;
+          border: 3px solid #07506d;
+          border-radius: 19px;
 
           background:
             linear-gradient(
               180deg,
-              #82dcf7 0%,
-              #56bce5 38%,
-              #2f9ecb 78%,
-              #208bb7 100%
+              #82dcf7,
+              #55bde5 45%,
+              #2596c2
             );
 
           box-shadow:
             inset 0 6px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .75
-              ),
-
+              rgba(255,255,255,.7),
             inset 0 -5px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .13
-              ),
-
-            0 9px 0
-              #07506c,
-
-            0 16px 23px
-              rgba(
-                0,
-                0,
-                0,
-                .20
-              );
+              rgba(0,0,0,.12),
+            0 9px 0 #07506d,
+            0 16px 22px
+              rgba(0,0,0,.2);
         }
 
         .backButton,
-        .modeButton,
+        .studyButton,
+        .directionButton,
         .toolButton,
-        .navButton,
-        .laterButton {
-          cursor: pointer;
-
-          font-weight: 800;
-        }
-
-        .backButton {
-          min-height: 46px;
-
-          padding:
-            8px
-            14px;
-
-          border:
-            2px solid
-            #174461;
-
+        .navigation button,
+        .checkButton,
+        .emptyCard button {
+          border: 2px solid #526b76;
           border-radius: 9px;
-
-          color: #073b68;
 
           background:
             linear-gradient(
               180deg,
-              #c8f2ff,
-              #82d1ef 55%,
-              #4ba4d0
+              #f6fbfd,
+              #d6e3e8
             );
 
-          box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              ),
+          color: #254d5f;
 
-            0 4px 0
-              #17415c;
+          font-weight: 900;
+
+          box-shadow:
+            0 4px 0 #607984;
         }
 
-        .modeArea {
+        .backButton {
+          min-height: 45px;
+        }
+
+        .studyModes {
           display: grid;
 
           grid-template-columns:
             repeat(
-              4,
-              minmax(
-                0,
-                1fr
-              )
+              5,
+              minmax(0,1fr)
             );
 
           gap: 8px;
         }
 
-        .modeButton {
-          min-height: 43px;
-
-          padding:
-            6px
-            8px;
-
-          border:
-            2px solid
-            #276a88;
-
-          border-radius: 8px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #f4fbfd,
-              #d9e7ec
-            );
-
-          color: #335665;
-
-          box-shadow:
-            0 3px 0
-              #24627e;
-
+        .studyButton {
+          position: relative;
+          min-height: 44px;
+          padding: 6px;
           font-size: 12px;
         }
 
-        .modeButton.active {
-          border-color:
-            #073d5b;
+        .studyButton.active,
+        .directionButton.active {
+          border-color: #073f5d;
 
           background:
             linear-gradient(
               180deg,
-              #d4f5ff,
-              #7bcceb
+              #d8f6ff,
+              #7bccea
             );
 
-          color: #063c5c;
+          color: #063e5d;
 
           box-shadow:
-            inset 0 3px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              ),
-
-            0 4px 0
-              #073f5b;
+            inset 0 3px 3px
+              rgba(255,255,255,.8),
+            0 4px 0 #064764;
         }
 
-        .progressBox {
-          min-height: 62px;
+        .countBadge {
+          margin-left: 5px;
+          padding: 1px 5px;
+
+          border-radius: 20px;
+
+          background: #1b6887;
+          color: white;
+
+          font-size: 9px;
+        }
+
+        .progress {
+          min-height: 58px;
 
           display: flex;
-
-          align-items:
-            baseline;
-
-          justify-content:
-            center;
+          justify-content: center;
+          align-items: baseline;
 
           gap: 4px;
 
-          border:
-            2px solid
-            #174461;
-
+          border: 2px solid #174461;
           border-radius: 10px;
 
           background:
             linear-gradient(
-              180deg,
-              #e7f9ff,
-              #addff2
+              #e8faff,
+              #b2e1f2
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .85
-              ),
-
-            0 4px 0
-              #17415c;
+            0 4px 0 #17415c;
         }
 
-        .progressBox strong {
-          color: #073b68;
-
-          font-size: 25px;
+        .progress strong {
+          font-size: 24px;
         }
 
-        .progressBox span {
-          color: #496674;
-
-          font-size: 13px;
-
-          font-weight: 800;
+        .progress span {
+          font-size: 11px;
+          font-weight: 900;
         }
 
-        /* =========================================
-           CONTENT
-        ========================================= */
+        /* DIRECTIONS */
+
+        .directions {
+          width: min(
+            780px,
+            calc(100% - 20px)
+          );
+
+          margin: 45px auto 0;
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(4,1fr);
+
+          gap: 10px;
+        }
+
+        .directionButton {
+          min-height: 39px;
+          font-size: 11px;
+        }
+
+        /* CONTENT */
 
         .content {
-          width:
-            min(
-              960px,
-              calc(
-                100% - 20px
-              )
-            );
+          width: min(
+            950px,
+            calc(100% - 15px)
+          );
 
-          margin:
-            55px
-            auto
-            0;
+          margin: 36px auto 0;
 
           text-align: center;
         }
 
-        .modeLabel {
-          width:
-            fit-content;
+        .questionLabel,
+        .learnTitle {
+          width: fit-content;
 
-          margin:
-            0 auto
-            13px;
+          margin: 0 auto 13px;
 
-          padding:
-            5px
-            13px;
+          padding: 5px 14px;
 
-          border:
-            1px solid
-            #9aa8ae;
+          border: 1px solid #9ca9ae;
+          border-radius: 20px;
 
-          border-radius:
-            20px;
+          background: #e5ebed;
 
-          background: #e3eaed;
-
-          color: #536871;
+          color: #536a74;
 
           font-size: 11px;
-
           font-weight: 900;
         }
 
-        /* =========================================
-           WORD
-        ========================================= */
+        /* WORD */
 
         .wordCard {
-          width:
-            min(
-              500px,
-              92%
-            );
+          width: min(510px,94%);
+          min-height: 120px;
 
-          min-height: 122px;
-
-          margin: 0 auto;
-
-          padding:
-            20px;
+          margin: auto;
+          padding: 20px;
 
           display: flex;
-
           align-items: center;
+          justify-content: center;
 
-          justify-content:
-            center;
-
-          border:
-            3px solid
-            #07506d;
-
+          border: 3px solid #07506d;
           border-radius: 17px;
 
           background:
             linear-gradient(
-              180deg,
-              #81dcf7 0%,
-              #59bee6 40%,
-              #2fa0cf 100%
+              #82dcf7,
+              #52bae3 45%,
+              #2d9dca
             );
 
           box-shadow:
             inset 0 6px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .65
-              ),
-
-            inset 0 -4px 4px
-              rgba(
-                0,
-                0,
-                0,
-                .10
-              ),
-
-            0 9px 0
-              #07506d,
-
+              rgba(255,255,255,.65),
+            0 9px 0 #07506d,
             0 15px 20px
-              rgba(
-                0,
-                0,
-                0,
-                .18
-              );
+              rgba(0,0,0,.18);
 
           color: #073b68;
 
           font-size: 42px;
-
           font-weight: 900;
-
-          overflow-wrap:
-            anywhere;
         }
 
         .translation {
           margin-top: 20px;
 
-          color: #5a6970;
+          color: #5b6d74;
 
           font-size: 17px;
-
           font-weight: 800;
         }
 
-        /* =========================================
-           TOOLS
-        ========================================= */
+        /* LEARN */
 
-        .tools {
-          margin-top: 20px;
+        .learnCard {
+          width: min(720px,96%);
 
-          display: flex;
+          margin: 0 auto;
 
-          justify-content:
-            center;
-
-          gap: 12px;
-
-          flex-wrap: wrap;
-        }
-
-        .toolButton {
-          min-height: 39px;
-
-          padding:
-            6px
-            14px;
-
-          border:
-            1px solid
-            #8d999e;
-
-          border-radius: 8px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #f6f6f6,
-              #dadfe1
-            );
-
-          color: #465b65;
-
-          box-shadow:
-            0 3px 0
-              #8b969b;
-        }
-
-        .difficultActive {
-          border-color:
-            #af8a27;
-
-          background:
-            linear-gradient(
-              180deg,
-              #fff7d7,
-              #ead88e
-            );
-
-          color: #70550b;
-        }
-
-        /* =========================================
-           ANSWERS
-        ========================================= */
-
-        .answers {
-          margin-top: 65px;
+          padding: 32px;
 
           display: grid;
 
           grid-template-columns:
-            repeat(
-              2,
-              minmax(
-                280px,
-                1fr
-              )
+            repeat(3,1fr);
+
+          gap: 18px;
+
+          border: 3px solid #07506d;
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              #83dcf6,
+              #4eb6df
             );
 
-          gap: 52px;
+          box-shadow:
+            inset 0 6px 5px
+              rgba(255,255,255,.65),
+            0 9px 0 #07506d,
+            0 16px 22px
+              rgba(0,0,0,.18);
+        }
+
+        .learnCard > div {
+          min-height: 105px;
+
+          padding: 12px;
+
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+
+          border: 2px solid #597983;
+          border-radius: 12px;
+
+          background:
+            linear-gradient(
+              #f5f7f7,
+              #dce2e4
+            );
+
+          box-shadow:
+            0 5px 0 #698087;
+        }
+
+        .learnCard span {
+          font-size: 11px;
+          font-weight: 900;
+          color: #63777f;
+        }
+
+        .learnCard strong {
+          margin-top: 8px;
+          font-size: 27px;
+        }
+
+        .learnCard p {
+          grid-column: 1 / -1;
+
+          margin: 8px 0 0;
+
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        /* TOOLS */
+
+        .tools {
+          margin-top: 25px;
+
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+        }
+
+        .toolButton {
+          min-height: 38px;
+          padding: 6px 15px;
+        }
+
+        .difficultActive {
+          border-color: #a7862b;
+          background:
+            linear-gradient(
+              #fff7d7,
+              #e7d48a
+            );
+          color: #72570a;
+        }
+
+        /* ANSWERS */
+
+        .answers {
+          margin-top: 55px;
+
+          display: grid;
+          grid-template-columns:
+            repeat(2,1fr);
+
+          gap: 45px;
         }
 
         .answerButton {
-          min-height: 108px;
+          min-height: 105px;
+          padding: 16px;
 
-          padding:
-            15px
-            20px;
-
-          border:
-            2px solid
-            #747f84;
-
+          border: 2px solid #747f84;
           border-radius: 13px;
 
           background:
             linear-gradient(
-              180deg,
-              #eeeeee 0%,
-              #e7e7e7 50%,
-              #dcdcdc 100%
+              #f1f1f1,
+              #dedede
             );
 
           box-shadow:
             inset 0 5px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .95
-              ),
-
-            inset 0 -4px 4px
-              rgba(
-                0,
-                0,
-                0,
-                .08
-              ),
-
-            0 8px 0
-              #747f84,
-
+              rgba(255,255,255,.9),
+            0 8px 0 #747f84,
             0 13px 18px
-              rgba(
-                0,
-                0,
-                0,
-                .19
-              );
+              rgba(0,0,0,.18);
 
-          color: #152c36;
+          color: #172f39;
 
-          font-size: 24px;
-
+          font-size: 23px;
           font-weight: 900;
-
-          cursor: pointer;
-
-          transition:
-            transform
-            .08s ease;
-        }
-
-        .answerButton:hover:not(
-            :disabled
-          ) {
-          transform:
-            translateY(
-              -2px
-            );
         }
 
         .answerButton.correct {
-          border-color:
-            #42845b;
+          border-color: #42845b;
 
           background:
             linear-gradient(
-              180deg,
               #e8f8ed,
               #bfe5cb
             );
 
           box-shadow:
-            0 7px 0
-              #4f8b63;
+            0 7px 0 #4f8b63;
         }
 
         .answerButton.wrong {
-          border-color:
-            #a85e5e;
+          border-color: #a85e5e;
 
           background:
             linear-gradient(
-              180deg,
               #ffeaea,
               #efc2c2
             );
 
           box-shadow:
-            0 7px 0
-              #9d6262;
+            0 7px 0 #9d6262;
         }
 
-        .answerButton:disabled {
-          cursor: default;
+        /* WRITE */
+
+        .writeArea {
+          width: min(700px,100%);
+
+          margin: 55px auto 0;
         }
 
-        /* =========================================
-           STATS
-        ========================================= */
+        .writeInputs {
+          display: grid;
+          grid-template-columns:
+            repeat(2,1fr);
 
-        .miniStats {
-          margin-top: 34px;
+          gap: 25px;
+        }
+
+        .writeInputs label {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .writeInputs span {
+          font-weight: 900;
+          color: #41606d;
+        }
+
+        .writeInputs input {
+          min-height: 70px;
+          padding: 12px 18px;
+
+          border: 2px solid #6d7e85;
+          border-radius: 12px;
+
+          outline: none;
+
+          background: #f3f3f3;
+
+          box-shadow:
+            inset 0 4px 7px
+              rgba(0,0,0,.08),
+            0 5px 0 #77858a;
+
+          text-align: center;
+
+          color: #153c4e;
+
+          font-size: 23px;
+          font-weight: 900;
+        }
+
+        .writeInputs input:focus {
+          border-color: #278eb8;
+        }
+
+        .checkButton {
+          min-width: 190px;
+          min-height: 45px;
+
+          margin-top: 28px;
+
+          background:
+            linear-gradient(
+              #d8f6ff,
+              #83cee9
+            );
+        }
+
+        .writeResult {
+          margin: 30px auto 0;
+
+          padding: 13px 20px;
+
+          width: fit-content;
+
+          border-radius: 9px;
+
+          font-size: 17px;
+          font-weight: 900;
+        }
+
+        .writeResult.success {
+          background: #d8efdf;
+          color: #27613b;
+        }
+
+        .writeResult.fail {
+          background: #f5dada;
+          color: #843d3d;
+        }
+
+        /* STATS */
+
+        .stats {
+          margin-top: 35px;
 
           display: flex;
-
-          align-items: center;
-
-          justify-content:
-            center;
-
-          gap: 12px;
+          justify-content: center;
+          gap: 10px;
 
           flex-wrap: wrap;
         }
 
-        .miniStat {
-          min-width: 112px;
+        .stats div {
+          min-width: 105px;
+          min-height: 48px;
 
-          min-height: 43px;
+          padding: 5px 10px;
 
-          padding:
-            5px
-            10px;
+          display: flex;
+          flex-direction: column;
 
-          display: grid;
-
-          grid-template-columns:
-            20px
-            1fr;
-
-          grid-template-rows:
-            20px
-            13px;
-
-          align-items: center;
-
-          border:
-            1px solid
-            #89969c;
-
+          border: 1px solid #89969c;
           border-radius: 8px;
 
           background:
             linear-gradient(
-              180deg,
               #f1f3f4,
               #dce1e3
             );
 
           box-shadow:
-            0 3px 0
-              #8b969b;
+            0 3px 0 #8b969b;
         }
 
-        .miniStat > span {
-          grid-row:
-            1 / 3;
-
-          color: #477080;
-
-          font-weight: 900;
+        .stats strong {
+          font-size: 16px;
         }
 
-        .miniStat strong {
-          color: #153f52;
-
-          font-size: 15px;
-        }
-
-        .miniStat small {
-          color: #667980;
-
+        .stats span {
           font-size: 9px;
-
           font-weight: 800;
         }
 
-        /* =========================================
-           NAVIGATION
-        ========================================= */
+        /* NAVIGATION */
 
         .navigation {
-          margin-top: 55px;
+          margin-top: 50px;
 
           display: grid;
 
           grid-template-columns:
-            160px
-            1fr
-            160px;
+            160px 1fr 160px;
 
-          gap: 18px;
-
-          align-items: center;
+          gap: 20px;
         }
 
-        .navButton,
-        .laterButton {
-          min-height: 45px;
-
-          padding:
-            8px
-            14px;
-
-          border:
-            2px solid
-            #64737a;
-
-          border-radius: 9px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #f5f5f5,
-              #d8dcde
-            );
-
-          color: #354e59;
-
-          box-shadow:
-            0 4px 0
-              #7b868b;
+        .navigation button {
+          min-height: 44px;
         }
 
-        .laterButton {
+        .navigation .later {
           justify-self: center;
-
           min-width: 230px;
 
-          border-color:
-            #337b9a;
+          border-color: #337b9a;
 
           background:
             linear-gradient(
-              180deg,
               #dff6ff,
               #a8dceb
             );
+        }
 
-          color: #17526b;
+        /* EMPTY */
+
+        .emptyCard {
+          width: min(550px,90%);
+
+          margin: 80px auto;
+
+          padding: 35px;
+
+          display: flex;
+          flex-direction: column;
+          gap: 25px;
+
+          text-align: center;
+
+          border: 2px solid #687a82;
+          border-radius: 15px;
+
+          background: #e9edef;
 
           box-shadow:
-            0 4px 0
-              #397a95;
+            0 7px 0 #78878d;
+
+          font-size: 19px;
+          font-weight: 900;
         }
 
-        /* =========================================
-           TABLET
-        ========================================= */
+        .emptyCard button {
+          min-height: 45px;
+        }
 
-        @media (
-          max-width: 850px
-        ) {
+        /* TABLET */
+
+        @media (max-width: 900px) {
           .topPanel {
             grid-template-columns:
-              150px
-              1fr
-              85px;
-
-            gap: 12px;
-
-            padding:
-              14px;
+              130px 1fr 80px;
           }
 
-          .modeArea {
+          .studyModes {
             grid-template-columns:
-              repeat(
-                2,
-                1fr
-              );
-          }
-
-          .answers {
-            gap: 25px;
+              repeat(3,1fr);
           }
         }
 
-        /* =========================================
-           MOBILE
-        ========================================= */
+        /* MOBILE */
 
-        @media (
-          max-width: 620px
-        ) {
+        @media (max-width: 650px) {
           .page {
             padding:
-              10px
-              5px
-              35px;
+              10px 5px 35px;
           }
 
           .topPanel {
             width:
-              calc(
-                100% - 10px
-              );
-
-            padding: 12px;
-
-            display: grid;
+              calc(100% - 8px);
 
             grid-template-columns:
-              1fr
-              70px;
+              1fr 70px;
 
-            gap: 10px;
-
-            border-radius: 15px;
+            padding: 12px;
           }
 
           .backButton {
             grid-column:
               1 / -1;
-
-            width: 100%;
-
-            min-height: 39px;
           }
 
-          .modeArea {
+          .studyModes {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(
-                  0,
-                  1fr
-                )
-              );
-
-            gap: 7px;
+              repeat(2,1fr);
           }
 
-          .modeButton {
-            min-height: 39px;
-
-            padding:
-              5px
-              3px;
-
+          .studyButton {
             font-size: 10px;
           }
 
-          .progressBox {
-            min-height: 85px;
+          .directions {
+            margin-top: 35px;
 
-            flex-direction:
-              column;
-
-            align-items: center;
-
-            gap: 0;
-          }
-
-          .progressBox strong {
-            font-size: 22px;
+            grid-template-columns:
+              repeat(2,1fr);
           }
 
           .content {
-            width:
-              calc(
-                100% - 14px
-              );
-
-            margin-top: 38px;
+            margin-top: 30px;
           }
 
           .wordCard {
-            min-height: 100px;
-
+            min-height: 95px;
             font-size: 34px;
           }
 
-          .translation {
-            font-size: 15px;
+          .learnCard {
+            padding: 20px 12px;
+
+            grid-template-columns: 1fr;
+          }
+
+          .learnCard p {
+            grid-column: auto;
           }
 
           .answers {
-            margin-top: 48px;
+            margin-top: 45px;
 
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
 
             gap: 22px;
           }
 
           .answerButton {
-            min-height: 82px;
-
+            min-height: 80px;
             font-size: 20px;
           }
 
-          .miniStats {
+          .writeInputs {
+            grid-template-columns: 1fr;
+          }
+
+          .writeInputs input {
+            min-height: 60px;
+            font-size: 20px;
+          }
+
+          .stats {
             display: grid;
-
             grid-template-columns:
-              repeat(
-                4,
-                minmax(
-                  0,
-                  1fr
-                )
-              );
-
-            gap: 6px;
+              repeat(4,1fr);
           }
 
-          .miniStat {
+          .stats div {
             min-width: 0;
-
-            min-height: 54px;
-
-            padding:
-              5px
-              3px;
-
-            display: flex;
-
-            flex-direction:
-              column;
-
-            justify-content:
-              center;
-
-            gap: 0;
-          }
-
-          .miniStat > span {
-            display: none;
-          }
-
-          .miniStat strong {
-            font-size: 15px;
-          }
-
-          .miniStat small {
-            font-size: 8px;
+            padding: 5px 2px;
           }
 
           .navigation {
-            margin-top: 42px;
-
             grid-template-columns:
-              1fr
-              1fr;
-
-            gap: 12px;
+              1fr 1fr;
           }
 
-          .laterButton {
-            grid-column:
-              1 / -1;
-
+          .navigation .later {
+            grid-column: 1 / -1;
             grid-row: 1;
 
             width: 100%;
-
             min-width: 0;
-          }
-
-          .navButton {
-            width: 100%;
-
-            padding:
-              6px;
-
-            font-size: 12px;
-          }
-        }
-
-        @media (
-          max-width: 370px
-        ) {
-          .wordCard {
-            font-size: 29px;
-          }
-
-          .answerButton {
-            font-size: 18px;
-          }
-
-          .modeButton {
-            font-size: 9px;
           }
         }
       `}</style>
