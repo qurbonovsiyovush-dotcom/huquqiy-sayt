@@ -51,39 +51,71 @@ function shuffle<T>(items: T[]) {
 
   for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+
+    [copy[i], copy[j]] = [
+      copy[j],
+      copy[i],
+    ];
   }
 
   return copy;
 }
 
 export default function SynonymsPage() {
-  const [words, setWords] = useState<SynonymWord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [words, setWords] =
+    useState<SynonymWord[]>([]);
 
-  const [mode, setMode] = useState<Mode>("learn");
-  const [index, setIndex] = useState(0);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [progress, setProgress] = useState<ProgressMap>({});
+  const [error, setError] =
+    useState("");
 
-  const [revealed, setRevealed] = useState(false);
+  const [mode, setMode] =
+    useState<Mode>("learn");
 
-  const [selectedAnswer, setSelectedAnswer] = useState("");
-  const [choiceResult, setChoiceResult] = useState<
+  const [index, setIndex] =
+    useState(0);
+
+  const [progress, setProgress] =
+    useState<ProgressMap>({});
+
+  const [revealed, setRevealed] =
+    useState(false);
+
+  const [
+    selectedAnswer,
+    setSelectedAnswer,
+  ] = useState("");
+
+  const [
+    choiceResult,
+    setChoiceResult,
+  ] = useState<
     "correct" | "wrong" | ""
   >("");
 
-  const [writeAnswer, setWriteAnswer] = useState("");
-  const [writeResult, setWriteResult] = useState<
+  const [
+    writeAnswer,
+    setWriteAnswer,
+  ] = useState("");
+
+  const [
+    writeResult,
+    setWriteResult,
+  ] = useState<
     "correct" | "wrong" | ""
   >("");
 
-  const [speechSupported, setSpeechSupported] = useState(false);
+  const [
+    speechSupported,
+    setSpeechSupported,
+  ] = useState(false);
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const timerRef =
+    useRef<ReturnType<
+      typeof setTimeout
+    > | null>(null);
 
   useEffect(() => {
     setSpeechSupported(
@@ -96,7 +128,9 @@ export default function SynonymsPage() {
 
     return () => {
       if (timerRef.current) {
-        clearTimeout(timerRef.current);
+        clearTimeout(
+          timerRef.current
+        );
       }
     };
   }, []);
@@ -106,19 +140,27 @@ export default function SynonymsPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(API, {
-        cache: "no-store",
-      });
+      const response =
+        await fetch(API, {
+          cache: "no-store",
+        });
 
-      const data: ApiResponse = await response.json();
+      const data: ApiResponse =
+        await response.json();
 
-      if (!response.ok || !data.ok) {
+      if (
+        !response.ok ||
+        !data.ok
+      ) {
         throw new Error(
-          data.message || "Sinonimlarni yuklab bo‘lmadi."
+          data.message ||
+            "Sinonimlarni yuklab bo‘lmadi."
         );
       }
 
-      setWords(data.words || []);
+      setWords(
+        data.words || []
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -132,16 +174,23 @@ export default function SynonymsPage() {
 
   function loadProgress() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw =
+        localStorage.getItem(
+          STORAGE_KEY
+        );
 
       if (!raw) {
         setProgress({});
         return;
       }
 
-      const parsed = JSON.parse(raw);
+      const parsed =
+        JSON.parse(raw);
 
-      if (parsed && typeof parsed === "object") {
+      if (
+        parsed &&
+        typeof parsed === "object"
+      ) {
         setProgress(parsed);
       }
     } catch {
@@ -149,7 +198,9 @@ export default function SynonymsPage() {
     }
   }
 
-  function saveProgress(next: ProgressMap) {
+  function saveProgress(
+    next: ProgressMap
+  ) {
     setProgress(next);
 
     try {
@@ -162,83 +213,146 @@ export default function SynonymsPage() {
     }
   }
 
-  const wrongIds = useMemo(() => {
-    return new Set(
-      Object.entries(progress)
-        .filter(([, item]) => item.wrong > 0)
-        .map(([id]) => id)
+  const wrongIds = useMemo(
+    () =>
+      new Set(
+        Object.entries(progress)
+          .filter(
+            ([, item]) =>
+              item.wrong > 0
+          )
+          .map(([id]) => id)
+      ),
+    [progress]
+  );
+
+  const difficultIds =
+    useMemo(
+      () =>
+        new Set(
+          Object.entries(progress)
+            .filter(
+              ([, item]) =>
+                item.difficult
+            )
+            .map(([id]) => id)
+        ),
+      [progress]
     );
-  }, [progress]);
 
-  const difficultIds = useMemo(() => {
-    return new Set(
-      Object.entries(progress)
-        .filter(([, item]) => item.difficult)
-        .map(([id]) => id)
-    );
-  }, [progress]);
+  const visibleWords =
+    useMemo(() => {
+      if (mode === "wrong") {
+        return words.filter(
+          (item) =>
+            wrongIds.has(
+              item.id
+            )
+        );
+      }
 
-  const visibleWords = useMemo(() => {
-    if (mode === "wrong") {
-      return words.filter((item) => wrongIds.has(item.id));
-    }
+      if (
+        mode === "difficult"
+      ) {
+        return words.filter(
+          (item) =>
+            difficultIds.has(
+              item.id
+            )
+        );
+      }
 
-    if (mode === "difficult") {
-      return words.filter((item) =>
-        difficultIds.has(item.id)
-      );
-    }
-
-    return words;
-  }, [words, mode, wrongIds, difficultIds]);
+      return words;
+    }, [
+      words,
+      mode,
+      wrongIds,
+      difficultIds,
+    ]);
 
   const current =
     visibleWords.length > 0
       ? visibleWords[
-          Math.min(index, visibleWords.length - 1)
+          Math.min(
+            index,
+            visibleWords.length -
+              1
+          )
         ]
       : null;
 
-  const currentProgress = current
-    ? progress[current.id] || {
-        correct: 0,
-        wrong: 0,
-        difficult: false,
-        learned: false,
-      }
-    : null;
+  const currentProgress =
+    current
+      ? progress[
+          current.id
+        ] || {
+          correct: 0,
+          wrong: 0,
+          difficult: false,
+          learned: false,
+        }
+      : null;
 
-  const totalCorrect = useMemo(() => {
-    return Object.values(progress).reduce(
-      (sum, item) => sum + item.correct,
-      0
+  const totalCorrect =
+    useMemo(
+      () =>
+        Object.values(
+          progress
+        ).reduce(
+          (sum, item) =>
+            sum +
+            item.correct,
+          0
+        ),
+      [progress]
     );
-  }, [progress]);
 
-  const totalWrong = useMemo(() => {
-    return Object.values(progress).reduce(
-      (sum, item) => sum + item.wrong,
-      0
+  const totalWrong =
+    useMemo(
+      () =>
+        Object.values(
+          progress
+        ).reduce(
+          (sum, item) =>
+            sum +
+            item.wrong,
+          0
+        ),
+      [progress]
     );
-  }, [progress]);
 
-  const learnedCount = useMemo(() => {
-    return Object.values(progress).filter(
-      (item) => item.learned
-    ).length;
-  }, [progress]);
+  const learnedCount =
+    useMemo(
+      () =>
+        Object.values(
+          progress
+        ).filter(
+          (item) =>
+            item.learned
+        ).length,
+      [progress]
+    );
 
   const accuracy =
-    totalCorrect + totalWrong > 0
+    totalCorrect +
+      totalWrong >
+    0
       ? Math.round(
-          (totalCorrect / (totalCorrect + totalWrong)) * 100
+          (totalCorrect /
+            (totalCorrect +
+              totalWrong)) *
+            100
         )
       : 0;
 
   function clearTimer() {
     if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+      clearTimeout(
+        timerRef.current
+      );
+
+      timerRef.current =
+        null;
     }
   }
 
@@ -246,15 +360,23 @@ export default function SynonymsPage() {
     clearTimer();
 
     setRevealed(false);
+
     setSelectedAnswer("");
+
     setChoiceResult("");
+
     setWriteAnswer("");
+
     setWriteResult("");
   }
 
-  function changeMode(nextMode: Mode) {
+  function changeMode(
+    nextMode: Mode
+  ) {
     resetCard();
+
     setMode(nextMode);
+
     setIndex(0);
   }
 
@@ -262,15 +384,28 @@ export default function SynonymsPage() {
     clearTimer();
 
     setRevealed(false);
+
     setSelectedAnswer("");
+
     setChoiceResult("");
+
     setWriteAnswer("");
+
     setWriteResult("");
 
     setIndex((old) => {
-      if (visibleWords.length === 0) return 0;
+      if (
+        visibleWords.length ===
+        0
+      ) {
+        return 0;
+      }
 
-      if (old < visibleWords.length - 1) {
+      if (
+        old <
+        visibleWords.length -
+          1
+      ) {
         return old + 1;
       }
 
@@ -282,156 +417,291 @@ export default function SynonymsPage() {
     resetCard();
 
     setIndex((old) => {
-      if (visibleWords.length === 0) return 0;
+      if (
+        visibleWords.length ===
+        0
+      ) {
+        return 0;
+      }
 
       if (old > 0) {
         return old - 1;
       }
 
-      return visibleWords.length - 1;
+      return (
+        visibleWords.length -
+        1
+      );
     });
   }
 
-  function autoNext(delay: number) {
+  function autoNext(
+    delay: number
+  ) {
     clearTimer();
 
-    timerRef.current = setTimeout(() => {
-      next();
-    }, delay);
+    timerRef.current =
+      setTimeout(() => {
+        next();
+      }, delay);
   }
 
   function markResult(
     item: SynonymWord,
     correct: boolean
   ) {
-    const old = progress[item.id] || {
-      correct: 0,
-      wrong: 0,
-      difficult: false,
-      learned: false,
-    };
+    const old =
+      progress[
+        item.id
+      ] || {
+        correct: 0,
+        wrong: 0,
+        difficult: false,
+        learned: false,
+      };
 
     const nextCorrect =
-      old.correct + (correct ? 1 : 0);
-
-    const nextItem: ProgressItem = {
-      ...old,
-      correct: nextCorrect,
-      wrong: old.wrong + (correct ? 0 : 1),
-      learned:
-        nextCorrect >= 3 ? true : old.learned,
-    };
+      old.correct +
+      (correct ? 1 : 0);
 
     saveProgress({
       ...progress,
-      [item.id]: nextItem,
+
+      [item.id]: {
+        ...old,
+
+        correct:
+          nextCorrect,
+
+        wrong:
+          old.wrong +
+          (correct ? 0 : 1),
+
+        learned:
+          nextCorrect >= 3
+            ? true
+            : old.learned,
+      },
     });
   }
 
   function toggleDifficult() {
     if (!current) return;
 
-    const old = progress[current.id] || {
-      correct: 0,
-      wrong: 0,
-      difficult: false,
-      learned: false,
-    };
+    const old =
+      progress[
+        current.id
+      ] || {
+        correct: 0,
+        wrong: 0,
+        difficult: false,
+        learned: false,
+      };
 
     saveProgress({
       ...progress,
 
       [current.id]: {
         ...old,
-        difficult: !old.difficult,
+
+        difficult:
+          !old.difficult,
       },
     });
   }
 
+  /* =====================================================
+     O‘RGANISH
+     AVTOMATIK O‘TMAYDI
+  ===================================================== */
+
   function revealSynonyms() {
-    if (!current || revealed) return;
+    if (!current) return;
 
     setRevealed(true);
-
-    autoNext(2400);
   }
 
-  const choiceOptions = useMemo(() => {
-    if (!current || current.synonyms.length === 0) {
-      return [];
+  /* =====================================================
+     TANLASH
+     FAQAT SHU REJIMDA AVTOMATIK O‘TADI
+  ===================================================== */
+
+  const choiceOptions =
+    useMemo(() => {
+      if (
+        !current ||
+        current.synonyms.length ===
+          0
+      ) {
+        return [];
+      }
+
+      const correct =
+        current.synonyms[0];
+
+      const accepted =
+        current.synonyms.map(
+          normalize
+        );
+
+      const wrongPool =
+        words
+          .filter(
+            (item) =>
+              item.id !==
+              current.id
+          )
+          .flatMap(
+            (item) =>
+              item.synonyms
+          )
+          .filter(
+            (item) =>
+              !accepted.includes(
+                normalize(item)
+              )
+          );
+
+      const uniqueWrong =
+        Array.from(
+          new Set(wrongPool)
+        );
+
+      const wrongAnswers =
+        shuffle(
+          uniqueWrong
+        ).slice(0, 3);
+
+      return shuffle([
+        correct,
+        ...wrongAnswers,
+      ]);
+    }, [
+      current,
+      words,
+    ]);
+
+  function checkChoice(
+    answer: string
+  ) {
+    if (
+      !current ||
+      choiceResult
+    ) {
+      return;
     }
 
-    const correct = current.synonyms[0];
-
-    const wrongPool = words
-      .filter((item) => item.id !== current.id)
-      .flatMap((item) => item.synonyms)
-      .filter(
-        (item) =>
-          normalize(item) !== normalize(correct) &&
-          !current.synonyms
-            .map(normalize)
-            .includes(normalize(item))
+    const accepted =
+      current.synonyms.map(
+        normalize
       );
 
-    const uniqueWrong = Array.from(
-      new Set(wrongPool)
+    const correct =
+      accepted.includes(
+        normalize(answer)
+      );
+
+    setSelectedAnswer(
+      answer
     );
 
-    const wrongAnswers = shuffle(uniqueWrong).slice(0, 3);
-
-    return shuffle([correct, ...wrongAnswers]);
-  }, [current, words]);
-
-  function checkChoice(answer: string) {
-    if (!current || choiceResult) return;
-
-    const accepted = current.synonyms.map(normalize);
-
-    const correct = accepted.includes(
-      normalize(answer)
+    setChoiceResult(
+      correct
+        ? "correct"
+        : "wrong"
     );
 
-    setSelectedAnswer(answer);
+    markResult(
+      current,
+      correct
+    );
 
-    setChoiceResult(correct ? "correct" : "wrong");
+    /*
+      FAQAT TANLASHDA
+      AVTOMATIK O‘TISH
+    */
 
-    markResult(current, correct);
-
-    autoNext(correct ? 1200 : 2300);
+    autoNext(
+      correct
+        ? 1200
+        : 2300
+    );
   }
 
+  /* =====================================================
+     YOZISH
+     AVTOMATIK O‘TMAYDI
+  ===================================================== */
+
   function checkWrite() {
-    if (!current || writeResult) return;
+    if (
+      !current ||
+      writeResult
+    ) {
+      return;
+    }
 
-    const answer = normalize(writeAnswer);
+    const answer =
+      normalize(
+        writeAnswer
+      );
 
-    if (!answer) return;
+    if (!answer) {
+      return;
+    }
 
-    const accepted = current.synonyms.map(normalize);
+    const accepted =
+      current.synonyms.map(
+        normalize
+      );
 
-    const correct = accepted.includes(answer);
+    const correct =
+      accepted.includes(
+        answer
+      );
 
-    setWriteResult(correct ? "correct" : "wrong");
+    setWriteResult(
+      correct
+        ? "correct"
+        : "wrong"
+    );
 
-    markResult(current, correct);
+    markResult(
+      current,
+      correct
+    );
 
-    autoNext(correct ? 1200 : 2300);
+    /*
+      BU YERDA autoNext YO‘Q.
+      FOYDALANUVCHI KEYINGI
+      TUGMASINI O‘ZI BOSADI.
+    */
   }
 
   function speakWord() {
-    if (!current || !speechSupported) return;
+    if (
+      !current ||
+      !speechSupported
+    ) {
+      return;
+    }
 
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(
-      current.word
+    const utterance =
+      new SpeechSynthesisUtterance(
+        current.word
+      );
+
+    utterance.lang =
+      "en-US";
+
+    utterance.rate =
+      0.85;
+
+    window.speechSynthesis.speak(
+      utterance
     );
-
-    utterance.lang = "en-US";
-    utterance.rate = 0.85;
-
-    window.speechSynthesis.speak(utterance);
   }
 
   if (loading) {
@@ -444,28 +714,59 @@ export default function SynonymsPage() {
         <style jsx>{`
           .centerPage {
             min-height: 100vh;
+
             display: grid;
+
             place-items: center;
-            background: #edf3f6;
-            font-family: "Bell MT", "Times New Roman", serif;
+
+            background:
+              #edf3f6;
+
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
           }
 
           .message3d {
-            padding: 24px 40px;
-            border: 2px solid #59666c;
-            border-radius: 14px;
-            background: linear-gradient(
-              180deg,
-              #f5f5f5,
-              #d3d6d8
-            );
+            padding:
+              24px 40px;
+
+            border:
+              2px solid
+              #59666c;
+
+            border-radius:
+              14px;
+
+            background:
+              linear-gradient(
+                180deg,
+                #f5f5f5,
+                #d3d6d8
+              );
+
             box-shadow:
-              inset 0 3px 2px #ffffff,
-              0 7px 0 #737d82,
-              0 13px 20px rgba(0, 0, 0, 0.18);
-            font-size: 22px;
-            font-weight: 700;
-            color: #075478;
+              inset 0 3px
+                2px #ffffff,
+              0 7px 0
+                #737d82,
+              0 13px 20px
+                rgba(
+                  0,
+                  0,
+                  0,
+                  0.18
+                );
+
+            font-size:
+              22px;
+
+            font-weight:
+              700;
+
+            color:
+              #075478;
           }
         `}</style>
       </main>
@@ -475,25 +776,50 @@ export default function SynonymsPage() {
   if (error) {
     return (
       <main className="centerPage">
-        <div className="errorBox">{error}</div>
+        <div className="errorBox">
+          {error}
+        </div>
 
         <style jsx>{`
           .centerPage {
             min-height: 100vh;
+
             display: grid;
+
             place-items: center;
-            background: #edf3f6;
-            font-family: "Bell MT", "Times New Roman", serif;
+
+            background:
+              #edf3f6;
+
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
           }
 
           .errorBox {
-            padding: 22px 35px;
-            border: 2px solid #a84b4b;
-            border-radius: 14px;
-            background: #fff0f0;
-            box-shadow: 0 6px 0 #884646;
-            color: #8d2222;
-            font-weight: 700;
+            padding:
+              22px 35px;
+
+            border:
+              2px solid
+              #a84b4b;
+
+            border-radius:
+              14px;
+
+            background:
+              #fff0f0;
+
+            box-shadow:
+              0 6px 0
+              #884646;
+
+            color:
+              #8d2222;
+
+            font-weight:
+              700;
           }
         `}</style>
       </main>
@@ -517,13 +843,23 @@ export default function SynonymsPage() {
         </button>
 
         <div className="headerCenter">
-          <h1>Synonyms</h1>
-          <div>Sinonimlarni yodlash</div>
+          <h1>
+            Synonyms
+          </h1>
+
+          <div>
+            Sinonimlarni yodlash
+          </div>
         </div>
 
         <div className="totalBox">
-          <strong>{words.length}</strong>
-          <span>Jami</span>
+          <strong>
+            {words.length}
+          </strong>
+
+          <span>
+            Jami
+          </span>
         </div>
       </header>
 
@@ -538,7 +874,11 @@ export default function SynonymsPage() {
                 ? "modeButton activeButton"
                 : "modeButton"
             }
-            onClick={() => changeMode("learn")}
+            onClick={() =>
+              changeMode(
+                "learn"
+              )
+            }
           >
             O‘rganish
           </button>
@@ -550,7 +890,11 @@ export default function SynonymsPage() {
                 ? "modeButton activeButton"
                 : "modeButton"
             }
-            onClick={() => changeMode("choice")}
+            onClick={() =>
+              changeMode(
+                "choice"
+              )
+            }
           >
             Tanlash
           </button>
@@ -562,7 +906,11 @@ export default function SynonymsPage() {
                 ? "modeButton activeButton"
                 : "modeButton"
             }
-            onClick={() => changeMode("write")}
+            onClick={() =>
+              changeMode(
+                "write"
+              )
+            }
           >
             Yozish
           </button>
@@ -574,7 +922,11 @@ export default function SynonymsPage() {
                 ? "modeButton activeButton"
                 : "modeButton"
             }
-            onClick={() => changeMode("wrong")}
+            onClick={() =>
+              changeMode(
+                "wrong"
+              )
+            }
           >
             Xatolarim
           </button>
@@ -582,11 +934,16 @@ export default function SynonymsPage() {
           <button
             type="button"
             className={
-              mode === "difficult"
+              mode ===
+              "difficult"
                 ? "modeButton activeButton"
                 : "modeButton"
             }
-            onClick={() => changeMode("difficult")}
+            onClick={() =>
+              changeMode(
+                "difficult"
+              )
+            }
           >
             ★ Qiyinlar
           </button>
@@ -594,32 +951,54 @@ export default function SynonymsPage() {
 
         <div className="statsRow">
           <div className="statBox">
-            <span>To‘g‘ri</span>
-            <strong>{totalCorrect}</strong>
+            <span>
+              To‘g‘ri
+            </span>
+
+            <strong>
+              {totalCorrect}
+            </strong>
           </div>
 
           <div className="statBox">
-            <span>Xato</span>
-            <strong>{totalWrong}</strong>
+            <span>
+              Xato
+            </span>
+
+            <strong>
+              {totalWrong}
+            </strong>
           </div>
 
           <div className="statBox">
-            <span>Yodlangan</span>
-            <strong>{learnedCount}</strong>
+            <span>
+              Yodlangan
+            </span>
+
+            <strong>
+              {learnedCount}
+            </strong>
           </div>
 
           <div className="statBox">
-            <span>Natija</span>
-            <strong>{accuracy}%</strong>
+            <span>
+              Natija
+            </span>
+
+            <strong>
+              {accuracy}%
+            </strong>
           </div>
         </div>
       </section>
 
-      {visibleWords.length === 0 ? (
+      {visibleWords.length ===
+      0 ? (
         <section className="emptyPanel">
           {mode === "wrong"
             ? "Hozircha xato qilingan so‘zlar yo‘q."
-            : mode === "difficult"
+            : mode ===
+                "difficult"
               ? "Hozircha qiyin deb belgilangan so‘zlar yo‘q."
               : "So‘zlar mavjud emas."}
         </section>
@@ -627,13 +1006,20 @@ export default function SynonymsPage() {
         <section className="learningPanel">
           <div className="progressRow">
             <span>
-              {index + 1} / {visibleWords.length}
+              {index + 1} /{" "}
+              {visibleWords.length}
             </span>
 
             <span>
-              To‘g‘ri: {currentProgress?.correct || 0}
+              To‘g‘ri:{" "}
+              {currentProgress
+                ?.correct || 0}
+
               {" · "}
-              Xato: {currentProgress?.wrong || 0}
+
+              Xato:{" "}
+              {currentProgress
+                ?.wrong || 0}
             </span>
           </div>
 
@@ -642,8 +1028,12 @@ export default function SynonymsPage() {
               <button
                 type="button"
                 className="smallGray3d"
-                onClick={speakWord}
-                disabled={!speechSupported}
+                onClick={
+                  speakWord
+                }
+                disabled={
+                  !speechSupported
+                }
               >
                 🔊
               </button>
@@ -651,11 +1041,14 @@ export default function SynonymsPage() {
               <button
                 type="button"
                 className={
-                  currentProgress?.difficult
+                  currentProgress
+                    ?.difficult
                     ? "smallGray3d starActive"
                     : "smallGray3d"
                 }
-                onClick={toggleDifficult}
+                onClick={
+                  toggleDifficult
+                }
               >
                 ★
               </button>
@@ -665,97 +1058,144 @@ export default function SynonymsPage() {
               Inglizcha so‘z
             </div>
 
-            <h2>{current.word}</h2>
+            <h2>
+              {current.word}
+            </h2>
 
             <div className="translationBox">
               {current.uzbek}
             </div>
 
-            {mode === "learn" && (
+            {/* O‘RGANISH */}
+
+            {mode ===
+              "learn" && (
               <div className="contentArea">
                 {!revealed ? (
                   <button
                     type="button"
                     className="blueButton"
-                    onClick={revealSynonyms}
+                    onClick={
+                      revealSynonyms
+                    }
                   >
-                    Sinonimlarni ko‘rsatish
+                    Sinonimlarni
+                    ko‘rsatish
                   </button>
                 ) : (
-                  <>
-                    <div className="synonymList">
-                      {current.synonyms.map(
-                        (synonym, idx) => (
-                          <span
-                            key={`${synonym}-${idx}`}
-                            className="synonymChip"
-                          >
-                            {synonym}
-                          </span>
-                        )
-                      )}
-                    </div>
-
-                    <div className="autoText">
-                      Keyingi so‘zga avtomatik o‘tiladi...
-                    </div>
-                  </>
+                  <div className="synonymList">
+                    {current.synonyms.map(
+                      (
+                        synonym,
+                        idx
+                      ) => (
+                        <span
+                          key={`${synonym}-${idx}`}
+                          className="synonymChip"
+                        >
+                          {
+                            synonym
+                          }
+                        </span>
+                      )
+                    )}
+                  </div>
                 )}
               </div>
             )}
 
-            {mode === "choice" && (
+            {/* TANLASH */}
+
+            {mode ===
+              "choice" && (
               <div className="contentArea">
                 <div className="question">
                   Qaysi biri{" "}
-                  <strong>{current.word}</strong>{" "}
-                  so‘zining sinonimi?
+                  <strong>
+                    {
+                      current.word
+                    }
+                  </strong>{" "}
+                  so‘zining
+                  sinonimi?
                 </div>
 
                 <div className="answersGrid">
-                  {choiceOptions.map((option) => {
-                    let className = "answerButton";
+                  {choiceOptions.map(
+                    (
+                      option
+                    ) => {
+                      let className =
+                        "answerButton";
 
-                    if (choiceResult) {
-                      const isCorrect =
-                        current.synonyms
-                          .map(normalize)
-                          .includes(normalize(option));
-
-                      if (isCorrect) {
-                        className += " correctAnswer";
-                      } else if (
-                        option === selectedAnswer
+                      if (
+                        choiceResult
                       ) {
-                        className += " wrongAnswer";
-                      }
-                    }
+                        const isCorrect =
+                          current.synonyms
+                            .map(
+                              normalize
+                            )
+                            .includes(
+                              normalize(
+                                option
+                              )
+                            );
 
-                    return (
-                      <button
-                        type="button"
-                        key={option}
-                        className={className}
-                        disabled={Boolean(choiceResult)}
-                        onClick={() =>
-                          checkChoice(option)
+                        if (
+                          isCorrect
+                        ) {
+                          className +=
+                            " correctAnswer";
+                        } else if (
+                          option ===
+                          selectedAnswer
+                        ) {
+                          className +=
+                            " wrongAnswer";
                         }
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
+                      }
+
+                      return (
+                        <button
+                          type="button"
+                          key={
+                            option
+                          }
+                          className={
+                            className
+                          }
+                          disabled={
+                            Boolean(
+                              choiceResult
+                            )
+                          }
+                          onClick={() =>
+                            checkChoice(
+                              option
+                            )
+                          }
+                        >
+                          {
+                            option
+                          }
+                        </button>
+                      );
+                    }
+                  )}
                 </div>
 
                 {choiceResult && (
                   <div
                     className={
-                      choiceResult === "correct"
+                      choiceResult ===
+                      "correct"
                         ? "resultBox correctResult"
                         : "resultBox wrongResult"
                     }
                   >
-                    {choiceResult === "correct"
+                    {choiceResult ===
+                    "correct"
                       ? "✓ To‘g‘ri!"
                       : `✗ Xato. To‘g‘ri javoblardan biri: ${current.synonyms[0]}`}
                   </div>
@@ -763,24 +1203,48 @@ export default function SynonymsPage() {
               </div>
             )}
 
-            {mode === "write" && (
+            {/* YOZISH */}
+
+            {mode ===
+              "write" && (
               <div className="contentArea">
                 <div className="question">
-                  <strong>{current.word}</strong>{" "}
-                  so‘zining sinonimini yozing.
+                  <strong>
+                    {
+                      current.word
+                    }
+                  </strong>{" "}
+                  so‘zining
+                  sinonimini yozing.
                 </div>
 
                 <div className="writeRow">
                   <input
                     type="text"
-                    value={writeAnswer}
-                    placeholder="Sinonim yozing..."
-                    disabled={Boolean(writeResult)}
-                    onChange={(e) =>
-                      setWriteAnswer(e.target.value)
+                    value={
+                      writeAnswer
                     }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                    placeholder="Sinonim yozing..."
+                    disabled={
+                      Boolean(
+                        writeResult
+                      )
+                    }
+                    onChange={(
+                      e
+                    ) =>
+                      setWriteAnswer(
+                        e.target
+                          .value
+                      )
+                    }
+                    onKeyDown={(
+                      e
+                    ) => {
+                      if (
+                        e.key ===
+                        "Enter"
+                      ) {
                         checkWrite();
                       }
                     }}
@@ -789,9 +1253,13 @@ export default function SynonymsPage() {
                   <button
                     type="button"
                     className="blueButton checkButton"
-                    onClick={checkWrite}
+                    onClick={
+                      checkWrite
+                    }
                     disabled={
-                      Boolean(writeResult) ||
+                      Boolean(
+                        writeResult
+                      ) ||
                       !writeAnswer.trim()
                     }
                   >
@@ -802,13 +1270,15 @@ export default function SynonymsPage() {
                 {writeResult && (
                   <div
                     className={
-                      writeResult === "correct"
+                      writeResult ===
+                      "correct"
                         ? "resultBox correctResult"
                         : "resultBox wrongResult"
                     }
                   >
-                    {writeResult === "correct"
-                      ? "✓ To‘g‘ri!"
+                    {writeResult ===
+                    "correct"
+                      ? "✓ To‘g‘ri! Endi Keyingi → tugmasini bosing."
                       : `✗ Xato. Sinonimlar: ${current.synonyms.join(
                           ", "
                         )}`}
@@ -817,8 +1287,12 @@ export default function SynonymsPage() {
               </div>
             )}
 
-            {(mode === "wrong" ||
-              mode === "difficult") && (
+            {/* REVIEW */}
+
+            {(mode ===
+              "wrong" ||
+              mode ===
+                "difficult") && (
               <div className="contentArea">
                 <div className="question">
                   Sinonimlar
@@ -826,12 +1300,17 @@ export default function SynonymsPage() {
 
                 <div className="synonymList">
                   {current.synonyms.map(
-                    (synonym, idx) => (
+                    (
+                      synonym,
+                      idx
+                    ) => (
                       <span
                         key={`${synonym}-${idx}`}
                         className="synonymChip"
                       >
-                        {synonym}
+                        {
+                          synonym
+                        }
                       </span>
                     )
                   )}
@@ -844,7 +1323,9 @@ export default function SynonymsPage() {
             <button
               type="button"
               className="grayButton navButton"
-              onClick={previous}
+              onClick={
+                previous
+              }
             >
               ← Oldingi
             </button>
@@ -855,7 +1336,8 @@ export default function SynonymsPage() {
               onClick={() => {
                 if (
                   current &&
-                  !currentProgress?.difficult
+                  !currentProgress
+                    ?.difficult
                 ) {
                   toggleDifficult();
                 }
@@ -863,7 +1345,8 @@ export default function SynonymsPage() {
                 next();
               }}
             >
-              ★ Keyinroq yana ko‘rsat
+              ★ Keyinroq yana
+              ko‘rsat
             </button>
 
             <button
@@ -882,22 +1365,40 @@ export default function SynonymsPage() {
           box-sizing: border-box;
         }
 
-        :global(html),
+        :global(html) {
+          background:
+            #edf3f6;
+        }
+
         :global(body) {
           margin: 0;
-          background: #edf3f6;
+
+          background:
+            #edf3f6;
         }
 
         button,
         input {
-          font-family: "Bell MT", "Times New Roman", serif;
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
         }
 
         .page {
           min-height: 100vh;
-          padding: 26px 18px 70px;
-          font-family: "Bell MT", "Times New Roman", serif;
-          color: #142e3c;
+
+          padding:
+            26px 18px
+            70px;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+
+          color:
+            #142e3c;
 
           background:
             radial-gradient(
@@ -912,27 +1413,49 @@ export default function SynonymsPage() {
         .controlPanel,
         .learningPanel,
         .emptyPanel {
-          width: min(1150px, 100%);
-          margin-left: auto;
-          margin-right: auto;
+          width:
+            min(
+              1150px,
+              100%
+            );
+
+          margin-left:
+            auto;
+
+          margin-right:
+            auto;
         }
 
-        /* ===========================
-           TOP
-        =========================== */
+        /* HEADER */
 
         .topPanel {
-          min-height: 105px;
-          margin-bottom: 28px;
-          padding: 18px 24px;
+          min-height:
+            105px;
+
+          margin-bottom:
+            28px;
+
+          padding:
+            18px 24px;
 
           display: grid;
-          grid-template-columns: 180px 1fr 145px;
-          align-items: center;
+
+          grid-template-columns:
+            180px
+            1fr
+            145px;
+
+          align-items:
+            center;
+
           gap: 20px;
 
-          border: 3px solid #0b4969;
-          border-radius: 20px;
+          border:
+            3px solid
+            #0b4969;
+
+          border-radius:
+            20px;
 
           background:
             linear-gradient(
@@ -943,45 +1466,96 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 4px 3px rgba(255, 255, 255, 0.92),
-            inset 0 -7px 0 #08709a,
-            0 9px 0 #07506f,
-            0 16px 24px rgba(0, 0, 0, 0.2);
+            inset 0 4px 3px
+              rgba(
+                255,
+                255,
+                255,
+                0.92
+              ),
+            inset 0 -7px 0
+              #08709a,
+            0 9px 0
+              #07506f,
+            0 16px 24px
+              rgba(
+                0,
+                0,
+                0,
+                0.2
+              );
         }
 
         .headerCenter {
-          text-align: center;
+          text-align:
+            center;
         }
 
         .headerCenter h1 {
           margin: 0;
-          color: #064d73;
-          font-size: clamp(34px, 4vw, 44px);
+
+          color:
+            #064d73;
+
+          font-size:
+            clamp(
+              34px,
+              4vw,
+              44px
+            );
+
           line-height: 1;
 
           text-shadow:
-            0 2px 0 #ffffff,
-            0 3px 3px rgba(0, 0, 0, 0.12);
+            0 2px 0
+              #ffffff,
+            0 3px 3px
+              rgba(
+                0,
+                0,
+                0,
+                0.12
+              );
         }
 
         .headerCenter div {
-          margin-top: 7px;
-          color: #164b63;
-          font-size: 14px;
-          font-weight: 700;
+          margin-top:
+            7px;
+
+          color:
+            #164b63;
+
+          font-size:
+            14px;
+
+          font-weight:
+            700;
         }
 
         .totalBox {
-          min-height: 58px;
-          padding: 7px 14px;
+          min-height:
+            58px;
+
+          padding:
+            7px 14px;
 
           display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
 
-          border: 2px solid #737d82;
-          border-radius: 11px;
+          flex-direction:
+            column;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          border:
+            2px solid
+            #737d82;
+
+          border-radius:
+            11px;
 
           background:
             linear-gradient(
@@ -992,64 +1566,104 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 6px 0 #707a7f;
+            inset 0 3px 2px
+              #ffffff,
+            0 6px 0
+              #707a7f;
         }
 
         .totalBox strong {
-          color: #0676aa;
-          font-size: 24px;
+          color:
+            #0676aa;
+
+          font-size:
+            24px;
         }
 
         .totalBox span {
-          font-size: 13px;
-          font-weight: 700;
+          font-size:
+            13px;
+
+          font-weight:
+            700;
         }
 
-        /* ===========================
-           GRAY 3D
-        =========================== */
+        /* GRAY 3D */
 
         .grayButton,
         .modeButton,
         .answerButton,
         .smallGray3d {
-          border: 2px solid #7c878c;
-          color: #172d38;
+          border:
+            2px solid
+            #7c878c;
+
+          color:
+            #172d38;
 
           background:
             linear-gradient(
               180deg,
-              #f4f4f4 0%,
+              #f4f4f4,
               #e3e3e3 45%,
-              #c9cdcf 100%
+              #c9cdcf
             );
 
           box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -2px 3px rgba(0, 0, 0, 0.08),
-            0 5px 0 #717b80,
-            0 9px 12px rgba(0, 0, 0, 0.13);
+            inset 0 3px 2px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+            inset 0 -2px 3px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 5px 0
+              #717b80,
+            0 9px 12px
+              rgba(
+                0,
+                0,
+                0,
+                0.13
+              );
 
-          font-weight: 700;
-          cursor: pointer;
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
         }
 
         .backButton {
-          min-height: 55px;
-          border-radius: 11px;
+          min-height:
+            55px;
+
+          border-radius:
+            11px;
         }
 
-        /* ===========================
-           CONTROL
-        =========================== */
+        /* CONTROL */
 
         .controlPanel {
-          margin-bottom: 28px;
-          padding: 17px;
+          margin-bottom:
+            28px;
 
-          border: 3px solid #40484c;
-          border-radius: 18px;
+          padding:
+            17px;
+
+          border:
+            3px solid
+            #40484c;
+
+          border-radius:
+            18px;
 
           background:
             linear-gradient(
@@ -1060,26 +1674,52 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 0.18),
-            inset 0 -7px 0 #303639,
-            0 8px 0 #303639,
-            0 14px 20px rgba(0, 0, 0, 0.18);
+            inset 0 3px 3px
+              rgba(
+                255,
+                255,
+                255,
+                0.18
+              ),
+            inset 0 -7px 0
+              #303639,
+            0 8px 0
+              #303639,
+            0 14px 20px
+              rgba(
+                0,
+                0,
+                0,
+                0.18
+              );
         }
 
         .modeRow {
           display: grid;
-          grid-template-columns: repeat(5, 1fr);
+
+          grid-template-columns:
+            repeat(
+              5,
+              1fr
+            );
+
           gap: 13px;
         }
 
         .modeButton {
-          min-height: 49px;
-          border-radius: 9px;
+          min-height:
+            49px;
+
+          border-radius:
+            9px;
         }
 
         .activeButton {
-          border-color: #126487;
-          color: #064d70;
+          border-color:
+            #126487;
+
+          color:
+            #064d70;
 
           background:
             linear-gradient(
@@ -1090,63 +1730,96 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #126181;
+            inset 0 3px 2px
+              #ffffff,
+            0 5px 0
+              #126181;
         }
 
         .statsRow {
-          margin-top: 15px;
+          margin-top:
+            15px;
 
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+
+          grid-template-columns:
+            repeat(
+              4,
+              1fr
+            );
+
           gap: 13px;
         }
 
         .statBox {
-          min-height: 68px;
+          min-height:
+            68px;
+
           padding: 9px;
 
           display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
 
-          border: 2px solid #9aa3a7;
-          border-radius: 9px;
+          flex-direction:
+            column;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          border:
+            2px solid
+            #9aa3a7;
+
+          border-radius:
+            9px;
 
           background:
             linear-gradient(
-              180deg,
               #f2f2f2,
               #dedede 50%,
               #c7cbcd
             );
 
           box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #798388;
+            inset 0 3px 2px
+              #ffffff,
+            0 5px 0
+              #798388;
         }
 
         .statBox span {
-          font-size: 13px;
-          font-weight: 700;
+          font-size:
+            13px;
+
+          font-weight:
+            700;
         }
 
         .statBox strong {
-          margin-top: 4px;
-          color: #0877aa;
-          font-size: 22px;
+          margin-top:
+            4px;
+
+          color:
+            #0877aa;
+
+          font-size:
+            22px;
         }
 
-        /* ===========================
-           LEARNING PANEL
-        =========================== */
+        /* MAIN */
 
         .learningPanel {
-          padding: 20px;
+          padding:
+            20px;
 
-          border: 3px solid #3b4347;
-          border-radius: 20px;
+          border:
+            3px solid
+            #3b4347;
+
+          border-radius:
+            20px;
 
           background:
             linear-gradient(
@@ -1157,35 +1830,65 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 0.17),
-            inset 0 -8px 0 #2e3437,
-            0 10px 0 #2e3437,
-            0 17px 26px rgba(0, 0, 0, 0.22);
+            inset 0 3px 3px
+              rgba(
+                255,
+                255,
+                255,
+                0.17
+              ),
+            inset 0 -8px 0
+              #2e3437,
+            0 10px 0
+              #2e3437,
+            0 17px 26px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
         .progressRow {
-          min-height: 30px;
-          padding: 0 5px 8px;
+          min-height:
+            30px;
+
+          padding:
+            0 5px 8px;
 
           display: flex;
-          justify-content: space-between;
 
-          color: #ffffff;
-          font-size: 14px;
-          font-weight: 700;
+          justify-content:
+            space-between;
+
+          color:
+            #ffffff;
+
+          font-weight:
+            700;
         }
 
         .wordCard {
-          position: relative;
+          position:
+            relative;
 
-          min-height: 410px;
+          min-height:
+            410px;
 
-          padding: 28px 42px 32px;
+          padding:
+            28px 42px
+            32px;
 
-          text-align: center;
+          text-align:
+            center;
 
-          border: 3px solid #c5cbce;
-          border-radius: 17px;
+          border:
+            3px solid
+            #c5cbce;
+
+          border-radius:
+            17px;
 
           background:
             linear-gradient(
@@ -1196,28 +1899,47 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 4px 4px #ffffff,
-            inset 0 -4px 5px rgba(0, 0, 0, 0.07),
-            0 8px 0 #7b858a,
-            0 13px 18px rgba(0, 0, 0, 0.18);
+            inset 0 4px 4px
+              #ffffff,
+            0 8px 0
+              #7b858a,
+            0 13px 18px
+              rgba(
+                0,
+                0,
+                0,
+                0.18
+              );
         }
 
         .iconButtons {
-          position: absolute;
+          position:
+            absolute;
+
           top: 18px;
+
           right: 22px;
 
           display: flex;
+
           gap: 11px;
         }
 
         .smallGray3d {
-          width: 48px;
-          height: 45px;
-          border-radius: 9px;
+          width:
+            48px;
+
+          height:
+            45px;
+
+          border-radius:
+            9px;
         }
 
         .starActive {
+          border-color:
+            #b18a21;
+
           background:
             linear-gradient(
               #fff8c9,
@@ -1227,40 +1949,67 @@ export default function SynonymsPage() {
         }
 
         .wordLabel {
-          color: #667176;
-          font-size: 15px;
-          font-weight: 700;
+          color:
+            #667176;
+
+          font-size:
+            15px;
+
+          font-weight:
+            700;
         }
 
         .wordCard h2 {
-          margin: 8px 0 21px;
+          margin:
+            8px 0 21px;
 
-          color: #0875aa;
+          color:
+            #0875aa;
 
-          font-size: clamp(43px, 6vw, 61px);
+          font-size:
+            clamp(
+              43px,
+              6vw,
+              61px
+            );
 
           line-height: 1;
 
           text-shadow:
-            0 2px 0 #ffffff,
-            0 3px 3px rgba(0, 0, 0, 0.1);
+            0 2px 0
+              #ffffff;
         }
 
         .translationBox {
-          width: min(800px, 90%);
+          width:
+            min(
+              800px,
+              90%
+            );
 
-          margin: 0 auto;
+          margin:
+            0 auto;
 
-          min-height: 58px;
+          min-height:
+            58px;
 
-          padding: 13px 20px;
+          padding:
+            13px 20px;
 
           display: flex;
-          align-items: center;
-          justify-content: center;
 
-          border: 2px solid #6daac6;
-          border-radius: 10px;
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          border:
+            2px solid
+            #6daac6;
+
+          border-radius:
+            10px;
 
           background:
             linear-gradient(
@@ -1270,41 +2019,61 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #6e9eb3;
+            inset 0 3px 2px
+              #ffffff,
+            0 5px 0
+              #6e9eb3;
 
-          color: #17546f;
+          color:
+            #17546f;
 
-          font-size: 21px;
-          font-weight: 700;
+          font-size:
+            21px;
+
+          font-weight:
+            700;
         }
 
         .contentArea {
-          width: min(900px, 100%);
+          width:
+            min(
+              900px,
+              100%
+            );
 
-          margin: 24px auto 0;
+          margin:
+            24px auto 0;
         }
 
         .question {
-          margin-bottom: 18px;
+          margin-bottom:
+            18px;
 
-          font-size: 19px;
-          font-weight: 700;
+          font-size:
+            19px;
+
+          font-weight:
+            700;
         }
 
-        /* ===========================
-           BLUE BUTTON
-        =========================== */
+        /* BLUE */
 
         .blueButton {
-          min-height: 50px;
+          min-height:
+            48px;
 
-          padding: 11px 26px;
+          padding:
+            10px 24px;
 
-          border: 2px solid #116184;
-          border-radius: 9px;
+          border:
+            2px solid
+            #116184;
 
-          color: #074d70;
+          border-radius:
+            9px;
+
+          color:
+            #074d70;
 
           background:
             linear-gradient(
@@ -1314,207 +2083,241 @@ export default function SynonymsPage() {
             );
 
           box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #115f7e,
-            0 9px 12px rgba(0, 0, 0, 0.13);
+            inset 0 3px 2px
+              #ffffff,
+            0 5px 0
+              #115f7e,
+            0 9px 12px
+              rgba(
+                0,
+                0,
+                0,
+                0.13
+              );
 
-          font-weight: 700;
-          cursor: pointer;
+          font-weight:
+            700;
+
+          cursor:
+            pointer;
         }
 
-        /* =================================================
-           KATTALASHTIRILGAN SINONIMLAR
-        ================================================= */
+        /* KATTAROQ SYNONYMS */
 
         .synonymList {
           display: flex;
-          flex-wrap: wrap;
 
-          justify-content: center;
-          align-items: center;
+          flex-wrap:
+            wrap;
+
+          justify-content:
+            center;
+
+          align-items:
+            center;
 
           gap: 18px;
 
-          margin-top: 10px;
+          margin-top:
+            8px;
         }
 
         .synonymChip {
-          min-width: 155px;
-          min-height: 60px;
+          min-width:
+            150px;
 
-          padding: 14px 25px;
+          min-height:
+            58px;
 
-          display: inline-flex;
+          padding:
+            14px 24px;
 
-          align-items: center;
-          justify-content: center;
+          display: flex;
 
-          border: 2px solid #648fa3;
+          align-items:
+            center;
 
-          border-radius: 10px;
+          justify-content:
+            center;
 
-          color: #075779;
+          border:
+            2px solid
+            #669ab1;
+
+          border-radius:
+            10px;
 
           background:
             linear-gradient(
               180deg,
-              #f5f5f5 0%,
-              #e4e4e4 45%,
-              #c9cdcf 100%
+              #f4f4f4,
+              #e2e2e2 48%,
+              #c9cdcf
             );
 
           box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.98),
-            inset 0 -2px 3px rgba(0, 0, 0, 0.08),
-            0 6px 0 #74848b,
-            0 11px 15px rgba(0, 0, 0, 0.14);
+            inset 0 3px 2px
+              #ffffff,
+            inset 0 -2px 3px
+              rgba(
+                0,
+                0,
+                0,
+                0.08
+              ),
+            0 6px 0
+              #74848b,
+            0 10px 14px
+              rgba(
+                0,
+                0,
+                0,
+                0.14
+              );
 
-          font-size: 20px;
+          color:
+            #075779;
 
-          line-height: 1.1;
+          font-size:
+            20px;
 
-          font-weight: 700;
-
-          letter-spacing: 0.2px;
-
-          text-shadow: 0 1px 0 #ffffff;
+          font-weight:
+            700;
         }
 
-        .autoText {
-          margin-top: 22px;
-
-          color: #687277;
-
-          font-size: 14px;
-
-          font-weight: 700;
-        }
-
-        /* ===========================
-           ANSWERS
-        =========================== */
+        /* ANSWERS */
 
         .answersGrid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+
+          grid-template-columns:
+            repeat(
+              2,
+              1fr
+            );
+
           gap: 16px;
         }
 
         .answerButton {
-          min-height: 60px;
+          min-height:
+            60px;
 
-          padding: 12px 18px;
+          padding:
+            12px 18px;
 
-          border-radius: 10px;
+          border-radius:
+            10px;
 
-          font-size: 17px;
+          font-size:
+            17px;
         }
 
         .correctAnswer {
-          border-color: #34824c;
-
-          color: #175c2b;
+          border-color:
+            #34824c;
 
           background:
             linear-gradient(
               #f1fff4,
-              #bceac8 50%,
+              #bceac8,
               #8bd29d
             );
-
-          box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #4e9b62;
         }
 
         .wrongAnswer {
-          border-color: #a44c4c;
-
-          color: #812323;
+          border-color:
+            #a44c4c;
 
           background:
             linear-gradient(
               #fff5f5,
-              #f2c0c0 50%,
+              #f2c0c0,
               #e59595
             );
-
-          box-shadow:
-            inset 0 3px 2px #ffffff,
-            0 5px 0 #a75959;
         }
 
-        /* ===========================
-           WRITE
-        =========================== */
+        /* WRITE */
 
         .writeRow {
           display: grid;
 
-          grid-template-columns: 1fr 180px;
+          grid-template-columns:
+            1fr 180px;
 
           gap: 15px;
         }
 
         .writeRow input {
-          width: 100%;
+          min-height:
+            52px;
 
-          min-height: 52px;
+          padding:
+            10px 16px;
 
-          padding: 10px 16px;
+          border:
+            2px solid
+            #838e93;
 
-          border: 2px solid #838e93;
+          border-radius:
+            9px;
 
-          border-radius: 9px;
+          font-size:
+            17px;
 
-          outline: none;
-
-          background: linear-gradient(
-            #ffffff,
-            #f0f0f0
-          );
-
-          box-shadow:
-            inset 0 3px 5px rgba(0, 0, 0, 0.09),
-            0 3px 0 #9aa2a6;
-
-          font-size: 17px;
-
-          font-weight: 700;
+          font-weight:
+            700;
         }
 
         .resultBox {
-          margin-top: 18px;
+          margin-top:
+            18px;
 
-          padding: 12px 16px;
+          padding:
+            12px;
 
-          border-radius: 9px;
+          border-radius:
+            9px;
 
-          font-weight: 700;
+          font-weight:
+            700;
         }
 
         .correctResult {
-          border: 2px solid #68a978;
-          color: #216535;
-          background: #e9ffed;
+          color:
+            #216535;
+
+          background:
+            #e9ffed;
+
+          border:
+            2px solid
+            #68a978;
         }
 
         .wrongResult {
-          border: 2px solid #bf7272;
-          color: #8b2626;
-          background: #fff0f0;
+          color:
+            #8b2626;
+
+          background:
+            #fff0f0;
+
+          border:
+            2px solid
+            #bf7272;
         }
 
-        /* ===========================
-           BOTTOM
-        =========================== */
+        /* BOTTOM */
 
         .bottomNavigation {
-          margin-top: 22px;
+          margin-top:
+            22px;
 
           display: grid;
 
-          grid-template-columns: 1fr 1.35fr 1fr;
+          grid-template-columns:
+            1fr 1.35fr
+            1fr;
 
           gap: 15px;
         }
@@ -1522,111 +2325,114 @@ export default function SynonymsPage() {
         .navButton,
         .laterButton {
           width: 100%;
-          min-height: 52px;
-          border-radius: 10px;
+
+          min-height:
+            52px;
+
+          border-radius:
+            10px;
         }
 
         .emptyPanel {
-          padding: 35px;
+          padding:
+            35px;
 
-          text-align: center;
+          text-align:
+            center;
 
-          border: 3px solid #3e464a;
+          border:
+            3px solid
+            #3e464a;
 
-          border-radius: 18px;
+          border-radius:
+            18px;
 
-          color: #ffffff;
+          color:
+            white;
 
           background:
-            linear-gradient(
-              #686e71,
-              #444a4d
-            );
+            #50575a;
 
-          box-shadow:
-            0 9px 0 #303639;
-
-          font-weight: 700;
+          font-weight:
+            700;
         }
 
         button:active {
-          transform: translateY(3px);
+          transform:
+            translateY(
+              4px
+            );
+
+          box-shadow:
+            none;
         }
 
         button:disabled {
-          cursor: not-allowed;
-          opacity: 0.72;
+          opacity:
+            0.72;
+
+          cursor:
+            not-allowed;
         }
 
-        /* ===========================
-           TABLET
-        =========================== */
-
-        @media (max-width: 900px) {
-          .topPanel {
-            grid-template-columns: 150px 1fr 120px;
-          }
-
+        @media (
+          max-width: 900px
+        ) {
           .modeRow {
-            grid-template-columns: repeat(3, 1fr);
-          }
-
-          .wordCard {
-            padding-left: 25px;
-            padding-right: 25px;
-          }
-
-          .synonymChip {
-            min-width: 140px;
-            min-height: 56px;
-
-            font-size: 18px;
+            grid-template-columns:
+              repeat(
+                3,
+                1fr
+              );
           }
         }
 
-        /* ===========================
-           MOBILE
-        =========================== */
-
-        @media (max-width: 650px) {
+        @media (
+          max-width: 650px
+        ) {
           .page {
-            padding: 15px 9px 50px;
+            padding:
+              15px 9px
+              50px;
           }
 
           .topPanel {
-            grid-template-columns: 1fr;
-            padding: 14px;
+            grid-template-columns:
+              1fr;
           }
 
           .headerCenter {
             order: -1;
           }
 
-          .backButton,
-          .totalBox {
-            width: 100%;
-          }
-
-          .controlPanel {
-            padding: 12px;
-          }
-
           .modeRow {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns:
+              repeat(
+                2,
+                1fr
+              );
           }
 
           .statsRow {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns:
+              repeat(
+                2,
+                1fr
+              );
           }
 
           .learningPanel {
-            padding: 12px;
+            padding:
+              12px;
           }
 
           .wordCard {
-            min-height: 0;
+            min-height:
+              0;
 
-            padding: 75px 13px 24px;
+            padding:
+              75px 13px
+              24px;
           }
 
           .iconButtons {
@@ -1634,30 +2440,32 @@ export default function SynonymsPage() {
 
             right: 50%;
 
-            transform: translateX(50%);
+            transform:
+              translateX(
+                50%
+              );
           }
 
           .translationBox {
             width: 100%;
           }
 
-          .synonymList {
-            gap: 13px;
-          }
-
-          .synonymChip {
-            min-width: 130px;
-            min-height: 54px;
-
-            padding: 12px 18px;
-
-            font-size: 17px;
-          }
-
           .answersGrid,
           .writeRow,
           .bottomNavigation {
-            grid-template-columns: 1fr;
+            grid-template-columns:
+              1fr;
+          }
+
+          .synonymChip {
+            min-width:
+              130px;
+
+            min-height:
+              54px;
+
+            font-size:
+              18px;
           }
         }
       `}</style>
