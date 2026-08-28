@@ -1,541 +1,904 @@
 "use client";
 
-const dictionaries = [
-  {
-    icon: "EN",
-    title: "English–Uzbek Dictionary",
-    href: "/qollanmalar/dictionaries/english-uzbek",
-  },
-  {
-    icon: "UZ",
-    title: "Uzbek–English Dictionary",
-    href: "/qollanmalar/dictionaries/uzbek-english",
-  },
-  {
-    icon: "PV",
-    title: "Phrasal Verbs",
-    href: "/qollanmalar/dictionaries/phrasal-verbs",
-  },
-  {
-    icon: "IV",
-    title: "Irregular Verbs",
-    href: "/qollanmalar/dictionaries/irregular-verbs",
-  },
-  {
-    icon: "S/A",
-    title: "Synonyms & Antonyms",
-    href: "/qollanmalar/dictionaries/synonyms-antonyms",
-  },
-  {
-    icon: "C",
-    title: "Collocations",
-    href: "/qollanmalar/dictionaries/collocations",
-  },
-];
-
 export default function DictionariesPage() {
-  function goTo(href: string) {
-    window.location.href = href;
+  /* =====================================================
+     ORQAGA QAYTISH
+  ===================================================== */
+
+  function goBack() {
+    window.location.href = "/qollanmalar";
   }
+
+  /* =====================================================
+     LUG‘AT BO‘LIMLARI
+  ===================================================== */
+
+  const cards = [
+    {
+      title: "English–Uzbek Dictionary",
+      subtitle: "Inglizcha so‘zlarni yodlash va mustahkamlash",
+      href: "/qollanmalar/dictionaries/english-uzbek",
+      badge: "EN",
+    },
+    {
+      title: "Phrasal Verbs",
+      subtitle: "Eng muhim inglizcha phrasal verblar",
+      href: "/qollanmalar/dictionaries/phrasal-verbs",
+      badge: "PV",
+    },
+    {
+      title: "Irregular Verbs",
+      subtitle: "Noto‘g‘ri fe’llarni yodlash va mashq qilish",
+      href: "/qollanmalar/dictionaries/irregular-verbs",
+      badge: "IV",
+    },
+    {
+      title: "Synonyms & Antonyms",
+      subtitle: "Sinonim va antonimlar orqali lug‘at boyligini oshirish",
+      href: "/qollanmalar/dictionaries/synonyms-antonyms",
+      badge: "S/A",
+    },
+    {
+      title: "Collocations",
+      subtitle: "Ingliz tilidagi eng muhim so‘z birikmalari",
+      href: "/qollanmalar/dictionaries/collocations",
+      badge: "C",
+    },
+    {
+      title: "IELTS Vocabulary",
+      subtitle: "IELTS uchun eng kerakli akademik so‘zlar",
+      href: "/qollanmalar/dictionaries/ielts-vocabulary",
+      badge: "IELTS",
+    },
+  ];
 
   return (
     <main className="page">
-      <header className="topPanel">
-        <button
-          type="button"
-          className="backButton"
-          onClick={() => goTo("/qollanmalar")}
-        >
-          ← Qo‘llanmalarga qaytish
-        </button>
+      <div className="shell">
+        {/* =================================================
+            YUQORI PANEL
+        ================================================= */}
 
-        <div className="brand">QURBONOV.UZ</div>
-      </header>
+        <header className="topBar">
+          <button
+            type="button"
+            className="backButton"
+            onClick={goBack}
+          >
+            ← Qo‘llanmalar
+          </button>
 
-      <section className="mainPanel">
-        <div className="panelTitle">
-          Inglizcha lug‘atlar
-        </div>
+          <div className="topTitle">
+            QURBONOV.UZ
+          </div>
+        </header>
 
-        <div className="cards">
-          {dictionaries.map((item) => (
-            <article
-              className="dictionaryCard"
-              key={item.href}
-            >
-              <div className="icon3d">
-                {item.icon}
-              </div>
+        {/* =================================================
+            ASOSIY PANEL
+        ================================================= */}
 
-              <h2>{item.title}</h2>
+        <section className="mainPanel">
+          <div className="floatingTitle">
+            Inglizcha lug‘atlar
+          </div>
 
-              <button
-                type="button"
-                className="openButton"
-                onClick={() => goTo(item.href)}
+          <div className="intro">
+            <h1>Kerakli bo‘limni tanlang</h1>
+          </div>
+
+          {/* =================================================
+              KARTALAR
+          ================================================= */}
+
+          <div className="cardGrid">
+            {cards.map((card) => (
+              <article
+                key={card.href}
+                className="dictionaryCard"
               >
-                Ochish
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>
+                <div className="badge">
+                  {card.badge}
+                </div>
+
+                <div className="cardContent">
+                  <h2>{card.title}</h2>
+
+                  <p>{card.subtitle}</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="openButton"
+                  onClick={() => {
+                    window.location.href = card.href;
+                  }}
+                >
+                  Ochish
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
 
       <style jsx>{`
         * {
           box-sizing: border-box;
         }
 
-        :global(body) {
-          margin: 0;
-        }
+        /* =====================================================
+           SAHIFA
+        ===================================================== */
 
         .page {
           min-height: 100vh;
-          padding: 35px 20px 70px;
 
-          font-family:
-            "Bell MT",
-            Georgia,
-            "Times New Roman",
-            serif;
+          padding:
+            24px
+            18px
+            70px;
 
           background:
             radial-gradient(
-              circle at 50% 0%,
+              circle at top,
               #ffffff 0%,
-              #f2f7fa 43%,
-              #dee6eb 100%
+              #f4f8fa 50%,
+              #e8f0f4 100%
             );
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            Georgia,
+            serif;
+
+          color: #111;
         }
 
-        /* =============================================
+        .shell {
+          width: min(1200px, 96%);
+
+          margin: 0 auto;
+        }
+
+        button {
+          font-family: inherit;
+        }
+
+        /* =====================================================
            YUQORI PANEL
-        ============================================= */
+        ===================================================== */
 
-        .topPanel {
-          width: min(1120px, 100%);
-          min-height: 92px;
+        .topBar {
+          width: 100%;
 
-          margin: 0 auto 66px;
-          padding: 18px 25px;
+          min-height: 100px;
+
+          padding:
+            18px
+            30px;
 
           display: flex;
+
           align-items: center;
+
           justify-content: space-between;
+
           gap: 20px;
 
-          border: 3px solid #253239;
-          border-radius: 22px;
+          border:
+            3px solid
+            #174461;
 
-          background:
-            linear-gradient(
-              180deg,
-              #858b8e 0%,
-              #686f72 16%,
-              #50575a 60%,
-              #3c4346 100%
-            );
-
-          box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 0.43),
-            inset 0 -6px 8px rgba(0, 0, 0, 0.3),
-            0 9px 0 #202b30,
-            0 17px 26px rgba(0, 0, 0, 0.25);
-        }
-
-        .brand {
-          color: #ffffff;
-
-          font-size: 18px;
-          font-weight: 900;
-          letter-spacing: 3px;
-
-          text-shadow:
-            0 2px 0 #164d6b,
-            0 3px 4px rgba(0, 0, 0, 0.72);
-        }
-
-        /* =============================================
-           ORQAGA 3D TUGMASI
-        ============================================= */
-
-        .backButton {
-          min-width: 220px;
-          min-height: 50px;
-
-          padding: 10px 20px;
-
-          border: 2px solid #155b7d;
-          border-radius: 11px;
-
-          color: #063f63;
-
-          background:
-            linear-gradient(
-              180deg,
-              #dff8ff 0%,
-              #b0e9fb 17%,
-              #7ccff0 47%,
-              #4bb1dc 74%,
-              #2c90be 100%
-            );
-
-          box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.97),
-            inset 0 -4px 5px rgba(0, 71, 107, 0.23),
-            0 7px 0 #164d68,
-            0 12px 16px rgba(0, 0, 0, 0.27);
-
-          font-family: inherit;
-          font-size: 15px;
-          font-weight: 900;
-
-          cursor: pointer;
-
-          transition:
-            transform 0.13s ease,
-            box-shadow 0.13s ease,
-            filter 0.13s ease;
-        }
-
-        .backButton:hover {
-          transform: translateY(-3px);
-          filter: brightness(1.04);
-
-          box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.97),
-            0 10px 0 #164d68,
-            0 16px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .backButton:active {
-          transform: translateY(5px);
-
-          box-shadow:
-            inset 0 4px 7px rgba(0, 0, 0, 0.2),
-            0 2px 0 #164d68,
-            0 4px 6px rgba(0, 0, 0, 0.2);
-        }
-
-        /* =============================================
-           KATTA PANEL
-        ============================================= */
-
-        .mainPanel {
-          position: relative;
-
-          width: min(1120px, 100%);
-          margin: 0 auto;
-
-          padding: 95px 30px 46px;
-
-          border: 3px solid #263238;
           border-radius: 25px;
 
           background:
             linear-gradient(
-              145deg,
-              #737a7d 0%,
-              #5d6467 28%,
-              #4b5255 65%,
-              #373e41 100%
+              180deg,
+              #8bdcff 0%,
+              #62bee9 47%,
+              #399bc9 100%
             );
 
           box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 0.4),
-            inset 0 -8px 12px rgba(0, 0, 0, 0.3),
-            0 10px 0 #222c30,
-            0 20px 35px rgba(0, 0, 0, 0.3);
+            inset 0 5px 4px
+              rgba(255,255,255,.75),
+
+            inset 0 -5px 5px
+              rgba(0,0,0,.12),
+
+            0 8px 0
+              #174d6d,
+
+            0 14px 18px
+              rgba(0,0,0,.20);
         }
 
-        .panelTitle {
+        .topTitle {
+          color: #073b68;
+
+          font-size: 20px;
+
+          font-weight: 900;
+
+          letter-spacing: 2px;
+
+          text-shadow:
+            0 1px 0
+            rgba(255,255,255,.75);
+        }
+
+        /* =====================================================
+           ORQAGA TUGMASI
+        ===================================================== */
+
+        .backButton {
+          min-width: 170px;
+
+          min-height: 50px;
+
+          padding:
+            9px
+            22px;
+
+          border:
+            2px solid
+            #174461;
+
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #b8edff 0%,
+              #72c7ed 52%,
+              #439ed0 100%
+            );
+
+          box-shadow:
+            inset 0 4px 4px
+              rgba(255,255,255,.8),
+
+            inset 0 -3px 3px
+              rgba(0,0,0,.12),
+
+            0 5px 0
+              #17415c,
+
+            0 9px 11px
+              rgba(0,0,0,.18);
+
+          color: #073b68;
+
+          font-size: 14px;
+
+          font-weight: 700;
+
+          cursor: pointer;
+
+          transition:
+            transform .1s ease,
+            filter .1s ease,
+            box-shadow .1s ease;
+        }
+
+        .backButton:hover {
+          transform:
+            translateY(-2px);
+
+          filter:
+            brightness(1.04);
+        }
+
+        .backButton:active {
+          transform:
+            translateY(3px);
+
+          box-shadow:
+            inset 0 4px 5px
+              rgba(0,0,0,.1),
+
+            0 1px 0
+              #17415c;
+        }
+
+        /* =====================================================
+           ASOSIY KULRANG PANEL
+        ===================================================== */
+
+        .mainPanel {
+          position: relative;
+
+          margin-top: 70px;
+
+          padding:
+            68px
+            30px
+            38px;
+
+          border:
+            3px solid
+            #333a3e;
+
+          border-radius: 23px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #62686b 0%,
+              #505659 46%,
+              #3d4346 100%
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(255,255,255,.10),
+
+            inset 0 -7px 7px
+              rgba(0,0,0,.22),
+
+            0 6px 0
+              #30373b,
+
+            0 11px 0
+              #242a2d,
+
+            0 17px 24px
+              rgba(0,0,0,.22);
+        }
+
+        /* =====================================================
+           INGLIZCHA LUG‘ATLAR SARLAVHASI
+        ===================================================== */
+
+        .floatingTitle {
           position: absolute;
 
-          top: -38px;
           left: 50%;
 
-          transform: translateX(-50%);
+          top: -31px;
 
-          min-width: 320px;
-          padding: 15px 38px;
+          transform:
+            translateX(-50%);
+
+          min-width: 350px;
+
+          min-height: 60px;
+
+          padding:
+            10px
+            30px;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          border:
+            3px solid
+            #174461;
+
+          border-radius: 12px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #b1ebff 0%,
+              #73c8ef 47%,
+              #3d9dce 100%
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(255,255,255,.72),
+
+            inset 0 -5px 5px
+              rgba(0,0,0,.13),
+
+            0 6px 0
+              #17415c,
+
+            0 10px 13px
+              rgba(20,65,92,.24);
+
+          color: #073b68;
+
+          font-size: 30px;
+
+          font-weight: 700;
 
           text-align: center;
 
-          color: #063f68;
+          white-space: nowrap;
+        }
 
-          font-size: 31px;
-          font-weight: 900;
+        /* =====================================================
+           INTRO
+        ===================================================== */
 
-          border: 2px solid #145b80;
+        .intro {
+          margin-bottom: 28px;
+
+          text-align: center;
+        }
+
+        .intro h1 {
+          margin: 0;
+
+          color: #ffffff;
+
+          font-size: 25px;
+
+          font-weight: 700;
+
+          text-shadow:
+            0 2px 0
+            rgba(0,0,0,.35);
+        }
+
+        /* =====================================================
+           KARTALAR
+        ===================================================== */
+
+        .cardGrid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              3,
+              minmax(0, 1fr)
+            );
+
+          gap: 25px;
+        }
+
+        .dictionaryCard {
+          min-height: 225px;
+
+          padding:
+            22px
+            18px
+            20px;
+
+          display: flex;
+
+          flex-direction: column;
+
+          align-items: center;
+
+          justify-content: center;
+
+          text-align: center;
+
+          border:
+            2px solid
+            #596166;
+
           border-radius: 15px;
 
           background:
             linear-gradient(
               180deg,
-              #d5f5ff 0%,
-              #a3e3fa 16%,
-              #73ccef 48%,
-              #45afe0 76%,
-              #278dbd 100%
+              #f8f8f8 0%,
+              #e9e9e9 45%,
+              #c9c9c9 100%
             );
 
           box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -3px 5px rgba(0, 72, 110, 0.25),
-            0 8px 0 #155775,
-            0 13px 18px rgba(0, 0, 0, 0.3);
+            inset 0 7px 6px
+              rgba(255,255,255,.95),
 
-          text-shadow:
-            0 1px 0 #ffffff,
-            0 2px 2px rgba(0, 0, 0, 0.15);
+            inset 0 -5px 5px
+              rgba(0,0,0,.10),
+
+            0 6px 0
+              #596166,
+
+            0 11px 12px
+              rgba(0,0,0,.18);
         }
 
-        /* =============================================
-           6 TA 3D KARTA
-        ============================================= */
+        /* =====================================================
+           BADGE
+        ===================================================== */
 
-        .cards {
+        .badge {
+          min-width: 58px;
+
+          min-height: 44px;
+
+          padding:
+            7px
+            11px;
+
+          margin-bottom: 15px;
+
           display: grid;
 
-          grid-template-columns:
-            repeat(3, minmax(0, 1fr));
+          place-items: center;
 
-          gap: 36px 30px;
-        }
+          border:
+            2px solid
+            #174461;
 
-        .dictionaryCard {
-          min-height: 260px;
+          border-radius: 10px;
 
-          padding: 27px 20px 28px;
-
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: space-between;
-
-          border: 2px solid #f7f7f7;
-          border-radius: 18px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #ffffff 0%,
-              #f7f7f7 24%,
-              #ededed 55%,
-              #d6d6d6 100%
-            );
-
-          box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 1),
-            inset 0 -4px 7px rgba(0, 0, 0, 0.12),
-            0 9px 0 #3c4549,
-            0 15px 20px rgba(0, 0, 0, 0.28);
-
-          transition:
-            transform 0.18s ease,
-            box-shadow 0.18s ease;
-        }
-
-        .dictionaryCard:hover {
-          transform:
-            translateY(-6px)
-            scale(1.012);
-
-          box-shadow:
-            inset 0 3px 3px rgba(255, 255, 255, 1),
-            inset 0 -4px 7px rgba(0, 0, 0, 0.1),
-            0 14px 0 #3c4549,
-            0 23px 28px rgba(0, 0, 0, 0.31);
-        }
-
-        .icon3d {
-          min-width: 58px;
-          height: 49px;
-
-          padding: 0 10px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          color: #06476f;
-
-          font-size: 17px;
-          font-weight: 900;
-
-          border: 2px solid #145a7b;
-          border-radius: 11px;
+          color: #073b68;
 
           background:
             linear-gradient(
               180deg,
-              #d9f7ff 0%,
-              #a9e5fa 20%,
-              #73ccef 53%,
-              #48add8 78%,
-              #318db5 100%
+              #c5f0ff 0%,
+              #76c5ec 50%,
+              #4da2d3 100%
             );
 
           box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -3px 4px rgba(0, 65, 100, 0.2),
-            0 6px 0 #164d68,
-            0 9px 12px rgba(0, 0, 0, 0.25);
+            inset 0 4px 4px
+              rgba(255,255,255,.78),
+
+            0 4px 0
+              #17415c;
+
+          font-size: 15px;
+
+          font-weight: 900;
+        }
+
+        /* =====================================================
+           KARTA MATNI
+        ===================================================== */
+
+        .cardContent {
+          flex: 1;
+
+          display: flex;
+
+          flex-direction: column;
+
+          align-items: center;
+
+          justify-content: center;
         }
 
         .dictionaryCard h2 {
-          margin: 25px 0;
+          margin:
+            0
+            0
+            8px;
 
-          color: #101010;
+          color: #111;
 
-          text-align: center;
+          font-size: 22px;
 
-          font-size: 23px;
-          line-height: 1.25;
-          font-weight: 900;
-
-          text-shadow:
-            0 1px 0 #ffffff,
-            0 2px 2px rgba(0, 0, 0, 0.12);
+          line-height: 1.15;
         }
 
-        /* =============================================
-           OCHISH — HAQIQIY 3D BUTTON
-        ============================================= */
+        .dictionaryCard p {
+          max-width: 300px;
+
+          margin: 0;
+
+          color: #525c62;
+
+          font-size: 13px;
+
+          line-height: 1.35;
+
+          font-weight: 700;
+        }
+
+        /* =====================================================
+           OCHISH TUGMASI
+        ===================================================== */
 
         .openButton {
-          width: 165px;
-          min-height: 50px;
+          min-width: 150px;
 
-          padding: 10px 20px;
+          min-height: 45px;
 
-          border: 2px solid #155b7d;
-          border-radius: 11px;
+          margin-top: 18px;
 
-          color: #063f63;
+          padding:
+            8px
+            20px;
+
+          border:
+            2px solid
+            #174461;
+
+          border-radius: 9px;
+
+          color: #073b68;
 
           background:
             linear-gradient(
               180deg,
-              #e0f8ff 0%,
-              #afeafb 17%,
-              #78d0f1 47%,
-              #49b2df 74%,
-              #2a91c0 100%
+              #a8e7ff 0%,
+              #72c3eb 55%,
+              #4b9dcd 100%
             );
 
           box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.97),
-            inset 0 -4px 5px rgba(0, 71, 107, 0.23),
-            0 7px 0 #164d68,
-            0 11px 15px rgba(0, 0, 0, 0.27);
+            inset 0 4px 4px
+              rgba(255,255,255,.8),
 
-          font-family: inherit;
-          font-size: 16px;
-          font-weight: 900;
+            inset 0 -3px 3px
+              rgba(0,0,0,.12),
+
+            0 4px 0
+              #17415c,
+
+            0 8px 10px
+              rgba(0,0,0,.18);
+
+          font-size: 15px;
+
+          font-weight: 700;
 
           cursor: pointer;
 
-          text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.85);
-
           transition:
-            transform 0.13s ease,
-            box-shadow 0.13s ease,
-            filter 0.13s ease;
+            transform .1s ease,
+            filter .1s ease,
+            box-shadow .1s ease;
         }
 
         .openButton:hover {
-          transform: translateY(-4px);
-          filter: brightness(1.05);
+          transform:
+            translateY(-2px);
 
-          box-shadow:
-            inset 0 3px 2px rgba(255, 255, 255, 0.97),
-            0 11px 0 #164d68,
-            0 16px 18px rgba(0, 0, 0, 0.3);
+          filter:
+            brightness(1.04);
         }
 
         .openButton:active {
-          transform: translateY(5px);
+          transform:
+            translateY(3px);
 
           box-shadow:
-            inset 0 4px 7px rgba(0, 0, 0, 0.2),
-            0 2px 0 #164d68,
-            0 4px 6px rgba(0, 0, 0, 0.22);
+            inset 0 4px 5px
+              rgba(0,0,0,.10),
+
+            0 1px 0
+              #17415c;
         }
 
-        /* =============================================
-           RESPONSIVE
-        ============================================= */
+        /* =====================================================
+           TABLET
+        ===================================================== */
 
-        @media (max-width: 950px) {
-          .cards {
+        @media (max-width: 1050px) {
+          .cardGrid {
             grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-          }
-
-          .mainPanel {
-            padding-left: 24px;
-            padding-right: 24px;
+              repeat(
+                2,
+                minmax(0, 1fr)
+              );
           }
         }
 
-        @media (max-width: 650px) {
+        /* =====================================================
+           TELEFON
+        ===================================================== */
+
+        @media (max-width: 640px) {
           .page {
             padding:
-              20px 12px
-              50px;
+              10px
+              8px
+              35px;
           }
 
-          .topPanel {
-            margin-bottom: 60px;
+          .shell {
+            width: 100%;
+          }
 
-            padding: 15px;
+          .topBar {
+            min-height: 68px;
 
-            flex-direction: column;
+            padding:
+              10px
+              12px;
+
+            border-radius: 18px;
+
+            border-width: 2px;
+
+            box-shadow:
+              inset 0 4px 4px
+                rgba(255,255,255,.68),
+
+              inset 0 -4px 4px
+                rgba(0,0,0,.10),
+
+              0 5px 0
+                #174d6d,
+
+              0 9px 12px
+                rgba(0,0,0,.16);
+          }
+
+          .topTitle {
+            display: none;
           }
 
           .backButton {
             width: 100%;
-          }
 
-          .brand {
-            margin: 5px 0;
+            min-width: 0;
+
+            min-height: 40px;
+
+            padding:
+              7px
+              15px;
+
+            font-size: 13px;
+
+            border-radius: 8px;
           }
 
           .mainPanel {
-            padding:
-              80px 15px
-              30px;
-
-            border-radius: 20px;
-          }
-
-          .panelTitle {
-            min-width: 245px;
+            margin-top: 55px;
 
             padding:
-              13px 20px;
+              48px
+              12px
+              22px;
 
-            font-size: 25px;
+            border-radius: 18px;
+
+            border-width: 2px;
+
+            box-shadow:
+              inset 0 4px 4px
+                rgba(255,255,255,.08),
+
+              inset 0 -5px 5px
+                rgba(0,0,0,.18),
+
+              0 4px 0
+                #30373b,
+
+              0 8px 0
+                #242a2d,
+
+              0 12px 16px
+                rgba(0,0,0,.18);
           }
 
-          .cards {
-            grid-template-columns: 1fr;
-            gap: 28px;
+          .floatingTitle {
+            top: -24px;
+
+            width:
+              min(
+                86%,
+                310px
+              );
+
+            min-width: 0;
+
+            min-height: 46px;
+
+            padding:
+              7px
+              14px;
+
+            font-size: 21px;
+
+            border-width: 2px;
+
+            border-radius: 10px;
+
+            white-space: normal;
+          }
+
+          .intro {
+            margin-bottom: 18px;
+          }
+
+          .intro h1 {
+            font-size: 20px;
+          }
+
+          .cardGrid {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(0, 1fr)
+              );
+
+            gap: 12px;
           }
 
           .dictionaryCard {
-            min-height: 235px;
+            min-height: 190px;
+
+            padding:
+              15px
+              8px
+              14px;
+
+            border-radius: 11px;
+
+            box-shadow:
+              inset 0 5px 4px
+                rgba(255,255,255,.92),
+
+              inset 0 -4px 4px
+                rgba(0,0,0,.09),
+
+              0 4px 0
+                #596166,
+
+              0 7px 8px
+                rgba(0,0,0,.14);
+          }
+
+          .badge {
+            min-width: 44px;
+
+            min-height: 36px;
+
+            margin-bottom: 10px;
+
+            padding:
+              5px
+              7px;
+
+            font-size: 12px;
           }
 
           .dictionaryCard h2 {
-            font-size: 22px;
+            font-size: 16px;
+          }
+
+          .dictionaryCard p {
+            font-size: 10px;
+
+            line-height: 1.25;
           }
 
           .openButton {
-            width: 170px;
+            min-width: 105px;
+
+            min-height: 38px;
+
+            margin-top: 12px;
+
+            padding:
+              6px
+              10px;
+
+            font-size: 12px;
+          }
+        }
+
+        /* =====================================================
+           JUDA KICHIK TELEFON
+        ===================================================== */
+
+        @media (max-width: 390px) {
+          .cardGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .dictionaryCard {
+            min-height: 165px;
+          }
+
+          .dictionaryCard h2 {
+            font-size: 18px;
+          }
+
+          .dictionaryCard p {
+            font-size: 11px;
+          }
+
+          .openButton {
+            min-width: 125px;
           }
         }
       `}</style>
