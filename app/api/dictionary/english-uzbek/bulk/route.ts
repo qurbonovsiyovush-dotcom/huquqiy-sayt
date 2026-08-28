@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put, list } from "@vercel/blob";
+import { put, list, get } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,21 +31,23 @@ function emptyData(): DictionaryData {
   };
 }
 
-function cleanText(value: unknown) {
+function cleanText(value: unknown): string {
   if (typeof value !== "string") {
     return "";
   }
 
-  return value
-    .trim()
-    .replace(/\s+/g, " ");
+  return value.trim().replace(/\s+/g, " ");
 }
 
-function createId(index: number) {
+function createId(index: number): string {
   return `${Date.now()}-${index}-${Math.random()
     .toString(36)
     .slice(2, 10)}`;
 }
+
+/* =========================================================
+   PRIVATE BLOB'DAN O'QISH
+========================================================= */
 
 async function readDictionary(): Promise<DictionaryData> {
   try {
@@ -63,15 +65,21 @@ async function readDictionary(): Promise<DictionaryData> {
         new Date(a.uploadedAt).getTime()
     )[0];
 
-    const response = await fetch(latest.url, {
-      cache: "no-store",
+    const blob = await get(latest.pathname, {
+      access: "private",
     });
 
-    if (!response.ok) {
+    if (!blob || blob.statusCode !== 200 || !blob.stream) {
       return emptyData();
     }
 
-    const data = await response.json();
+    const text = await new Response(blob.stream).text();
+
+    if (!text.trim()) {
+      return emptyData();
+    }
+
+    const data = JSON.parse(text);
 
     if (!data || !Array.isArray(data.words)) {
       return emptyData();
@@ -94,6 +102,10 @@ async function readDictionary(): Promise<DictionaryData> {
   }
 }
 
+/* =========================================================
+   PRIVATE BLOB'GA SAQLASH
+========================================================= */
+
 async function saveDictionary(
   data: DictionaryData
 ) {
@@ -101,12 +113,16 @@ async function saveDictionary(
     BLOB_PATH,
     JSON.stringify(data, null, 2),
     {
-      access: "public",
+      access: "private",
       allowOverwrite: true,
       contentType: "application/json",
     }
   );
 }
+
+/* =========================================================
+   BULK IMPORT
+========================================================= */
 
 export async function POST(
   request: NextRequest
@@ -134,10 +150,6 @@ export async function POST(
       );
     }
 
-    /*
-      Juda katta yoki noto‘g‘ri requestlardan
-      himoya qilish uchun limit.
-    */
     if (incomingWords.length > 10000) {
       return NextResponse.json(
         {
@@ -153,10 +165,6 @@ export async function POST(
 
     const data = await readDictionary();
 
-    /*
-      Mavjud lug‘atdagi juftliklarni Set'ga joylaymiz.
-      Bu 2700+ so‘zda dublikat tekshiruvini tezlashtiradi.
-    */
     const existingPairs = new Set(
       data.words.map((word) => {
         return `${word.english
@@ -167,8 +175,7 @@ export async function POST(
       })
     );
 
-    const now =
-      new Date().toISOString();
+    const now = new Date().toISOString();
 
     const newWords: DictionaryWord[] = [];
 
@@ -177,11 +184,8 @@ export async function POST(
 
     incomingWords.forEach(
       (item, index) => {
-        const english =
-          cleanText(item.english);
-
-        const uzbek =
-          cleanText(item.uzbek);
+        const english = cleanText(item.english);
+        const uzbek = cleanText(item.uzbek);
 
         if (!english || !uzbek) {
           invalid++;
@@ -191,10 +195,6 @@ export async function POST(
         const pairKey =
           `${english.toLowerCase()}|||${uzbek.toLowerCase()}`;
 
-        /*
-          Bazada yoki shu bulk request ichida
-          takror bo‘lsa o‘tkazib yuboramiz.
-        */
         if (existingPairs.has(pairKey)) {
           skipped++;
           return;
@@ -216,16 +216,12 @@ export async function POST(
       return NextResponse.json(
         {
           ok: true,
-
           message:
             "Yangi so‘z qo‘shilmadi.",
-
           added: 0,
           skipped,
           invalid,
-
-          total:
-            data.words.length,
+          total: data.words.length,
         },
         {
           status: 200,
@@ -235,9 +231,6 @@ export async function POST(
 
     data.words.push(...newWords);
 
-    /*
-      Inglizcha bo‘yicha alifbo tartibi.
-    */
     data.words.sort((a, b) =>
       a.english.localeCompare(
         b.english,
@@ -255,22 +248,13 @@ export async function POST(
     return NextResponse.json(
       {
         ok: true,
-
         message:
           "Ommaviy import muvaffaqiyatli yakunlandi.",
-
-        added:
-          newWords.length,
-
+        added: newWords.length,
         skipped,
-
         invalid,
-
-        total:
-          data.words.length,
-
-        importedWords:
-          newWords.length,
+        total: data.words.length,
+        importedWords: newWords.length,
       },
       {
         status: 201,
@@ -285,7 +269,6 @@ export async function POST(
     return NextResponse.json(
       {
         ok: false,
-
         message:
           "Ommaviy import vaqtida xatolik yuz berdi.",
       },
