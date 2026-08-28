@@ -1,98 +1,400 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type GuideCard = {
-  title: string;
-  href: string;
-  badge: string;
+type VocabularyWord = {
+  word: string;
+  translation: string;
+  example?: string;
+  uzbekExample?: string;
 };
 
-const cards: GuideCard[] = [
-  {
-    title: "Kodekslar",
-    href: "/qollanmalar/kodekslar",
-    badge: "K",
-  },
-  {
-    title: "Qonun va qonunchilik hujjatlari",
-    href: "/qollanmalar/qonunlar",
-    badge: "Q",
-  },
-  {
-    title: "Darsliklar",
-    href: "/qollanmalar/darsliklar",
-    badge: "D",
-  },
-  {
-    title: "English Vocabulary",
-    href: "/qollanmalar/english-vocabulary",
-    badge: "EN",
-  },
-  {
-    title: "Inglizcha lug‘atlar",
-    href: "/qollanmalar/dictionaries",
-    badge: "L",
-  },
-];
+type VocabularyUnit = {
+  book: number;
+  unit: number;
+  words: VocabularyWord[];
+  updatedAt?: string;
+};
 
-export default function QollanmalarPage() {
+const BOOKS = Array.from({ length: 6 }, (_, i) => i + 1);
+const UNITS = Array.from({ length: 30 }, (_, i) => i + 1);
+
+export default function DictionaryAdminPage() {
   const router = useRouter();
 
-  function openPage(href: string) {
-    router.push(href);
+  const [book, setBook] = useState(1);
+  const [unit, setUnit] = useState(1);
+
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const selectedLabel = useMemo(
+    () => `Book ${book} → Unit ${unit}`,
+    [book, unit]
+  );
+
+  useEffect(() => {
+    loadUnit();
+  }, [book, unit]);
+
+  async function loadUnit() {
+    try {
+      setLoading(true);
+      setMessage("");
+      setError("");
+
+      const response = await fetch("/api/vocabulary", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Lug‘at ma’lumotlarini yuklab bo‘lmadi.");
+      }
+
+      const data = await response.json();
+
+      let units: VocabularyUnit[] = [];
+
+      if (Array.isArray(data)) {
+        units = data;
+      } else if (Array.isArray(data?.units)) {
+        units = data.units;
+      } else if (Array.isArray(data?.data)) {
+        units = data.data;
+      }
+
+      const current = units.find(
+        (item) =>
+          Number(item.book) === Number(book) &&
+          Number(item.unit) === Number(unit)
+      );
+
+      if (!current || !Array.isArray(current.words)) {
+        setText("");
+        return;
+      }
+
+      const formatted = current.words
+        .map((item) => {
+          const english = item.word || "";
+          const uzbek = item.translation || "";
+          const englishExample = item.example || "";
+          const uzbekExample = item.uzbekExample || "";
+
+          if (englishExample || uzbekExample) {
+            return `${english} | ${uzbek} | ${englishExample} | ${uzbekExample}`;
+          }
+
+          return `${english} | ${uzbek}`;
+        })
+        .join("\n");
+
+      setText(formatted);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ma’lumotlarni yuklashda xatolik yuz berdi."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function goToAdmin() {
-    window.location.href = "/admin";
+  async function saveUnit() {
+    try {
+      setLoading(true);
+      setMessage("");
+      setError("");
+
+      const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (lines.length === 0) {
+        setError("Kamida bitta so‘z kiriting.");
+        return;
+      }
+
+      const words: VocabularyWord[] = [];
+
+      for (const line of lines) {
+        const parts = line.split("|").map((part) => part.trim());
+
+        if (parts.length < 2 || !parts[0] || !parts[1]) {
+          throw new Error(
+            `Noto‘g‘ri format: "${line}". Format: English | Uzbek`
+          );
+        }
+
+        words.push({
+          word: parts[0],
+          translation: parts[1],
+          example: parts[2] || "",
+          uzbekExample: parts[3] || "",
+        });
+      }
+
+      const response = await fetch("/api/vocabulary", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          book,
+          unit,
+          words,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            "Ma’lumotlarni saqlashda xatolik yuz berdi."
+        );
+      }
+
+      setMessage(
+        `✓ ${selectedLabel} muvaffaqiyatli saqlandi. Jami: ${words.length} ta so‘z.`
+      );
+
+      await loadUnit();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Saqlashda xatolik yuz berdi."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteUnit() {
+    const confirmed = window.confirm(
+      `${selectedLabel} ichidagi barcha so‘zlarni o‘chirmoqchimisiz?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setMessage("");
+      setError("");
+
+      const response = await fetch(
+        `/api/vocabulary?book=${book}&unit=${unit}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            "Unitni o‘chirishda xatolik yuz berdi."
+        );
+      }
+
+      setText("");
+      setMessage(`✓ ${selectedLabel} muvaffaqiyatli o‘chirildi.`);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "O‘chirishda xatolik yuz berdi."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <main className="page">
       {/* =========================
-          TEPA 3D PANEL
+          TEPADAGI 3D PANEL
       ========================== */}
-      <section className="topPanel">
-        <div className="pageTitle">Qo‘llanmalar</div>
+      <header className="topPanel">
+        <div className="namePlate">
+          Qurbonov Siyovush Jamaliddinzoda
+        </div>
 
-        <button
-          type="button"
-          className="backButton"
-          onClick={goToAdmin}
-        >
-          Orqaga
-        </button>
-      </section>
+        <div className="topActions">
+          <button
+            className="whiteButton"
+            onClick={() => router.push("/")}
+          >
+            Asosiy sahifa
+          </button>
+
+          <button
+            className="blueButton"
+            onClick={() => router.push("/admin")}
+          >
+            ← Orqaga
+          </button>
+        </div>
+      </header>
 
       {/* =========================
-          ASOSIY PANEL
+          ASOSIY LUG‘AT BOSHQARUVI
       ========================== */}
       <section className="mainPanel">
-        <h1 className="heading">
-          Kerakli bo‘limni tanlang
-        </h1>
+        <div className="titlePlate">Lug‘at boshqaruvi</div>
 
-        <div className="cards">
-          {cards.map((card) => (
-            <article
-              className="card"
-              key={card.title}
+        {/* =========================
+            BOSHQA LUG‘ATLAR
+        ========================== */}
+        <div className="dictionaryCards">
+          <div className="dictionaryCard">
+            <div className="miniBadge">EN</div>
+
+            <h2>English–Uzbek Dictionary</h2>
+
+            <button
+              className="manageButton"
+              onClick={() =>
+                router.push("/admin/dictionary/english-uzbek")
+              }
             >
-              <div className="badge">
-                {card.badge}
-              </div>
+              Boshqarish
+            </button>
+          </div>
 
-              <h2>{card.title}</h2>
+          <div className="dictionaryCard">
+            <div className="miniBadge">IV</div>
 
-              <button
-                type="button"
-                className="openButton"
-                onClick={() => openPage(card.href)}
+            <h2>Irregular Verbs</h2>
+
+            <button
+              className="manageButton"
+              onClick={() =>
+                router.push("/admin/dictionary/irregular-verbs")
+              }
+            >
+              Boshqarish
+            </button>
+          </div>
+        </div>
+
+        {/* =========================
+            ENGLISH VOCABULARY
+        ========================== */}
+        <div className="vocabularyBox">
+          <div className="vocabularyHeading">
+            <div className="bigBadge">4000</div>
+
+            <div>
+              <h1>English Vocabulary</h1>
+              <p>
+                4000 Essential English Words — so‘zlar va misol
+                gaplarni boshqarish
+              </p>
+            </div>
+          </div>
+
+          <div className="selectors">
+            <div className="field">
+              <label>Book</label>
+
+              <select
+                value={book}
+                onChange={(e) => setBook(Number(e.target.value))}
+                disabled={loading}
               >
-                Ochish
-              </button>
-            </article>
-          ))}
+                {BOOKS.map((item) => (
+                  <option key={item} value={item}>
+                    Book {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label>Unit</label>
+
+              <select
+                value={unit}
+                onChange={(e) => setUnit(Number(e.target.value))}
+                disabled={loading}
+              >
+                {UNITS.map((item) => (
+                  <option key={item} value={item}>
+                    Unit {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="selectedBox">
+            Tanlandi: <strong>{selectedLabel}</strong>
+          </div>
+
+          <div className="inputSection">
+            <h2>So‘zlarni kiriting</h2>
+
+            <p>
+              Format: <strong>English | Uzbek | English example | Uzbek example</strong>
+            </p>
+
+            <p>
+              Misol gap bo‘lmasa: <strong>English | Uzbek</strong>
+            </p>
+
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`afraid | qo‘rqqan | I am afraid of dogs. | Men itlardan qo‘rqaman.
+agree | rozi bo‘lmoq | I agree with you. | Men sizga qo‘shilaman.
+angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
+              disabled={loading}
+            />
+          </div>
+
+          {error && <div className="errorBox">{error}</div>}
+
+          {message && <div className="successBox">{message}</div>}
+
+          <div className="bottomActions">
+            <button
+              className="saveButton"
+              onClick={saveUnit}
+              disabled={loading}
+            >
+              {loading ? "Kutilmoqda..." : "Saqlash"}
+            </button>
+
+            <button
+              className="reloadButton"
+              onClick={loadUnit}
+              disabled={loading}
+            >
+              Qayta yuklash
+            </button>
+
+            <button
+              className="deleteButton"
+              onClick={deleteUnit}
+              disabled={loading}
+            >
+              Unitni o‘chirish
+            </button>
+          </div>
         </div>
       </section>
 
@@ -103,484 +405,626 @@ export default function QollanmalarPage() {
 
         .page {
           min-height: 100vh;
-          padding: 16px 20px 60px;
-
+          padding: 26px 28px 60px;
           background:
             radial-gradient(
               circle at top,
               #ffffff 0%,
-              #f3f6f7 48%,
-              #e8edef 100%
+              #f4f8fa 45%,
+              #edf3f5 100%
             );
-
-          color: #111;
-
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            Georgia,
-            serif;
+          color: #062f50;
+          font-family: "Bell MT", "Times New Roman", serif;
         }
 
-        button {
-          font-family: inherit;
-        }
-
-        /* ==========================================
-           TEPA KO‘K 3D PANEL
-        ========================================== */
+        /* =====================
+           TOP PANEL
+        ====================== */
 
         .topPanel {
-          width: min(1850px, 100%);
-          min-height: 140px;
-
-          margin: 0 auto 34px;
-
-          padding: 28px 35px;
+          width: min(1500px, 96%);
+          min-height: 108px;
+          margin: 0 auto 75px;
+          padding: 18px 25px;
 
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 30px;
+          gap: 20px;
 
-          border: 3px solid #123d52;
-          border-radius: 30px;
+          border: 3px solid #0a3b58;
+          border-radius: 25px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #8ad8fb 0%,
-              #63b8e5 50%,
-              #429dce 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #83d8fb 0%,
+            #54bce8 45%,
+            #3198c8 100%
+          );
 
           box-shadow:
-            inset 0 7px 7px rgba(255, 255, 255, 0.5),
-            inset 0 -8px 8px rgba(0, 0, 0, 0.12),
-            0 11px 0 #123d52,
-            0 18px 25px rgba(0, 0, 0, 0.2);
+            inset 0 3px 4px rgba(255, 255, 255, 0.85),
+            inset 0 -7px 0 #086184,
+            0 12px 0 #073b55,
+            0 20px 28px rgba(0, 0, 0, 0.18);
         }
 
-        /* ==========================================
-           QO‘LLANMALAR NOMI
-        ========================================== */
+        .namePlate {
+          min-width: 410px;
+          padding: 20px 26px;
 
-        .pageTitle {
-          width: 480px;
-          max-width: 45%;
-          min-height: 78px;
+          text-align: center;
+          font-size: 25px;
+          font-weight: 700;
+          color: #111;
 
-          padding: 14px 30px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border: 3px solid #4f5c62;
+          border: 3px solid #59636a;
           border-radius: 18px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #eeeeee 48%,
-              #d5d5d5 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff,
+            #e7e7e7 60%,
+            #cccccc
+          );
 
           box-shadow:
-            inset 0 6px 7px rgba(255, 255, 255, 0.95),
-            inset 0 -5px 6px rgba(0, 0, 0, 0.08),
-            0 8px 0 #4d595e,
-            0 13px 16px rgba(0, 0, 0, 0.2);
-
-          color: #111;
-
-          text-align: center;
-
-          font-size: 33px;
-          font-weight: 900;
+            inset 0 3px 4px #ffffff,
+            0 8px 0 #657077,
+            0 12px 18px rgba(0, 0, 0, 0.2);
         }
 
-        /* ==========================================
-           ORQAGA TUGMASI
-           BOSILGANDA /admin GA O‘TADI
-        ========================================== */
+        .topActions {
+          display: flex;
+          gap: 16px;
+          align-items: center;
+        }
 
-        .backButton {
-          width: 170px;
-          min-height: 66px;
-
-          padding: 10px 24px;
-
-          border: 3px solid #4e5b61;
-          border-radius: 16px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #eeeeee 48%,
-              #d3d3d3 100%
-            );
-
-          box-shadow:
-            inset 0 5px 6px rgba(255, 255, 255, 0.95),
-            inset 0 -4px 5px rgba(0, 0, 0, 0.08),
-            0 7px 0 #4e5b61,
-            0 11px 14px rgba(0, 0, 0, 0.2);
-
-          color: #111;
-
-          font-size: 17px;
-          font-weight: 900;
-
+        button {
+          font-family: inherit;
+          font-weight: 700;
           cursor: pointer;
-
-          transition:
-            transform 0.1s ease,
-            box-shadow 0.1s ease;
         }
 
-        .backButton:hover {
-          transform: translateY(-2px);
+        button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .whiteButton,
+        .blueButton {
+          min-width: 140px;
+          padding: 18px 20px;
+          border-radius: 15px;
+          font-size: 15px;
+        }
+
+        .whiteButton {
+          color: #111;
+          border: 2px solid #5a646a;
+
+          background: linear-gradient(
+            180deg,
+            #ffffff,
+            #e9e9e9 60%,
+            #cfcfcf
+          );
 
           box-shadow:
-            inset 0 5px 6px rgba(255, 255, 255, 0.95),
-            0 9px 0 #4e5b61,
-            0 14px 17px rgba(0, 0, 0, 0.22);
+            inset 0 2px 3px white,
+            0 7px 0 #687278;
         }
 
-        .backButton:active {
+        .blueButton {
+          color: #063453;
+          border: 2px solid #075278;
+
+          background: linear-gradient(
+            180deg,
+            #b8ebff,
+            #65c9f0 55%,
+            #36a7d5
+          );
+
+          box-shadow:
+            inset 0 2px 3px white,
+            0 7px 0 #075274;
+        }
+
+        .whiteButton:active,
+        .blueButton:active,
+        .manageButton:active,
+        .saveButton:active,
+        .reloadButton:active,
+        .deleteButton:active {
           transform: translateY(4px);
-
-          box-shadow:
-            inset 0 4px 5px rgba(0, 0, 0, 0.08),
-            0 2px 0 #4e5b61;
+          box-shadow: none;
         }
 
-        /* ==========================================
-           ASOSIY KULRANG 3D PANEL
-        ========================================== */
+        /* =====================
+           MAIN PANEL
+        ====================== */
 
         .mainPanel {
-          width: min(1850px, 100%);
+          position: relative;
 
+          width: min(1150px, 96%);
           margin: 0 auto;
+          padding: 75px 35px 42px;
 
-          padding: 38px 34px 48px;
-
-          border: 2px solid #30383b;
+          border: 3px solid #343b3f;
           border-radius: 26px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #666b6d 0%,
-              #53595b 50%,
-              #3e4547 100%
-            );
+          background: linear-gradient(
+            145deg,
+            #686e71 0%,
+            #555b5e 45%,
+            #3f4548 100%
+          );
 
           box-shadow:
-            inset 0 6px 8px rgba(255, 255, 255, 0.12),
-            inset 0 -9px 11px rgba(0, 0, 0, 0.22),
-            0 10px 0 #303638,
-            0 18px 27px rgba(0, 0, 0, 0.22);
+            inset 0 3px 3px rgba(255, 255, 255, 0.2),
+            inset 0 -8px 0 #292e31,
+            0 14px 24px rgba(0, 0, 0, 0.22);
         }
 
-        /* ==========================================
-           SARLAVHA
-        ========================================== */
+        .titlePlate {
+          position: absolute;
+          top: -45px;
+          left: 50%;
+          transform: translateX(-50%);
 
-        .heading {
-          margin: 0 0 34px;
-
-          color: #fff;
+          min-width: 300px;
+          padding: 17px 35px;
 
           text-align: center;
+          font-size: 30px;
+          font-weight: 700;
 
-          font-size: 29px;
-          font-weight: 900;
+          border: 3px solid #07527a;
+          border-radius: 18px;
 
-          text-shadow:
-            0 2px 2px rgba(0, 0, 0, 0.7);
+          background: linear-gradient(
+            180deg,
+            #a3e6ff,
+            #60c5ee 55%,
+            #329dcc
+          );
+
+          box-shadow:
+            inset 0 3px 3px white,
+            0 8px 0 #075274,
+            0 12px 18px rgba(0, 0, 0, 0.25);
         }
 
-        /* ==========================================
-           KARTALAR
-        ========================================== */
+        /* =====================
+           DICTIONARY CARDS
+        ====================== */
 
-        .cards {
-          width: 100%;
-
+        .dictionaryCards {
           display: grid;
-
-          grid-template-columns:
-            repeat(3, minmax(0, 1fr));
-
-          gap: 32px 30px;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 25px;
+          margin-bottom: 30px;
         }
 
-        .card {
-          min-height: 260px;
-
-          padding: 25px 24px 24px;
+        .dictionaryCard {
+          min-height: 220px;
+          padding: 26px;
 
           display: flex;
           flex-direction: column;
           align-items: center;
+          justify-content: center;
+          gap: 22px;
 
-          border: 1px solid #d0d0d0;
-          border-radius: 15px;
+          color: #111;
 
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #f5f5f5 55%,
-              #e4e4e4 100%
-            );
+          border: 2px solid #e9e9e9;
+          border-radius: 20px;
+
+          background: linear-gradient(
+            145deg,
+            #ffffff 0%,
+            #eeeeee 55%,
+            #d5d5d5 100%
+          );
 
           box-shadow:
-            inset 0 5px 7px rgba(255, 255, 255, 0.96),
-            0 8px 0 #858c8e,
-            0 14px 19px rgba(0, 0, 0, 0.22);
+            inset 0 4px 5px white,
+            0 9px 0 #747d80,
+            0 14px 20px rgba(0, 0, 0, 0.22);
+        }
 
+        .dictionaryCard h2 {
+          margin: 0;
           text-align: center;
-
-          transition:
-            transform 0.15s ease,
-            box-shadow 0.15s ease;
+          font-size: 27px;
         }
 
-        .card:hover {
-          transform: translateY(-3px);
-
-          box-shadow:
-            inset 0 5px 7px rgba(255, 255, 255, 0.96),
-            0 10px 0 #858c8e,
-            0 17px 22px rgba(0, 0, 0, 0.25);
-        }
-
-        /* ==========================================
-           BADGE
-        ========================================== */
-
-        .badge {
-          width: 58px;
-          height: 49px;
+        .miniBadge {
+          min-width: 58px;
+          height: 52px;
+          padding: 0 12px;
 
           display: flex;
           align-items: center;
           justify-content: center;
 
-          flex-shrink: 0;
+          font-size: 17px;
+          font-weight: 700;
+          color: #063554;
 
-          border: 2px solid #07506d;
-          border-radius: 10px;
+          border: 2px solid #075277;
+          border-radius: 12px;
 
-          background:
-            linear-gradient(
-              180deg,
-              #e1f8ff 0%,
-              #78d1f0 48%,
-              #3ca8d5 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #c7f0ff,
+            #69c9ee 55%,
+            #35a4d2
+          );
 
           box-shadow:
-            inset 0 4px 4px rgba(255, 255, 255, 0.8),
-            0 5px 0 #07506d;
-
-          color: #063e68;
-
-          font-size: 16px;
-          font-weight: 900;
+            inset 0 2px 3px white,
+            0 6px 0 #075274;
         }
 
-        /* ==========================================
-           KARTA NOMI
-        ========================================== */
+        .manageButton {
+          min-width: 160px;
+          padding: 14px 22px;
 
-        .card h2 {
-          width: 100%;
+          color: #063554;
+          font-size: 16px;
 
-          margin: 28px 0 0;
+          border: 2px solid #075277;
+          border-radius: 12px;
 
+          background: linear-gradient(
+            180deg,
+            #bcecff,
+            #65c8ef 55%,
+            #35a4d2
+          );
+
+          box-shadow:
+            inset 0 2px 3px white,
+            0 6px 0 #075274;
+        }
+
+        /* =====================
+           VOCABULARY BOX
+        ====================== */
+
+        .vocabularyBox {
+          padding: 30px;
           color: #111;
 
-          font-size: 24px;
-          line-height: 1.15;
-          font-weight: 900;
-        }
+          border: 2px solid #e8e8e8;
+          border-radius: 20px;
 
-        /* ==========================================
-           OCHISH TUGMASI
-        ========================================== */
-
-        .openButton {
-          width: 155px;
-          min-height: 47px;
-
-          margin-top: auto;
-
-          border: 2px solid #07506d;
-          border-radius: 9px;
-
-          background:
-            linear-gradient(
-              180deg,
-              #d9f6ff 0%,
-              #75cfee 48%,
-              #38a7d5 100%
-            );
+          background: linear-gradient(
+            145deg,
+            #ffffff,
+            #eeeeee 60%,
+            #d8d8d8
+          );
 
           box-shadow:
-            inset 0 4px 4px rgba(255, 255, 255, 0.75),
-            0 6px 0 #07506d,
-            0 10px 12px rgba(0, 0, 0, 0.18);
-
-          color: #073e65;
-
-          font-size: 14px;
-          font-weight: 900;
-
-          cursor: pointer;
-
-          transition:
-            transform 0.1s ease,
-            box-shadow 0.1s ease;
+            inset 0 4px 5px white,
+            0 9px 0 #737c80,
+            0 14px 20px rgba(0, 0, 0, 0.22);
         }
 
-        .openButton:hover {
-          transform: translateY(-2px);
+        .vocabularyHeading {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 30px;
+          text-align: center;
+        }
+
+        .vocabularyHeading h1 {
+          margin: 0 0 5px;
+          font-size: 31px;
+        }
+
+        .vocabularyHeading p {
+          margin: 0;
+          font-size: 15px;
+          color: #424242;
+        }
+
+        .bigBadge {
+          min-width: 70px;
+          height: 55px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          color: #063554;
+          font-weight: 700;
+
+          border: 2px solid #075277;
+          border-radius: 12px;
+
+          background: linear-gradient(
+            180deg,
+            #c7f0ff,
+            #69c9ee 55%,
+            #35a4d2
+          );
 
           box-shadow:
-            inset 0 4px 4px rgba(255, 255, 255, 0.75),
-            0 8px 0 #07506d,
-            0 12px 14px rgba(0, 0, 0, 0.2);
+            inset 0 2px 3px white,
+            0 6px 0 #075274;
         }
 
-        .openButton:active {
-          transform: translateY(4px);
+        .selectors {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+        }
+
+        .field {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .field label {
+          font-size: 18px;
+          font-weight: 700;
+        }
+
+        select {
+          width: 100%;
+          padding: 16px 18px;
+
+          font-family: inherit;
+          font-size: 17px;
+          font-weight: 700;
+
+          border: 1px solid #8c969b;
+          border-radius: 12px;
+
+          background: #fff;
 
           box-shadow:
-            inset 0 3px 4px rgba(0, 0, 0, 0.08),
-            0 2px 0 #07506d;
+            inset 0 2px 3px rgba(0, 0, 0, 0.05),
+            0 5px 0 #8b9498;
         }
 
-        /* ==========================================
-           KATTA MONITOR
-        ========================================== */
+        .selectedBox {
+          margin-top: 24px;
+          padding: 15px 18px;
 
-        @media (min-width: 1500px) {
-          .mainPanel {
-            padding: 40px 45px 50px;
-          }
+          font-size: 17px;
+          color: #073c5d;
 
-          .cards {
-            gap: 34px 36px;
-          }
+          border: 1px solid #4b9ec3;
+          border-radius: 10px;
 
-          .card {
-            min-height: 275px;
-          }
+          background: linear-gradient(
+            180deg,
+            #d9f4ff,
+            #b7e3f5
+          );
+
+          box-shadow: 0 5px 0 #76a9bd;
         }
 
-        /* ==========================================
-           TABLET
-        ========================================== */
-
-        @media (max-width: 1000px) {
-          .topPanel {
-            min-height: 115px;
-
-            padding: 22px 25px;
-          }
-
-          .pageTitle {
-            width: 360px;
-
-            font-size: 27px;
-          }
-
-          .mainPanel {
-            padding: 32px 24px 42px;
-          }
-
-          .cards {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-          }
+        .inputSection {
+          margin-top: 30px;
         }
 
-        /* ==========================================
-           TELEFON
-        ========================================== */
+        .inputSection h2 {
+          margin: 0 0 7px;
+          font-size: 25px;
+        }
 
-        @media (max-width: 620px) {
+        .inputSection p {
+          margin: 4px 0;
+          color: #444;
+          font-size: 15px;
+        }
+
+        textarea {
+          width: 100%;
+          min-height: 330px;
+          margin-top: 15px;
+          padding: 18px;
+
+          resize: vertical;
+
+          font-family: "Bell MT", "Times New Roman", serif;
+          font-size: 17px;
+          line-height: 1.65;
+
+          border: 1px solid #8d969b;
+          border-radius: 12px;
+          outline: none;
+
+          background: #fff;
+
+          box-shadow:
+            inset 0 3px 6px rgba(0, 0, 0, 0.08),
+            0 4px 0 #91999d;
+        }
+
+        textarea:focus {
+          border-color: #1987b6;
+          box-shadow:
+            inset 0 3px 6px rgba(0, 0, 0, 0.08),
+            0 0 0 3px rgba(51, 174, 224, 0.18),
+            0 4px 0 #4d91ad;
+        }
+
+        .successBox,
+        .errorBox {
+          margin-top: 20px;
+          padding: 15px 18px;
+          border-radius: 10px;
+          font-weight: 700;
+        }
+
+        .successBox {
+          color: #155f2a;
+          background: #e3f7e8;
+          border: 1px solid #74ba85;
+        }
+
+        .errorBox {
+          color: #8a1c1c;
+          background: #fdeaea;
+          border: 1px solid #d88b8b;
+        }
+
+        .bottomActions {
+          display: flex;
+          gap: 15px;
+          flex-wrap: wrap;
+          margin-top: 25px;
+        }
+
+        .saveButton,
+        .reloadButton,
+        .deleteButton {
+          min-width: 150px;
+          padding: 14px 22px;
+
+          border-radius: 11px;
+          font-size: 16px;
+        }
+
+        .saveButton {
+          color: #063554;
+          border: 2px solid #075277;
+
+          background: linear-gradient(
+            180deg,
+            #bcecff,
+            #65c8ef 55%,
+            #35a4d2
+          );
+
+          box-shadow:
+            inset 0 2px 3px white,
+            0 6px 0 #075274;
+        }
+
+        .reloadButton {
+          color: #222;
+          border: 2px solid #6c7579;
+
+          background: linear-gradient(
+            180deg,
+            #ffffff,
+            #e8e8e8,
+            #cfcfcf
+          );
+
+          box-shadow:
+            inset 0 2px 3px white,
+            0 6px 0 #737b7f;
+        }
+
+        .deleteButton {
+          color: #7b1111;
+          border: 2px solid #a84e4e;
+
+          background: linear-gradient(
+            180deg,
+            #fff7f7,
+            #f3dede,
+            #e5bcbc
+          );
+
+          box-shadow:
+            inset 0 2px 3px white,
+            0 6px 0 #9e5c5c;
+        }
+
+        /* =====================
+           MOBILE
+        ====================== */
+
+        @media (max-width: 850px) {
           .page {
-            padding: 10px 8px 40px;
+            padding: 16px 12px 40px;
           }
 
           .topPanel {
-            min-height: 96px;
-
+            width: 100%;
+            margin-bottom: 65px;
             padding: 14px;
-
-            border-radius: 18px;
-
-            gap: 12px;
+            flex-direction: column;
           }
 
-          .pageTitle {
-            width: auto;
-            max-width: none;
+          .namePlate {
+            width: 100%;
+            min-width: 0;
+            font-size: 20px;
+          }
 
+          .topActions {
+            width: 100%;
+          }
+
+          .whiteButton,
+          .blueButton {
             flex: 1;
-
-            min-height: 58px;
-
-            padding: 10px 12px;
-
-            border-radius: 12px;
-
-            font-size: 21px;
-          }
-
-          .backButton {
-            width: 100px;
-            min-height: 52px;
-
-            padding: 7px 8px;
-
-            border-radius: 11px;
-
-            font-size: 13px;
+            min-width: 0;
           }
 
           .mainPanel {
-            padding: 28px 14px 32px;
-
-            border-radius: 18px;
+            width: 100%;
+            padding: 65px 15px 25px;
           }
 
-          .heading {
-            margin-bottom: 25px;
-
-            font-size: 22px;
+          .titlePlate {
+            min-width: 240px;
+            font-size: 24px;
           }
 
-          .cards {
+          .dictionaryCards {
             grid-template-columns: 1fr;
-
-            gap: 25px;
           }
 
-          .card {
-            min-height: 220px;
+          .dictionaryCard {
+            min-height: 190px;
           }
 
-          .card h2 {
-            font-size: 21px;
+          .selectors {
+            grid-template-columns: 1fr;
+          }
+
+          .vocabularyBox {
+            padding: 20px 15px;
+          }
+
+          .vocabularyHeading {
+            flex-direction: column;
+          }
+
+          .vocabularyHeading h1 {
+            font-size: 26px;
+          }
+
+          textarea {
+            min-height: 300px;
+          }
+
+          .bottomActions {
+            flex-direction: column;
+          }
+
+          .saveButton,
+          .reloadButton,
+          .deleteButton {
+            width: 100%;
           }
         }
       `}</style>
