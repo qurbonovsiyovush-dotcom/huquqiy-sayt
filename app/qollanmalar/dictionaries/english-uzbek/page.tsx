@@ -29,17 +29,18 @@ export default function EnglishUzbekLearnPage() {
 
   const [options, setOptions] = useState<string[]>([]);
   const [correctAnswer, setCorrectAnswer] = useState("");
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(
-    null
-  );
+  const [selectedAnswer, setSelectedAnswer] =
+    useState<string | null>(null);
 
-  const [difficultWords, setDifficultWords] = useState<Set<string>>(
-    new Set()
-  );
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
 
-  // =========================================================
+  const [difficultWords, setDifficultWords] =
+    useState<Set<string>>(new Set());
+
+  // =====================================================
   // LUG‘ATNI YUKLASH
-  // =========================================================
+  // =====================================================
 
   useEffect(() => {
     async function loadWords() {
@@ -106,9 +107,9 @@ export default function EnglishUzbekLearnPage() {
     return mode;
   }, [mode, mixedDirection]);
 
-  // =========================================================
-  // JAVOB VARIANTLARINI YARATISH
-  // =========================================================
+  // =====================================================
+  // JAVOB VARIANTLARI
+  // =====================================================
 
   const createOptions = useCallback(() => {
     if (!currentWord || words.length === 0) return;
@@ -152,7 +153,9 @@ export default function EnglishUzbekLearnPage() {
       wrongPool[Math.floor(Math.random() * wrongPool.length)];
 
     const generated =
-      Math.random() < 0.5 ? [correct, wrong] : [wrong, correct];
+      Math.random() < 0.5
+        ? [correct, wrong]
+        : [wrong, correct];
 
     setCorrectAnswer(correct);
     setOptions(generated);
@@ -165,19 +168,25 @@ export default function EnglishUzbekLearnPage() {
     }
   }, [currentWord, words.length, index, mode, createOptions]);
 
-  // =========================================================
-  // JAVOB TANLASH
-  // =========================================================
+  // =====================================================
+  // JAVOB
+  // =====================================================
 
   function handleAnswer(answer: string) {
     if (selectedAnswer !== null) return;
 
     setSelectedAnswer(answer);
+
+    if (answer === correctAnswer) {
+      setCorrectCount((prev) => prev + 1);
+    } else {
+      setWrongCount((prev) => prev + 1);
+    }
   }
 
-  // =========================================================
+  // =====================================================
   // KEYINGI
-  // =========================================================
+  // =====================================================
 
   function nextWord() {
     if (words.length === 0) return;
@@ -189,9 +198,9 @@ export default function EnglishUzbekLearnPage() {
     setSelectedAnswer(null);
   }
 
-  // =========================================================
+  // =====================================================
   // OLDINGI
-  // =========================================================
+  // =====================================================
 
   function previousWord() {
     if (words.length === 0) return;
@@ -203,16 +212,15 @@ export default function EnglishUzbekLearnPage() {
     setSelectedAnswer(null);
   }
 
-  // =========================================================
-  // KEYINROQ YANA KO‘RSAT
-  // =========================================================
+  // =====================================================
+  // KEYINROQ
+  // =====================================================
 
   function showLater() {
     if (!currentWord || words.length < 2) return;
 
     setWords((prevWords) => {
       const copy = [...prevWords];
-
       const [removed] = copy.splice(index, 1);
 
       const minDistance = 5;
@@ -225,7 +233,8 @@ export default function EnglishUzbekLearnPage() {
           index +
           minDistance +
           Math.floor(
-            Math.random() * (maxDistance - minDistance + 1)
+            Math.random() *
+              (maxDistance - minDistance + 1)
           );
       }
 
@@ -243,9 +252,9 @@ export default function EnglishUzbekLearnPage() {
     setSelectedAnswer(null);
   }
 
-  // =========================================================
+  // =====================================================
   // QIYIN SO‘Z
-  // =========================================================
+  // =====================================================
 
   function toggleDifficult() {
     if (!currentWord) return;
@@ -263,9 +272,9 @@ export default function EnglishUzbekLearnPage() {
     });
   }
 
-  // =========================================================
+  // =====================================================
   // TALAFFUZ
-  // =========================================================
+  // =====================================================
 
   function pronounce() {
     if (!currentWord) return;
@@ -298,40 +307,42 @@ export default function EnglishUzbekLearnPage() {
       : currentWord.uzbek;
   }, [currentWord, currentDirection]);
 
-  // =========================================================
+  // =====================================================
   // LOADING
-  // =========================================================
+  // =====================================================
 
   if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.messageBox}>
+      <main className="page">
+        <div className="messageBox">
           Lug‘at yuklanmoqda...
         </div>
+
+        <style jsx>{css}</style>
       </main>
     );
   }
 
   if (error || words.length === 0) {
     return (
-      <main style={styles.page}>
-        <div style={styles.messageBox}>
+      <main className="page">
+        <div className="messageBox">
           {error || "Lug‘atda so‘z mavjud emas."}
         </div>
+
+        <style jsx>{css}</style>
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      {/* =====================================================
-          TEPADAGI 3D PANEL
-      ===================================================== */}
+    <main className="page">
+      {/* ================= TOP PANEL ================= */}
 
-      <section style={styles.topPanel}>
+      <section className="topPanel">
         <button
           type="button"
-          style={styles.backButton}
+          className="backButton"
           onClick={() =>
             router.push("/qollanmalar/dictionaries")
           }
@@ -339,15 +350,12 @@ export default function EnglishUzbekLearnPage() {
           ← Lug‘atlar
         </button>
 
-        <div style={styles.modeGroup}>
+        <div className="modeGroup">
           <button
             type="button"
-            style={{
-              ...styles.modeButton,
-              ...(mode === "en-uz"
-                ? styles.modeButtonActive
-                : {}),
-            }}
+            className={`modeButton ${
+              mode === "en-uz" ? "activeMode" : ""
+            }`}
             onClick={() => {
               setMode("en-uz");
               setSelectedAnswer(null);
@@ -358,12 +366,9 @@ export default function EnglishUzbekLearnPage() {
 
           <button
             type="button"
-            style={{
-              ...styles.modeButton,
-              ...(mode === "uz-en"
-                ? styles.modeButtonActive
-                : {}),
-            }}
+            className={`modeButton ${
+              mode === "uz-en" ? "activeMode" : ""
+            }`}
             onClick={() => {
               setMode("uz-en");
               setSelectedAnswer(null);
@@ -374,12 +379,9 @@ export default function EnglishUzbekLearnPage() {
 
           <button
             type="button"
-            style={{
-              ...styles.modeButton,
-              ...(mode === "mixed"
-                ? styles.modeButtonActive
-                : {}),
-            }}
+            className={`modeButton ${
+              mode === "mixed" ? "activeMode" : ""
+            }`}
             onClick={() => {
               setMode("mixed");
               setSelectedAnswer(null);
@@ -389,28 +391,24 @@ export default function EnglishUzbekLearnPage() {
           </button>
         </div>
 
-        <div style={styles.progress}>
+        <div className="progress">
           {index + 1} / {words.length}
         </div>
       </section>
 
-      {/* =====================================================
-          ASOSIY O‘RGANISH QISMI
-      ===================================================== */}
+      {/* ================= STUDY ================= */}
 
-      <section style={styles.studyArea}>
-        {/* SAVOL */}
-
-        <div style={styles.wordCard}>
+      <section className="studyArea">
+        <div className="wordCard">
           {questionText}
         </div>
 
-        {/* TALAFFUZ + QIYIN SO‘Z */}
+        {/* TALAFFUZ VA QIYIN SO‘Z */}
 
-        <div style={styles.functionButtons}>
+        <div className="functionButtons">
           <button
             type="button"
-            style={styles.smallButton}
+            className="smallButton"
             onClick={pronounce}
           >
             🔊 Talaffuz
@@ -418,12 +416,11 @@ export default function EnglishUzbekLearnPage() {
 
           <button
             type="button"
-            style={{
-              ...styles.smallButton,
-              ...(difficultWords.has(currentWord.id)
-                ? styles.difficultActive
-                : {}),
-            }}
+            className={`smallButton ${
+              difficultWords.has(currentWord.id)
+                ? "difficultActive"
+                : ""
+            }`}
             onClick={toggleDifficult}
           >
             {difficultWords.has(currentWord.id)
@@ -432,27 +429,17 @@ export default function EnglishUzbekLearnPage() {
           </button>
         </div>
 
-        {/* =================================================
-            2 TA JAVOB
-        ================================================= */}
+        {/* ================= JAVOBLAR ================= */}
 
-        <div style={styles.answers}>
+        <div className="answers">
           {options.map((option) => {
-            let optionStyle: React.CSSProperties = {
-              ...styles.answerButton,
-            };
+            let className = "answerButton";
 
             if (selectedAnswer !== null) {
               if (option === correctAnswer) {
-                optionStyle = {
-                  ...optionStyle,
-                  ...styles.correctAnswer,
-                };
+                className += " correctAnswer";
               } else if (option === selectedAnswer) {
-                optionStyle = {
-                  ...optionStyle,
-                  ...styles.wrongAnswer,
-                };
+                className += " wrongAnswer";
               }
             }
 
@@ -460,7 +447,7 @@ export default function EnglishUzbekLearnPage() {
               <button
                 key={option}
                 type="button"
-                style={optionStyle}
+                className={className}
                 onClick={() => handleAnswer(option)}
               >
                 {option}
@@ -469,14 +456,38 @@ export default function EnglishUzbekLearnPage() {
           })}
         </div>
 
-        {/* =================================================
-            PASTKI NAVIGATSIYA
-        ================================================= */}
+        {/* ================= KICHIK STATISTIKA ================= */}
 
-        <div style={styles.navigation}>
+        <div className="miniStats">
+          <div className="miniStat correctStat">
+            <span>✓</span>
+            <span>To‘g‘ri</span>
+            <strong>{correctCount}</strong>
+          </div>
+
+          <div className="miniStat wrongStat">
+            <span>✕</span>
+            <span>Xato</span>
+            <strong>{wrongCount}</strong>
+          </div>
+
           <button
             type="button"
-            style={styles.navButton}
+            className="miniStat difficultStat"
+            onClick={toggleDifficult}
+          >
+            <span>★</span>
+            <span>Qiyin so‘z</span>
+            <strong>{difficultWords.size}</strong>
+          </button>
+        </div>
+
+        {/* ================= NAVIGATION ================= */}
+
+        <div className="navigation">
+          <button
+            type="button"
+            className="navButton"
             onClick={previousWord}
           >
             ← Oldingi
@@ -484,7 +495,7 @@ export default function EnglishUzbekLearnPage() {
 
           <button
             type="button"
-            style={styles.laterButton}
+            className="laterButton"
             onClick={showLater}
           >
             ↻ Keyinroq yana ko‘rsat
@@ -492,355 +503,720 @@ export default function EnglishUzbekLearnPage() {
 
           <button
             type="button"
-            style={styles.navButton}
+            className="navButton"
             onClick={nextWord}
           >
             Keyingi →
           </button>
         </div>
       </section>
+
+      <style jsx>{css}</style>
     </main>
   );
 }
 
-// =========================================================
-// 3D DESIGN
-// =========================================================
+// =====================================================
+// CSS
+// =====================================================
 
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    padding: "36px 24px 80px",
-    background:
-      "radial-gradient(circle at top, #ffffff 0%, #f4f8fa 48%, #eaf2f6 100%)",
-    fontFamily:
-      '"Bell MT", "Times New Roman", Georgia, serif',
-    color: "#063b5a",
-  },
-
-  topPanel: {
-    width: "min(1090px, calc(100% - 20px))",
-    margin: "0 auto",
-
-    minHeight: "98px",
-    padding: "17px 28px",
-
-    display: "grid",
-    gridTemplateColumns: "190px 1fr 130px",
-    alignItems: "center",
-    gap: "22px",
-
-    border: "2px solid #075476",
-    borderRadius: "20px",
+const css = `
+  .page {
+    min-height: 100vh;
+    padding: 36px 24px 80px;
 
     background:
-      "linear-gradient(180deg, #82dcf7 0%, #56bce5 38%, #2f9ecb 78%, #208bb7 100%)",
+      radial-gradient(
+        circle at top,
+        #ffffff 0%,
+        #f4f8fa 48%,
+        #eaf2f6 100%
+      );
 
-    boxShadow:
-      "0 10px 0 #07506c, 0 16px 23px rgba(0,0,0,0.20), inset 0 3px 3px rgba(255,255,255,0.85), inset 0 -3px 4px rgba(0,78,110,0.16)",
-  },
+    font-family:
+      "Bell MT",
+      "Times New Roman",
+      Georgia,
+      serif;
 
-  backButton: {
-    minWidth: "165px",
-    height: "46px",
+    color: #063b5a;
+  }
 
-    padding: "0 22px",
+  button {
+    font-family: inherit;
+  }
 
-    borderRadius: "9px",
-    border: "1px solid #7e8c94",
+  /* ================= TOP PANEL ================= */
 
-    background:
-      "linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #e4e4e4 100%)",
+  .topPanel {
+    width: min(1090px, calc(100% - 20px));
+    margin: 0 auto;
 
-    boxShadow:
-      "0 6px 0 #68757c, 0 8px 12px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.9)",
+    min-height: 98px;
+    padding: 17px 28px;
 
-    fontFamily: "inherit",
-    fontSize: "16px",
-    fontWeight: 700,
-    color: "#063b5b",
+    display: grid;
+    grid-template-columns: 190px 1fr 130px;
+    align-items: center;
+    gap: 22px;
 
-    cursor: "pointer",
-  },
-
-  modeGroup: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "16px",
-    flexWrap: "wrap",
-  },
-
-  modeButton: {
-    minWidth: "155px",
-    height: "46px",
-
-    padding: "0 18px",
-
-    borderRadius: "8px",
-    border: "1px solid #839097",
+    border: 2px solid #075476;
+    border-radius: 20px;
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #f1f1f1 50%, #dedede 100%)",
+      linear-gradient(
+        180deg,
+        #82dcf7 0%,
+        #56bce5 38%,
+        #2f9ecb 78%,
+        #208bb7 100%
+      );
 
-    boxShadow:
-      "0 6px 0 #66757c, 0 8px 11px rgba(0,0,0,0.17), inset 0 1px 1px rgba(255,255,255,0.95)",
+    box-shadow:
+      0 10px 0 #07506c,
+      0 16px 23px rgba(0,0,0,.20),
+      inset 0 3px 3px rgba(255,255,255,.85),
+      inset 0 -3px 4px rgba(0,78,110,.16);
+  }
 
-    fontFamily: "inherit",
-    fontSize: "16px",
-    fontWeight: 700,
-
-    color: "#063a58",
-    cursor: "pointer",
-  },
-
-  modeButtonActive: {
-    color: "#ffffff",
-
-    border: "1px solid #00517a",
-
-    background:
-      "linear-gradient(180deg, #5cd0f8 0%, #22a6df 47%, #0d7fb5 100%)",
-
-    boxShadow:
-      "0 6px 0 #064f70, 0 9px 13px rgba(0,0,0,0.22), inset 0 2px 2px rgba(255,255,255,0.4)",
-  },
-
-  progress: {
-    justifySelf: "end",
-
-    minWidth: "110px",
-
-    textAlign: "center",
-
-    fontFamily: "inherit",
-    fontSize: "17px",
-    fontWeight: 800,
-    letterSpacing: "2px",
-
-    color: "#043c5c",
-
-    textShadow:
-      "0 1px 0 rgba(255,255,255,0.65)",
-  },
-
-  studyArea: {
-    width: "min(1050px, calc(100% - 20px))",
-    margin: "50px auto 0",
-  },
-
-  wordCard: {
-    width: "min(500px, 92%)",
-    minHeight: "122px",
-
-    margin: "0 auto",
-    padding: "22px 32px",
-
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-
-    textAlign: "center",
-
-    borderRadius: "16px",
-    border: "2px solid #075274",
+  .backButton,
+  .modeButton,
+  .smallButton,
+  .navButton,
+  .laterButton {
+    border: 1px solid #858f95;
 
     background:
-      "linear-gradient(180deg, #81dcf7 0%, #59bee6 40%, #2fa0cf 100%)",
+      linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #f1f1f1 52%,
+        #dedede 100%
+      );
 
-    boxShadow:
-      "0 9px 0 #07506d, 0 15px 22px rgba(0,0,0,0.21), inset 0 3px 3px rgba(255,255,255,0.75), inset 0 -3px 3px rgba(0,75,110,0.16)",
+    color: #063b5a;
 
-    color: "#062e49",
+    font-weight: 700;
 
-    fontFamily: "inherit",
-    fontSize: "42px",
-    fontWeight: 700,
+    cursor: pointer;
 
-    wordBreak: "break-word",
-  },
+    box-shadow:
+      0 6px 0 #66747a,
+      0 9px 12px rgba(0,0,0,.17),
+      inset 0 1px 1px rgba(255,255,255,.9);
+  }
 
-  functionButtons: {
-    marginTop: "30px",
+  .backButton {
+    min-width: 165px;
+    height: 46px;
 
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
+    padding: 0 22px;
 
-    gap: "15px",
-    flexWrap: "wrap",
-  },
+    border-radius: 9px;
 
-  smallButton: {
-    minWidth: "122px",
-    height: "45px",
+    font-size: 16px;
+  }
 
-    padding: "0 19px",
+  .modeGroup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-    border: "1px solid #858f95",
-    borderRadius: "8px",
+    gap: 16px;
+  }
 
-    background:
-      "linear-gradient(180deg, #ffffff 0%, #f1f1f1 55%, #dedede 100%)",
+  .modeButton {
+    min-width: 155px;
+    height: 46px;
 
-    boxShadow:
-      "0 6px 0 #67747a, 0 9px 12px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.9)",
+    padding: 0 18px;
 
-    color: "#063b5a",
+    border-radius: 8px;
 
-    fontFamily: "inherit",
-    fontSize: "16px",
-    fontWeight: 700,
+    font-size: 16px;
+  }
 
-    cursor: "pointer",
-  },
+  .activeMode {
+    color: white;
 
-  difficultActive: {
-    background:
-      "linear-gradient(180deg, #fff6b6 0%, #ffd95b 100%)",
-
-    boxShadow:
-      "0 6px 0 #b28c18, 0 9px 12px rgba(0,0,0,0.18)",
-  },
-
-  answers: {
-    marginTop: "70px",
-
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(2, minmax(280px, 1fr))",
-
-    gap: "52px",
-  },
-
-  answerButton: {
-    minHeight: "108px",
-
-    padding: "22px 28px",
-
-    borderRadius: "13px",
-    border: "1px solid #90999e",
+    border-color: #00517a;
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #f5f5f5 45%, #e8e8e8 100%)",
+      linear-gradient(
+        180deg,
+        #5cd0f8 0%,
+        #22a6df 47%,
+        #0d7fb5 100%
+      );
 
-    boxShadow:
-      "0 8px 0 #748087, 0 13px 18px rgba(0,0,0,0.19), inset 0 2px 2px rgba(255,255,255,0.9)",
+    box-shadow:
+      0 6px 0 #064f70,
+      0 9px 13px rgba(0,0,0,.22),
+      inset 0 2px 2px rgba(255,255,255,.4);
+  }
 
-    color: "#073951",
+  .progress {
+    justify-self: end;
 
-    fontFamily: "inherit",
-    fontSize: "29px",
-    fontWeight: 700,
+    min-width: 110px;
 
-    cursor: "pointer",
+    text-align: center;
+
+    font-size: 17px;
+    font-weight: 800;
+
+    letter-spacing: 2px;
+
+    color: #043c5c;
+  }
+
+  /* ================= STUDY ================= */
+
+  .studyArea {
+    width: min(1050px, calc(100% - 20px));
+
+    margin: 50px auto 0;
+  }
+
+  .wordCard {
+    width: min(500px, 92%);
+    min-height: 122px;
+
+    margin: 0 auto;
+    padding: 22px 32px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    box-sizing: border-box;
+
+    text-align: center;
+
+    border-radius: 16px;
+    border: 2px solid #075274;
+
+    background:
+      linear-gradient(
+        180deg,
+        #81dcf7 0%,
+        #59bee6 40%,
+        #2fa0cf 100%
+      );
+
+    box-shadow:
+      0 9px 0 #07506d,
+      0 15px 22px rgba(0,0,0,.21),
+      inset 0 3px 3px rgba(255,255,255,.75),
+      inset 0 -3px 3px rgba(0,75,110,.16);
+
+    color: #062e49;
+
+    font-size: 42px;
+    font-weight: 700;
+
+    overflow-wrap: anywhere;
+  }
+
+  .functionButtons {
+    margin-top: 30px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 15px;
+  }
+
+  .smallButton {
+    min-width: 122px;
+    height: 45px;
+
+    padding: 0 19px;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+  }
+
+  .difficultActive {
+    background:
+      linear-gradient(
+        180deg,
+        #fff6b6 0%,
+        #ffd95b 100%
+      );
+
+    box-shadow:
+      0 6px 0 #b28c18,
+      0 9px 12px rgba(0,0,0,.18);
+  }
+
+  /* ================= ANSWERS ================= */
+
+  .answers {
+    margin-top: 70px;
+
+    display: grid;
+    grid-template-columns:
+      repeat(2, minmax(280px, 1fr));
+
+    gap: 52px;
+  }
+
+  .answerButton {
+    min-height: 108px;
+
+    padding: 22px 28px;
+
+    border-radius: 13px;
+    border: 1px solid #8c969b;
+
+    /*
+      OLDINGIDAN BIR OZ KULRANGROQ
+    */
+    background:
+      linear-gradient(
+        180deg,
+        #eeeeee 0%,
+        #e7e7e7 50%,
+        #dcdcdc 100%
+      );
+
+    box-shadow:
+      0 8px 0 #747f84,
+      0 13px 18px rgba(0,0,0,.19),
+      inset 0 2px 2px rgba(255,255,255,.85);
+
+    color: #073951;
+
+    font-size: 29px;
+    font-weight: 700;
+
+    cursor: pointer;
 
     transition:
-      "transform 0.12s ease, box-shadow 0.12s ease",
-  },
+      transform .12s ease,
+      box-shadow .12s ease,
+      background .15s ease;
+  }
 
-  correctAnswer: {
-    border: "2px solid #16883a",
+  .answerButton:hover {
+    background:
+      linear-gradient(
+        180deg,
+        #f2f2f2 0%,
+        #e9e9e9 50%,
+        #dedede 100%
+      );
+  }
+
+  .correctAnswer {
+    border: 2px solid #16883a;
 
     background:
-      "linear-gradient(180deg, #e3ffe8 0%, #a7e9b4 100%)",
+      linear-gradient(
+        180deg,
+        #e3ffe8 0%,
+        #a7e9b4 100%
+      );
 
-    color: "#075d23",
+    color: #075d23;
 
-    boxShadow:
-      "0 8px 0 #418e53, 0 13px 18px rgba(0,0,0,0.17)",
-  },
+    box-shadow:
+      0 8px 0 #418e53,
+      0 13px 18px rgba(0,0,0,.17);
+  }
 
-  wrongAnswer: {
-    border: "2px solid #ae2828",
-
-    background:
-      "linear-gradient(180deg, #ffe8e8 0%, #eeaaaa 100%)",
-
-    color: "#8c1616",
-
-    boxShadow:
-      "0 8px 0 #a04d4d, 0 13px 18px rgba(0,0,0,0.17)",
-  },
-
-  navigation: {
-    marginTop: "50px",
-
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-
-    gap: "19px",
-    flexWrap: "wrap",
-  },
-
-  navButton: {
-    minWidth: "112px",
-    height: "46px",
-
-    padding: "0 18px",
-
-    borderRadius: "8px",
-    border: "1px solid #858f95",
+  .wrongAnswer {
+    border: 2px solid #ae2828;
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #e2e2e2 100%)",
+      linear-gradient(
+        180deg,
+        #ffe8e8 0%,
+        #eeaaaa 100%
+      );
 
-    boxShadow:
-      "0 6px 0 #66747a, 0 9px 12px rgba(0,0,0,0.17), inset 0 1px 1px rgba(255,255,255,0.9)",
+    color: #8c1616;
 
-    color: "#063b5a",
+    box-shadow:
+      0 8px 0 #a04d4d,
+      0 13px 18px rgba(0,0,0,.17);
+  }
 
-    fontFamily: "inherit",
-    fontSize: "15px",
-    fontWeight: 700,
+  /* ================= MINI STATS ================= */
 
-    cursor: "pointer",
-  },
+  .miniStats {
+    margin-top: 34px;
 
-  laterButton: {
-    minWidth: "215px",
-    height: "46px",
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-    padding: "0 22px",
+    gap: 14px;
 
-    borderRadius: "22px",
-    border: "1px solid #858f95",
+    flex-wrap: wrap;
+  }
+
+  .miniStat {
+    min-width: 118px;
+    height: 40px;
+
+    padding: 0 13px;
+
+    box-sizing: border-box;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    border-radius: 8px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    box-shadow:
+      0 4px 0 rgba(70,80,85,.55),
+      0 7px 10px rgba(0,0,0,.12),
+      inset 0 1px 1px rgba(255,255,255,.9);
+  }
+
+  .miniStat strong {
+    font-size: 15px;
+  }
+
+  .correctStat {
+    border: 1px solid #8dbd94;
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #f2f2f2 52%, #e1e1e1 100%)",
+      linear-gradient(
+        180deg,
+        #f5fff6 0%,
+        #dceede 100%
+      );
 
-    boxShadow:
-      "0 6px 0 #66747a, 0 9px 12px rgba(0,0,0,0.18), inset 0 1px 1px rgba(255,255,255,0.9)",
+    color: #17622a;
+  }
 
-    color: "#063b5a",
-
-    fontFamily: "inherit",
-    fontSize: "15px",
-    fontWeight: 700,
-
-    cursor: "pointer",
-  },
-
-  messageBox: {
-    width: "min(700px, 92%)",
-    margin: "110px auto",
-
-    padding: "38px",
-
-    borderRadius: "16px",
-    border: "1px solid #9aa4a9",
+  .wrongStat {
+    border: 1px solid #d4a0a0;
 
     background:
-      "linear-gradient(180deg, #ffffff 0%, #eeeeee 100%)",
+      linear-gradient(
+        180deg,
+        #fffafa 0%,
+        #f1dddd 100%
+      );
 
-    boxShadow:
-      "0 9px 0 #718087, 0 16px 25px rgba(0,0,0,0.18)",
+    color: #8d2424;
+  }
 
-    textAlign: "center",
+  .difficultStat {
+    border: 1px solid #d4b66e;
 
-    fontFamily: "inherit",
-    fontSize: "22px",
-    fontWeight: 700,
-  },
-};
+    background:
+      linear-gradient(
+        180deg,
+        #fffdf5 0%,
+        #f2e8c9 100%
+      );
+
+    color: #765512;
+
+    cursor: pointer;
+
+    font-family: inherit;
+  }
+
+  /* ================= NAVIGATION ================= */
+
+  .navigation {
+    margin-top: 38px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 19px;
+
+    flex-wrap: wrap;
+  }
+
+  .navButton {
+    min-width: 112px;
+    height: 46px;
+
+    padding: 0 18px;
+
+    border-radius: 8px;
+
+    font-size: 15px;
+  }
+
+  .laterButton {
+    min-width: 215px;
+    height: 46px;
+
+    padding: 0 22px;
+
+    border-radius: 22px;
+
+    font-size: 15px;
+  }
+
+  .messageBox {
+    width: min(700px, 92%);
+
+    margin: 110px auto;
+
+    padding: 38px;
+
+    box-sizing: border-box;
+
+    border-radius: 16px;
+    border: 1px solid #9aa4a9;
+
+    background:
+      linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #eeeeee 100%
+      );
+
+    box-shadow:
+      0 9px 0 #718087,
+      0 16px 25px rgba(0,0,0,.18);
+
+    text-align: center;
+
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  /* =====================================================
+     TELEFON
+  ===================================================== */
+
+  @media (max-width: 760px) {
+    .page {
+      padding:
+        18px 10px
+        calc(45px + env(safe-area-inset-bottom));
+    }
+
+    .topPanel {
+      width: 100%;
+      min-height: auto;
+
+      box-sizing: border-box;
+
+      padding: 14px;
+
+      display: flex;
+      flex-direction: column;
+
+      gap: 14px;
+
+      border-radius: 16px;
+    }
+
+    .backButton {
+      min-width: 0;
+      width: 150px;
+      height: 42px;
+
+      order: 3;
+    }
+
+    .modeGroup {
+      width: 100%;
+
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+
+      gap: 9px;
+
+      order: 1;
+    }
+
+    .modeButton {
+      min-width: 0;
+      width: 100%;
+
+      height: 42px;
+
+      padding: 0 7px;
+
+      font-size: 13px;
+    }
+
+    .modeButton:last-child {
+      grid-column: 1 / -1;
+
+      width: 50%;
+
+      justify-self: center;
+    }
+
+    .progress {
+      min-width: 0;
+
+      justify-self: auto;
+
+      order: 2;
+
+      font-size: 15px;
+    }
+
+    .studyArea {
+      width: 100%;
+
+      margin-top: 38px;
+    }
+
+    .wordCard {
+      width: 94%;
+      min-height: 105px;
+
+      padding: 18px 16px;
+
+      font-size: clamp(29px, 9vw, 38px);
+    }
+
+    .functionButtons {
+      margin-top: 26px;
+
+      gap: 10px;
+
+      flex-wrap: wrap;
+    }
+
+    .smallButton {
+      min-width: 0;
+
+      height: 42px;
+
+      padding: 0 13px;
+
+      font-size: 14px;
+    }
+
+    .answers {
+      margin-top: 48px;
+
+      grid-template-columns: 1fr;
+
+      gap: 22px;
+    }
+
+    .answerButton {
+      width: 100%;
+      min-height: 88px;
+
+      padding: 18px 15px;
+
+      font-size: 24px;
+    }
+
+    .miniStats {
+      width: 100%;
+
+      margin-top: 30px;
+
+      display: grid;
+      grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+      gap: 8px;
+    }
+
+    .miniStat {
+      min-width: 0;
+      width: 100%;
+      height: 42px;
+
+      padding: 0 5px;
+
+      gap: 4px;
+
+      font-size: 11px;
+
+      white-space: nowrap;
+    }
+
+    .miniStat strong {
+      font-size: 12px;
+    }
+
+    .navigation {
+      width: 100%;
+
+      margin-top: 34px;
+
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+
+      gap: 13px;
+    }
+
+    .navButton {
+      min-width: 0;
+      width: 100%;
+
+      padding: 0 8px;
+
+      font-size: 13px;
+    }
+
+    .laterButton {
+      grid-column: 1 / -1;
+
+      grid-row: 1;
+
+      min-width: 0;
+      width: min(240px, 100%);
+
+      justify-self: center;
+
+      padding: 0 12px;
+
+      font-size: 13px;
+    }
+  }
+
+  /* JUDA KICHIK TELEFON */
+
+  @media (max-width: 390px) {
+    .page {
+      padding-left: 7px;
+      padding-right: 7px;
+    }
+
+    .topPanel {
+      padding: 12px 9px;
+    }
+
+    .modeButton {
+      font-size: 12px;
+    }
+
+    .wordCard {
+      font-size: 29px;
+    }
+
+    .answerButton {
+      font-size: 22px;
+    }
+
+    .miniStat {
+      font-size: 10px;
+    }
+
+    .miniStat strong {
+      font-size: 11px;
+    }
+  }
+`;
