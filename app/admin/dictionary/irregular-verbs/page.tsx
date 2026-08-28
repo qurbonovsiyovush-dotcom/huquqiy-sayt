@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FormEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -24,97 +25,72 @@ type ApiResponse = {
   total?: number;
 };
 
-const API_URL =
-  "/api/dictionary/irregular-verbs";
+const API_URL = "/api/dictionary/irregular-verbs";
 
 export default function IrregularVerbsAdminPage() {
-  const [verbs, setVerbs] = useState<
-    IrregularVerb[]
-  >([]);
-
-  const [v1, setV1] = useState("");
-  const [v2, setV2] = useState("");
-  const [v3, setV3] = useState("");
-  const [uzbek, setUzbek] = useState("");
-
+  const [verbs, setVerbs] = useState<IrregularVerb[]>([]);
   const [search, setSearch] = useState("");
 
-  const [editingId, setEditingId] = useState<
-    string | null
-  >(null);
+  const [editingVerb, setEditingVerb] =
+    useState<IrregularVerb | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  const [message, setMessage] =
-    useState("");
+  /* =====================================================
+     BAZADAN YUKLASH
+  ===================================================== */
 
-  const [error, setError] =
-    useState("");
+  const loadVerbs = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-  /* =========================================================
-     MA’LUMOTLARNI YUKLASH
-  ========================================================= */
+      const response = await fetch(API_URL, {
+        method: "GET",
+        cache: "no-store",
+      });
 
-  const loadVerbs = useCallback(
-    async () => {
-      try {
-        setLoading(true);
-        setError("");
+      const data: ApiResponse = await response.json();
 
-        const response = await fetch(
-          API_URL,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.message ||
+            "Fe’llarni yuklashda xatolik yuz berdi."
         );
-
-        const data: ApiResponse =
-          await response.json();
-
-        if (!response.ok || !data.ok) {
-          throw new Error(
-            data.message ||
-              "Fe’llarni yuklab bo‘lmadi."
-          );
-        }
-
-        setVerbs(
-          Array.isArray(data.verbs)
-            ? data.verbs
-            : []
-        );
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Ma’lumotlarni yuklashda xatolik."
-        );
-      } finally {
-        setLoading(false);
       }
-    },
-    []
-  );
+
+      setVerbs(
+        Array.isArray(data.verbs)
+          ? data.verbs
+          : []
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Fe’llarni yuklashda xatolik yuz berdi."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void loadVerbs();
   }, [loadVerbs]);
 
-  /* =========================================================
+  /* =====================================================
      QIDIRUV
-  ========================================================= */
+  ===================================================== */
 
   const filteredVerbs = useMemo(() => {
-    const q = search
-      .trim()
-      .toLowerCase();
+    const q = search.trim().toLowerCase();
 
     if (!q) {
       return verbs;
@@ -122,64 +98,66 @@ export default function IrregularVerbsAdminPage() {
 
     return verbs.filter((verb) => {
       return (
-        verb.v1
-          .toLowerCase()
-          .includes(q) ||
-        verb.v2
-          .toLowerCase()
-          .includes(q) ||
-        verb.v3
-          .toLowerCase()
-          .includes(q) ||
-        verb.uzbek
-          .toLowerCase()
-          .includes(q)
+        verb.v1.toLowerCase().includes(q) ||
+        verb.v2.toLowerCase().includes(q) ||
+        verb.v3.toLowerCase().includes(q) ||
+        verb.uzbek.toLowerCase().includes(q)
       );
     });
   }, [verbs, search]);
 
-  /* =========================================================
-     FORMNI TOZALASH
-  ========================================================= */
-
-  function clearForm() {
-    setV1("");
-    setV2("");
-    setV3("");
-    setUzbek("");
-    setEditingId(null);
-  }
-
-  /* =========================================================
+  /* =====================================================
      XABARLARNI TOZALASH
-  ========================================================= */
+  ===================================================== */
 
   function clearMessages() {
     setMessage("");
     setError("");
   }
 
-  /* =========================================================
+  /* =====================================================
      QO‘SHISH / TAHRIRLASH
-  ========================================================= */
 
-  async function saveVerb() {
-    const cleanV1 = v1.trim();
-    const cleanV2 = v2.trim();
-    const cleanV3 = v3.trim();
-    const cleanUzbek = uzbek.trim();
+     MUHIM:
+     Qiymatlar to‘g‘ridan-to‘g‘ri FORM'dan olinadi.
+  ===================================================== */
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (saving) {
+      return;
+    }
 
     clearMessages();
 
-    if (
-      !cleanV1 ||
-      !cleanV2 ||
-      !cleanV3 ||
-      !cleanUzbek
-    ) {
+    const form = event.currentTarget;
+
+    const formData = new FormData(form);
+
+    const v1 = String(
+      formData.get("v1") ?? ""
+    ).trim();
+
+    const v2 = String(
+      formData.get("v2") ?? ""
+    ).trim();
+
+    const v3 = String(
+      formData.get("v3") ?? ""
+    ).trim();
+
+    const uzbek = String(
+      formData.get("uzbek") ?? ""
+    ).trim();
+
+    if (!v1 || !v2 || !v3 || !uzbek) {
       setError(
         "V1, V2, V3 va tarjimani to‘liq kiriting."
       );
+
       return;
     }
 
@@ -187,32 +165,30 @@ export default function IrregularVerbsAdminPage() {
       setSaving(true);
 
       const isEditing =
-        editingId !== null;
+        editingVerb !== null;
 
-      const response = await fetch(
-        API_URL,
-        {
-          method: isEditing
-            ? "PUT"
-            : "POST",
+      const response = await fetch(API_URL, {
+        method: isEditing
+          ? "PUT"
+          : "POST",
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-          body: JSON.stringify({
-            ...(isEditing
-              ? { id: editingId }
-              : {}),
+        body: JSON.stringify({
+          ...(isEditing
+            ? {
+                id: editingVerb.id,
+              }
+            : {}),
 
-            v1: cleanV1,
-            v2: cleanV2,
-            v3: cleanV3,
-            uzbek: cleanUzbek,
-          }),
-        }
-      );
+          v1,
+          v2,
+          v3,
+          uzbek,
+        }),
+      });
 
       const data: ApiResponse =
         await response.json();
@@ -220,7 +196,7 @@ export default function IrregularVerbsAdminPage() {
       if (!response.ok || !data.ok) {
         throw new Error(
           data.message ||
-            "Saqlashda xatolik yuz berdi."
+            "Fe’lni saqlashda xatolik yuz berdi."
         );
       }
 
@@ -230,7 +206,9 @@ export default function IrregularVerbsAdminPage() {
         await loadVerbs();
       }
 
-      clearForm();
+      form.reset();
+
+      setEditingVerb(null);
 
       setMessage(
         data.message ||
@@ -244,28 +222,21 @@ export default function IrregularVerbsAdminPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Saqlashda xatolik yuz berdi."
+          : "Fe’lni saqlashda xatolik yuz berdi."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  /* =========================================================
-     TAHRIRLASHNI BOSHLASH
-  ========================================================= */
+  /* =====================================================
+     TAHRIRLASH
+  ===================================================== */
 
-  function startEdit(
-    verb: IrregularVerb
-  ) {
+  function startEdit(verb: IrregularVerb) {
     clearMessages();
 
-    setEditingId(verb.id);
-
-    setV1(verb.v1);
-    setV2(verb.v2);
-    setV3(verb.v3);
-    setUzbek(verb.uzbek);
+    setEditingVerb(verb);
 
     window.scrollTo({
       top: 0,
@@ -273,17 +244,21 @@ export default function IrregularVerbsAdminPage() {
     });
   }
 
-  /* =========================================================
+  function cancelEdit() {
+    clearMessages();
+    setEditingVerb(null);
+  }
+
+  /* =====================================================
      O‘CHIRISH
-  ========================================================= */
+  ===================================================== */
 
   async function deleteVerb(
     verb: IrregularVerb
   ) {
-    const confirmed =
-      window.confirm(
-        `"${verb.v1} — ${verb.v2} — ${verb.v3}" fe’lini o‘chirmoqchimisiz?`
-      );
+    const confirmed = window.confirm(
+      `"${verb.v1} — ${verb.v2} — ${verb.v3}" fe’lini o‘chirmoqchimisiz?`
+    );
 
     if (!confirmed) {
       return;
@@ -294,21 +269,17 @@ export default function IrregularVerbsAdminPage() {
     try {
       setSaving(true);
 
-      const response = await fetch(
-        API_URL,
-        {
-          method: "DELETE",
+      const response = await fetch(API_URL, {
+        method: "DELETE",
 
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-          body: JSON.stringify({
-            id: verb.id,
-          }),
-        }
-      );
+        body: JSON.stringify({
+          id: verb.id,
+        }),
+      });
 
       const data: ApiResponse =
         await response.json();
@@ -316,7 +287,7 @@ export default function IrregularVerbsAdminPage() {
       if (!response.ok || !data.ok) {
         throw new Error(
           data.message ||
-            "O‘chirishda xatolik yuz berdi."
+            "Fe’lni o‘chirishda xatolik yuz berdi."
         );
       }
 
@@ -326,8 +297,10 @@ export default function IrregularVerbsAdminPage() {
         await loadVerbs();
       }
 
-      if (editingId === verb.id) {
-        clearForm();
+      if (
+        editingVerb?.id === verb.id
+      ) {
+        setEditingVerb(null);
       }
 
       setMessage(
@@ -340,37 +313,19 @@ export default function IrregularVerbsAdminPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "O‘chirishda xatolik yuz berdi."
+          : "Fe’lni o‘chirishda xatolik yuz berdi."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  /* =========================================================
-     ENTER BILAN SAQLASH
-  ========================================================= */
-
-  function handleKeyDown(
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-
-      if (!saving) {
-        void saveVerb();
-      }
-    }
-  }
-
-  /* =========================================================
-     SAHIFA
-  ========================================================= */
-
   return (
     <main className="page">
       <div className="container">
-        {/* HEADER */}
+        {/* ==========================================
+            HEADER
+        ========================================== */}
 
         <section className="headerPanel">
           <button
@@ -389,9 +344,7 @@ export default function IrregularVerbsAdminPage() {
               ADMIN PANEL
             </div>
 
-            <h1>
-              Irregular Verbs
-            </h1>
+            <h1>Irregular Verbs</h1>
           </div>
 
           <div className="totalBox">
@@ -399,13 +352,13 @@ export default function IrregularVerbsAdminPage() {
               {verbs.length}
             </strong>
 
-            <span>
-              Jami fe’l
-            </span>
+            <span>Jami fe’l</span>
           </div>
         </section>
 
-        {/* XABARLAR */}
+        {/* ==========================================
+            XABAR
+        ========================================== */}
 
         {message && (
           <div className="message success">
@@ -419,138 +372,130 @@ export default function IrregularVerbsAdminPage() {
           </div>
         )}
 
-        {/* FORM */}
+        {/* ==========================================
+            FORM
+        ========================================== */}
 
         <section className="panel">
           <div className="panelHeader">
             <div className="panelTitle">
-              {editingId
+              {editingVerb
                 ? "Fe’lni tahrirlash"
                 : "Yangi fe’l qo‘shish"}
             </div>
 
-            {editingId && (
+            {editingVerb && (
               <div className="editingBadge">
                 TAHRIRLASH
               </div>
             )}
           </div>
 
-          <div className="formGrid">
-            <label>
-              <span>V1</span>
+          <form
+            key={
+              editingVerb
+                ? editingVerb.id
+                : "new"
+            }
+            onSubmit={handleSubmit}
+          >
+            <div className="formGrid">
+              <label>
+                <span>V1</span>
 
-              <input
-                value={v1}
-                disabled={saving}
-                onKeyDown={
-                  handleKeyDown
-                }
-                onChange={(e) =>
-                  setV1(
-                    e.target.value
-                  )
-                }
-                placeholder="go"
-              />
-            </label>
+                <input
+                  name="v1"
+                  defaultValue={
+                    editingVerb?.v1 ?? ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="go"
+                />
+              </label>
 
-            <label>
-              <span>V2</span>
+              <label>
+                <span>V2</span>
 
-              <input
-                value={v2}
-                disabled={saving}
-                onKeyDown={
-                  handleKeyDown
-                }
-                onChange={(e) =>
-                  setV2(
-                    e.target.value
-                  )
-                }
-                placeholder="went"
-              />
-            </label>
+                <input
+                  name="v2"
+                  defaultValue={
+                    editingVerb?.v2 ?? ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="went"
+                />
+              </label>
 
-            <label>
-              <span>V3</span>
+              <label>
+                <span>V3</span>
 
-              <input
-                value={v3}
-                disabled={saving}
-                onKeyDown={
-                  handleKeyDown
-                }
-                onChange={(e) =>
-                  setV3(
-                    e.target.value
-                  )
-                }
-                placeholder="gone"
-              />
-            </label>
+                <input
+                  name="v3"
+                  defaultValue={
+                    editingVerb?.v3 ?? ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="gone"
+                />
+              </label>
 
-            <label>
-              <span>
-                Tarjimasi
-              </span>
+              <label>
+                <span>
+                  Tarjimasi
+                </span>
 
-              <input
-                value={uzbek}
-                disabled={saving}
-                onKeyDown={
-                  handleKeyDown
-                }
-                onChange={(e) =>
-                  setUzbek(
-                    e.target.value
-                  )
-                }
-                placeholder="bormoq"
-              />
-            </label>
-          </div>
+                <input
+                  name="uzbek"
+                  defaultValue={
+                    editingVerb?.uzbek ?? ""
+                  }
+                  disabled={saving}
+                  autoComplete="off"
+                  placeholder="bormoq"
+                />
+              </label>
+            </div>
 
-          <div className="formActions">
-            <button
-              type="button"
-              className="primaryButton"
-              disabled={saving}
-              onClick={() =>
-                void saveVerb()
-              }
-            >
-              {saving
-                ? "Saqlanmoqda..."
-                : editingId
-                  ? "✓ Saqlash"
-                  : "+ Qo‘shish"}
-            </button>
-
-            {editingId && (
+            <div className="formActions">
               <button
-                type="button"
-                className="grayButton"
+                type="submit"
+                className="primaryButton"
                 disabled={saving}
-                onClick={() => {
-                  clearForm();
-                  clearMessages();
-                }}
               >
-                Bekor qilish
+                {saving
+                  ? "Saqlanmoqda..."
+                  : editingVerb
+                    ? "✓ Saqlash"
+                    : "+ Qo‘shish"}
               </button>
-            )}
-          </div>
+
+              {editingVerb && (
+                <button
+                  type="button"
+                  className="grayButton"
+                  disabled={saving}
+                  onClick={
+                    cancelEdit
+                  }
+                >
+                  Bekor qilish
+                </button>
+              )}
+            </div>
+          </form>
         </section>
 
-        {/* RO‘YXAT */}
+        {/* ==========================================
+            RO‘YXAT
+        ========================================== */}
 
         <section className="panel">
           <div className="listHeader">
             <div className="panelTitle noMargin">
-              Irregular Verbs
-              ro‘yxati
+              Irregular Verbs ro‘yxati
             </div>
 
             <div className="resultCount">
@@ -564,9 +509,9 @@ export default function IrregularVerbsAdminPage() {
             <input
               className="searchInput"
               value={search}
-              onChange={(e) =>
+              onChange={(event) =>
                 setSearch(
-                  e.target.value
+                  event.target.value
                 )
               }
               placeholder="V1, V2, V3 yoki tarjima bo‘yicha qidirish..."
@@ -588,12 +533,10 @@ export default function IrregularVerbsAdminPage() {
           </div>
 
           {loading ? (
-            <div className="loadingState">
-              Ma’lumotlar
-              yuklanmoqda...
+            <div className="emptyState">
+              Ma’lumotlar yuklanmoqda...
             </div>
-          ) : filteredVerbs.length ===
-            0 ? (
+          ) : filteredVerbs.length === 0 ? (
             <div className="emptyState">
               {verbs.length === 0
                 ? "Hozircha fe’llar yo‘q. Yuqoridagi forma orqali birinchi fe’lni qo‘shing."
@@ -608,29 +551,17 @@ export default function IrregularVerbsAdminPage() {
                     <th>V1</th>
                     <th>V2</th>
                     <th>V3</th>
-                    <th>
-                      Tarjimasi
-                    </th>
-                    <th>
-                      Amallar
-                    </th>
+                    <th>Tarjimasi</th>
+                    <th>Amallar</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {filteredVerbs.map(
-                    (
-                      verb,
-                      index
-                    ) => (
-                      <tr
-                        key={
-                          verb.id
-                        }
-                      >
+                    (verb, index) => (
+                      <tr key={verb.id}>
                         <td className="numberCell">
-                          {index +
-                            1}
+                          {index + 1}
                         </td>
 
                         <td className="verbCell">
@@ -646,9 +577,7 @@ export default function IrregularVerbsAdminPage() {
                         </td>
 
                         <td className="translationCell">
-                          {
-                            verb.uzbek
-                          }
+                          {verb.uzbek}
                         </td>
 
                         <td>
@@ -656,9 +585,7 @@ export default function IrregularVerbsAdminPage() {
                             <button
                               type="button"
                               className="editButton"
-                              disabled={
-                                saving
-                              }
+                              disabled={saving}
                               onClick={() =>
                                 startEdit(
                                   verb
@@ -671,9 +598,7 @@ export default function IrregularVerbsAdminPage() {
                             <button
                               type="button"
                               className="deleteButton"
-                              disabled={
-                                saving
-                              }
+                              disabled={saving}
                               onClick={() =>
                                 void deleteVerb(
                                   verb
@@ -701,11 +626,7 @@ export default function IrregularVerbsAdminPage() {
 
         .page {
           min-height: 100vh;
-
-          padding:
-            25px
-            16px
-            70px;
+          padding: 25px 16px 70px;
 
           background:
             radial-gradient(
@@ -725,40 +646,29 @@ export default function IrregularVerbsAdminPage() {
         }
 
         .container {
-          width:
-            min(
-              1180px,
-              100%
-            );
-
-          margin:
-            0 auto;
+          width: min(1180px, 100%);
+          margin: 0 auto;
         }
 
         button,
         input {
-          font-family:
-            inherit;
+          font-family: inherit;
         }
 
         button:disabled,
         input:disabled {
-          cursor:
-            not-allowed;
-
-          opacity: .65;
+          cursor: not-allowed;
+          opacity: 0.65;
         }
 
-        /* ===========================
+        /* ==========================================
            HEADER
-        =========================== */
+        ========================================== */
 
         .headerPanel {
           min-height: 105px;
 
-          padding:
-            17px
-            25px;
+          padding: 17px 25px;
 
           display: grid;
 
@@ -767,17 +677,13 @@ export default function IrregularVerbsAdminPage() {
             1fr
             150px;
 
-          align-items:
-            center;
+          align-items: center;
 
           gap: 20px;
 
-          border:
-            3px solid
-            #174461;
+          border: 3px solid #174461;
 
-          border-radius:
-            22px;
+          border-radius: 22px;
 
           background:
             linear-gradient(
@@ -789,90 +695,55 @@ export default function IrregularVerbsAdminPage() {
 
           box-shadow:
             inset 0 6px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .75
-              ),
+              rgba(255,255,255,.75),
 
             inset 0 -5px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .13
-              ),
+              rgba(0,0,0,.13),
 
-            0 8px 0
-              #174d6d,
+            0 8px 0 #174d6d,
 
             0 14px 19px
-              rgba(
-                0,
-                0,
-                0,
-                .20
-              );
+              rgba(0,0,0,.20);
         }
 
         .headerCenter {
-          text-align:
-            center;
+          text-align: center;
         }
 
         .smallTitle {
-          margin-bottom:
-            4px;
+          margin-bottom: 4px;
 
-          color:
-            #145277;
+          color: #145277;
 
-          font-size:
-            12px;
+          font-size: 12px;
 
-          font-weight:
-            900;
+          font-weight: 900;
 
-          letter-spacing:
-            2px;
+          letter-spacing: 2px;
         }
 
         .headerCenter h1 {
           margin: 0;
 
-          color:
-            #073b68;
+          color: #073b68;
 
-          font-size:
-            34px;
+          font-size: 34px;
 
           line-height: 1;
 
           text-shadow:
             0 1px 0
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              );
+              rgba(255,255,255,.8);
         }
 
         .backButton {
-          min-height:
-            47px;
+          min-height: 47px;
 
-          padding:
-            8px
-            15px;
+          padding: 8px 15px;
 
-          border:
-            2px solid
-            #174461;
+          border: 2px solid #174461;
 
-          border-radius:
-            9px;
+          border-radius: 9px;
 
           background:
             linear-gradient(
@@ -884,53 +755,35 @@ export default function IrregularVerbsAdminPage() {
 
           box-shadow:
             inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              ),
+              rgba(255,255,255,.8),
 
-            0 4px 0
-              #17415c;
+            0 4px 0 #17415c;
 
-          color:
-            #073b68;
+          color: #073b68;
 
-          font-size:
-            14px;
+          font-size: 14px;
 
-          font-weight:
-            700;
+          font-weight: 700;
 
-          cursor:
-            pointer;
+          cursor: pointer;
         }
 
         .totalBox {
-          min-height:
-            66px;
+          min-height: 66px;
 
-          padding:
-            8px;
+          padding: 8px;
 
           display: flex;
 
-          flex-direction:
-            column;
+          flex-direction: column;
 
-          align-items:
-            center;
+          align-items: center;
 
-          justify-content:
-            center;
+          justify-content: center;
 
-          border:
-            2px solid
-            #174461;
+          border: 2px solid #174461;
 
-          border-radius:
-            11px;
+          border-radius: 11px;
 
           background:
             linear-gradient(
@@ -941,105 +794,70 @@ export default function IrregularVerbsAdminPage() {
 
           box-shadow:
             inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .85
-              ),
+              rgba(255,255,255,.85),
 
-            0 4px 0
-              #17415c;
+            0 4px 0 #17415c;
         }
 
         .totalBox strong {
-          color:
-            #073b68;
-
-          font-size:
-            25px;
+          color: #073b68;
+          font-size: 25px;
         }
 
         .totalBox span {
-          color:
-            #35576b;
+          color: #35576b;
 
-          font-size:
-            11px;
+          font-size: 11px;
 
-          font-weight:
-            700;
+          font-weight: 700;
         }
 
-        /* ===========================
+        /* ==========================================
            XABAR
-        =========================== */
+        ========================================== */
 
         .message {
-          margin-top:
-            25px;
+          margin-top: 25px;
 
-          padding:
-            14px
-            18px;
+          padding: 14px 18px;
 
-          border-radius:
-            10px;
+          border-radius: 10px;
 
-          font-weight:
-            700;
+          font-weight: 700;
 
           box-shadow:
             0 4px 8px
-              rgba(
-                0,
-                0,
-                0,
-                .08
-              );
+              rgba(0,0,0,.08);
         }
 
         .success {
-          border:
-            1px solid
-            #65a57b;
+          border: 1px solid #65a57b;
 
-          background:
-            #e3f7e9;
+          background: #e3f7e9;
 
-          color:
-            #27613a;
+          color: #27613a;
         }
 
         .error {
-          border:
-            1px solid
-            #c77676;
+          border: 1px solid #c77676;
 
-          background:
-            #ffe7e7;
+          background: #ffe7e7;
 
-          color:
-            #842d2d;
+          color: #842d2d;
         }
 
-        /* ===========================
+        /* ==========================================
            PANEL
-        =========================== */
+        ========================================== */
 
         .panel {
-          margin-top:
-            30px;
+          margin-top: 30px;
 
-          padding:
-            25px;
+          padding: 25px;
 
-          border:
-            2px solid
-            #4d5559;
+          border: 2px solid #4d5559;
 
-          border-radius:
-            18px;
+          border-radius: 18px;
 
           background:
             linear-gradient(
@@ -1050,91 +868,60 @@ export default function IrregularVerbsAdminPage() {
 
           box-shadow:
             inset 0 5px 5px
-              rgba(
-                255,
-                255,
-                255,
-                .95
-              ),
+              rgba(255,255,255,.95),
 
             inset 0 -5px 5px
-              rgba(
-                0,
-                0,
-                0,
-                .08
-              ),
+              rgba(0,0,0,.08),
 
-            0 6px 0
-              #596166,
+            0 6px 0 #596166,
 
             0 11px 16px
-              rgba(
-                0,
-                0,
-                0,
-                .16
-              );
+              rgba(0,0,0,.16);
         }
 
         .panelHeader {
           display: flex;
 
-          align-items:
-            center;
+          align-items: center;
 
-          justify-content:
-            space-between;
+          justify-content: space-between;
 
           gap: 15px;
 
-          margin-bottom:
-            20px;
+          margin-bottom: 20px;
         }
 
         .panelTitle {
-          color:
-            #073b68;
+          color: #073b68;
 
-          font-size:
-            24px;
+          font-size: 24px;
 
-          font-weight:
-            900;
+          font-weight: 900;
         }
 
         .editingBadge {
-          padding:
-            6px
-            10px;
+          padding: 6px 10px;
 
-          border:
-            1px solid
-            #237aa0;
+          border: 1px solid #237aa0;
 
-          border-radius:
-            7px;
+          border-radius: 7px;
 
-          background:
-            #d9f2fc;
+          background: #d9f2fc;
 
-          color:
-            #175978;
+          color: #175978;
 
-          font-size:
-            11px;
+          font-size: 11px;
 
-          font-weight:
-            900;
+          font-weight: 900;
         }
 
         .noMargin {
           margin: 0;
         }
 
-        /* ===========================
+        /* ==========================================
            FORM
-        =========================== */
+        ========================================== */
 
         .formGrid {
           display: grid;
@@ -1142,10 +929,7 @@ export default function IrregularVerbsAdminPage() {
           grid-template-columns:
             repeat(
               4,
-              minmax(
-                0,
-                1fr
-              )
+              minmax(0, 1fr)
             );
 
           gap: 15px;
@@ -1154,124 +938,88 @@ export default function IrregularVerbsAdminPage() {
         label {
           display: flex;
 
-          flex-direction:
-            column;
+          flex-direction: column;
 
           gap: 7px;
         }
 
         label span {
-          color:
-            #384a54;
+          color: #384a54;
 
-          font-size:
-            13px;
+          font-size: 13px;
 
-          font-weight:
-            900;
+          font-weight: 900;
         }
 
         input {
           outline: none;
 
-          border:
-            2px solid
-            #a2adb2;
+          border: 2px solid #a2adb2;
 
           color: #111;
 
-          background:
-            #fff;
+          background: #fff;
 
           box-shadow:
             inset 0 2px 4px
-              rgba(
-                0,
-                0,
-                0,
-                .08
-              );
+              rgba(0,0,0,.08);
         }
 
         input:focus {
-          border-color:
-            #359bc7;
+          border-color: #359bc7;
 
           box-shadow:
             0 0 0 3px
-              rgba(
-                53,
-                155,
-                199,
-                .15
-              );
+              rgba(53,155,199,.15);
         }
 
         label input {
           width: 100%;
 
-          min-height:
-            48px;
+          min-height: 48px;
 
-          padding:
-            10px
-            12px;
+          padding: 10px 12px;
 
-          border-radius:
-            8px;
+          border-radius: 8px;
 
-          font-size:
-            16px;
+          font-size: 16px;
         }
 
         .formActions {
-          margin-top:
-            20px;
+          margin-top: 20px;
 
           display: flex;
 
           gap: 12px;
 
-          flex-wrap:
-            wrap;
+          flex-wrap: wrap;
         }
 
-        /* ===========================
-           BUTTONS
-        =========================== */
+        /* ==========================================
+           TUGMALAR
+        ========================================== */
 
         .primaryButton,
         .grayButton,
         .refreshButton,
         .editButton,
         .deleteButton {
-          font-weight:
-            700;
-
-          cursor:
-            pointer;
+          font-weight: 700;
+          cursor: pointer;
         }
 
         .primaryButton {
-          min-width:
-            155px;
+          min-width: 155px;
 
-          min-height:
-            45px;
+          min-height: 45px;
 
-          padding:
-            8px
-            18px;
+          padding: 8px 18px;
 
-          border:
-            2px solid
-            #174461;
+          border: 2px solid #174461;
 
-          border-radius:
-            8px;
+          border-radius: 8px;
 
-          color:
-            #073b68;
+          color: #073b68;
 
           background:
             linear-gradient(
@@ -1283,31 +1031,19 @@ export default function IrregularVerbsAdminPage() {
 
           box-shadow:
             inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .8
-              ),
+              rgba(255,255,255,.8),
 
-            0 4px 0
-              #17415c;
+            0 4px 0 #17415c;
         }
 
         .grayButton {
-          min-height:
-            45px;
+          min-height: 45px;
 
-          padding:
-            8px
-            18px;
+          padding: 8px 18px;
 
-          border:
-            2px solid
-            #6f787d;
+          border: 2px solid #6f787d;
 
-          border-radius:
-            8px;
+          border-radius: 8px;
 
           background:
             linear-gradient(
@@ -1317,54 +1053,41 @@ export default function IrregularVerbsAdminPage() {
             );
 
           box-shadow:
-            0 4px 0
-              #747c80;
+            0 4px 0 #747c80;
         }
 
-        /* ===========================
-           LIST
-        =========================== */
+        /* ==========================================
+           RO‘YXAT
+        ========================================== */
 
         .listHeader {
           display: flex;
 
-          align-items:
-            center;
+          align-items: center;
 
-          justify-content:
-            space-between;
+          justify-content: space-between;
 
           gap: 15px;
 
-          margin-bottom:
-            18px;
+          margin-bottom: 18px;
         }
 
         .resultCount {
-          padding:
-            8px
-            14px;
+          padding: 8px 14px;
 
-          border:
-            1px solid
-            #8a969c;
+          border: 1px solid #8a969c;
 
-          border-radius:
-            8px;
+          border-radius: 8px;
 
-          background:
-            #dbe3e7;
+          background: #dbe3e7;
 
-          color:
-            #344b57;
+          color: #344b57;
 
-          font-weight:
-            900;
+          font-weight: 900;
         }
 
         .searchRow {
-          margin-bottom:
-            20px;
+          margin-bottom: 20px;
 
           display: grid;
 
@@ -1378,30 +1101,21 @@ export default function IrregularVerbsAdminPage() {
         .searchInput {
           width: 100%;
 
-          min-height:
-            48px;
+          min-height: 48px;
 
-          padding:
-            10px
-            14px;
+          padding: 10px 14px;
 
-          border-radius:
-            9px;
+          border-radius: 9px;
 
-          font-size:
-            15px;
+          font-size: 15px;
         }
 
         .refreshButton {
-          min-height:
-            48px;
+          min-height: 48px;
 
-          border:
-            2px solid
-            #67757c;
+          border: 2px solid #67757c;
 
-          border-radius:
-            9px;
+          border-radius: 9px;
 
           background:
             linear-gradient(
@@ -1410,51 +1124,38 @@ export default function IrregularVerbsAdminPage() {
               #d3d8da 100%
             );
 
-          color:
-            #354c58;
+          color: #354c58;
 
           box-shadow:
-            0 3px 0
-              #747e83;
+            0 3px 0 #747e83;
         }
 
         .tableWrapper {
-          overflow-x:
-            auto;
+          overflow-x: auto;
 
-          border:
-            1px solid
-            #a7afb3;
+          border: 1px solid #a7afb3;
 
-          border-radius:
-            10px;
+          border-radius: 10px;
         }
 
         table {
           width: 100%;
 
-          border-collapse:
-            collapse;
+          border-collapse: collapse;
 
-          background:
-            #fff;
+          background: #fff;
         }
 
         th,
         td {
-          padding:
-            13px
-            12px;
+          padding: 13px 12px;
 
           border-bottom:
-            1px solid
-            #d5dadd;
+            1px solid #d5dadd;
 
-          text-align:
-            left;
+          text-align: left;
 
-          white-space:
-            nowrap;
+          white-space: nowrap;
         }
 
         th {
@@ -1465,118 +1166,84 @@ export default function IrregularVerbsAdminPage() {
               #bfdce8 100%
             );
 
-          color:
-            #163f55;
+          color: #163f55;
 
-          font-size:
-            13px;
+          font-size: 13px;
         }
 
         td {
-          font-size:
-            14px;
+          font-size: 14px;
         }
 
         tbody tr:hover {
-          background:
-            #f3f8fa;
+          background: #f3f8fa;
         }
 
         .numberCell {
-          color:
-            #6a777d;
+          color: #6a777d;
         }
 
         .verbCell {
-          color:
-            #073b68;
+          color: #073b68;
 
-          font-size:
-            16px;
+          font-size: 16px;
 
-          font-weight:
-            900;
+          font-weight: 900;
         }
 
         .translationCell {
-          font-weight:
-            700;
+          font-weight: 700;
         }
 
         .actionButtons {
           display: flex;
-
           gap: 8px;
         }
 
         .editButton,
         .deleteButton {
-          min-height:
-            34px;
+          min-height: 34px;
 
-          padding:
-            5px
-            10px;
+          padding: 5px 10px;
 
-          border-radius:
-            7px;
+          border-radius: 7px;
         }
 
         .editButton {
-          border:
-            1px solid
-            #267fa5;
+          border: 1px solid #267fa5;
 
-          background:
-            #d5f1fc;
+          background: #d5f1fc;
 
-          color:
-            #14516d;
+          color: #14516d;
         }
 
         .deleteButton {
-          border:
-            1px solid
-            #a25b5b;
+          border: 1px solid #a25b5b;
 
-          background:
-            #ffe2e2;
+          background: #ffe2e2;
 
-          color:
-            #7d2424;
+          color: #7d2424;
         }
 
-        .loadingState,
         .emptyState {
-          padding:
-            45px
-            15px;
+          padding: 45px 15px;
 
-          border:
-            2px dashed
-            #a6b0b5;
+          border: 2px dashed #a6b0b5;
 
-          border-radius:
-            10px;
+          border-radius: 10px;
 
-          text-align:
-            center;
+          text-align: center;
 
-          color:
-            #66767e;
+          color: #66767e;
 
-          font-weight:
-            700;
+          font-weight: 700;
         }
 
-        /* ===========================
+        /* ==========================================
            TABLET
-        =========================== */
+        ========================================== */
 
-        @media (
-          max-width:
-          900px
-        ) {
+        @media (max-width: 900px) {
           .headerPanel {
             grid-template-columns:
               170px
@@ -1585,40 +1252,29 @@ export default function IrregularVerbsAdminPage() {
           }
 
           .headerCenter h1 {
-            font-size:
-              27px;
+            font-size: 27px;
           }
 
           .formGrid {
             grid-template-columns:
               repeat(
                 2,
-                minmax(
-                  0,
-                  1fr
-                )
+                minmax(0, 1fr)
               );
           }
         }
 
-        /* ===========================
+        /* ==========================================
            TELEFON
-        =========================== */
+        ========================================== */
 
-        @media (
-          max-width:
-          620px
-        ) {
+        @media (max-width: 620px) {
           .page {
-            padding:
-              10px
-              8px
-              40px;
+            padding: 10px 8px 40px;
           }
 
           .headerPanel {
-            padding:
-              12px;
+            padding: 12px;
 
             display: grid;
 
@@ -1628,89 +1284,69 @@ export default function IrregularVerbsAdminPage() {
 
             gap: 10px;
 
-            border-radius:
-              16px;
+            border-radius: 16px;
           }
 
           .backButton {
-            grid-column:
-              1 / -1;
+            grid-column: 1 / -1;
 
             width: 100%;
 
-            min-height:
-              40px;
+            min-height: 40px;
           }
 
           .headerCenter {
-            text-align:
-              left;
+            text-align: left;
           }
 
           .smallTitle {
-            font-size:
-              9px;
+            font-size: 9px;
           }
 
           .headerCenter h1 {
-            font-size:
-              23px;
+            font-size: 23px;
           }
 
           .totalBox {
-            min-height:
-              55px;
+            min-height: 55px;
           }
 
           .totalBox strong {
-            font-size:
-              20px;
+            font-size: 20px;
           }
 
           .totalBox span {
-            font-size:
-              9px;
+            font-size: 9px;
           }
 
           .panel {
-            margin-top:
-              22px;
+            margin-top: 22px;
 
-            padding:
-              17px
-              12px;
+            padding: 17px 12px;
 
-            border-radius:
-              14px;
+            border-radius: 14px;
           }
 
           .panelTitle {
-            font-size:
-              20px;
+            font-size: 20px;
           }
 
           .formGrid {
             grid-template-columns:
               repeat(
                 2,
-                minmax(
-                  0,
-                  1fr
-                )
+                minmax(0, 1fr)
               );
 
             gap: 10px;
           }
 
           label input {
-            min-height:
-              43px;
+            min-height: 43px;
 
-            padding:
-              8px;
+            padding: 8px;
 
-            font-size:
-              14px;
+            font-size: 14px;
           }
 
           .primaryButton,
@@ -1719,21 +1355,17 @@ export default function IrregularVerbsAdminPage() {
           }
 
           .listHeader {
-            align-items:
-              flex-start;
+            align-items: flex-start;
 
-            flex-direction:
-              column;
+            flex-direction: column;
           }
 
           .resultCount {
-            font-size:
-              12px;
+            font-size: 12px;
           }
 
           .searchRow {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
 
           .refreshButton {
@@ -1742,33 +1374,24 @@ export default function IrregularVerbsAdminPage() {
 
           th,
           td {
-            padding:
-              10px
-              9px;
+            padding: 10px 9px;
 
-            font-size:
-              12px;
+            font-size: 12px;
           }
 
           .verbCell {
-            font-size:
-              14px;
+            font-size: 14px;
           }
 
           .editButton,
           .deleteButton {
-            font-size:
-              11px;
+            font-size: 11px;
           }
         }
 
-        @media (
-          max-width:
-          390px
-        ) {
+        @media (max-width: 390px) {
           .formGrid {
-            grid-template-columns:
-              1fr;
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
