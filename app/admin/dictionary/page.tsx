@@ -224,6 +224,23 @@ export default function DictionaryAdminPage() {
     window.location.href = "/admin";
   }
 
+  function goEnglishUzbek() {
+    window.location.href = "/admin/dictionary/english-uzbek";
+  }
+
+  function goIrregularVerbs() {
+    window.location.href = "/admin/dictionary/irregular-verbs";
+  }
+
+  function scrollToVocabulary() {
+    document
+      .getElementById("english-vocabulary-editor")
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+  }
+
   return (
     <main className="page">
       <div className="wrapper">
@@ -268,9 +285,57 @@ export default function DictionaryAdminPage() {
             Lug‘at boshqaruvi
           </div>
 
+          {/* =====================================================
+              LUG‘AT BOSHQARUVI KARTALARI
+          ===================================================== */}
+
+          <div className="dictionaryMenu">
+            <article className="dictionaryMenuCard">
+              <div className="dictionaryBadge">EN</div>
+
+              <h2>English Vocabulary</h2>
+
+              <button
+                type="button"
+                className="dictionaryMenuButton"
+                onClick={scrollToVocabulary}
+              >
+                Boshqarish
+              </button>
+            </article>
+
+            <article className="dictionaryMenuCard">
+              <div className="dictionaryBadge">EN–UZ</div>
+
+              <h2>English–Uzbek Dictionary</h2>
+
+              <button
+                type="button"
+                className="dictionaryMenuButton"
+                onClick={goEnglishUzbek}
+              >
+                Boshqarish
+              </button>
+            </article>
+
+            <article className="dictionaryMenuCard">
+              <div className="dictionaryBadge">IV</div>
+
+              <h2>Irregular Verbs</h2>
+
+              <button
+                type="button"
+                className="dictionaryMenuButton"
+                onClick={goIrregularVerbs}
+              >
+                Boshqarish
+              </button>
+            </article>
+          </div>
+
           {/* BOOK + UNIT CARD */}
 
-          <div className="innerCard">
+          <div className="innerCard" id="english-vocabulary-editor">
             <h2>English Vocabulary</h2>
 
             <p className="subtitle">
@@ -716,6 +781,119 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
           box-shadow:
             0 5px 0 #174d68,
             inset 0 2px 0 rgba(255,255,255,.55);
+        }
+
+        /* ========================================
+           LUG‘AT BOSHQARUVI MENYUSI
+        ======================================== */
+
+        .dictionaryMenu {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+          margin-bottom: 30px;
+        }
+
+        .dictionaryMenuCard {
+          min-height: 190px;
+          padding: 22px 16px 20px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          border-radius: 14px;
+          border: 1px solid #d7d7d7;
+
+          background:
+            linear-gradient(
+              145deg,
+              #fbfbfb 0%,
+              #ececec 45%,
+              #d1d1d1 100%
+            );
+
+          box-shadow:
+            0 7px 0 #777c7e,
+            0 11px 18px rgba(0, 0, 0, 0.17),
+            inset 0 2px 0 #ffffff;
+
+          text-align: center;
+        }
+
+        .dictionaryBadge {
+          min-width: 58px;
+          height: 48px;
+
+          padding: 0 10px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 9px;
+          border: 1px solid #155476;
+
+          background:
+            linear-gradient(
+              180deg,
+              #dff7ff 0%,
+              #78cdf3 48%,
+              #4aa8d6 100%
+            );
+
+          color: #123d59;
+
+          font-size: 14px;
+          font-weight: 700;
+
+          box-shadow:
+            0 5px 0 #15506e,
+            inset 0 2px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .dictionaryMenuCard h2 {
+          margin: 25px 0 20px;
+
+          color: #111;
+
+          font-size: 20px;
+          line-height: 1.15;
+        }
+
+        .dictionaryMenuButton {
+          min-width: 135px;
+          height: 42px;
+
+          margin-top: auto;
+          padding: 0 16px;
+
+          border-radius: 8px;
+          border: 1px solid #155679;
+
+          background:
+            linear-gradient(
+              180deg,
+              #74cff6,
+              #4eaadb
+            );
+
+          color: #123b53;
+
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
+
+          cursor: pointer;
+
+          box-shadow:
+            0 5px 0 #15506e,
+            inset 0 2px 0 rgba(255,255,255,.6);
+        }
+
+        .dictionaryMenuButton:active {
+          transform: translateY(4px);
+          box-shadow: none;
         }
 
         /* ========================================
@@ -1202,6 +1380,14 @@ angry | jahli chiqqan | He is angry with me. | U mendan jahli chiqdi.`}
 
           .topActions {
             display: none;
+          }
+
+          .dictionaryMenu {
+            grid-template-columns: 1fr;
+          }
+
+          .dictionaryMenuCard {
+            min-height: 165px;
           }
 
           .adminBox {
