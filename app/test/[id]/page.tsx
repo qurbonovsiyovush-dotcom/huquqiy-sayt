@@ -245,8 +245,7 @@ export default function TestSolvePage() {
           }
         );
 
-        const attemptData =
-          await readJson(attemptResponse);
+        const attemptData = await readJson(attemptResponse);
 
         if (attemptResponse.ok) {
           setAttemptLimit(
@@ -431,21 +430,14 @@ export default function TestSolvePage() {
     }
 
     finishLock.current = false;
-
     resultSavedRef.current = false;
 
     setAnswers({});
-
     setCurrentIndex(0);
-
     setFinished(false);
-
     setShowReview(false);
-
     setReviewMode("all");
-
     setFlagged({});
-
     setZoomQuestionId(null);
 
     try {
@@ -498,9 +490,7 @@ export default function TestSolvePage() {
     finishLock.current = true;
 
     setFinished(true);
-
     setStarted(false);
-
     setZoomQuestionId(null);
 
     try {
@@ -548,7 +538,7 @@ export default function TestSolvePage() {
   }, [started, finished, test]);
 
   /* =====================================================
-     AUTOSAVE / ONLINE
+     ONLINE
   ===================================================== */
 
   useEffect(() => {
@@ -579,6 +569,10 @@ export default function TestSolvePage() {
       );
     };
   }, []);
+
+  /* =====================================================
+     AUTOSAVE
+  ===================================================== */
 
   useEffect(() => {
     if (
@@ -753,7 +747,7 @@ export default function TestSolvePage() {
   ]);
 
   /* =====================================================
-     VARIANT TANLASH
+     JAVOB
   ===================================================== */
 
   function selectAnswer(
@@ -795,13 +789,9 @@ export default function TestSolvePage() {
     }
 
     let correct = 0;
-
     let incorrect = 0;
-
     let unanswered = 0;
-
     let earnedPoints = 0;
-
     let totalPoints = 0;
 
     for (const question of test.questions) {
@@ -860,7 +850,7 @@ export default function TestSolvePage() {
   }, [test, answers]);
 
   /* =====================================================
-     NATIJANI SERVERGA SAQLASH
+     NATIJANI SAQLASH
   ===================================================== */
 
   useEffect(() => {
@@ -906,25 +896,17 @@ export default function TestSolvePage() {
               testId: test.id,
               testTitle: test.title,
               subject: test.subject,
-
               total: result.total,
-
               correct: result.correct,
-
               incorrect: result.incorrect,
-
               unanswered:
                 result.unanswered,
-
               percentage:
                 result.percentage,
-
               earnedPoints:
                 result.earnedPoints,
-
               totalPoints:
                 result.totalPoints,
-
               spentSeconds,
             }),
           }
@@ -1014,7 +996,7 @@ export default function TestSolvePage() {
   ]);
 
   /* =====================================================
-     VAQT FORMAT
+     VAQT
   ===================================================== */
 
   function formatTime(seconds: number) {
@@ -1038,10 +1020,6 @@ export default function TestSolvePage() {
       "0"
     )}`;
   }
-
-  /* =====================================================
-     CURRENT QUESTION
-  ===================================================== */
 
   const currentQuestion =
     test?.questions?.[currentIndex] ||
@@ -1208,37 +1186,29 @@ export default function TestSolvePage() {
                 >
                   {shape.imageSrc ? (
                     <img
-                      src={
-                        shape.imageSrc
-                      }
+                      src={shape.imageSrc}
                       alt="Test rasmi"
                       draggable={false}
                       style={{
                         width: "100%",
                         height: "100%",
                         display: "block",
-
                         objectFit:
                           shape.objectFit ??
                           "contain",
-
                         borderStyle:
                           "solid",
-
                         borderColor:
                           shape.borderColor ??
                           "transparent",
-
                         borderWidth: `${
                           shape.borderWidth ??
                           0
                         }px`,
-
                         borderRadius: `${
                           shape.borderRadius ??
                           0
                         }px`,
-
                         boxSizing:
                           "border-box",
                       }}
@@ -1264,7 +1234,6 @@ export default function TestSolvePage() {
                         background:
                           shape.backgroundColor ??
                           "#8fc9ef",
-
                         borderColor:
                           shape.borderColor ??
                           "#2f5975",
@@ -1279,7 +1248,6 @@ export default function TestSolvePage() {
                         background:
                           shape.backgroundColor ??
                           "#8fc9ef",
-
                         borderColor:
                           shape.borderColor ??
                           "#2f5975",
@@ -1380,10 +1348,7 @@ export default function TestSolvePage() {
       <main className="statePage">
         <div className="stateBox">
           <div className="loader" />
-
-          <h2>
-            Test yuklanmoqda...
-          </h2>
+          <h2>Test yuklanmoqda...</h2>
         </div>
 
         <style jsx>
@@ -1420,8 +1385,7 @@ export default function TestSolvePage() {
               router.push("/test")
             }
           >
-            Testlar bo‘limiga
-            qaytish
+            Testlar bo‘limiga qaytish
           </button>
         </div>
 
@@ -1465,7 +1429,9 @@ export default function TestSolvePage() {
               {test.subject}
             </div>
 
-            <h1>{test.title}</h1>
+            <h1>
+              {test.title}
+            </h1>
 
             {test.description && (
               <p className="description">
@@ -1475,15 +1441,9 @@ export default function TestSolvePage() {
 
             <div className="introInformation">
               <div className="info">
-                <span>
-                  Savollar
-                </span>
-
+                <span>Savollar</span>
                 <strong>
-                  {
-                    test.questions
-                      .length
-                  }
+                  {test.questions.length}
                 </strong>
               </div>
 
@@ -1493,8 +1453,7 @@ export default function TestSolvePage() {
                 <strong>
                   {test.duration}
                   <small>
-                    {" "}
-                    daqiqa
+                    {" "}daqiqa
                   </small>
                 </strong>
               </div>
@@ -1508,9 +1467,7 @@ export default function TestSolvePage() {
               </div>
 
               <div className="info">
-                <span>
-                  Urinish
-                </span>
+                <span>Urinish</span>
 
                 <strong
                   className={
@@ -1604,10 +1561,14 @@ export default function TestSolvePage() {
                 {result.percentage}%
               </strong>
 
-              <span>Natija</span>
+              <span>
+                Natija
+              </span>
             </div>
 
-            <h1>{test.title}</h1>
+            <h1>
+              {test.title}
+            </h1>
 
             <p className="resultSubject">
               {test.subject}
@@ -1618,7 +1579,6 @@ export default function TestSolvePage() {
                 <span>
                   Jami savol
                 </span>
-
                 <strong>
                   {result.total}
                 </strong>
@@ -1628,7 +1588,6 @@ export default function TestSolvePage() {
                 <span>
                   To‘g‘ri
                 </span>
-
                 <strong>
                   {result.correct}
                 </strong>
@@ -1638,7 +1597,6 @@ export default function TestSolvePage() {
                 <span>
                   Noto‘g‘ri
                 </span>
-
                 <strong>
                   {result.incorrect}
                 </strong>
@@ -1648,14 +1606,15 @@ export default function TestSolvePage() {
                 <span>
                   Javobsiz
                 </span>
-
                 <strong>
                   {result.unanswered}
                 </strong>
               </div>
 
               <div className="resultItem">
-                <span>Ball</span>
+                <span>
+                  Ball
+                </span>
 
                 <strong>
                   {result.earnedPoints}/
@@ -1669,7 +1628,9 @@ export default function TestSolvePage() {
                 </span>
 
                 <strong>
-                  {formatTime(spentSeconds)}
+                  {formatTime(
+                    spentSeconds
+                  )}
                 </strong>
               </div>
             </div>
@@ -1765,7 +1726,9 @@ export default function TestSolvePage() {
                 )
 
                 .filter(({ question }) => {
-                  if (reviewMode === "all") {
+                  if (
+                    reviewMode === "all"
+                  ) {
                     return true;
                   }
 
@@ -1818,6 +1781,7 @@ export default function TestSolvePage() {
                         </div>
 
                         <div
+                          lang="uz"
                           className="questionHtml"
                           dangerouslySetInnerHTML={{
                             __html:
@@ -1851,7 +1815,9 @@ export default function TestSolvePage() {
                               let className =
                                 "reviewOption";
 
-                              if (correctOption) {
+                              if (
+                                correctOption
+                              ) {
                                 className +=
                                   " correctOption";
                               }
@@ -2057,7 +2023,9 @@ export default function TestSolvePage() {
 
       <div className="testLayout">
         <aside className="navigator">
-          <h3>Savollar</h3>
+          <h3>
+            Savollar
+          </h3>
 
           <div className="questionNumbers">
             {test.questions.map(
@@ -2143,7 +2111,9 @@ export default function TestSolvePage() {
             <>
               <div className="questionTop">
                 <div>
-                  <span>SAVOL</span>
+                  <span>
+                    SAVOL
+                  </span>
 
                   <strong>
                     {currentIndex + 1}
@@ -2189,6 +2159,7 @@ export default function TestSolvePage() {
                   </div>
 
                   <div
+                    lang="uz"
                     className="questionHtml"
                     dangerouslySetInnerHTML={{
                       __html:
@@ -2326,7 +2297,8 @@ export default function TestSolvePage() {
           const zoomQuestion =
             test.questions.find(
               (q) =>
-                q.id === zoomQuestionId
+                q.id ===
+                zoomQuestionId
             );
 
           if (!zoomQuestion) {
@@ -2467,7 +2439,6 @@ const pageStyles = `
   .page {
     min-height: 100vh;
     padding: 20px 20px 100px;
-
     background:
       linear-gradient(
         180deg,
@@ -2475,9 +2446,7 @@ const pageStyles = `
         #f7f8f9 55%,
         #e9eef1 100%
       );
-
     color: #111;
-
     font-family:
       "Bell MT",
       "Times New Roman",
@@ -2493,6 +2462,8 @@ const pageStyles = `
     opacity: .45;
     cursor: not-allowed;
   }
+
+  /* HEADER */
 
   .topHeader,
   .testHeader {
@@ -2555,19 +2526,20 @@ const pageStyles = `
     background:
       linear-gradient(#fff, #bbb);
 
-    box-shadow: 0 4px 0 #555;
+    box-shadow:
+      0 4px 0 #555;
 
     font-weight: 700;
   }
+
+  /* PANEL */
 
   .panel,
   .reviewPanel {
     position: relative;
 
     width: min(1300px, 96%);
-
     margin: 100px auto 0;
-
     padding: 80px 35px 35px;
 
     border: 3px solid #303538;
@@ -2592,7 +2564,6 @@ const pageStyles = `
     position: absolute;
     top: -36px;
     left: 50%;
-
     transform: translateX(-50%);
 
     min-width: 330px;
@@ -2615,10 +2586,14 @@ const pageStyles = `
       0 5px 0 #17415c;
 
     color: #073b68;
+
     font-size: 28px;
     font-weight: 700;
+
     text-align: center;
   }
+
+  /* INTRO */
 
   .introCard,
   .resultBox,
@@ -2736,9 +2711,12 @@ const pageStyles = `
       0 5px 0 #17415c;
 
     color: #073b68;
+
     font-size: 18px;
     font-weight: 700;
   }
+
+  /* TEST HEADER */
 
   .testHeaderLeft {
     display: flex;
@@ -2769,7 +2747,8 @@ const pageStyles = `
     background:
       linear-gradient(#fff, #ccc);
 
-    box-shadow: 0 4px 0 #555;
+    box-shadow:
+      0 4px 0 #555;
   }
 
   .timer span {
@@ -2783,6 +2762,7 @@ const pageStyles = `
 
   .timerDanger {
     border-color: #a51f1f;
+
     background:
       linear-gradient(#ffe2e2, #ef9b9b);
   }
@@ -2790,6 +2770,8 @@ const pageStyles = `
   .timerDanger strong {
     color: #a31212;
   }
+
+  /* PROGRESS */
 
   .progressPanel {
     width: min(1500px, 98%);
@@ -2802,7 +2784,8 @@ const pageStyles = `
     background:
       linear-gradient(#fff, #ccc);
 
-    box-shadow: 0 5px 0 #555d61;
+    box-shadow:
+      0 5px 0 #555d61;
   }
 
   .progressInformation {
@@ -2834,12 +2817,14 @@ const pageStyles = `
         #1788c2
       );
 
-    transition: width .25s ease;
+    transition:
+      width .25s ease;
   }
+
+  /* TEST LAYOUT */
 
   .testLayout {
     width: min(1500px, 98%);
-
     margin: 35px auto 0;
 
     display: grid;
@@ -2851,6 +2836,8 @@ const pageStyles = `
 
     align-items: start;
   }
+
+  /* NAVIGATOR */
 
   .navigator {
     position: sticky;
@@ -2884,6 +2871,7 @@ const pageStyles = `
     display: grid;
     grid-template-columns:
       repeat(4, 1fr);
+
     gap: 8px;
   }
 
@@ -2985,6 +2973,8 @@ const pageStyles = `
     font-weight: 700;
   }
 
+  /* QUESTION PANEL */
+
   .questionPanel {
     overflow: hidden;
 
@@ -3036,9 +3026,7 @@ const pageStyles = `
     align-items: center;
     justify-content: center;
 
-    border:
-      2px solid #174461;
-
+    border: 2px solid #174461;
     border-radius: 50%;
 
     background: white;
@@ -3058,9 +3046,7 @@ const pageStyles = `
     min-height: 38px;
     padding: 0 14px;
 
-    border:
-      2px solid #805600;
-
+    border: 2px solid #805600;
     border-radius: 9px;
 
     background:
@@ -3101,15 +3087,12 @@ const pageStyles = `
   .question3DCard {
     position: relative;
 
-    margin:
-      0 0 34px;
+    margin: 0 0 34px;
 
     padding:
       42px 34px 32px;
 
-    border:
-      2px solid #8a959d;
-
+    border: 2px solid #8a959d;
     border-radius: 22px;
 
     background:
@@ -3157,9 +3140,7 @@ const pageStyles = `
     align-items: center;
     justify-content: center;
 
-    border:
-      2px solid #174461;
-
+    border: 2px solid #174461;
     border-radius: 10px;
 
     background:
@@ -3189,15 +3170,18 @@ const pageStyles = `
 
   .questionHtml {
     width: 100%;
+    max-width: 100%;
 
     margin: 0;
+
+    color: #000000 !important;
 
     direction: ltr;
 
     text-align: justify !important;
-    text-align-last: left;
+    text-align-last: left !important;
 
-    color: #000000 !important;
+    text-justify: inter-word;
 
     font-family:
       "Bell MT",
@@ -3207,53 +3191,84 @@ const pageStyles = `
     font-size:
       clamp(22px, 2vw, 30px);
 
-    line-height: 1.6;
+    line-height: 1.58;
 
     font-weight: 400;
 
-    white-space: normal;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
 
-    word-break: normal;
+    white-space: normal !important;
 
-    overflow-wrap: break-word;
+    word-break: normal !important;
 
-    hyphens: none;
+    overflow-wrap: normal;
+
+    hyphens: auto;
+
+    -webkit-hyphens: auto;
 
     text-shadow:
       0 1px 0 rgba(255,255,255,.9);
   }
 
+  /*
+    SAVOL ICHIDAGI HAR QANDAY HTML RANGINI
+    MAJBURAN QORA QILADI
+  */
+
   .questionHtml :global(*) {
+    color: #000000 !important;
+
+    border-color: inherit;
+
+    letter-spacing: inherit;
+
+    word-spacing: inherit;
+  }
+
+  /*
+    Ba'zi importlarda <font color=""> kelishi mumkin.
+  */
+
+  .questionHtml :global(font) {
+    color: #000000 !important;
+  }
+
+  /*
+    Inline style bilan rang kelgan bo‘lsa ham qora.
+  */
+
+  .questionHtml :global([style]) {
     color: #000000 !important;
   }
 
   .questionHtml :global(p) {
-    display: block;
-
     width: 100%;
 
-    margin:
-      0 0 18px;
+    margin: 0 0 16px;
 
     padding: 0;
 
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
-    text-align:
-      justify !important;
+    text-align: justify !important;
+    text-align-last: left !important;
 
-    text-align-last:
-      left;
+    text-justify: inter-word;
 
-    white-space: normal;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
 
-    word-break: normal;
+    white-space: normal !important;
 
-    overflow-wrap:
-      break-word;
+    word-break: normal !important;
 
-    hyphens: none;
+    overflow-wrap: normal;
+
+    hyphens: auto;
+
+    -webkit-hyphens: auto;
   }
 
   .questionHtml :global(p:last-child) {
@@ -3261,83 +3276,89 @@ const pageStyles = `
   }
 
   .questionHtml :global(div) {
-    width: 100%;
+    max-width: 100%;
 
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
-    text-align:
-      justify !important;
+    text-align: justify !important;
+    text-align-last: left !important;
 
-    text-align-last:
-      left;
+    text-justify: inter-word;
 
-    white-space:
-      normal;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
 
-    word-break:
-      normal;
+    white-space: normal !important;
 
-    overflow-wrap:
-      break-word;
+    word-break: normal !important;
 
-    hyphens: none;
+    overflow-wrap: normal;
+
+    hyphens: auto;
+
+    -webkit-hyphens: auto;
   }
 
   .questionHtml :global(span) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
-    white-space:
-      normal;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
 
-    word-break:
-      normal;
+    white-space: normal !important;
   }
 
-  .questionHtml :global(br) {
-    display: initial;
-  }
+  /*
+    QALIN
+  */
 
   .questionHtml :global(strong),
   .questionHtml :global(b) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
-    font-weight:
-      800 !important;
+    font-weight: 800 !important;
   }
+
+  /*
+    KURSIV
+  */
 
   .questionHtml :global(i),
   .questionHtml :global(em) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
-    font-style:
-      italic !important;
+    font-style: italic !important;
   }
 
-  .questionHtml :global(strong em),
+  /*
+    QALIN + KURSIV
+  */
+
   .questionHtml :global(strong i),
-  .questionHtml :global(b em),
-  .questionHtml :global(b i) {
-    color:
-      #000000 !important;
+  .questionHtml :global(strong em),
+  .questionHtml :global(b i),
+  .questionHtml :global(b em) {
+    color: #000000 !important;
 
-    font-weight:
-      800 !important;
+    font-weight: 800 !important;
 
-    font-style:
-      italic !important;
+    font-style: italic !important;
   }
+
+  /*
+    TAGI CHIZILGAN
+  */
 
   .questionHtml :global(u) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
     text-decoration:
       underline;
   }
+
+  /*
+    SARLAVHALAR
+  */
 
   .questionHtml :global(h1),
   .questionHtml :global(h2),
@@ -3345,82 +3366,90 @@ const pageStyles = `
   .questionHtml :global(h4),
   .questionHtml :global(h5),
   .questionHtml :global(h6) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
-    font-weight:
-      800 !important;
+    font-weight: 800 !important;
 
-    text-align:
-      justify !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
 
-    text-align-last:
-      left;
+    text-align: justify !important;
+    text-align-last: left !important;
   }
+
+  /*
+    RO‘YXAT
+  */
 
   .questionHtml :global(ul),
   .questionHtml :global(ol) {
     width: 100%;
 
-    margin:
-      14px 0 18px;
+    margin: 14px 0 18px;
 
-    padding-left:
-      38px;
+    padding-left: 38px;
 
-    color:
-      #000000 !important;
+    color: #000000 !important;
   }
 
   .questionHtml :global(li) {
-    width: 100%;
+    margin: 7px 0;
 
-    margin:
-      7px 0;
+    color: #000000 !important;
 
-    padding-left:
-      4px;
+    text-align: justify !important;
+    text-align-last: left !important;
 
-    color:
-      #000000 !important;
+    text-justify: inter-word;
 
-    text-align:
-      justify !important;
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
 
-    text-align-last:
-      left;
+    white-space: normal !important;
 
-    white-space:
-      normal;
+    word-break: normal !important;
 
-    word-break:
-      normal;
+    hyphens: auto;
 
-    overflow-wrap:
-      break-word;
-
-    hyphens: none;
+    -webkit-hyphens: auto;
   }
 
-  .questionHtml :global(a) {
-    color:
-      #000000 !important;
+  /*
+    LINK HAM QORA
+  */
 
-    font-weight:
-      700;
+  .questionHtml :global(a) {
+    color: #000000 !important;
+
+    font-weight: 700;
 
     text-decoration:
       underline;
 
-    border-bottom:
-      none;
+    border-bottom: none;
   }
+
+  /*
+    BR
+  */
+
+  .questionHtml :global(br) {
+    display: initial;
+  }
+
+  /*
+    RASM
+  */
 
   .questionHtml :global(img),
   .optionText :global(img) {
     max-width: 100%;
     height: auto;
   }
+
+  /*
+    JADVAL
+  */
 
   .questionHtml :global(table),
   .optionText :global(table) {
@@ -3435,27 +3464,21 @@ const pageStyles = `
   .questionHtml :global(td),
   .optionText :global(th),
   .optionText :global(td) {
-    padding:
-      8px 10px;
+    padding: 8px 10px;
 
     border:
       1px solid #555;
 
-    vertical-align:
-      top;
+    vertical-align: top;
+  }
+
+  .questionHtml :global(th),
+  .questionHtml :global(td) {
+    color: #000000 !important;
   }
 
   .questionHtml :global(th) {
-    color:
-      #000000 !important;
-
-    font-weight:
-      800;
-  }
-
-  .questionHtml :global(td) {
-    color:
-      #000000 !important;
+    font-weight: 800;
   }
 
   /* SHAPES */
@@ -3463,8 +3486,7 @@ const pageStyles = `
   .shapeResultScroll {
     width: 100%;
 
-    margin:
-      0 0 28px;
+    margin: 0 0 28px;
 
     overflow-x: auto;
     overflow-y: hidden;
@@ -3481,12 +3503,15 @@ const pageStyles = `
 
   .resultShapeItem {
     position: absolute;
+
     box-sizing: border-box;
   }
 
   .resultImageItem {
     overflow: visible;
-    background: transparent;
+
+    background:
+      transparent;
   }
 
   .resultShapeBody {
@@ -3523,10 +3548,12 @@ const pageStyles = `
     height: 84%;
 
     display: flex;
+
     align-items: center;
     justify-content: center;
 
     border: 2px solid;
+
     border-radius: 50%;
 
     box-sizing: border-box;
@@ -3546,6 +3573,7 @@ const pageStyles = `
 
   .options {
     display: grid;
+
     gap: 15px;
   }
 
@@ -3553,8 +3581,7 @@ const pageStyles = `
     width: 100%;
     min-height: 75px;
 
-    padding:
-      12px 18px;
+    padding: 12px 18px;
 
     display: grid;
 
@@ -3565,8 +3592,7 @@ const pageStyles = `
 
     gap: 15px;
 
-    border:
-      2px solid #999;
+    border: 2px solid #999;
 
     border-radius: 12px;
 
@@ -3603,6 +3629,7 @@ const pageStyles = `
     height: 42px;
 
     display: flex;
+
     align-items: center;
     justify-content: center;
 
@@ -3629,11 +3656,15 @@ const pageStyles = `
 
     text-align: left;
 
-    color: #000000;
+    color: #000000 !important;
 
     font-size: 17px;
 
     line-height: 1.5;
+
+    letter-spacing: normal !important;
+
+    word-spacing: normal !important;
 
     white-space: normal;
 
@@ -3644,14 +3675,17 @@ const pageStyles = `
   }
 
   .optionText :global(*) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
+  }
+
+  .optionText :global([style]),
+  .optionText :global(font) {
+    color: #000000 !important;
   }
 
   .optionText :global(strong),
   .optionText :global(b) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
     font-weight:
       800 !important;
@@ -3659,8 +3693,7 @@ const pageStyles = `
 
   .optionText :global(i),
   .optionText :global(em) {
-    color:
-      #000000 !important;
+    color: #000000 !important;
 
     font-style:
       italic !important;
@@ -3673,6 +3706,8 @@ const pageStyles = `
 
     font-size: 25px;
   }
+
+  /* ACTIONS */
 
   .questionActions {
     padding:
@@ -3690,11 +3725,9 @@ const pageStyles = `
     min-width: 180px;
     min-height: 55px;
 
-    padding:
-      0 20px;
+    padding: 0 20px;
 
-    border-radius:
-      10px;
+    border-radius: 10px;
 
     font-weight: 700;
   }
@@ -3746,22 +3779,19 @@ const pageStyles = `
     color: #125a32;
   }
 
+  /* RESULT */
+
   .resultCircle {
     width: 180px;
     height: 180px;
 
-    margin:
-      0 auto 25px;
+    margin: 0 auto 25px;
 
     display: flex;
-
-    flex-direction:
-      column;
+    flex-direction: column;
 
     align-items: center;
-
-    justify-content:
-      center;
+    justify-content: center;
 
     border:
       8px solid #168fc9;
@@ -3777,6 +3807,7 @@ const pageStyles = `
 
   .resultCircle strong {
     color: #07517e;
+
     font-size: 45px;
   }
 
@@ -3785,8 +3816,7 @@ const pageStyles = `
   }
 
   .resultGrid {
-    margin:
-      30px 0;
+    margin: 30px 0;
 
     display: grid;
 
@@ -3803,13 +3833,10 @@ const pageStyles = `
 
     display: flex;
 
-    flex-direction:
-      column;
+    flex-direction: column;
 
     align-items: center;
-
-    justify-content:
-      center;
+    justify-content: center;
 
     border:
       1px solid #999;
@@ -3822,11 +3849,13 @@ const pageStyles = `
 
   .resultItem span {
     margin-bottom: 7px;
+
     color: #555;
   }
 
   .resultItem strong {
     color: #07517e;
+
     font-size: 26px;
   }
 
@@ -3839,8 +3868,7 @@ const pageStyles = `
   }
 
   .resultMessage {
-    margin:
-      25px 0;
+    margin: 25px 0;
 
     padding: 20px;
 
@@ -3855,14 +3883,14 @@ const pageStyles = `
     color: #07517e;
 
     font-size: 21px;
+
     font-weight: 700;
   }
 
   .resultActions {
     display: flex;
 
-    justify-content:
-      center;
+    justify-content: center;
 
     flex-wrap: wrap;
 
@@ -3872,11 +3900,9 @@ const pageStyles = `
   .resultActions button {
     min-height: 55px;
 
-    padding:
-      0 22px;
+    padding: 0 22px;
 
-    border-radius:
-      9px;
+    border-radius: 9px;
 
     font-weight: 700;
   }
@@ -3913,9 +3939,10 @@ const pageStyles = `
     color: #125a32;
   }
 
+  /* REVIEW */
+
   .reviewQuestion {
-    margin-bottom:
-      25px;
+    margin-bottom: 25px;
 
     padding: 25px;
 
@@ -3930,13 +3957,11 @@ const pageStyles = `
   }
 
   .reviewNumber {
-    margin-bottom:
-      15px;
+    margin-bottom: 15px;
 
     color: #07517e;
 
     font-size: 17px;
-
     font-weight: 700;
   }
 
@@ -3947,8 +3972,7 @@ const pageStyles = `
   }
 
   .reviewOption {
-    padding:
-      13px 15px;
+    padding: 13px 15px;
 
     display: flex;
 
@@ -3966,37 +3990,42 @@ const pageStyles = `
 
   .correctOption {
     border-color: #3d9661;
-    background: #d8f1df;
+
+    background:
+      #d8f1df;
   }
 
   .selectedWrong {
     border-color: #b93333;
-    background: #f6dada;
+
+    background:
+      #f6dada;
   }
 
   .answerStatus {
-    margin-top:
-      15px;
+    margin-top: 15px;
 
     padding: 12px;
 
-    border-radius:
-      8px;
+    border-radius: 8px;
 
-    text-align:
-      center;
+    text-align: center;
 
     font-weight: 700;
   }
 
   .correctStatus {
     color: #126033;
-    background: #d8f1df;
+
+    background:
+      #d8f1df;
   }
 
   .wrongStatus {
     color: #8c1818;
-    background: #f6dada;
+
+    background:
+      #f6dada;
   }
 
   .saveIndicatorWrap {
@@ -4004,8 +4033,7 @@ const pageStyles = `
 
     min-height: 42px;
 
-    padding:
-      9px 14px;
+    padding: 9px 14px;
 
     display: flex;
 
@@ -4035,8 +4063,7 @@ const pageStyles = `
 
     border-radius: 50%;
 
-    flex:
-      0 0 auto;
+    flex: 0 0 auto;
   }
 
   .onlineDot {
@@ -4074,7 +4101,6 @@ const pageStyles = `
     display: flex;
 
     align-items: center;
-
     justify-content: center;
 
     background:
@@ -4118,6 +4144,7 @@ const pageStyles = `
     color: #073b68;
 
     font-size: 18px;
+
     font-weight: 800;
   }
 
@@ -4185,7 +4212,10 @@ const pageStyles = `
     line-height: 1.45;
   }
 
+  /* RESPONSIVE */
+
   @media (max-width: 900px) {
+
     .introInformation {
       grid-template-columns:
         repeat(2, 1fr);
@@ -4195,8 +4225,7 @@ const pageStyles = `
       padding:
         36px 22px 24px;
 
-      border-radius:
-        17px;
+      border-radius: 17px;
     }
 
     .question3DLabel {
@@ -4209,7 +4238,8 @@ const pageStyles = `
 
     .questionHtml {
       font-size: 21px;
-      line-height: 1.6;
+
+      line-height: 1.55;
     }
 
     .testLayout {
@@ -4233,6 +4263,7 @@ const pageStyles = `
   }
 
   @media (max-width: 650px) {
+
     .page {
       padding:
         10px 6px 50px;
@@ -4246,8 +4277,7 @@ const pageStyles = `
 
       padding: 12px;
 
-      flex-direction:
-        column;
+      flex-direction: column;
 
       gap: 12px;
 
@@ -4269,11 +4299,13 @@ const pageStyles = `
 
     .topHeader .grayButton {
       width: 100%;
+
       min-height: 46px;
     }
 
     .testHeaderLeft {
       width: 100%;
+
       text-align: center;
     }
 
@@ -4403,6 +4435,7 @@ const pageStyles = `
 
     .startButton {
       min-height: 52px;
+
       font-size: 16px;
     }
 
@@ -4425,8 +4458,7 @@ const pageStyles = `
     }
 
     .navigator h3 {
-      margin-bottom:
-        12px;
+      margin-bottom: 12px;
 
       font-size: 19px;
     }
@@ -4439,8 +4471,7 @@ const pageStyles = `
     }
 
     .legend {
-      margin-top:
-        15px;
+      margin-top: 15px;
 
       padding: 10px;
     }
@@ -4448,13 +4479,11 @@ const pageStyles = `
     .finishSideButton {
       min-height: 46px;
 
-      margin-top:
-        14px;
+      margin-top: 14px;
     }
 
     .questionPanel {
-      border-radius:
-        16px;
+      border-radius: 16px;
     }
 
     .questionTop {
@@ -4466,7 +4495,6 @@ const pageStyles = `
 
     .questionTop strong {
       width: 36px;
-
       height: 36px;
 
       font-size: 18px;
@@ -4498,23 +4526,19 @@ const pageStyles = `
     }
 
     .question3DCard {
-      margin-bottom:
-        25px;
+      margin-bottom: 25px;
 
       padding:
         32px 15px 20px;
 
-      border-radius:
-        15px;
+      border-radius: 15px;
     }
 
     .question3DLabel {
       top: -16px;
-
       left: 14px;
 
       min-width: 120px;
-
       min-height: 34px;
 
       padding:
@@ -4525,6 +4549,7 @@ const pageStyles = `
 
     .questionHtml {
       font-size: 18px;
+
       line-height: 1.5;
     }
 
@@ -4545,11 +4570,13 @@ const pageStyles = `
 
     .optionLetter {
       width: 34px;
+
       height: 34px;
     }
 
     .optionText {
       font-size: 15px;
+
       line-height: 1.4;
     }
 
@@ -4567,8 +4594,7 @@ const pageStyles = `
       padding:
         10px 9px 14px;
 
-      flex-direction:
-        row;
+      flex-direction: row;
 
       gap: 8px;
 
@@ -4634,8 +4660,7 @@ const pageStyles = `
     }
 
     .resultItem span {
-      margin-bottom:
-        4px;
+      margin-bottom: 4px;
 
       font-size: 13px;
     }
@@ -4668,16 +4693,14 @@ const pageStyles = `
     }
 
     .reviewQuestion {
-      margin-bottom:
-        15px;
+      margin-bottom: 15px;
 
       padding:
         14px 10px;
     }
 
     .reviewNumber {
-      margin-bottom:
-        10px;
+      margin-bottom: 10px;
 
       font-size: 15px;
     }
@@ -4691,8 +4714,7 @@ const pageStyles = `
     }
 
     .answerStatus {
-      margin-top:
-        10px;
+      margin-top: 10px;
 
       padding: 9px;
 
@@ -4700,8 +4722,7 @@ const pageStyles = `
     }
 
     .shapeResultScroll {
-      margin-bottom:
-        18px;
+      margin-bottom: 18px;
     }
 
     .saveIndicatorWrap {
@@ -4725,17 +4746,18 @@ const pageStyles = `
       padding:
         58px 10px 16px;
 
-      border-radius:
-        14px;
+      border-radius: 14px;
     }
 
     .zoomTitle {
       left: 14px;
+
       font-size: 15px;
     }
 
     .reviewAnswerSummary {
       padding: 10px;
+
       font-size: 13px;
     }
   }
