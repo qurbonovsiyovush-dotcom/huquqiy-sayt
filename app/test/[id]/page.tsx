@@ -99,17 +99,21 @@ export default function TestSolvePage() {
 
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
 
-  const [reviewMode, setReviewMode] = useState<"all" | "wrong">("all");
+  const [reviewMode, setReviewMode] =
+    useState<"all" | "wrong">("all");
 
-  const [zoomQuestionId, setZoomQuestionId] = useState<string | null>(null);
+  const [zoomQuestionId, setZoomQuestionId] =
+    useState<string | null>(null);
 
-  const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
+  const [saveState, setSaveState] =
+    useState<"saved" | "saving">("saved");
 
   const [isOnline, setIsOnline] = useState(true);
 
   const [attemptLoading, setAttemptLoading] = useState(true);
 
-  const [attemptLimit, setAttemptLimit] = useState<number | null>(null);
+  const [attemptLimit, setAttemptLimit] =
+    useState<number | null>(null);
 
   const [attemptsUsed, setAttemptsUsed] = useState(0);
 
@@ -204,7 +208,9 @@ export default function TestSolvePage() {
             ? Number(receivedTest.duration)
             : 30,
 
-        description: String(receivedTest.description || ""),
+        description: String(
+          receivedTest.description || ""
+        ),
 
         status: receivedTest.status,
 
@@ -245,7 +251,8 @@ export default function TestSolvePage() {
           }
         );
 
-        const attemptData = await readJson(attemptResponse);
+        const attemptData =
+          await readJson(attemptResponse);
 
         if (attemptResponse.ok) {
           setAttemptLimit(
@@ -270,7 +277,9 @@ export default function TestSolvePage() {
               ? null
               : Math.max(
                   0,
-                  Number(attemptData?.attemptsRemaining) || 0
+                  Number(
+                    attemptData?.attemptsRemaining
+                  ) || 0
                 )
           );
 
@@ -352,6 +361,7 @@ export default function TestSolvePage() {
             );
 
             setStarted(true);
+
             setFinished(false);
           }
         }
@@ -382,9 +392,7 @@ export default function TestSolvePage() {
      SAVOL MATNI
   ===================================================== */
 
-  function getQuestionText(
-    question: TestQuestion
-  ) {
+  function getQuestionText(question: TestQuestion) {
     return (
       question.questionHtml ||
       question.questionText ||
@@ -467,10 +475,9 @@ export default function TestSolvePage() {
         (question) => !answers[question.id]
       ).length;
 
-      const flaggedCount =
-        test.questions.filter(
-          (question) => flagged[question.id]
-        ).length;
+      const flaggedCount = test.questions.filter(
+        (question) => flagged[question.id]
+      ).length;
 
       const answered =
         test.questions.length - unanswered;
@@ -614,8 +621,9 @@ export default function TestSolvePage() {
       }
     }, 180);
 
-    return () =>
+    return () => {
       window.clearTimeout(timeout);
+    };
   }, [
     test,
     started,
@@ -682,8 +690,7 @@ export default function TestSolvePage() {
         return;
       }
 
-      const key =
-        event.key.toLowerCase();
+      const key = event.key.toLowerCase();
 
       const optionIndex = [
         "a",
@@ -1348,7 +1355,10 @@ export default function TestSolvePage() {
       <main className="statePage">
         <div className="stateBox">
           <div className="loader" />
-          <h2>Test yuklanmoqda...</h2>
+
+          <h2>
+            Test yuklanmoqda...
+          </h2>
         </div>
 
         <style jsx>
@@ -1441,25 +1451,36 @@ export default function TestSolvePage() {
 
             <div className="introInformation">
               <div className="info">
-                <span>Savollar</span>
+                <span>
+                  Savollar
+                </span>
+
                 <strong>
-                  {test.questions.length}
+                  {
+                    test.questions
+                      .length
+                  }
                 </strong>
               </div>
 
               <div className="info">
-                <span>Vaqt</span>
+                <span>
+                  Vaqt
+                </span>
 
                 <strong>
                   {test.duration}
                   <small>
-                    {" "}daqiqa
+                    {" "}
+                    daqiqa
                   </small>
                 </strong>
               </div>
 
               <div className="info">
-                <span>Holati</span>
+                <span>
+                  Holati
+                </span>
 
                 <strong className="green">
                   Tayyor
@@ -1467,7 +1488,9 @@ export default function TestSolvePage() {
               </div>
 
               <div className="info">
-                <span>Urinish</span>
+                <span>
+                  Urinish
+                </span>
 
                 <strong
                   className={
@@ -1478,8 +1501,7 @@ export default function TestSolvePage() {
                 >
                   {attemptLoading
                     ? "Tekshirilmoqda..."
-                    : attemptLimit ===
-                      null
+                    : attemptLimit === null
                     ? "Cheksiz"
                     : `${
                         attemptsRemaining ??
@@ -1579,6 +1601,7 @@ export default function TestSolvePage() {
                 <span>
                   Jami savol
                 </span>
+
                 <strong>
                   {result.total}
                 </strong>
@@ -1588,6 +1611,7 @@ export default function TestSolvePage() {
                 <span>
                   To‘g‘ri
                 </span>
+
                 <strong>
                   {result.correct}
                 </strong>
@@ -1597,6 +1621,7 @@ export default function TestSolvePage() {
                 <span>
                   Noto‘g‘ri
                 </span>
+
                 <strong>
                   {result.incorrect}
                 </strong>
@@ -1606,6 +1631,7 @@ export default function TestSolvePage() {
                 <span>
                   Javobsiz
                 </span>
+
                 <strong>
                   {result.unanswered}
                 </strong>
@@ -1617,8 +1643,13 @@ export default function TestSolvePage() {
                 </span>
 
                 <strong>
-                  {result.earnedPoints}/
-                  {result.totalPoints}
+                  {
+                    result.earnedPoints
+                  }
+                  /
+                  {
+                    result.totalPoints
+                  }
                 </strong>
               </div>
 
@@ -1654,10 +1685,17 @@ export default function TestSolvePage() {
                     showReview &&
                     reviewMode === "all"
                   ) {
-                    setShowReview(false);
+                    setShowReview(
+                      false
+                    );
                   } else {
-                    setReviewMode("all");
-                    setShowReview(true);
+                    setReviewMode(
+                      "all"
+                    );
+
+                    setShowReview(
+                      true
+                    );
                   }
                 }}
               >
@@ -1671,8 +1709,13 @@ export default function TestSolvePage() {
                 type="button"
                 className="wrongOnlyButton"
                 onClick={() => {
-                  setReviewMode("wrong");
-                  setShowReview(true);
+                  setReviewMode(
+                    "wrong"
+                  );
+
+                  setShowReview(
+                    true
+                  );
                 }}
               >
                 Faqat xatolarni ko‘rish
@@ -1701,7 +1744,9 @@ export default function TestSolvePage() {
                 type="button"
                 className="grayButton"
                 onClick={() =>
-                  router.push("/test")
+                  router.push(
+                    "/test"
+                  )
                 }
               >
                 Boshqa test tanlash
@@ -1719,36 +1764,48 @@ export default function TestSolvePage() {
             <div className="reviewInner">
               {test.questions
                 .map(
-                  (question, index) => ({
+                  (
+                    question,
+                    index
+                  ) => ({
                     question,
                     index,
                   })
                 )
 
-                .filter(({ question }) => {
-                  if (
-                    reviewMode === "all"
-                  ) {
-                    return true;
-                  }
+                .filter(
+                  ({ question }) => {
+                    if (
+                      reviewMode ===
+                      "all"
+                    ) {
+                      return true;
+                    }
 
-                  const selectedId =
-                    answers[question.id];
+                    const selectedId =
+                      answers[
+                        question.id
+                      ];
 
-                  const selectedOption =
-                    question.options?.find(
-                      (option) =>
-                        String(option.id) ===
-                        String(selectedId)
+                    const selectedOption =
+                      question.options?.find(
+                        (option) =>
+                          String(
+                            option.id
+                          ) ===
+                          String(
+                            selectedId
+                          )
+                      );
+
+                    return (
+                      !selectedOption ||
+                      !optionIsCorrect(
+                        selectedOption
+                      )
                     );
-
-                  return (
-                    !selectedOption ||
-                    !optionIsCorrect(
-                      selectedOption
-                    )
-                  );
-                })
+                  }
+                )
 
                 .map(
                   ({
@@ -1756,13 +1813,19 @@ export default function TestSolvePage() {
                     index,
                   }) => {
                     const selectedId =
-                      answers[question.id];
+                      answers[
+                        question.id
+                      ];
 
                     const selectedOption =
                       question.options?.find(
                         (option) =>
-                          String(option.id) ===
-                          String(selectedId)
+                          String(
+                            option.id
+                          ) ===
+                          String(
+                            selectedId
+                          )
                       );
 
                     const correct =
@@ -1773,11 +1836,14 @@ export default function TestSolvePage() {
 
                     return (
                       <article
-                        key={question.id}
+                        key={
+                          question.id
+                        }
                         className="reviewQuestion"
                       >
                         <div className="reviewNumber">
-                          {index + 1}-savol
+                          {index + 1}
+                          -savol
                         </div>
 
                         <div
@@ -1797,8 +1863,13 @@ export default function TestSolvePage() {
                         )}
 
                         <div className="reviewOptions">
-                          {(question.options || []).map(
-                            (option) => {
+                          {(
+                            question.options ||
+                            []
+                          ).map(
+                            (
+                              option
+                            ) => {
                               const selected =
                                 String(
                                   selectedId
@@ -1832,8 +1903,12 @@ export default function TestSolvePage() {
 
                               return (
                                 <div
-                                  key={option.id}
-                                  className={className}
+                                  key={
+                                    option.id
+                                  }
+                                  className={
+                                    className
+                                  }
                                 >
                                   <span>
                                     {correctOption
@@ -2040,7 +2115,9 @@ export default function TestSolvePage() {
 
                 return (
                   <button
-                    key={question.id}
+                    key={
+                      question.id
+                    }
                     type="button"
                     className={[
                       "numberButton",
@@ -2063,7 +2140,9 @@ export default function TestSolvePage() {
                       .filter(Boolean)
                       .join(" ")}
                     onClick={() =>
-                      setCurrentIndex(index)
+                      setCurrentIndex(
+                        index
+                      )
                     }
                   >
                     {index + 1}
@@ -2125,7 +2204,8 @@ export default function TestSolvePage() {
                     type="button"
                     className={
                       flagged[
-                        currentQuestion.id
+                        currentQuestion
+                          .id
                       ]
                         ? "flagButton flagButtonActive"
                         : "flagButton"
@@ -2139,7 +2219,8 @@ export default function TestSolvePage() {
                   >
                     ⚑{" "}
                     {flagged[
-                      currentQuestion.id
+                      currentQuestion
+                        .id
                     ]
                       ? "BELGILANGAN"
                       : "BELGILASH"}
@@ -2187,15 +2268,20 @@ export default function TestSolvePage() {
                       const selected =
                         String(
                           answers[
-                            currentQuestion.id
+                            currentQuestion
+                              .id
                           ] || ""
                         ) ===
-                        String(option.id);
+                        String(
+                          option.id
+                        );
 
                       return (
                         <button
                           type="button"
-                          key={option.id}
+                          key={
+                            option.id
+                          }
                           className={
                             selected
                               ? "option selectedOption"
@@ -2311,7 +2397,9 @@ export default function TestSolvePage() {
               role="dialog"
               aria-modal="true"
               onClick={() =>
-                setZoomQuestionId(null)
+                setZoomQuestionId(
+                  null
+                )
               }
             >
               <div
@@ -2324,7 +2412,9 @@ export default function TestSolvePage() {
                   type="button"
                   className="zoomClose"
                   onClick={() =>
-                    setZoomQuestionId(null)
+                    setZoomQuestionId(
+                      null
+                    )
                   }
                   aria-label="Yopish"
                 >
@@ -2439,6 +2529,7 @@ const pageStyles = `
   .page {
     min-height: 100vh;
     padding: 20px 20px 100px;
+
     background:
       linear-gradient(
         180deg,
@@ -2446,7 +2537,9 @@ const pageStyles = `
         #f7f8f9 55%,
         #e9eef1 100%
       );
+
     color: #111;
+
     font-family:
       "Bell MT",
       "Times New Roman",
@@ -2539,7 +2632,9 @@ const pageStyles = `
     position: relative;
 
     width: min(1300px, 96%);
+
     margin: 100px auto 0;
+
     padding: 80px 35px 35px;
 
     border: 3px solid #303538;
@@ -2562,8 +2657,10 @@ const pageStyles = `
 
   .floatingTitle {
     position: absolute;
+
     top: -36px;
     left: 50%;
+
     transform: translateX(-50%);
 
     min-width: 330px;
@@ -2579,7 +2676,10 @@ const pageStyles = `
     border-radius: 16px;
 
     background:
-      linear-gradient(#abe6ff, #58a8d7);
+      linear-gradient(
+        #abe6ff,
+        #58a8d7
+      );
 
     box-shadow:
       inset 0 6px 5px rgba(255,255,255,.7),
@@ -2604,7 +2704,10 @@ const pageStyles = `
     border-radius: 18px;
 
     background:
-      linear-gradient(#f8f8f8, #ccc);
+      linear-gradient(
+        #f8f8f8,
+        #ccc
+      );
 
     box-shadow:
       inset 0 6px 5px white,
@@ -2704,7 +2807,10 @@ const pageStyles = `
     border-radius: 12px;
 
     background:
-      linear-gradient(#b8ecff, #58a8d7);
+      linear-gradient(
+        #b8ecff,
+        #58a8d7
+      );
 
     box-shadow:
       inset 0 5px 5px rgba(255,255,255,.7),
@@ -2745,7 +2851,10 @@ const pageStyles = `
     border-radius: 12px;
 
     background:
-      linear-gradient(#fff, #ccc);
+      linear-gradient(
+        #fff,
+        #ccc
+      );
 
     box-shadow:
       0 4px 0 #555;
@@ -2764,7 +2873,10 @@ const pageStyles = `
     border-color: #a51f1f;
 
     background:
-      linear-gradient(#ffe2e2, #ef9b9b);
+      linear-gradient(
+        #ffe2e2,
+        #ef9b9b
+      );
   }
 
   .timerDanger strong {
@@ -2782,7 +2894,10 @@ const pageStyles = `
     border-radius: 13px;
 
     background:
-      linear-gradient(#fff, #ccc);
+      linear-gradient(
+        #fff,
+        #ccc
+      );
 
     box-shadow:
       0 5px 0 #555d61;
@@ -2825,6 +2940,7 @@ const pageStyles = `
 
   .testLayout {
     width: min(1500px, 98%);
+
     margin: 35px auto 0;
 
     display: grid;
@@ -2869,6 +2985,7 @@ const pageStyles = `
 
   .questionNumbers {
     display: grid;
+
     grid-template-columns:
       repeat(4, 1fr);
 
@@ -2882,7 +2999,10 @@ const pageStyles = `
     border-radius: 8px;
 
     background:
-      linear-gradient(#fff, #ccc);
+      linear-gradient(
+        #fff,
+        #ccc
+      );
 
     font-weight: 700;
   }
@@ -2891,7 +3011,10 @@ const pageStyles = `
     border-color: #277b49;
 
     background:
-      linear-gradient(#c6f1d3, #70ca8e);
+      linear-gradient(
+        #c6f1d3,
+        #70ca8e
+      );
   }
 
   .currentNumber {
@@ -2903,7 +3026,10 @@ const pageStyles = `
     border-color: #a66a00;
 
     background:
-      linear-gradient(#fff0b8, #e9b84f);
+      linear-gradient(
+        #fff0b8,
+        #e9b84f
+      );
   }
 
   .currentNumber.flaggedNumber {
@@ -2964,7 +3090,10 @@ const pageStyles = `
     border-radius: 9px;
 
     background:
-      linear-gradient(#f77b7b, #c62525);
+      linear-gradient(
+        #f77b7b,
+        #c62525
+      );
 
     box-shadow:
       0 4px 0 #831515;
@@ -3002,7 +3131,10 @@ const pageStyles = `
     justify-content: space-between;
 
     background:
-      linear-gradient(#a9e5ff, #58a8d7);
+      linear-gradient(
+        #a9e5ff,
+        #58a8d7
+      );
 
     border-bottom:
       3px solid #174461;
@@ -3026,7 +3158,9 @@ const pageStyles = `
     align-items: center;
     justify-content: center;
 
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
+
     border-radius: 50%;
 
     background: white;
@@ -3046,11 +3180,16 @@ const pageStyles = `
     min-height: 38px;
     padding: 0 14px;
 
-    border: 2px solid #805600;
+    border:
+      2px solid #805600;
+
     border-radius: 9px;
 
     background:
-      linear-gradient(#fff8d8, #e8c56a);
+      linear-gradient(
+        #fff8d8,
+        #e8c56a
+      );
 
     box-shadow:
       0 3px 0 #805600;
@@ -3061,7 +3200,10 @@ const pageStyles = `
 
   .flagButtonActive {
     background:
-      linear-gradient(#ffe68a, #e4a92f);
+      linear-gradient(
+        #ffe68a,
+        #e4a92f
+      );
   }
 
   .questionTop p {
@@ -3077,7 +3219,10 @@ const pageStyles = `
     border-radius: 15px;
 
     background:
-      linear-gradient(#fff, #ddd);
+      linear-gradient(
+        #fff,
+        #ddd
+      );
 
     box-shadow:
       inset 0 5px 5px white,
@@ -3087,12 +3232,15 @@ const pageStyles = `
   .question3DCard {
     position: relative;
 
-    margin: 0 0 34px;
+    margin:
+      0 0 34px;
 
     padding:
       42px 34px 32px;
 
-    border: 2px solid #8a959d;
+    border:
+      2px solid #8a959d;
+
     border-radius: 22px;
 
     background:
@@ -3115,6 +3263,7 @@ const pageStyles = `
     content: "";
 
     position: absolute;
+
     inset: 7px;
 
     pointer-events: none;
@@ -3140,7 +3289,9 @@ const pageStyles = `
     align-items: center;
     justify-content: center;
 
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
+
     border-radius: 10px;
 
     background:
@@ -3165,7 +3316,7 @@ const pageStyles = `
 
   /* =====================================================
      SAVOL MATNI
-     QORA + IKKI CHETI TEKIS
+     HAMMASI TO‘Q QORA
   ===================================================== */
 
   .questionHtml {
@@ -3174,190 +3325,314 @@ const pageStyles = `
 
     margin: 0;
 
-    color: #000000 !important;
-
     direction: ltr;
 
-    text-align: justify !important;
-    text-align-last: left !important;
+    color: #000000 !important;
 
-    text-justify: inter-word;
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity: 1 !important;
 
     font-family:
       "Bell MT",
       "Times New Roman",
       serif;
 
+    /*
+      400 juda ingichka chiqayotgan edi.
+      600 matnni to‘q va aniq qiladi.
+    */
+    font-weight: 600 !important;
+
     font-size:
       clamp(22px, 2vw, 30px);
 
-    line-height: 1.58;
+    line-height: 1.55;
 
-    font-weight: 400;
+    /*
+      Ikki chetidan tekis.
+    */
+    text-align: justify !important;
 
-    letter-spacing: normal !important;
-    word-spacing: normal !important;
+    text-align-last:
+      left !important;
 
-    white-space: normal !important;
+    text-justify:
+      inter-word;
 
-    word-break: normal !important;
+    /*
+      Ortiqcha Enter / bo‘shliq muammosi.
+    */
+    white-space:
+      normal !important;
 
-    overflow-wrap: normal;
+    word-break:
+      normal !important;
 
-    hyphens: auto;
+    overflow-wrap:
+      break-word;
 
-    -webkit-hyphens: auto;
+    letter-spacing:
+      0 !important;
+
+    word-spacing:
+      normal !important;
 
     text-shadow:
-      0 1px 0 rgba(255,255,255,.9);
+      none !important;
   }
 
   /*
-    SAVOL ICHIDAGI HAR QANDAY HTML RANGINI
-    MAJBURAN QORA QILADI
+    SAVOL ICHIDAGI HAMMA ELEMENT QORA
   */
 
   .questionHtml :global(*) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    border-color: inherit;
+    -webkit-text-fill-color:
+      #000000 !important;
 
-    letter-spacing: inherit;
+    opacity:
+      1 !important;
 
-    word-spacing: inherit;
+    letter-spacing:
+      0 !important;
+
+    word-spacing:
+      normal !important;
+
+    text-shadow:
+      none !important;
   }
 
   /*
-    Ba'zi importlarda <font color=""> kelishi mumkin.
-  */
-
-  .questionHtml :global(font) {
-    color: #000000 !important;
-  }
-
-  /*
-    Inline style bilan rang kelgan bo‘lsa ham qora.
+    INLINE STYLE HAM RANGNI O‘ZGARTIRA OLMAYDI
   */
 
   .questionHtml :global([style]) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
   }
 
+  /*
+    ESKI FONT TAG
+  */
+
+  .questionHtml :global(font) {
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
+  }
+
+  /*
+    PARAGRAF
+  */
+
   .questionHtml :global(p) {
+    display: block;
+
     width: 100%;
 
-    margin: 0 0 16px;
+    margin:
+      0 0 14px;
 
     padding: 0;
 
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    text-align: justify !important;
-    text-align-last: left !important;
+    -webkit-text-fill-color:
+      #000000 !important;
 
-    text-justify: inter-word;
+    opacity:
+      1 !important;
 
-    letter-spacing: normal !important;
-    word-spacing: normal !important;
+    text-align:
+      justify !important;
 
-    white-space: normal !important;
+    text-align-last:
+      left !important;
 
-    word-break: normal !important;
+    text-justify:
+      inter-word;
 
-    overflow-wrap: normal;
+    white-space:
+      normal !important;
 
-    hyphens: auto;
+    word-break:
+      normal !important;
 
-    -webkit-hyphens: auto;
+    overflow-wrap:
+      break-word;
+
+    letter-spacing:
+      0 !important;
+
+    word-spacing:
+      normal !important;
   }
 
   .questionHtml :global(p:last-child) {
     margin-bottom: 0;
   }
 
+  /*
+    DIV
+  */
+
   .questionHtml :global(div) {
     max-width: 100%;
 
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    text-align: justify !important;
-    text-align-last: left !important;
+    -webkit-text-fill-color:
+      #000000 !important;
 
-    text-justify: inter-word;
+    opacity:
+      1 !important;
 
-    letter-spacing: normal !important;
-    word-spacing: normal !important;
+    text-align:
+      justify !important;
 
-    white-space: normal !important;
+    text-align-last:
+      left !important;
 
-    word-break: normal !important;
+    text-justify:
+      inter-word;
 
-    overflow-wrap: normal;
+    white-space:
+      normal !important;
 
-    hyphens: auto;
+    word-break:
+      normal !important;
 
-    -webkit-hyphens: auto;
-  }
+    overflow-wrap:
+      break-word;
 
-  .questionHtml :global(span) {
-    color: #000000 !important;
+    letter-spacing:
+      0 !important;
 
-    letter-spacing: normal !important;
-    word-spacing: normal !important;
-
-    white-space: normal !important;
+    word-spacing:
+      normal !important;
   }
 
   /*
-    QALIN
+    SPAN
+  */
+
+  .questionHtml :global(span) {
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
+
+    white-space:
+      normal !important;
+
+    letter-spacing:
+      0 !important;
+
+    word-spacing:
+      normal !important;
+  }
+
+  /*
+    BOLD
   */
 
   .questionHtml :global(strong),
   .questionHtml :global(b) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    font-weight: 800 !important;
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    font-weight:
+      800 !important;
+
+    opacity:
+      1 !important;
   }
 
   /*
-    KURSIV
+    ITALIC
   */
 
   .questionHtml :global(i),
   .questionHtml :global(em) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    font-style: italic !important;
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    font-style:
+      italic !important;
+
+    opacity:
+      1 !important;
   }
 
   /*
-    QALIN + KURSIV
+    BOLD + ITALIC
   */
 
   .questionHtml :global(strong i),
   .questionHtml :global(strong em),
   .questionHtml :global(b i),
   .questionHtml :global(b em) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    font-weight: 800 !important;
+    -webkit-text-fill-color:
+      #000000 !important;
 
-    font-style: italic !important;
+    font-weight:
+      800 !important;
+
+    font-style:
+      italic !important;
+
+    opacity:
+      1 !important;
   }
 
   /*
-    TAGI CHIZILGAN
+    UNDERLINE
   */
 
   .questionHtml :global(u) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
 
     text-decoration:
       underline;
   }
 
   /*
-    SARLAVHALAR
+    HEADINGS
   */
 
   .questionHtml :global(h1),
@@ -3366,67 +3641,84 @@ const pageStyles = `
   .questionHtml :global(h4),
   .questionHtml :global(h5),
   .questionHtml :global(h6) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    font-weight: 800 !important;
+    -webkit-text-fill-color:
+      #000000 !important;
 
-    letter-spacing: normal !important;
-    word-spacing: normal !important;
+    font-weight:
+      800 !important;
 
-    text-align: justify !important;
-    text-align-last: left !important;
+    opacity:
+      1 !important;
   }
 
   /*
-    RO‘YXAT
+    LIST
   */
 
   .questionHtml :global(ul),
   .questionHtml :global(ol) {
     width: 100%;
 
-    margin: 14px 0 18px;
+    margin:
+      12px 0 16px;
 
-    padding-left: 38px;
+    padding-left:
+      38px;
 
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
   }
 
   .questionHtml :global(li) {
-    margin: 7px 0;
+    margin:
+      7px 0;
 
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
-    text-align: justify !important;
-    text-align-last: left !important;
+    -webkit-text-fill-color:
+      #000000 !important;
 
-    text-justify: inter-word;
+    opacity:
+      1 !important;
 
-    letter-spacing: normal !important;
-    word-spacing: normal !important;
+    text-align:
+      justify !important;
 
-    white-space: normal !important;
+    text-align-last:
+      left !important;
 
-    word-break: normal !important;
+    white-space:
+      normal !important;
 
-    hyphens: auto;
+    word-break:
+      normal !important;
 
-    -webkit-hyphens: auto;
+    overflow-wrap:
+      break-word;
   }
 
   /*
-    LINK HAM QORA
+    LINK
   */
 
   .questionHtml :global(a) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
 
     font-weight: 700;
 
     text-decoration:
       underline;
-
-    border-bottom: none;
   }
 
   /*
@@ -3444,6 +3736,7 @@ const pageStyles = `
   .questionHtml :global(img),
   .optionText :global(img) {
     max-width: 100%;
+
     height: auto;
   }
 
@@ -3454,6 +3747,7 @@ const pageStyles = `
   .questionHtml :global(table),
   .optionText :global(table) {
     width: auto;
+
     max-width: 100%;
 
     border-collapse:
@@ -3464,21 +3758,31 @@ const pageStyles = `
   .questionHtml :global(td),
   .optionText :global(th),
   .optionText :global(td) {
-    padding: 8px 10px;
+    padding:
+      8px 10px;
 
     border:
       1px solid #555;
 
-    vertical-align: top;
+    vertical-align:
+      top;
   }
 
   .questionHtml :global(th),
   .questionHtml :global(td) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
   }
 
   .questionHtml :global(th) {
-    font-weight: 800;
+    font-weight:
+      800 !important;
   }
 
   /* SHAPES */
@@ -3486,9 +3790,11 @@ const pageStyles = `
   .shapeResultScroll {
     width: 100%;
 
-    margin: 0 0 28px;
+    margin:
+      0 0 28px;
 
     overflow-x: auto;
+
     overflow-y: hidden;
   }
 
@@ -3496,6 +3802,7 @@ const pageStyles = `
     position: relative;
 
     min-width: 1px;
+
     min-height: 1px;
 
     max-width: none;
@@ -3504,7 +3811,8 @@ const pageStyles = `
   .resultShapeItem {
     position: absolute;
 
-    box-sizing: border-box;
+    box-sizing:
+      border-box;
   }
 
   .resultImageItem {
@@ -3518,24 +3826,28 @@ const pageStyles = `
     display: flex;
 
     align-items: center;
+
     justify-content: center;
 
     overflow: hidden;
 
     padding: 8px;
 
-    box-sizing: border-box;
+    box-sizing:
+      border-box;
   }
 
   .resultShapeBody.circle,
   .resultShapeBody.ellipse {
-    border-radius: 999px;
+    border-radius:
+      999px;
   }
 
   .resultVenn {
     position: relative;
 
     width: 100%;
+
     height: 100%;
   }
 
@@ -3545,18 +3857,21 @@ const pageStyles = `
     top: 8%;
 
     width: 58%;
+
     height: 84%;
 
     display: flex;
 
     align-items: center;
+
     justify-content: center;
 
     border: 2px solid;
 
     border-radius: 50%;
 
-    box-sizing: border-box;
+    box-sizing:
+      border-box;
 
     font-weight: 700;
   }
@@ -3579,9 +3894,11 @@ const pageStyles = `
 
   .option {
     width: 100%;
+
     min-height: 75px;
 
-    padding: 12px 18px;
+    padding:
+      12px 18px;
 
     display: grid;
 
@@ -3592,12 +3909,16 @@ const pageStyles = `
 
     gap: 15px;
 
-    border: 2px solid #999;
+    border:
+      2px solid #999;
 
     border-radius: 12px;
 
     background:
-      linear-gradient(#fff, #e4e4e4);
+      linear-gradient(
+        #fff,
+        #e4e4e4
+      );
 
     text-align: left;
 
@@ -3626,11 +3947,13 @@ const pageStyles = `
 
   .optionLetter {
     width: 42px;
+
     height: 42px;
 
     display: flex;
 
     align-items: center;
+
     justify-content: center;
 
     border:
@@ -3649,6 +3972,10 @@ const pageStyles = `
     font-weight: 700;
   }
 
+  /*
+    JAVOB VARIANTLARI HAM QORA
+  */
+
   .optionText {
     min-width: 0;
 
@@ -3656,36 +3983,78 @@ const pageStyles = `
 
     text-align: left;
 
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
+
+    font-family:
+      "Bell MT",
+      "Times New Roman",
+      serif;
 
     font-size: 17px;
 
     line-height: 1.5;
 
-    letter-spacing: normal !important;
+    font-weight: 600;
 
-    word-spacing: normal !important;
+    letter-spacing:
+      0 !important;
 
-    white-space: normal;
+    word-spacing:
+      normal !important;
 
-    word-break: normal;
+    white-space:
+      normal !important;
+
+    word-break:
+      normal !important;
 
     overflow-wrap:
       break-word;
+
+    text-shadow:
+      none !important;
   }
 
   .optionText :global(*) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
+
+    text-shadow:
+      none !important;
   }
 
   .optionText :global([style]),
   .optionText :global(font) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
+
+    opacity:
+      1 !important;
   }
 
   .optionText :global(strong),
   .optionText :global(b) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
 
     font-weight:
       800 !important;
@@ -3693,7 +4062,11 @@ const pageStyles = `
 
   .optionText :global(i),
   .optionText :global(em) {
-    color: #000000 !important;
+    color:
+      #000000 !important;
+
+    -webkit-text-fill-color:
+      #000000 !important;
 
     font-style:
       italic !important;
@@ -3707,7 +4080,7 @@ const pageStyles = `
     font-size: 25px;
   }
 
-  /* ACTIONS */
+  /* QUESTION ACTIONS */
 
   .questionActions {
     padding:
@@ -3723,11 +4096,14 @@ const pageStyles = `
 
   .questionActions button {
     min-width: 180px;
+
     min-height: 55px;
 
-    padding: 0 20px;
+    padding:
+      0 20px;
 
-    border-radius: 10px;
+    border-radius:
+      10px;
 
     font-weight: 700;
   }
@@ -3737,7 +4113,10 @@ const pageStyles = `
       2px solid #555;
 
     background:
-      linear-gradient(#fff, #bbb);
+      linear-gradient(
+        #fff,
+        #bbb
+      );
 
     box-shadow:
       0 4px 0 #555;
@@ -3783,15 +4162,21 @@ const pageStyles = `
 
   .resultCircle {
     width: 180px;
+
     height: 180px;
 
-    margin: 0 auto 25px;
+    margin:
+      0 auto 25px;
 
     display: flex;
-    flex-direction: column;
+
+    flex-direction:
+      column;
 
     align-items: center;
-    justify-content: center;
+
+    justify-content:
+      center;
 
     border:
       8px solid #168fc9;
@@ -3799,7 +4184,10 @@ const pageStyles = `
     border-radius: 50%;
 
     background:
-      linear-gradient(#fff, #d8f1fc);
+      linear-gradient(
+        #fff,
+        #d8f1fc
+      );
 
     box-shadow:
       0 7px 15px rgba(0,0,0,.2);
@@ -3816,7 +4204,8 @@ const pageStyles = `
   }
 
   .resultGrid {
-    margin: 30px 0;
+    margin:
+      30px 0;
 
     display: grid;
 
@@ -3833,10 +4222,13 @@ const pageStyles = `
 
     display: flex;
 
-    flex-direction: column;
+    flex-direction:
+      column;
 
     align-items: center;
-    justify-content: center;
+
+    justify-content:
+      center;
 
     border:
       1px solid #999;
@@ -3868,7 +4260,8 @@ const pageStyles = `
   }
 
   .resultMessage {
-    margin: 25px 0;
+    margin:
+      25px 0;
 
     padding: 20px;
 
@@ -3890,7 +4283,8 @@ const pageStyles = `
   .resultActions {
     display: flex;
 
-    justify-content: center;
+    justify-content:
+      center;
 
     flex-wrap: wrap;
 
@@ -3900,9 +4294,11 @@ const pageStyles = `
   .resultActions button {
     min-height: 55px;
 
-    padding: 0 22px;
+    padding:
+      0 22px;
 
-    border-radius: 9px;
+    border-radius:
+      9px;
 
     font-weight: 700;
   }
@@ -3942,7 +4338,8 @@ const pageStyles = `
   /* REVIEW */
 
   .reviewQuestion {
-    margin-bottom: 25px;
+    margin-bottom:
+      25px;
 
     padding: 25px;
 
@@ -3957,11 +4354,13 @@ const pageStyles = `
   }
 
   .reviewNumber {
-    margin-bottom: 15px;
+    margin-bottom:
+      15px;
 
     color: #07517e;
 
     font-size: 17px;
+
     font-weight: 700;
   }
 
@@ -3972,7 +4371,8 @@ const pageStyles = `
   }
 
   .reviewOption {
-    padding: 13px 15px;
+    padding:
+      13px 15px;
 
     display: flex;
 
@@ -4003,13 +4403,16 @@ const pageStyles = `
   }
 
   .answerStatus {
-    margin-top: 15px;
+    margin-top:
+      15px;
 
     padding: 12px;
 
-    border-radius: 8px;
+    border-radius:
+      8px;
 
-    text-align: center;
+    text-align:
+      center;
 
     font-weight: 700;
   }
@@ -4033,7 +4436,8 @@ const pageStyles = `
 
     min-height: 42px;
 
-    padding: 9px 14px;
+    padding:
+      9px 14px;
 
     display: flex;
 
@@ -4059,11 +4463,13 @@ const pageStyles = `
   .onlineDot,
   .offlineDot {
     width: 10px;
+
     height: 10px;
 
     border-radius: 50%;
 
-    flex: 0 0 auto;
+    flex:
+      0 0 auto;
   }
 
   .onlineDot {
@@ -4101,6 +4507,7 @@ const pageStyles = `
     display: flex;
 
     align-items: center;
+
     justify-content: center;
 
     background:
@@ -4129,7 +4536,10 @@ const pageStyles = `
     border-radius: 20px;
 
     background:
-      linear-gradient(#fff, #e9edf0);
+      linear-gradient(
+        #fff,
+        #e9edf0
+      );
 
     box-shadow:
       0 18px 60px rgba(0,0,0,.45);
@@ -4139,6 +4549,7 @@ const pageStyles = `
     position: absolute;
 
     top: 20px;
+
     left: 28px;
 
     color: #073b68;
@@ -4152,9 +4563,11 @@ const pageStyles = `
     position: absolute;
 
     top: 14px;
+
     right: 16px;
 
     width: 42px;
+
     height: 42px;
 
     border: 0;
@@ -4184,7 +4597,10 @@ const pageStyles = `
       2px solid #8e1515;
 
     background:
-      linear-gradient(#ffd7d7, #ef8d8d);
+      linear-gradient(
+        #ffd7d7,
+        #ef8d8d
+      );
 
     box-shadow:
       0 4px 0 #831515;
@@ -4225,7 +4641,8 @@ const pageStyles = `
       padding:
         36px 22px 24px;
 
-      border-radius: 17px;
+      border-radius:
+        17px;
     }
 
     .question3DLabel {
@@ -4277,7 +4694,8 @@ const pageStyles = `
 
       padding: 12px;
 
-      flex-direction: column;
+      flex-direction:
+        column;
 
       gap: 12px;
 
@@ -4403,7 +4821,10 @@ const pageStyles = `
         18px 0;
 
       grid-template-columns:
-        repeat(2, minmax(0, 1fr));
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
 
       gap: 9px;
     }
@@ -4458,7 +4879,8 @@ const pageStyles = `
     }
 
     .navigator h3 {
-      margin-bottom: 12px;
+      margin-bottom:
+        12px;
 
       font-size: 19px;
     }
@@ -4471,7 +4893,8 @@ const pageStyles = `
     }
 
     .legend {
-      margin-top: 15px;
+      margin-top:
+        15px;
 
       padding: 10px;
     }
@@ -4479,11 +4902,13 @@ const pageStyles = `
     .finishSideButton {
       min-height: 46px;
 
-      margin-top: 14px;
+      margin-top:
+        14px;
     }
 
     .questionPanel {
-      border-radius: 16px;
+      border-radius:
+        16px;
     }
 
     .questionTop {
@@ -4495,6 +4920,7 @@ const pageStyles = `
 
     .questionTop strong {
       width: 36px;
+
       height: 36px;
 
       font-size: 18px;
@@ -4526,19 +4952,23 @@ const pageStyles = `
     }
 
     .question3DCard {
-      margin-bottom: 25px;
+      margin-bottom:
+        25px;
 
       padding:
         32px 15px 20px;
 
-      border-radius: 15px;
+      border-radius:
+        15px;
     }
 
     .question3DLabel {
       top: -16px;
+
       left: 14px;
 
       min-width: 120px;
+
       min-height: 34px;
 
       padding:
@@ -4647,7 +5077,10 @@ const pageStyles = `
         18px 0;
 
       grid-template-columns:
-        repeat(2, minmax(0, 1fr));
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
 
       gap: 8px;
     }
@@ -4660,7 +5093,8 @@ const pageStyles = `
     }
 
     .resultItem span {
-      margin-bottom: 4px;
+      margin-bottom:
+        4px;
 
       font-size: 13px;
     }
@@ -4693,14 +5127,16 @@ const pageStyles = `
     }
 
     .reviewQuestion {
-      margin-bottom: 15px;
+      margin-bottom:
+        15px;
 
       padding:
         14px 10px;
     }
 
     .reviewNumber {
-      margin-bottom: 10px;
+      margin-bottom:
+        10px;
 
       font-size: 15px;
     }
@@ -4714,7 +5150,8 @@ const pageStyles = `
     }
 
     .answerStatus {
-      margin-top: 10px;
+      margin-top:
+        10px;
 
       padding: 9px;
 
@@ -4722,7 +5159,8 @@ const pageStyles = `
     }
 
     .shapeResultScroll {
-      margin-bottom: 18px;
+      margin-bottom:
+        18px;
     }
 
     .saveIndicatorWrap {
@@ -4746,7 +5184,8 @@ const pageStyles = `
       padding:
         58px 10px 16px;
 
-      border-radius: 14px;
+      border-radius:
+        14px;
     }
 
     .zoomTitle {
