@@ -93,25 +93,35 @@ export default function TestSolvePage() {
 
   const [answers, setAnswers] = useState<Answers>({});
 
-  const [remainingSeconds, setRemainingSeconds] =
-    useState(0);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
 
   const [showReview, setShowReview] = useState(false);
+
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
+
   const [reviewMode, setReviewMode] = useState<"all" | "wrong">("all");
+
   const [zoomQuestionId, setZoomQuestionId] = useState<string | null>(null);
+
   const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
+
   const [isOnline, setIsOnline] = useState(true);
 
   const [attemptLoading, setAttemptLoading] = useState(true);
+
   const [attemptLimit, setAttemptLimit] = useState<number | null>(null);
+
   const [attemptsUsed, setAttemptsUsed] = useState(0);
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+
+  const [attemptsRemaining, setAttemptsRemaining] =
+    useState<number | null>(null);
+
   const [canAttempt, setCanAttempt] = useState(true);
 
   const restoredRef = useRef(false);
 
   const finishLock = useRef(false);
+
   const resultSavedRef = useRef(false);
 
   /* =====================================================
@@ -138,6 +148,7 @@ export default function TestSolvePage() {
     }
 
     loadTest();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testId]);
 
@@ -162,16 +173,6 @@ export default function TestSolvePage() {
         );
       }
 
-      /*
-        API quyidagilardan birini qaytarsa ham ishlaydi:
-
-        { success: true, test: {...} }
-
-        yoki:
-
-        {...test}
-      */
-
       const receivedTest =
         data?.test && typeof data.test === "object"
           ? data.test
@@ -180,10 +181,6 @@ export default function TestSolvePage() {
       if (!receivedTest?.id) {
         throw new Error("Test topilmadi.");
       }
-
-      /*
-        Oddiy foydalanuvchi draft testni ishlamasligi kerak.
-      */
 
       if (receivedTest.status !== "published") {
         throw new Error(
@@ -207,9 +204,7 @@ export default function TestSolvePage() {
             ? Number(receivedTest.duration)
             : 30,
 
-        description: String(
-          receivedTest.description || ""
-        ),
+        description: String(receivedTest.description || ""),
 
         status: receivedTest.status,
 
@@ -217,7 +212,12 @@ export default function TestSolvePage() {
           receivedTest.attemptLimit === null ||
           receivedTest.attemptLimit === undefined
             ? null
-            : Math.max(1, Math.floor(Number(receivedTest.attemptLimit) || 1)),
+            : Math.max(
+                1,
+                Math.floor(
+                  Number(receivedTest.attemptLimit) || 1
+                )
+              ),
 
         questions: Array.isArray(receivedTest.questions)
           ? receivedTest.questions
@@ -232,37 +232,73 @@ export default function TestSolvePage() {
 
       setTest(normalizedTest);
 
-      // Serverdan foydalanuvchining ushbu test bo‘yicha urinish holatini olamiz.
       setAttemptLoading(true);
+
       try {
         const attemptResponse = await fetch(
-          `/api/results?testId=${encodeURIComponent(normalizedTest.id)}`,
-          { method: "GET", cache: "no-store" }
+          `/api/results?testId=${encodeURIComponent(
+            normalizedTest.id
+          )}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
         );
-        const attemptData = await readJson(attemptResponse);
+
+        const attemptData =
+          await readJson(attemptResponse);
 
         if (attemptResponse.ok) {
           setAttemptLimit(
-            attemptData?.attemptLimit === null || attemptData?.unlimited === true
+            attemptData?.attemptLimit === null ||
+              attemptData?.unlimited === true
               ? null
-              : Math.max(1, Number(attemptData?.attemptLimit) || 1)
+              : Math.max(
+                  1,
+                  Number(attemptData?.attemptLimit) || 1
+                )
           );
-          setAttemptsUsed(Math.max(0, Number(attemptData?.attemptsUsed) || 0));
+
+          setAttemptsUsed(
+            Math.max(
+              0,
+              Number(attemptData?.attemptsUsed) || 0
+            )
+          );
+
           setAttemptsRemaining(
             attemptData?.attemptsRemaining === null
               ? null
-              : Math.max(0, Number(attemptData?.attemptsRemaining) || 0)
+              : Math.max(
+                  0,
+                  Number(
+                    attemptData?.attemptsRemaining
+                  ) || 0
+                )
           );
-          setCanAttempt(attemptData?.canAttempt !== false);
+
+          setCanAttempt(
+            attemptData?.canAttempt !== false
+          );
         } else {
-          // Tekshiruv muvaffaqiyatsiz bo‘lsa testni boshlatmaymiz.
           setCanAttempt(false);
-          setError(attemptData?.message || "Urinish holatini tekshirib bo‘lmadi.");
+
+          setError(
+            attemptData?.message ||
+              "Urinish holatini tekshirib bo‘lmadi."
+          );
         }
       } catch (attemptError) {
-        console.error("ATTEMPT CHECK ERROR:", attemptError);
+        console.error(
+          "ATTEMPT CHECK ERROR:",
+          attemptError
+        );
+
         setCanAttempt(false);
-        setError("Urinish holatini tekshirib bo‘lmadi.");
+
+        setError(
+          "Urinish holatini tekshirib bo‘lmadi."
+        );
       } finally {
         setAttemptLoading(false);
       }
@@ -271,29 +307,63 @@ export default function TestSolvePage() {
         normalizedTest.duration * 60
       );
 
-      // Avvalgi tugallanmagan urinish bo‘lsa, shu qurilmada avtomatik tiklaymiz.
       try {
-        const raw = window.localStorage.getItem(`quiz-progress:${normalizedTest.id}`);
+        const raw = window.localStorage.getItem(
+          `quiz-progress:${normalizedTest.id}`
+        );
+
         if (raw) {
           const saved = JSON.parse(raw);
-          if (saved?.started === true && saved?.finished !== true) {
-            setAnswers(saved.answers && typeof saved.answers === "object" ? saved.answers : {});
-            setFlagged(saved.flagged && typeof saved.flagged === "object" ? saved.flagged : {});
+
+          if (
+            saved?.started === true &&
+            saved?.finished !== true
+          ) {
+            setAnswers(
+              saved.answers &&
+                typeof saved.answers === "object"
+                ? saved.answers
+                : {}
+            );
+
+            setFlagged(
+              saved.flagged &&
+                typeof saved.flagged === "object"
+                ? saved.flagged
+                : {}
+            );
+
             setCurrentIndex(
               Math.min(
-                Math.max(0, Number(saved.currentIndex) || 0),
-                Math.max(0, normalizedTest.questions.length - 1)
+                Math.max(
+                  0,
+                  Number(saved.currentIndex) || 0
+                ),
+                Math.max(
+                  0,
+                  normalizedTest.questions.length - 1
+                )
               )
             );
+
             setRemainingSeconds(
-              Math.max(1, Number(saved.remainingSeconds) || normalizedTest.duration * 60)
+              Math.max(
+                1,
+                Number(saved.remainingSeconds) ||
+                  normalizedTest.duration * 60
+              )
             );
+
             setStarted(true);
+
             setFinished(false);
           }
         }
       } catch (restoreError) {
-        console.error("TEST PROGRESS RESTORE ERROR:", restoreError);
+        console.error(
+          "TEST PROGRESS RESTORE ERROR:",
+          restoreError
+        );
       } finally {
         restoredRef.current = true;
       }
@@ -316,7 +386,9 @@ export default function TestSolvePage() {
      SAVOL MATNI
   ===================================================== */
 
-  function getQuestionText(question: TestQuestion) {
+  function getQuestionText(
+    question: TestQuestion
+  ) {
     return (
       question.questionHtml ||
       question.questionText ||
@@ -357,22 +429,32 @@ export default function TestSolvePage() {
           ? "Hozir testni boshlash mumkin emas."
           : `Siz ushbu test uchun berilgan ${attemptLimit} ta urinishdan foydalanib bo‘lgansiz.`
       );
+
       return;
     }
 
     finishLock.current = false;
+
     resultSavedRef.current = false;
 
     setAnswers({});
+
     setCurrentIndex(0);
+
     setFinished(false);
+
     setShowReview(false);
+
     setReviewMode("all");
+
     setFlagged({});
+
     setZoomQuestionId(null);
 
     try {
-      window.localStorage.removeItem(`quiz-progress:${test.id}`);
+      window.localStorage.removeItem(
+        `quiz-progress:${test.id}`
+      );
     } catch {}
 
     setRemainingSeconds(
@@ -396,10 +478,13 @@ export default function TestSolvePage() {
         (question) => !answers[question.id]
       ).length;
 
-      const flaggedCount = test.questions.filter(
-        (question) => flagged[question.id]
-      ).length;
-      const answered = test.questions.length - unanswered;
+      const flaggedCount =
+        test.questions.filter(
+          (question) => flagged[question.id]
+        ).length;
+
+      const answered =
+        test.questions.length - unanswered;
 
       const message =
         `Testni yakunlashdan oldin tekshiring:\n\n` +
@@ -416,11 +501,15 @@ export default function TestSolvePage() {
     finishLock.current = true;
 
     setFinished(true);
+
     setStarted(false);
+
     setZoomQuestionId(null);
 
     try {
-      window.localStorage.removeItem(`quiz-progress:${test.id}`);
+      window.localStorage.removeItem(
+        `quiz-progress:${test.id}`
+      );
     } catch {}
 
     window.scrollTo({
@@ -462,24 +551,50 @@ export default function TestSolvePage() {
   }, [started, finished, test]);
 
   /* =====================================================
-     AUTOSAVE / CHIQISHDAN HIMOYA / ONLINE HOLATI
+     AUTOSAVE / CHIQISHDAN HIMOYA / ONLINE
   ===================================================== */
 
   useEffect(() => {
-    const syncOnline = () => setIsOnline(window.navigator.onLine);
+    const syncOnline = () =>
+      setIsOnline(window.navigator.onLine);
+
     syncOnline();
-    window.addEventListener("online", syncOnline);
-    window.addEventListener("offline", syncOnline);
+
+    window.addEventListener(
+      "online",
+      syncOnline
+    );
+
+    window.addEventListener(
+      "offline",
+      syncOnline
+    );
+
     return () => {
-      window.removeEventListener("online", syncOnline);
-      window.removeEventListener("offline", syncOnline);
+      window.removeEventListener(
+        "online",
+        syncOnline
+      );
+
+      window.removeEventListener(
+        "offline",
+        syncOnline
+      );
     };
   }, []);
 
   useEffect(() => {
-    if (!test || !started || finished || !restoredRef.current) return;
+    if (
+      !test ||
+      !started ||
+      finished ||
+      !restoredRef.current
+    ) {
+      return;
+    }
 
     setSaveState("saving");
+
     const timeout = window.setTimeout(() => {
       try {
         window.localStorage.setItem(
@@ -496,37 +611,69 @@ export default function TestSolvePage() {
             savedAt: Date.now(),
           })
         );
+
         setSaveState("saved");
       } catch (saveError) {
-        console.error("TEST PROGRESS SAVE ERROR:", saveError);
+        console.error(
+          "TEST PROGRESS SAVE ERROR:",
+          saveError
+        );
+
         setSaveState("saved");
       }
     }, 180);
 
-    return () => window.clearTimeout(timeout);
-  }, [test, started, finished, answers, flagged, currentIndex, remainingSeconds]);
+    return () =>
+      window.clearTimeout(timeout);
+  }, [
+    test,
+    started,
+    finished,
+    answers,
+    flagged,
+    currentIndex,
+    remainingSeconds,
+  ]);
 
   useEffect(() => {
-    if (!started || finished) return;
+    if (!started || finished) {
+      return;
+    }
 
-    const beforeUnload = (event: BeforeUnloadEvent) => {
+    const beforeUnload = (
+      event: BeforeUnloadEvent
+    ) => {
       event.preventDefault();
       event.returnValue = "";
     };
 
-    window.addEventListener("beforeunload", beforeUnload);
-    return () => window.removeEventListener("beforeunload", beforeUnload);
+    window.addEventListener(
+      "beforeunload",
+      beforeUnload
+    );
+
+    return () =>
+      window.removeEventListener(
+        "beforeunload",
+        beforeUnload
+      );
   }, [started, finished]);
 
   /* =====================================================
-     KLAVIATURA: A/B/C/D VA ←/→
+     KLAVIATURA
   ===================================================== */
 
   useEffect(() => {
-    if (!started || finished || !test) return;
+    if (!started || finished || !test) {
+      return;
+    }
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
+    const onKeyDown = (
+      event: KeyboardEvent
+    ) => {
+      const target =
+        event.target as HTMLElement | null;
+
       if (
         target?.tagName === "INPUT" ||
         target?.tagName === "TEXTAREA" ||
@@ -537,37 +684,76 @@ export default function TestSolvePage() {
         return;
       }
 
-      const question = test.questions[currentIndex];
-      if (!question) return;
+      const question =
+        test.questions[currentIndex];
 
-      const key = event.key.toLowerCase();
-      const optionIndex = ["a", "b", "c", "d"].indexOf(key);
+      if (!question) {
+        return;
+      }
+
+      const key =
+        event.key.toLowerCase();
+
+      const optionIndex = [
+        "a",
+        "b",
+        "c",
+        "d",
+      ].indexOf(key);
 
       if (optionIndex >= 0) {
-        const option = question.options?.[optionIndex];
+        const option =
+          question.options?.[optionIndex];
+
         if (option) {
           event.preventDefault();
-          selectAnswer(question.id, option.id);
+
+          selectAnswer(
+            question.id,
+            option.id
+          );
         }
+
         return;
       }
 
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        setCurrentIndex((current) => Math.max(0, current - 1));
+
+        setCurrentIndex((current) =>
+          Math.max(0, current - 1)
+        );
       }
 
       if (event.key === "ArrowRight") {
         event.preventDefault();
+
         setCurrentIndex((current) =>
-          Math.min(test.questions.length - 1, current + 1)
+          Math.min(
+            test.questions.length - 1,
+            current + 1
+          )
         );
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [started, finished, test, currentIndex, zoomQuestionId]);
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+  }, [
+    started,
+    finished,
+    test,
+    currentIndex,
+    zoomQuestionId,
+  ]);
 
   /* =====================================================
      VARIANT TANLASH
@@ -612,10 +798,13 @@ export default function TestSolvePage() {
     }
 
     let correct = 0;
+
     let incorrect = 0;
+
     let unanswered = 0;
 
     let earnedPoints = 0;
+
     let totalPoints = 0;
 
     for (const question of test.questions) {
@@ -646,17 +835,21 @@ export default function TestSolvePage() {
         optionIsCorrect(selectedOption)
       ) {
         correct++;
+
         earnedPoints += points;
       } else {
         incorrect++;
       }
     }
 
-    const total = test.questions.length;
+    const total =
+      test.questions.length;
 
     const percentage =
       total > 0
-        ? Math.round((correct / total) * 100)
+        ? Math.round(
+            (correct / total) * 100
+          )
         : 0;
 
     return {
@@ -675,76 +868,154 @@ export default function TestSolvePage() {
   ===================================================== */
 
   useEffect(() => {
-    if (!finished || !test || resultSavedRef.current) {
+    if (
+      !finished ||
+      !test ||
+      resultSavedRef.current
+    ) {
       return;
     }
 
     resultSavedRef.current = true;
 
     const totalSeconds =
-      Math.max(1, Number(test.duration)) * 60;
+      Math.max(
+        1,
+        Number(test.duration)
+      ) * 60;
 
     const spentSeconds = Math.max(
       0,
-      totalSeconds - Math.max(0, remainingSeconds)
+      totalSeconds -
+        Math.max(0, remainingSeconds)
     );
 
-async function saveResult() {
-  if (!test) return;
-      try {
-        const response = await fetch("/api/results", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            testId: test.id,
-            testTitle: test.title,
-            subject: test.subject,
-            total: result.total,
-            correct: result.correct,
-            incorrect: result.incorrect,
-            unanswered: result.unanswered,
-            percentage: result.percentage,
-            earnedPoints: result.earnedPoints,
-            totalPoints: result.totalPoints,
-            spentSeconds,
-          }),
-        });
+    async function saveResult() {
+      if (!test) {
+        return;
+      }
 
-        const data = await readJson(response);
+      try {
+        const response = await fetch(
+          "/api/results",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              testId: test.id,
+              testTitle: test.title,
+              subject: test.subject,
+
+              total: result.total,
+
+              correct: result.correct,
+
+              incorrect: result.incorrect,
+
+              unanswered:
+                result.unanswered,
+
+              percentage:
+                result.percentage,
+
+              earnedPoints:
+                result.earnedPoints,
+
+              totalPoints:
+                result.totalPoints,
+
+              spentSeconds,
+            }),
+          }
+        );
+
+        const data =
+          await readJson(response);
 
         if (!response.ok) {
           resultSavedRef.current = false;
-          if (data?.code === "ATTEMPT_LIMIT_REACHED") {
+
+          if (
+            data?.code ===
+            "ATTEMPT_LIMIT_REACHED"
+          ) {
             setCanAttempt(false);
-            setAttemptLimit(data?.attemptLimit ?? attemptLimit);
-            setAttemptsUsed(Number(data?.attemptsUsed) || attemptsUsed);
+
+            setAttemptLimit(
+              data?.attemptLimit ??
+                attemptLimit
+            );
+
+            setAttemptsUsed(
+              Number(
+                data?.attemptsUsed
+              ) || attemptsUsed
+            );
+
             setAttemptsRemaining(0);
           }
-          console.error("RESULT SAVE ERROR:", data?.message || response.status);
+
+          console.error(
+            "RESULT SAVE ERROR:",
+            data?.message ||
+              response.status
+          );
+
           return;
         }
 
-        setAttemptLimit(data?.attemptLimit ?? null);
-        setAttemptsUsed(Math.max(0, Number(data?.attemptsUsed) || 0));
+        setAttemptLimit(
+          data?.attemptLimit ?? null
+        );
+
+        setAttemptsUsed(
+          Math.max(
+            0,
+            Number(data?.attemptsUsed) || 0
+          )
+        );
+
         setAttemptsRemaining(
           data?.attemptsRemaining === null
             ? null
-            : Math.max(0, Number(data?.attemptsRemaining) || 0)
+            : Math.max(
+                0,
+                Number(
+                  data?.attemptsRemaining
+                ) || 0
+              )
         );
+
         setCanAttempt(
           data?.attemptLimit === null ||
-          (Number(data?.attemptsRemaining) || 0) > 0
+            (Number(
+              data?.attemptsRemaining
+            ) || 0) > 0
         );
       } catch (error) {
         resultSavedRef.current = false;
-        console.error("RESULT SAVE ERROR:", error);
+
+        console.error(
+          "RESULT SAVE ERROR:",
+          error
+        );
       }
     }
 
     saveResult();
-  }, [finished, test, result, remainingSeconds, attemptLimit, attemptsUsed]);
+  }, [
+    finished,
+    test,
+    result,
+    remainingSeconds,
+    attemptLimit,
+    attemptsUsed,
+  ]);
 
   /* =====================================================
      VAQT FORMAT
@@ -760,12 +1031,16 @@ async function saveResult() {
       safeSeconds / 60
     );
 
-    const secs = safeSeconds % 60;
+    const secs =
+      safeSeconds % 60;
 
     return `${String(minutes).padStart(
       2,
       "0"
-    )}:${String(secs).padStart(2, "0")}`;
+    )}:${String(secs).padStart(
+      2,
+      "0"
+    )}`;
   }
 
   /* =====================================================
@@ -773,67 +1048,121 @@ async function saveResult() {
   ===================================================== */
 
   const currentQuestion =
-    test?.questions?.[currentIndex] || null;
+    test?.questions?.[currentIndex] ||
+    null;
 
   const answeredCount = test
     ? test.questions.filter(
-        (question) => !!answers[question.id]
+        (question) =>
+          !!answers[question.id]
       ).length
     : 0;
 
   const progress = test
     ? Math.round(
         (answeredCount /
-          Math.max(test.questions.length, 1)) *
+          Math.max(
+            test.questions.length,
+            1
+          )) *
           100
       )
     : 0;
 
   const spentSeconds = test
-    ? Math.max(0, Math.max(1, Number(test.duration)) * 60 - remainingSeconds)
+    ? Math.max(
+        0,
+        Math.max(
+          1,
+          Number(test.duration)
+        ) *
+          60 -
+          remainingSeconds
+      )
     : 0;
 
-  function renderQuestionShapes(question: TestQuestion, zoomed = false) {
-    const shapes = Array.isArray(question.shapes)
-      ? question.shapes
-      : [];
+  /* =====================================================
+     SHAPES
+  ===================================================== */
+
+  function renderQuestionShapes(
+    question: TestQuestion,
+    zoomed = false
+  ) {
+    const shapes =
+      Array.isArray(question.shapes)
+        ? question.shapes
+        : [];
 
     if (shapes.length === 0) {
       return null;
     }
 
-    const minX = Math.min(...shapes.map((shape) => Number(shape.x) || 0));
-    const minY = Math.min(...shapes.map((shape) => Number(shape.y) || 0));
+    const minX = Math.min(
+      ...shapes.map(
+        (shape) =>
+          Number(shape.x) || 0
+      )
+    );
+
+    const minY = Math.min(
+      ...shapes.map(
+        (shape) =>
+          Number(shape.y) || 0
+      )
+    );
+
     const maxX = Math.max(
       ...shapes.map(
         (shape) =>
           (Number(shape.x) || 0) +
-          Math.max(1, Number(shape.width) || 1)
+          Math.max(
+            1,
+            Number(shape.width) || 1
+          )
       )
     );
+
     const maxY = Math.max(
       ...shapes.map(
         (shape) =>
           (Number(shape.y) || 0) +
-          Math.max(1, Number(shape.height) || 1)
+          Math.max(
+            1,
+            Number(shape.height) || 1
+          )
       )
     );
 
-    /*
-      Muhim: sahifada bo‘sh katta canvas yasamaymiz.
-      Maydon faqat joylashtirilgan rasm/shakllarning real chegarasi
-      qancha bo‘lsa, shuncha bo‘ladi.
-    */
-    const stageWidth = Math.max(1, Math.ceil(maxX - minX));
-    const stageHeight = Math.max(1, Math.ceil(maxY - minY));
+    const stageWidth = Math.max(
+      1,
+      Math.ceil(maxX - minX)
+    );
+
+    const stageHeight = Math.max(
+      1,
+      Math.ceil(maxY - minY)
+    );
 
     return (
       <div
-        className={zoomed ? "shapeResultScroll shapeResultZoomed" : "shapeResultScroll shapeResultClickable"}
+        className={
+          zoomed
+            ? "shapeResultScroll shapeResultZoomed"
+            : "shapeResultScroll shapeResultClickable"
+        }
         onClick={() => {
-          if (!zoomed) setZoomQuestionId(question.id);
+          if (!zoomed) {
+            setZoomQuestionId(
+              question.id
+            );
+          }
         }}
-        title={zoomed ? undefined : "Kattalashtirib ko‘rish"}
+        title={
+          zoomed
+            ? undefined
+            : "Kattalashtirib ko‘rish"
+        }
       >
         <div
           className="shapeResultStage"
@@ -843,21 +1172,38 @@ async function saveResult() {
           }}
         >
           {shapes.map((shape) => {
-            const width = Math.max(1, Number(shape.width) || 1);
-            const height = Math.max(1, Number(shape.height) || 1);
-            const left = (Number(shape.x) || 0) - minX;
-            const top = (Number(shape.y) || 0) - minY;
+            const width = Math.max(
+              1,
+              Number(shape.width) || 1
+            );
+
+            const height = Math.max(
+              1,
+              Number(shape.height) || 1
+            );
+
+            const left =
+              (Number(shape.x) || 0) -
+              minX;
+
+            const top =
+              (Number(shape.y) || 0) -
+              minY;
 
             const commonStyle = {
               left,
               top,
               width,
               height,
-              zIndex: shape.zIndex ?? 1,
-              opacity: shape.opacity ?? 1,
+              zIndex:
+                shape.zIndex ?? 1,
+              opacity:
+                shape.opacity ?? 1,
             };
 
-            if (shape.type === "image") {
+            if (
+              shape.type === "image"
+            ) {
               return (
                 <div
                   key={shape.id}
@@ -866,19 +1212,39 @@ async function saveResult() {
                 >
                   {shape.imageSrc ? (
                     <img
-                      src={shape.imageSrc}
+                      src={
+                        shape.imageSrc
+                      }
                       alt="Test rasmi"
                       draggable={false}
                       style={{
                         width: "100%",
                         height: "100%",
                         display: "block",
-                        objectFit: shape.objectFit ?? "contain",
-                        borderStyle: "solid",
-                        borderColor: shape.borderColor ?? "transparent",
-                        borderWidth: `${shape.borderWidth ?? 0}px`,
-                        borderRadius: `${shape.borderRadius ?? 0}px`,
-                        boxSizing: "border-box",
+
+                        objectFit:
+                          shape.objectFit ??
+                          "contain",
+
+                        borderStyle:
+                          "solid",
+
+                        borderColor:
+                          shape.borderColor ??
+                          "transparent",
+
+                        borderWidth: `${
+                          shape.borderWidth ??
+                          0
+                        }px`,
+
+                        borderRadius: `${
+                          shape.borderRadius ??
+                          0
+                        }px`,
+
+                        boxSizing:
+                          "border-box",
                       }}
                     />
                   ) : null}
@@ -886,7 +1252,9 @@ async function saveResult() {
               );
             }
 
-            if (shape.type === "venn") {
+            if (
+              shape.type === "venn"
+            ) {
               return (
                 <div
                   key={shape.id}
@@ -897,17 +1265,28 @@ async function saveResult() {
                     <div
                       className="resultVennCircle resultVennOne"
                       style={{
-                        background: shape.backgroundColor ?? "#8fc9ef",
-                        borderColor: shape.borderColor ?? "#2f5975",
+                        background:
+                          shape.backgroundColor ??
+                          "#8fc9ef",
+
+                        borderColor:
+                          shape.borderColor ??
+                          "#2f5975",
                       }}
                     >
                       A
                     </div>
+
                     <div
                       className="resultVennCircle resultVennTwo"
                       style={{
-                        background: shape.backgroundColor ?? "#8fc9ef",
-                        borderColor: shape.borderColor ?? "#2f5975",
+                        background:
+                          shape.backgroundColor ??
+                          "#8fc9ef",
+
+                        borderColor:
+                          shape.borderColor ??
+                          "#2f5975",
                       }}
                     >
                       B
@@ -923,25 +1302,71 @@ async function saveResult() {
                 className={`resultShapeItem resultShapeBody ${shape.type}`}
                 style={{
                   ...commonStyle,
+
                   background:
-                    shape.type === "text"
+                    shape.type ===
+                    "text"
                       ? "transparent"
-                      : shape.backgroundColor ?? "#8fc9ef",
-                  borderColor: shape.borderColor ?? "#2f5975",
-                  borderWidth: `${shape.borderWidth ?? 2}px`,
-                  borderStyle: shape.type === "text" ? "none" : "solid",
-                  borderRadius: `${shape.borderRadius ?? 4}px`,
-                  color: shape.textColor ?? "#111111",
-                  fontFamily: shape.fontFamily ?? "Bell MT",
-                  fontSize: `${shape.fontSize ?? 20}px`,
-                  fontWeight: shape.fontWeight ?? "normal",
-                  fontStyle: shape.fontStyle ?? "normal",
-                  textAlign: shape.textAlign ?? "center",
-                  textDecoration: shape.textDecoration ?? "none",
-                  textTransform: shape.textTransform ?? "none",
+                      : shape.backgroundColor ??
+                        "#8fc9ef",
+
+                  borderColor:
+                    shape.borderColor ??
+                    "#2f5975",
+
+                  borderWidth: `${
+                    shape.borderWidth ??
+                    2
+                  }px`,
+
+                  borderStyle:
+                    shape.type ===
+                    "text"
+                      ? "none"
+                      : "solid",
+
+                  borderRadius: `${
+                    shape.borderRadius ??
+                    4
+                  }px`,
+
+                  color:
+                    shape.textColor ??
+                    "#111111",
+
+                  fontFamily:
+                    shape.fontFamily ??
+                    "Bell MT",
+
+                  fontSize: `${
+                    shape.fontSize ??
+                    20
+                  }px`,
+
+                  fontWeight:
+                    shape.fontWeight ??
+                    "normal",
+
+                  fontStyle:
+                    shape.fontStyle ??
+                    "normal",
+
+                  textAlign:
+                    shape.textAlign ??
+                    "center",
+
+                  textDecoration:
+                    shape.textDecoration ??
+                    "none",
+
+                  textTransform:
+                    shape.textTransform ??
+                    "none",
                 }}
               >
-                <span>{shape.text ?? ""}</span>
+                <span>
+                  {shape.text ?? ""}
+                </span>
               </div>
             );
           })}
@@ -960,10 +1385,14 @@ async function saveResult() {
         <div className="stateBox">
           <div className="loader" />
 
-          <h2>Test yuklanmoqda...</h2>
+          <h2>
+            Test yuklanmoqda...
+          </h2>
         </div>
 
-        <style jsx>{stateStyles}</style>
+        <style jsx>
+          {stateStyles}
+        </style>
       </main>
     );
   }
@@ -976,21 +1405,33 @@ async function saveResult() {
     return (
       <main className="statePage">
         <div className="stateBox">
-          <div className="errorIcon">!</div>
+          <div className="errorIcon">
+            !
+          </div>
 
-          <h1>Testni ochib bo‘lmadi</h1>
+          <h1>
+            Testni ochib bo‘lmadi
+          </h1>
 
-          <p>{error || "Test topilmadi."}</p>
+          <p>
+            {error ||
+              "Test topilmadi."}
+          </p>
 
           <button
             type="button"
-            onClick={() => router.push("/test")}
+            onClick={() =>
+              router.push("/test")
+            }
           >
-            Testlar bo‘limiga qaytish
+            Testlar bo‘limiga
+            qaytish
           </button>
         </div>
 
-        <style jsx>{stateStyles}</style>
+        <style jsx>
+          {stateStyles}
+        </style>
       </main>
     );
   }
@@ -1010,7 +1451,9 @@ async function saveResult() {
           <button
             type="button"
             className="grayButton"
-            onClick={() => router.push("/test")}
+            onClick={() =>
+              router.push("/test")
+            }
           >
             ← Testlarga qaytish
           </button>
@@ -1036,10 +1479,15 @@ async function saveResult() {
 
             <div className="introInformation">
               <div className="info">
-                <span>Savollar</span>
+                <span>
+                  Savollar
+                </span>
 
                 <strong>
-                  {test.questions.length}
+                  {
+                    test.questions
+                      .length
+                  }
                 </strong>
               </div>
 
@@ -1048,7 +1496,10 @@ async function saveResult() {
 
                 <strong>
                   {test.duration}
-                  <small> daqiqa</small>
+                  <small>
+                    {" "}
+                    daqiqa
+                  </small>
                 </strong>
               </div>
 
@@ -1061,25 +1512,43 @@ async function saveResult() {
               </div>
 
               <div className="info">
-                <span>Urinish</span>
-                <strong className={canAttempt ? "green" : ""}>
+                <span>
+                  Urinish
+                </span>
+
+                <strong
+                  className={
+                    canAttempt
+                      ? "green"
+                      : ""
+                  }
+                >
                   {attemptLoading
                     ? "Tekshirilmoqda..."
-                    : attemptLimit === null
+                    : attemptLimit ===
+                      null
                     ? "Cheksiz"
-                    : `${attemptsRemaining ?? 0} ta qoldi`}
+                    : `${
+                        attemptsRemaining ??
+                        0
+                      } ta qoldi`}
                 </strong>
               </div>
             </div>
 
             <div className="instruction">
-              <strong>Test tartibi</strong>
+              <strong>
+                Test tartibi
+              </strong>
 
               <p>
-                Har bir savol uchun javob variantini
-                belgilang. Savollar orasida erkin
-                harakat qilishingiz mumkin. Vaqt
-                tugaganda test avtomatik yakunlanadi.
+                Har bir savol uchun
+                javob variantini
+                belgilang. Savollar
+                orasida erkin harakat
+                qilishingiz mumkin.
+                Vaqt tugaganda test
+                avtomatik yakunlanadi.
               </p>
             </div>
 
@@ -1087,7 +1556,10 @@ async function saveResult() {
               type="button"
               className="startButton"
               onClick={startTest}
-              disabled={attemptLoading || !canAttempt}
+              disabled={
+                attemptLoading ||
+                !canAttempt
+              }
             >
               {attemptLoading
                 ? "URINISHLAR TEKSHIRILMOQDA..."
@@ -1098,7 +1570,9 @@ async function saveResult() {
           </div>
         </section>
 
-        <style jsx>{pageStyles}</style>
+        <style jsx>
+          {pageStyles}
+        </style>
       </main>
     );
   }
@@ -1118,7 +1592,9 @@ async function saveResult() {
           <button
             type="button"
             className="grayButton"
-            onClick={() => router.push("/test")}
+            onClick={() =>
+              router.push("/test")
+            }
           >
             Testlarga qaytish
           </button>
@@ -1146,7 +1622,9 @@ async function saveResult() {
 
             <div className="resultGrid">
               <div className="resultItem">
-                <span>Jami savol</span>
+                <span>
+                  Jami savol
+                </span>
 
                 <strong>
                   {result.total}
@@ -1154,7 +1632,9 @@ async function saveResult() {
               </div>
 
               <div className="resultItem correctResult">
-                <span>To‘g‘ri</span>
+                <span>
+                  To‘g‘ri
+                </span>
 
                 <strong>
                   {result.correct}
@@ -1162,7 +1642,9 @@ async function saveResult() {
               </div>
 
               <div className="resultItem wrongResult">
-                <span>Noto‘g‘ri</span>
+                <span>
+                  Noto‘g‘ri
+                </span>
 
                 <strong>
                   {result.incorrect}
@@ -1170,7 +1652,9 @@ async function saveResult() {
               </div>
 
               <div className="resultItem">
-                <span>Javobsiz</span>
+                <span>
+                  Javobsiz
+                </span>
 
                 <strong>
                   {result.unanswered}
@@ -1181,23 +1665,38 @@ async function saveResult() {
                 <span>Ball</span>
 
                 <strong>
-                  {result.earnedPoints}/
-                  {result.totalPoints}
+                  {
+                    result.earnedPoints
+                  }
+                  /
+                  {
+                    result.totalPoints
+                  }
                 </strong>
               </div>
 
               <div className="resultItem">
-                <span>Sarflangan vaqt</span>
-                <strong>{formatTime(spentSeconds)}</strong>
+                <span>
+                  Sarflangan vaqt
+                </span>
+
+                <strong>
+                  {formatTime(
+                    spentSeconds
+                  )}
+                </strong>
               </div>
             </div>
 
             <div className="resultMessage">
-              {result.percentage >= 86
+              {result.percentage >=
+              86
                 ? "A’lo natija!"
-                : result.percentage >= 71
+                : result.percentage >=
+                  71
                 ? "Yaxshi natija!"
-                : result.percentage >= 56
+                : result.percentage >=
+                  56
                 ? "Qoniqarli natija."
                 : "Natijani yaxshilash uchun mavzularni yana takrorlang."}
             </div>
@@ -1207,15 +1706,28 @@ async function saveResult() {
                 type="button"
                 className="reviewButton"
                 onClick={() => {
-                  if (showReview && reviewMode === "all") {
-                    setShowReview(false);
+                  if (
+                    showReview &&
+                    reviewMode ===
+                      "all"
+                  ) {
+                    setShowReview(
+                      false
+                    );
                   } else {
-                    setReviewMode("all");
-                    setShowReview(true);
+                    setReviewMode(
+                      "all"
+                    );
+
+                    setShowReview(
+                      true
+                    );
                   }
                 }}
               >
-                {showReview && reviewMode === "all"
+                {showReview &&
+                reviewMode ===
+                  "all"
                   ? "Javoblarni yopish"
                   : "Barcha javoblarni ko‘rish"}
               </button>
@@ -1224,23 +1736,36 @@ async function saveResult() {
                 type="button"
                 className="wrongOnlyButton"
                 onClick={() => {
-                  setReviewMode("wrong");
-                  setShowReview(true);
+                  setReviewMode(
+                    "wrong"
+                  );
+
+                  setShowReview(
+                    true
+                  );
                 }}
               >
-                Faqat xatolarni ko‘rish
+                Faqat xatolarni
+                ko‘rish
               </button>
 
               <button
                 type="button"
                 className="againButton"
                 onClick={startTest}
-                disabled={attemptLoading || !canAttempt}
+                disabled={
+                  attemptLoading ||
+                  !canAttempt
+                }
               >
                 {canAttempt
-                  ? attemptLimit === null
+                  ? attemptLimit ===
+                    null
                     ? "Qayta ishlash"
-                    : `Qayta ishlash (${attemptsRemaining ?? 0} ta qoldi)`
+                    : `Qayta ishlash (${
+                        attemptsRemaining ??
+                        0
+                      } ta qoldi)`
                   : "Urinishlar tugagan"}
               </button>
 
@@ -1248,7 +1773,9 @@ async function saveResult() {
                 type="button"
                 className="grayButton"
                 onClick={() =>
-                  router.push("/test")
+                  router.push(
+                    "/test"
+                  )
                 }
               >
                 Boshqa test tanlash
@@ -1265,159 +1792,265 @@ async function saveResult() {
 
             <div className="reviewInner">
               {test.questions
-                .map((question, index) => ({ question, index }))
-                .filter(({ question }) => {
-                  if (reviewMode === "all") return true;
-                  const selectedId = answers[question.id];
-                  const selectedOption = question.options?.find(
-                    (option) => String(option.id) === String(selectedId)
-                  );
-                  return !selectedOption || !optionIsCorrect(selectedOption);
-                })
-                .map(({ question, index }) => {
-                  const selectedId =
-                    answers[question.id];
+                .map(
+                  (
+                    question,
+                    index
+                  ) => ({
+                    question,
+                    index,
+                  })
+                )
 
-                  const selectedOption =
-                    question.options?.find(
-                      (option) =>
-                        String(option.id) ===
-                        String(selectedId)
+                .filter(
+                  ({ question }) => {
+                    if (
+                      reviewMode ===
+                      "all"
+                    ) {
+                      return true;
+                    }
+
+                    const selectedId =
+                      answers[
+                        question.id
+                      ];
+
+                    const selectedOption =
+                      question.options?.find(
+                        (option) =>
+                          String(
+                            option.id
+                          ) ===
+                          String(
+                            selectedId
+                          )
+                      );
+
+                    return (
+                      !selectedOption ||
+                      !optionIsCorrect(
+                        selectedOption
+                      )
                     );
+                  }
+                )
 
-                  const correct =
-                    !!selectedOption &&
-                    optionIsCorrect(
-                      selectedOption
-                    );
+                .map(
+                  ({
+                    question,
+                    index,
+                  }) => {
+                    const selectedId =
+                      answers[
+                        question.id
+                      ];
 
-                  return (
-                    <article
-                      key={question.id}
-                      className="reviewQuestion"
-                    >
-                      <div className="reviewNumber">
-                        {index + 1}-savol
-                      </div>
+                    const selectedOption =
+                      question.options?.find(
+                        (option) =>
+                          String(
+                            option.id
+                          ) ===
+                          String(
+                            selectedId
+                          )
+                      );
 
-                      <div
-                        className="questionHtml"
-                        dangerouslySetInnerHTML={{
-                          __html:
-                            getQuestionText(
-                              question
-                            ) ||
-                            "Savol matni mavjud emas.",
-                        }}
-                      />
+                    const correct =
+                      !!selectedOption &&
+                      optionIsCorrect(
+                        selectedOption
+                      );
 
-                      {renderQuestionShapes(question)}
-
-                      <div className="reviewOptions">
-                        {(question.options || []).map(
-                          (option) => {
-                            const selected =
-                              String(
-                                selectedId
-                              ) ===
-                              String(
-                                option.id
-                              );
-
-                            const correctOption =
-                              optionIsCorrect(
-                                option
-                              );
-
-                            let className =
-                              "reviewOption";
-
-                            if (correctOption) {
-                              className +=
-                                " correctOption";
-                            }
-
-                            if (
-                              selected &&
-                              !correctOption
-                            ) {
-                              className +=
-                                " selectedWrong";
-                            }
-
-                            return (
-                              <div
-                                key={option.id}
-                                className={
-                                  className
-                                }
-                              >
-                                <span>
-                                  {correctOption
-                                    ? "✓"
-                                    : selected
-                                    ? "×"
-                                    : "○"}
-                                </span>
-
-                                <div
-                                  dangerouslySetInnerHTML={{
-                                    __html:
-                                      getOptionText(
-                                        option
-                                      ),
-                                  }}
-                                />
-                              </div>
-                            );
-                          }
-                        )}
-                      </div>
-
-                      <div className="reviewAnswerSummary">
-                        <div>
-                          <strong>Siz tanlagan:</strong>{" "}
-                          {selectedOption
-                            ? getOptionText(selectedOption).replace(/<[^>]*>/g, "") || "—"
-                            : "Javob berilmagan"}
-                        </div>
-                        <div>
-                          <strong>To‘g‘ri javob:</strong>{" "}
-                          {(() => {
-                            const correctOption = question.options?.find(optionIsCorrect);
-                            return correctOption
-                              ? getOptionText(correctOption).replace(/<[^>]*>/g, "") || "—"
-                              : "Ko‘rsatilmagan";
-                          })()}
-                        </div>
-                        <div>
-                          <strong>Ball:</strong>{" "}
-                          {correct ? (Number(question.points) > 0 ? Number(question.points) : 1) : 0}/
-                          {Number(question.points) > 0 ? Number(question.points) : 1}
-                        </div>
-                      </div>
-
-                      <div
-                        className={
-                          correct
-                            ? "answerStatus correctStatus"
-                            : "answerStatus wrongStatus"
+                    return (
+                      <article
+                        key={
+                          question.id
                         }
+                        className="reviewQuestion"
                       >
-                        {correct
-                          ? "✓ To‘g‘ri javob"
-                          : selectedId
-                          ? "× Noto‘g‘ri javob"
-                          : "— Javob berilmagan"}
-                      </div>
-                    </article>
-                  );
-                })}
+                        <div className="reviewNumber">
+                          {index +
+                            1}
+                          -savol
+                        </div>
+
+                        <div
+                          className="questionHtml"
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              getQuestionText(
+                                question
+                              ) ||
+                              "Savol matni mavjud emas.",
+                          }}
+                        />
+
+                        {renderQuestionShapes(
+                          question
+                        )}
+
+                        <div className="reviewOptions">
+                          {(
+                            question.options ||
+                            []
+                          ).map(
+                            (
+                              option
+                            ) => {
+                              const selected =
+                                String(
+                                  selectedId
+                                ) ===
+                                String(
+                                  option.id
+                                );
+
+                              const correctOption =
+                                optionIsCorrect(
+                                  option
+                                );
+
+                              let className =
+                                "reviewOption";
+
+                              if (
+                                correctOption
+                              ) {
+                                className +=
+                                  " correctOption";
+                              }
+
+                              if (
+                                selected &&
+                                !correctOption
+                              ) {
+                                className +=
+                                  " selectedWrong";
+                              }
+
+                              return (
+                                <div
+                                  key={
+                                    option.id
+                                  }
+                                  className={
+                                    className
+                                  }
+                                >
+                                  <span>
+                                    {correctOption
+                                      ? "✓"
+                                      : selected
+                                      ? "×"
+                                      : "○"}
+                                  </span>
+
+                                  <div
+                                    dangerouslySetInnerHTML={{
+                                      __html:
+                                        getOptionText(
+                                          option
+                                        ),
+                                    }}
+                                  />
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+
+                        <div className="reviewAnswerSummary">
+                          <div>
+                            <strong>
+                              Siz
+                              tanlagan:
+                            </strong>{" "}
+                            {selectedOption
+                              ? getOptionText(
+                                  selectedOption
+                                ).replace(
+                                  /<[^>]*>/g,
+                                  ""
+                                ) ||
+                                "—"
+                              : "Javob berilmagan"}
+                          </div>
+
+                          <div>
+                            <strong>
+                              To‘g‘ri
+                              javob:
+                            </strong>{" "}
+                            {(() => {
+                              const correctOption =
+                                question.options?.find(
+                                  optionIsCorrect
+                                );
+
+                              return correctOption
+                                ? getOptionText(
+                                    correctOption
+                                  ).replace(
+                                    /<[^>]*>/g,
+                                    ""
+                                  ) ||
+                                  "—"
+                                : "Ko‘rsatilmagan";
+                            })()}
+                          </div>
+
+                          <div>
+                            <strong>
+                              Ball:
+                            </strong>{" "}
+                            {correct
+                              ? Number(
+                                  question.points
+                                ) >
+                                0
+                                ? Number(
+                                    question.points
+                                  )
+                                : 1
+                              : 0}
+                            /
+                            {Number(
+                              question.points
+                            ) >
+                            0
+                              ? Number(
+                                  question.points
+                                )
+                              : 1}
+                          </div>
+                        </div>
+
+                        <div
+                          className={
+                            correct
+                              ? "answerStatus correctStatus"
+                              : "answerStatus wrongStatus"
+                          }
+                        >
+                          {correct
+                            ? "✓ To‘g‘ri javob"
+                            : selectedId
+                            ? "× Noto‘g‘ri javob"
+                            : "— Javob berilmagan"}
+                        </div>
+                      </article>
+                    );
+                  }
+                )}
             </div>
           </section>
         )}
 
-        <style jsx>{pageStyles}</style>
+        <style jsx>
+          {pageStyles}
+        </style>
       </main>
     );
   }
@@ -1430,16 +2063,28 @@ async function saveResult() {
     <main className="page">
       <header className="testHeader">
         <div className="testHeaderLeft">
-          <span>{test.subject}</span>
+          <span>
+            {test.subject}
+          </span>
 
-          <strong>{test.title}</strong>
+          <strong>
+            {test.title}
+          </strong>
         </div>
 
         <div className="saveIndicatorWrap">
-          <span className={isOnline ? "onlineDot" : "offlineDot"} />
+          <span
+            className={
+              isOnline
+                ? "onlineDot"
+                : "offlineDot"
+            }
+          />
+
           <span>
             {isOnline
-              ? saveState === "saving"
+              ? saveState ===
+                "saving"
                 ? "Saqlanmoqda..."
                 : "Saqlandi"
               : "Internet yo‘q · lokal saqlandi"}
@@ -1448,15 +2093,20 @@ async function saveResult() {
 
         <div
           className={
-            remainingSeconds <= 300
+            remainingSeconds <=
+            300
               ? "timer timerDanger"
               : "timer"
           }
         >
-          <span>Qolgan vaqt</span>
+          <span>
+            Qolgan vaqt
+          </span>
 
           <strong>
-            {formatTime(remainingSeconds)}
+            {formatTime(
+              remainingSeconds
+            )}
           </strong>
         </div>
       </header>
@@ -1465,10 +2115,16 @@ async function saveResult() {
         <div className="progressInformation">
           <strong>
             {answeredCount} /{" "}
-            {test.questions.length} javob
+            {
+              test.questions
+                .length
+            }{" "}
+            javob
           </strong>
 
-          <span>{progress}%</span>
+          <span>
+            {progress}%
+          </span>
         </div>
 
         <div className="progressTrack">
@@ -1482,27 +2138,31 @@ async function saveResult() {
       </section>
 
       <div className="testLayout">
-        {/* =============================================
-            NAVIGATOR
-        ============================================= */}
-
         <aside className="navigator">
           <h3>Savollar</h3>
 
           <div className="questionNumbers">
             {test.questions.map(
-              (question, index) => {
+              (
+                question,
+                index
+              ) => {
                 const answered =
-                  !!answers[question.id];
+                  !!answers[
+                    question.id
+                  ];
 
                 return (
                   <button
-                    key={question.id}
+                    key={
+                      question.id
+                    }
                     type="button"
                     className={[
                       "numberButton",
 
-                      currentIndex === index
+                      currentIndex ===
+                      index
                         ? "currentNumber"
                         : "",
 
@@ -1510,14 +2170,18 @@ async function saveResult() {
                         ? "answeredNumber"
                         : "",
 
-                      flagged[question.id]
+                      flagged[
+                        question.id
+                      ]
                         ? "flaggedNumber"
                         : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
                     onClick={() =>
-                      setCurrentIndex(index)
+                      setCurrentIndex(
+                        index
+                      )
                     }
                   >
                     {index + 1}
@@ -1552,27 +2216,24 @@ async function saveResult() {
           <button
             type="button"
             className="finishSideButton"
-            onClick={() => finishTest(false)}
+            onClick={() =>
+              finishTest(false)
+            }
           >
             TESTNI YAKUNLASH
           </button>
         </aside>
-
-        {/* =============================================
-            QUESTION
-        ============================================= */}
 
         <section className="questionPanel">
           {currentQuestion && (
             <>
               <div className="questionTop">
                 <div>
-                  <span>
-                    SAVOL
-                  </span>
+                  <span>SAVOL</span>
 
                   <strong>
-                    {currentIndex + 1}
+                    {currentIndex +
+                      1}
                   </strong>
                 </div>
 
@@ -1580,19 +2241,37 @@ async function saveResult() {
                   <button
                     type="button"
                     className={
-                      flagged[currentQuestion.id]
+                      flagged[
+                        currentQuestion
+                          .id
+                      ]
                         ? "flagButton flagButtonActive"
                         : "flagButton"
                     }
-                    onClick={() => toggleFlag(currentQuestion.id)}
+                    onClick={() =>
+                      toggleFlag(
+                        currentQuestion.id
+                      )
+                    }
                     title="Bu savolga keyin qaytish uchun belgilang"
                   >
-                    ⚑ {flagged[currentQuestion.id] ? "BELGILANGAN" : "BELGILASH"}
+                    ⚑{" "}
+                    {flagged[
+                      currentQuestion
+                        .id
+                    ]
+                      ? "BELGILANGAN"
+                      : "BELGILASH"}
                   </button>
 
                   <p>
-                    {currentIndex + 1} /{" "}
-                    {test.questions.length}
+                    {currentIndex +
+                      1}{" "}
+                    /{" "}
+                    {
+                      test.questions
+                        .length
+                    }
                   </p>
                 </div>
               </div>
@@ -1615,61 +2294,74 @@ async function saveResult() {
                   />
                 </div>
 
-                {renderQuestionShapes(currentQuestion)}
+                {renderQuestionShapes(
+                  currentQuestion
+                )}
 
                 <div className="options">
                   {(
                     currentQuestion.options ||
                     []
-                  ).map((option, optionIndex) => {
-                    const selected =
-                      String(
-                        answers[
-                          currentQuestion.id
-                        ] || ""
-                      ) ===
-                      String(option.id);
+                  ).map(
+                    (
+                      option,
+                      optionIndex
+                    ) => {
+                      const selected =
+                        String(
+                          answers[
+                            currentQuestion
+                              .id
+                          ] || ""
+                        ) ===
+                        String(
+                          option.id
+                        );
 
-                    return (
-                      <button
-                        type="button"
-                        key={option.id}
-                        className={
-                          selected
-                            ? "option selectedOption"
-                            : "option"
-                        }
-                        onClick={() =>
-                          selectAnswer(
-                            currentQuestion.id,
+                      return (
+                        <button
+                          type="button"
+                          key={
                             option.id
-                          )
-                        }
-                      >
-                        <span className="optionLetter">
-                          {String.fromCharCode(
-                            65 + optionIndex
-                          )}
-                        </span>
+                          }
+                          className={
+                            selected
+                              ? "option selectedOption"
+                              : "option"
+                          }
+                          onClick={() =>
+                            selectAnswer(
+                              currentQuestion.id,
+                              option.id
+                            )
+                          }
+                        >
+                          <span className="optionLetter">
+                            {String.fromCharCode(
+                              65 +
+                                optionIndex
+                            )}
+                          </span>
 
-                        <div
-                          className="optionText"
-                          dangerouslySetInnerHTML={{
-                            __html:
-                              getOptionText(
-                                option
-                              ),
-                          }}
-                        />
+                          <div
+                            className="optionText"
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                getOptionText(
+                                  option
+                                ),
+                            }}
+                          />
 
-                        <span className="radio">
-                          {selected
-                            ? "●"
-                            : "○"}
-                        </span>
-                      </button>
-                    );
-                  })}
+                          <span className="radio">
+                            {selected
+                              ? "●"
+                              : "○"}
+                          </span>
+                        </button>
+                      );
+                    }
+                  )}
                 </div>
               </div>
 
@@ -1677,13 +2369,19 @@ async function saveResult() {
                 <button
                   type="button"
                   className="previousButton"
-                  disabled={currentIndex === 0}
+                  disabled={
+                    currentIndex ===
+                    0
+                  }
                   onClick={() =>
                     setCurrentIndex(
-                      (current) =>
+                      (
+                        current
+                      ) =>
                         Math.max(
                           0,
-                          current - 1
+                          current -
+                            1
                         )
                     )
                   }
@@ -1692,17 +2390,24 @@ async function saveResult() {
                 </button>
 
                 {currentIndex <
-                test.questions.length - 1 ? (
+                test.questions
+                  .length -
+                  1 ? (
                   <button
                     type="button"
                     className="nextButton"
                     onClick={() =>
                       setCurrentIndex(
-                        (current) =>
+                        (
+                          current
+                        ) =>
                           Math.min(
-                            test.questions
-                              .length - 1,
-                            current + 1
+                            test
+                              .questions
+                              .length -
+                              1,
+                            current +
+                              1
                           )
                       )
                     }
@@ -1714,7 +2419,9 @@ async function saveResult() {
                     type="button"
                     className="finishButton"
                     onClick={() =>
-                      finishTest(false)
+                      finishTest(
+                        false
+                      )
                     }
                   >
                     TESTNI YAKUNLASH
@@ -1726,33 +2433,68 @@ async function saveResult() {
         </section>
       </div>
 
-      {zoomQuestionId && (() => {
-        const zoomQuestion = test.questions.find((q) => q.id === zoomQuestionId);
-        if (!zoomQuestion) return null;
-        return (
-          <div
-            className="zoomOverlay"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setZoomQuestionId(null)}
-          >
-            <div className="zoomPanel" onClick={(event) => event.stopPropagation()}>
-              <button
-                type="button"
-                className="zoomClose"
-                onClick={() => setZoomQuestionId(null)}
-                aria-label="Yopish"
-              >
-                ×
-              </button>
-              <div className="zoomTitle">Savol tasviri · kattalashtirilgan</div>
-              {renderQuestionShapes(zoomQuestion, true)}
-            </div>
-          </div>
-        );
-      })()}
+      {zoomQuestionId &&
+        (() => {
+          const zoomQuestion =
+            test.questions.find(
+              (q) =>
+                q.id ===
+                zoomQuestionId
+            );
 
-      <style jsx>{pageStyles}</style>
+          if (!zoomQuestion) {
+            return null;
+          }
+
+          return (
+            <div
+              className="zoomOverlay"
+              role="dialog"
+              aria-modal="true"
+              onClick={() =>
+                setZoomQuestionId(
+                  null
+                )
+              }
+            >
+              <div
+                className="zoomPanel"
+                onClick={(
+                  event
+                ) =>
+                  event.stopPropagation()
+                }
+              >
+                <button
+                  type="button"
+                  className="zoomClose"
+                  onClick={() =>
+                    setZoomQuestionId(
+                      null
+                    )
+                  }
+                  aria-label="Yopish"
+                >
+                  ×
+                </button>
+
+                <div className="zoomTitle">
+                  Savol tasviri ·
+                  kattalashtirilgan
+                </div>
+
+                {renderQuestionShapes(
+                  zoomQuestion,
+                  true
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+      <style jsx>
+        {pageStyles}
+      </style>
     </main>
   );
 }
@@ -1845,6 +2587,7 @@ const pageStyles = `
   .page {
     min-height: 100vh;
     padding: 20px 20px 100px;
+
     background:
       linear-gradient(
         180deg,
@@ -1852,7 +2595,9 @@ const pageStyles = `
         #f7f8f9 55%,
         #e9eef1 100%
       );
+
     color: #111;
+
     font-family:
       "Bell MT",
       "Times New Roman",
@@ -1932,7 +2677,8 @@ const pageStyles = `
     background:
       linear-gradient(#fff, #bbb);
 
-    box-shadow: 0 4px 0 #555;
+    box-shadow:
+      0 4px 0 #555;
 
     font-weight: 700;
   }
@@ -1988,7 +2734,10 @@ const pageStyles = `
     border-radius: 16px;
 
     background:
-      linear-gradient(#abe6ff, #58a8d7);
+      linear-gradient(
+        #abe6ff,
+        #58a8d7
+      );
 
     box-shadow:
       inset 0 6px 5px rgba(255,255,255,.7),
@@ -2013,7 +2762,10 @@ const pageStyles = `
     border-radius: 18px;
 
     background:
-      linear-gradient(#f8f8f8, #ccc);
+      linear-gradient(
+        #f8f8f8,
+        #ccc
+      );
 
     box-shadow:
       inset 0 6px 5px white,
@@ -2046,7 +2798,8 @@ const pageStyles = `
     margin: 30px 0;
 
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns:
+      repeat(4, 1fr);
 
     gap: 15px;
   }
@@ -2063,7 +2816,8 @@ const pageStyles = `
     border: 1px solid #999;
     border-radius: 11px;
 
-    background: rgba(255,255,255,.7);
+    background:
+      rgba(255,255,255,.7);
   }
 
   .info span {
@@ -2111,7 +2865,10 @@ const pageStyles = `
     border-radius: 12px;
 
     background:
-      linear-gradient(#b8ecff, #58a8d7);
+      linear-gradient(
+        #b8ecff,
+        #58a8d7
+      );
 
     box-shadow:
       inset 0 5px 5px rgba(255,255,255,.7),
@@ -2152,9 +2909,13 @@ const pageStyles = `
     border-radius: 12px;
 
     background:
-      linear-gradient(#fff, #ccc);
+      linear-gradient(
+        #fff,
+        #ccc
+      );
 
-    box-shadow: 0 4px 0 #555;
+    box-shadow:
+      0 4px 0 #555;
   }
 
   .timer span {
@@ -2168,8 +2929,12 @@ const pageStyles = `
 
   .timerDanger {
     border-color: #a51f1f;
+
     background:
-      linear-gradient(#ffe2e2, #ef9b9b);
+      linear-gradient(
+        #ffe2e2,
+        #ef9b9b
+      );
   }
 
   .timerDanger strong {
@@ -2187,9 +2952,13 @@ const pageStyles = `
     border-radius: 13px;
 
     background:
-      linear-gradient(#fff, #ccc);
+      linear-gradient(
+        #fff,
+        #ccc
+      );
 
-    box-shadow: 0 5px 0 #555d61;
+    box-shadow:
+      0 5px 0 #555d61;
   }
 
   .progressInformation {
@@ -2221,7 +2990,8 @@ const pageStyles = `
         #1788c2
       );
 
-    transition: width .25s ease;
+    transition:
+      width .25s ease;
   }
 
   /* TEST LAYOUT */
@@ -2232,7 +3002,9 @@ const pageStyles = `
     margin: 35px auto 0;
 
     display: grid;
-    grid-template-columns: 270px minmax(0, 1fr);
+
+    grid-template-columns:
+      270px minmax(0, 1fr);
 
     gap: 25px;
 
@@ -2271,7 +3043,8 @@ const pageStyles = `
 
   .questionNumbers {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns:
+      repeat(4, 1fr);
     gap: 8px;
   }
 
@@ -2282,15 +3055,22 @@ const pageStyles = `
     border-radius: 8px;
 
     background:
-      linear-gradient(#fff, #ccc);
+      linear-gradient(
+        #fff,
+        #ccc
+      );
 
     font-weight: 700;
   }
 
   .answeredNumber {
     border-color: #277b49;
+
     background:
-      linear-gradient(#c6f1d3, #70ca8e);
+      linear-gradient(
+        #c6f1d3,
+        #70ca8e
+      );
   }
 
   .currentNumber {
@@ -2300,7 +3080,12 @@ const pageStyles = `
 
   .flaggedNumber {
     border-color: #a66a00;
-    background: linear-gradient(#fff0b8, #e9b84f);
+
+    background:
+      linear-gradient(
+        #fff0b8,
+        #e9b84f
+      );
   }
 
   .currentNumber.flaggedNumber {
@@ -2313,7 +3098,8 @@ const pageStyles = `
 
     border-radius: 10px;
 
-    background: rgba(255,255,255,.9);
+    background:
+      rgba(255,255,255,.9);
 
     font-size: 13px;
   }
@@ -2360,9 +3146,13 @@ const pageStyles = `
     border-radius: 9px;
 
     background:
-      linear-gradient(#f77b7b, #c62525);
+      linear-gradient(
+        #f77b7b,
+        #c62525
+      );
 
-    box-shadow: 0 4px 0 #831515;
+    box-shadow:
+      0 4px 0 #831515;
 
     color: white;
     font-weight: 700;
@@ -2402,7 +3192,8 @@ const pageStyles = `
         #58a8d7
       );
 
-    border-bottom: 3px solid #174461;
+    border-bottom:
+      3px solid #174461;
   }
 
   .questionTop div {
@@ -2423,7 +3214,9 @@ const pageStyles = `
     align-items: center;
     justify-content: center;
 
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
+
     border-radius: 50%;
 
     background: white;
@@ -2442,16 +3235,31 @@ const pageStyles = `
   .flagButton {
     min-height: 38px;
     padding: 0 14px;
-    border: 2px solid #805600;
+
+    border:
+      2px solid #805600;
+
     border-radius: 9px;
-    background: linear-gradient(#fff8d8, #e8c56a);
-    box-shadow: 0 3px 0 #805600;
+
+    background:
+      linear-gradient(
+        #fff8d8,
+        #e8c56a
+      );
+
+    box-shadow:
+      0 3px 0 #805600;
+
     color: #624200;
     font-weight: 800;
   }
 
   .flagButtonActive {
-    background: linear-gradient(#ffe68a, #e4a92f);
+    background:
+      linear-gradient(
+        #ffe68a,
+        #e4a92f
+      );
   }
 
   .questionTop p {
@@ -2467,7 +3275,10 @@ const pageStyles = `
     border-radius: 15px;
 
     background:
-      linear-gradient(#fff, #ddd);
+      linear-gradient(
+        #fff,
+        #ddd
+      );
 
     box-shadow:
       inset 0 5px 5px white,
@@ -2476,10 +3287,16 @@ const pageStyles = `
 
   .question3DCard {
     position: relative;
-    margin: 0 0 34px;
-    padding: 42px 34px 32px;
 
-    border: 2px solid #8a959d;
+    margin:
+      0 0 34px;
+
+    padding:
+      42px 34px 32px;
+
+    border:
+      2px solid #8a959d;
+
     border-radius: 22px;
 
     background:
@@ -2500,27 +3317,37 @@ const pageStyles = `
 
   .question3DCard::before {
     content: "";
+
     position: absolute;
+
     inset: 7px;
+
     pointer-events: none;
-    border: 1px solid rgba(255,255,255,.82);
+
+    border:
+      1px solid rgba(255,255,255,.82);
+
     border-radius: 16px;
   }
 
   .question3DLabel {
     position: absolute;
+
     top: -19px;
     left: 30px;
 
     min-width: 155px;
     min-height: 40px;
+
     padding: 7px 20px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
+
     border-radius: 10px;
 
     background:
@@ -2536,140 +3363,237 @@ const pageStyles = `
       0 8px 13px rgba(0,0,0,.2);
 
     color: #073b68;
+
     font-size: 14px;
     font-weight: 800;
+
     letter-spacing: 1.2px;
   }
 
-.questionHtml {
-  margin: 0;
+  /* =====================================================
+     SAVOL MATNI — HAMMASI QORA
+  ===================================================== */
 
-  direction: ltr;
-  text-align: left;
+  .questionHtml {
+    margin: 0;
+
+    direction: ltr;
+    text-align: left;
+
+    color: #000000 !important;
+
+    font-family:
+      "Bell MT",
+      "Times New Roman",
+      serif;
+
+    font-size:
+      clamp(22px, 2vw, 30px);
+
+    line-height: 1.6;
+
+    font-weight: 400;
+
+    white-space: normal;
+
+    word-break: normal;
+
+    overflow-wrap: break-word;
+
+    text-shadow:
+      0 1px 0 rgba(255,255,255,.9);
+  }
 
   /*
     MUHIM:
-    Admin panel/editor ichida Enter bilan yozilgan
-    yangi qatorlarni test sahifasida ham saqlaydi.
-
-    Masalan:
-
-    I. O‘zbekiston — suveren davlat.
-    II. O‘zbekiston — huquqiy davlat.
-    III. O‘zbekiston — diniy davlat.
-    IV. O‘zbekiston — ijtimoiy davlat.
-    V. O‘zbekiston — dunyoviy davlat.
-
-    endi bitta qatorda qo‘shilib ketmaydi.
+    Import qilingan HTML ichida rang yozilgan
+    bo‘lsa ham savol matni qora bo‘ladi.
   */
-  white-space: pre-wrap;
 
-  /*
-    Juda uzun so‘z yoki matn kartadan
-    tashqariga chiqib ketmasligi uchun.
-  */
-  overflow-wrap: anywhere;
-  word-break: normal;
-
-  color: #111315;
-
-  font-size: clamp(22px, 2vw, 30px);
-  line-height: 1.72;
-  font-weight: 500;
-
-  text-shadow: 0 1px 0 rgba(255,255,255,.9);
-}
-
-
-/* HTML editor orqali yaratilgan <p> lar */
-.questionHtml :global(p) {
-  margin: 0 0 18px;
-  white-space: pre-wrap;
-}
-
-
-/* Oxirgi paragrafdan keyin ortiqcha bo‘shliq bo‘lmaydi */
-.questionHtml :global(p:last-child) {
-  margin-bottom: 0;
-}
-
-
-/* Agar editor <div> ishlatgan bo‘lsa */
-.questionHtml :global(div) {
-  white-space: pre-wrap;
-}
-
-
-/* Agar editor <span> ishlatgan bo‘lsa */
-.questionHtml :global(span) {
-  white-space: pre-wrap;
-}
-
-
-/* <br> mavjud bo‘lsa normal ishlaydi */
-.questionHtml :global(br) {
-  display: block;
-  content: "";
-}
-
-
-/* Linklar */
-.questionHtml :global(a) {
-  color: #008b88;
-  font-weight: 700;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(0,139,136,.35);
-}
-
-
-/* Bold matn */
-.questionHtml :global(strong),
-.questionHtml :global(b) {
-  color: #082f4d;
-}
-
-
-/* Italic matn */
-.questionHtml :global(i),
-.questionHtml :global(em) {
-  font-style: italic;
-}
-
-
-/* Rasm */
-.questionHtml :global(img),
-.optionText :global(img) {
-  max-width: 100%;
-  height: auto;
-}
-
-
-/* Jadval */
-.questionHtml :global(table),
-.optionText :global(table) {
-  max-width: 100%;
-  border-collapse: collapse;
-}
+  .questionHtml :global(*) {
+    color: #000000 !important;
+  }
 
   .questionHtml :global(p) {
-    margin: 0 0 18px;
+    display: block;
+
+    margin:
+      0 0 18px;
+
+    padding: 0;
+
+    color:
+      #000000 !important;
+
+    white-space: normal;
+
+    word-break: normal;
+
+    overflow-wrap: break-word;
   }
 
   .questionHtml :global(p:last-child) {
     margin-bottom: 0;
   }
 
-  .questionHtml :global(a) {
-    color: #008b88;
-    font-weight: 700;
-    text-decoration: none;
-    border-bottom: 1px solid rgba(0,139,136,.35);
+  .questionHtml :global(div) {
+    color:
+      #000000 !important;
+
+    white-space: normal;
+
+    word-break: normal;
+
+    overflow-wrap: break-word;
   }
+
+  .questionHtml :global(span) {
+    color:
+      #000000 !important;
+
+    white-space: normal;
+
+    word-break: normal;
+  }
+
+  /*
+    HTMLdagi haqiqiy <br> qator tashlashni saqlaydi.
+  */
+
+  .questionHtml :global(br) {
+    display: initial;
+  }
+
+  /*
+    QALIN MATNLAR
+  */
 
   .questionHtml :global(strong),
   .questionHtml :global(b) {
-    color: #082f4d;
+    color:
+      #000000 !important;
+
+    font-weight:
+      800 !important;
   }
+
+  /*
+    KURSIV
+  */
+
+  .questionHtml :global(i),
+  .questionHtml :global(em) {
+    color:
+      #000000 !important;
+
+    font-style:
+      italic !important;
+  }
+
+  /*
+    QALIN + KURSIV
+  */
+
+  .questionHtml :global(strong em),
+  .questionHtml :global(strong i),
+  .questionHtml :global(b em),
+  .questionHtml :global(b i) {
+    color:
+      #000000 !important;
+
+    font-weight:
+      800 !important;
+
+    font-style:
+      italic !important;
+  }
+
+  /*
+    TAGI CHIZILGAN
+  */
+
+  .questionHtml :global(u) {
+    color:
+      #000000 !important;
+
+    text-decoration:
+      underline;
+  }
+
+  /*
+    SARLAVHALAR
+  */
+
+  .questionHtml :global(h1),
+  .questionHtml :global(h2),
+  .questionHtml :global(h3),
+  .questionHtml :global(h4),
+  .questionHtml :global(h5),
+  .questionHtml :global(h6) {
+    color:
+      #000000 !important;
+
+    font-weight:
+      800 !important;
+  }
+
+  /*
+    RO‘YXATLAR
+  */
+
+  .questionHtml :global(ul),
+  .questionHtml :global(ol) {
+    margin:
+      14px 0 18px;
+
+    padding-left:
+      38px;
+
+    color:
+      #000000 !important;
+  }
+
+  .questionHtml :global(li) {
+    margin:
+      7px 0;
+
+    padding-left:
+      4px;
+
+    color:
+      #000000 !important;
+
+    white-space:
+      normal;
+
+    word-break:
+      normal;
+
+    overflow-wrap:
+      break-word;
+  }
+
+  /*
+    LINK HAM SAVOL ICHIDA QORA
+  */
+
+  .questionHtml :global(a) {
+    color:
+      #000000 !important;
+
+    font-weight:
+      700;
+
+    text-decoration:
+      underline;
+
+    border-bottom:
+      none;
+  }
+
+  /*
+    RASMLAR
+  */
 
   .questionHtml :global(img),
   .optionText :global(img) {
@@ -2677,67 +3601,134 @@ const pageStyles = `
     height: auto;
   }
 
+  /*
+    JADVALLAR
+  */
+
   .questionHtml :global(table),
   .optionText :global(table) {
+    width: auto;
     max-width: 100%;
-    border-collapse: collapse;
+
+    border-collapse:
+      collapse;
   }
+
+  .questionHtml :global(th),
+  .questionHtml :global(td),
+  .optionText :global(th),
+  .optionText :global(td) {
+    padding:
+      8px 10px;
+
+    border:
+      1px solid #555;
+
+    vertical-align:
+      top;
+  }
+
+  .questionHtml :global(th) {
+    color:
+      #000000 !important;
+
+    font-weight:
+      800;
+  }
+
+  .questionHtml :global(td) {
+    color:
+      #000000 !important;
+  }
+
+  /* SHAPES */
 
   .shapeResultScroll {
     width: 100%;
-    margin: 0 0 28px;
+
+    margin:
+      0 0 28px;
+
     overflow-x: auto;
+
     overflow-y: hidden;
   }
 
   .shapeResultStage {
     position: relative;
+
     min-width: 1px;
+
     min-height: 1px;
+
     max-width: none;
   }
 
   .resultShapeItem {
     position: absolute;
-    box-sizing: border-box;
+
+    box-sizing:
+      border-box;
   }
 
   .resultImageItem {
     overflow: visible;
-    background: transparent;
+
+    background:
+      transparent;
   }
 
   .resultShapeBody {
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     overflow: hidden;
+
     padding: 8px;
-    box-sizing: border-box;
+
+    box-sizing:
+      border-box;
   }
 
   .resultShapeBody.circle,
   .resultShapeBody.ellipse {
-    border-radius: 999px;
+    border-radius:
+      999px;
   }
 
   .resultVenn {
     position: relative;
+
     width: 100%;
+
     height: 100%;
   }
 
   .resultVennCircle {
     position: absolute;
+
     top: 8%;
+
     width: 58%;
+
     height: 84%;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     border: 2px solid;
+
     border-radius: 50%;
-    box-sizing: border-box;
+
+    box-sizing:
+      border-box;
+
     font-weight: 700;
   }
 
@@ -2749,6 +3740,8 @@ const pageStyles = `
     right: 5%;
   }
 
+  /* OPTIONS */
+
   .options {
     display: grid;
     gap: 15px;
@@ -2758,19 +3751,28 @@ const pageStyles = `
     width: 100%;
     min-height: 75px;
 
-    padding: 12px 18px;
+    padding:
+      12px 18px;
 
     display: grid;
-    grid-template-columns: 48px minmax(0,1fr) 35px;
+
+    grid-template-columns:
+      48px minmax(0,1fr) 35px;
 
     align-items: center;
+
     gap: 15px;
 
-    border: 2px solid #999;
+    border:
+      2px solid #999;
+
     border-radius: 12px;
 
     background:
-      linear-gradient(#fff, #e4e4e4);
+      linear-gradient(
+        #fff,
+        #e4e4e4
+      );
 
     text-align: left;
 
@@ -2781,11 +3783,14 @@ const pageStyles = `
 
   .option:hover {
     border-color: #168fc9;
-    transform: translateY(-1px);
+
+    transform:
+      translateY(-1px);
   }
 
   .selectedOption {
-    border: 3px solid #168fc9;
+    border:
+      3px solid #168fc9;
 
     background:
       linear-gradient(
@@ -2796,17 +3801,25 @@ const pageStyles = `
 
   .optionLetter {
     width: 42px;
+
     height: 42px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
+
     border-radius: 50%;
 
     background:
-      linear-gradient(#b8ecff, #58a8d7);
+      linear-gradient(
+        #b8ecff,
+        #58a8d7
+      );
 
     color: #073b68;
 
@@ -2817,25 +3830,62 @@ const pageStyles = `
     min-width: 0;
 
     direction: ltr;
+
     text-align: left;
 
+    color: #000000;
+
     font-size: 17px;
+
     line-height: 1.5;
+
+    white-space: normal;
+
+    word-break: normal;
+
+    overflow-wrap: break-word;
+  }
+
+  .optionText :global(*) {
+    color: #000000 !important;
+  }
+
+  .optionText :global(strong),
+  .optionText :global(b) {
+    color:
+      #000000 !important;
+
+    font-weight:
+      800 !important;
+  }
+
+  .optionText :global(i),
+  .optionText :global(em) {
+    color:
+      #000000 !important;
+
+    font-style:
+      italic !important;
   }
 
   .radio {
     color: #0879b2;
+
     text-align: center;
+
     font-size: 25px;
   }
 
   /* QUESTION ACTIONS */
 
   .questionActions {
-    padding: 0 25px 28px;
+    padding:
+      0 25px 28px;
 
     display: flex;
-    justify-content: space-between;
+
+    justify-content:
+      space-between;
 
     gap: 15px;
   }
@@ -2844,31 +3894,43 @@ const pageStyles = `
     min-width: 180px;
     min-height: 55px;
 
-    padding: 0 20px;
+    padding:
+      0 20px;
 
-    border-radius: 10px;
+    border-radius:
+      10px;
 
     font-weight: 700;
   }
 
   .previousButton {
-    border: 2px solid #555;
+    border:
+      2px solid #555;
 
     background:
-      linear-gradient(#fff, #bbb);
+      linear-gradient(
+        #fff,
+        #bbb
+      );
 
-    box-shadow: 0 4px 0 #555;
+    box-shadow:
+      0 4px 0 #555;
   }
 
   .nextButton {
     margin-left: auto;
 
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
 
     background:
-      linear-gradient(#b8ecff, #58a8d7);
+      linear-gradient(
+        #b8ecff,
+        #58a8d7
+      );
 
-    box-shadow: 0 4px 0 #17415c;
+    box-shadow:
+      0 4px 0 #17415c;
 
     color: #073b68;
   }
@@ -2876,12 +3938,17 @@ const pageStyles = `
   .finishButton {
     margin-left: auto;
 
-    border: 2px solid #277b49;
+    border:
+      2px solid #277b49;
 
     background:
-      linear-gradient(#c6f1d3, #68c888);
+      linear-gradient(
+        #c6f1d3,
+        #68c888
+      );
 
-    box-shadow: 0 4px 0 #277144;
+    box-shadow:
+      0 4px 0 #277144;
 
     color: #125a32;
   }
@@ -2892,18 +3959,28 @@ const pageStyles = `
     width: 180px;
     height: 180px;
 
-    margin: 0 auto 25px;
+    margin:
+      0 auto 25px;
 
     display: flex;
-    flex-direction: column;
+
+    flex-direction:
+      column;
+
     align-items: center;
+
     justify-content: center;
 
-    border: 8px solid #168fc9;
+    border:
+      8px solid #168fc9;
+
     border-radius: 50%;
 
     background:
-      linear-gradient(#fff, #d8f1fc);
+      linear-gradient(
+        #fff,
+        #d8f1fc
+      );
 
     box-shadow:
       0 7px 15px rgba(0,0,0,.2);
@@ -2911,6 +3988,7 @@ const pageStyles = `
 
   .resultCircle strong {
     color: #07517e;
+
     font-size: 45px;
   }
 
@@ -2919,37 +3997,50 @@ const pageStyles = `
   }
 
   .resultGrid {
-    margin: 30px 0;
+    margin:
+      30px 0;
 
     display: grid;
+
     grid-template-columns:
-      repeat(5, 1fr);
+      repeat(3, 1fr);
 
     gap: 12px;
   }
 
   .resultItem {
     min-height: 72px;
+
     padding: 10px;
 
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
 
-    border: 1px solid #999;
+    flex-direction:
+      column;
+
+    align-items: center;
+
+    justify-content:
+      center;
+
+    border:
+      1px solid #999;
+
     border-radius: 10px;
 
-    background: rgba(255,255,255,.7);
+    background:
+      rgba(255,255,255,.7);
   }
 
   .resultItem span {
     margin-bottom: 7px;
+
     color: #555;
   }
 
   .resultItem strong {
     color: #07517e;
+
     font-size: 26px;
   }
 
@@ -2962,23 +4053,32 @@ const pageStyles = `
   }
 
   .resultMessage {
-    margin: 25px 0;
+    margin:
+      25px 0;
+
     padding: 20px;
 
-    border: 2px solid #168fc9;
+    border:
+      2px solid #168fc9;
+
     border-radius: 12px;
 
-    background: #dff5ff;
+    background:
+      #dff5ff;
 
     color: #07517e;
 
     font-size: 21px;
+
     font-weight: 700;
   }
 
   .resultActions {
     display: flex;
-    justify-content: center;
+
+    justify-content:
+      center;
+
     flex-wrap: wrap;
 
     gap: 15px;
@@ -2986,31 +4086,44 @@ const pageStyles = `
 
   .resultActions button {
     min-height: 55px;
-    padding: 0 22px;
 
-    border-radius: 9px;
+    padding:
+      0 22px;
+
+    border-radius:
+      9px;
 
     font-weight: 700;
   }
 
   .reviewButton {
-    border: 2px solid #174461;
+    border:
+      2px solid #174461;
 
     background:
-      linear-gradient(#b8ecff, #58a8d7);
+      linear-gradient(
+        #b8ecff,
+        #58a8d7
+      );
 
-    box-shadow: 0 4px 0 #17415c;
+    box-shadow:
+      0 4px 0 #17415c;
 
     color: #073b68;
   }
 
   .againButton {
-    border: 2px solid #277b49;
+    border:
+      2px solid #277b49;
 
     background:
-      linear-gradient(#c6f1d3, #68c888);
+      linear-gradient(
+        #c6f1d3,
+        #68c888
+      );
 
-    box-shadow: 0 4px 0 #277144;
+    box-shadow:
+      0 4px 0 #277144;
 
     color: #125a32;
   }
@@ -3018,10 +4131,14 @@ const pageStyles = `
   /* REVIEW */
 
   .reviewQuestion {
-    margin-bottom: 25px;
+    margin-bottom:
+      25px;
+
     padding: 25px;
 
-    border: 2px solid #777;
+    border:
+      2px solid #777;
+
     border-radius: 13px;
 
     background: white;
@@ -3030,27 +4147,35 @@ const pageStyles = `
   }
 
   .reviewNumber {
-    margin-bottom: 15px;
+    margin-bottom:
+      15px;
 
     color: #07517e;
 
     font-size: 17px;
+
     font-weight: 700;
   }
 
   .reviewOptions {
     display: grid;
+
     gap: 10px;
   }
 
   .reviewOption {
-    padding: 13px 15px;
+    padding:
+      13px 15px;
 
     display: flex;
+
     align-items: center;
+
     gap: 12px;
 
-    border: 1px solid #aaa;
+    border:
+      1px solid #aaa;
+
     border-radius: 8px;
 
     background: #eee;
@@ -3058,163 +4183,278 @@ const pageStyles = `
 
   .correctOption {
     border-color: #3d9661;
-    background: #d8f1df;
+
+    background:
+      #d8f1df;
   }
 
   .selectedWrong {
     border-color: #b93333;
-    background: #f6dada;
+
+    background:
+      #f6dada;
   }
 
   .answerStatus {
-    margin-top: 15px;
+    margin-top:
+      15px;
+
     padding: 12px;
 
-    border-radius: 8px;
+    border-radius:
+      8px;
 
-    text-align: center;
+    text-align:
+      center;
 
     font-weight: 700;
   }
 
   .correctStatus {
     color: #126033;
-    background: #d8f1df;
+
+    background:
+      #d8f1df;
   }
 
   .wrongStatus {
     color: #8c1818;
-    background: #f6dada;
+
+    background:
+      #f6dada;
   }
 
   .saveIndicatorWrap {
     margin-left: auto;
+
     min-height: 42px;
-    padding: 9px 14px;
+
+    padding:
+      9px 14px;
+
     display: flex;
+
     align-items: center;
+
     gap: 8px;
-    border: 1px solid #6f7b82;
+
+    border:
+      1px solid #6f7b82;
+
     border-radius: 11px;
-    background: rgba(255,255,255,.78);
+
+    background:
+      rgba(255,255,255,.78);
+
     font-size: 13px;
+
     font-weight: 700;
+
     white-space: nowrap;
   }
 
   .onlineDot,
   .offlineDot {
     width: 10px;
+
     height: 10px;
+
     border-radius: 50%;
-    flex: 0 0 auto;
+
+    flex:
+      0 0 auto;
   }
 
-  .onlineDot { background: #25944d; }
-  .offlineDot { background: #b32929; }
+  .onlineDot {
+    background: #25944d;
+  }
+
+  .offlineDot {
+    background: #b32929;
+  }
 
   .shapeResultClickable {
     cursor: zoom-in;
+
     border-radius: 12px;
-    transition: box-shadow .15s ease, transform .15s ease;
+
+    transition:
+      box-shadow .15s ease,
+      transform .15s ease;
   }
 
   .shapeResultClickable:hover {
-    box-shadow: 0 0 0 3px rgba(22,143,201,.18);
+    box-shadow:
+      0 0 0 3px rgba(22,143,201,.18);
   }
 
   .zoomOverlay {
     position: fixed;
+
     inset: 0;
+
     z-index: 9999;
+
     padding: 24px;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
-    background: rgba(13,20,25,.88);
-    backdrop-filter: blur(5px);
+
+    background:
+      rgba(13,20,25,.88);
+
+    backdrop-filter:
+      blur(5px);
   }
 
   .zoomPanel {
     position: relative;
-    width: min(1200px, 96vw);
+
+    width:
+      min(1200px, 96vw);
+
     max-height: 92vh;
+
     overflow: auto;
-    padding: 64px 28px 28px;
-    border: 2px solid #79c7ee;
+
+    padding:
+      64px 28px 28px;
+
+    border:
+      2px solid #79c7ee;
+
     border-radius: 20px;
-    background: linear-gradient(#fff, #e9edf0);
-    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+
+    background:
+      linear-gradient(
+        #fff,
+        #e9edf0
+      );
+
+    box-shadow:
+      0 18px 60px rgba(0,0,0,.45);
   }
 
   .zoomTitle {
     position: absolute;
+
     top: 20px;
+
     left: 28px;
+
     color: #073b68;
+
     font-size: 18px;
+
     font-weight: 800;
   }
 
   .zoomClose {
     position: absolute;
+
     top: 14px;
+
     right: 16px;
+
     width: 42px;
+
     height: 42px;
+
     border: 0;
+
     border-radius: 50%;
-    background: #25343d;
+
+    background:
+      #25343d;
+
     color: white;
+
     font-size: 28px;
+
     line-height: 1;
   }
 
   .shapeResultZoomed {
     min-height: 100px;
+
     overflow: auto;
+
     margin-bottom: 0;
   }
 
   .wrongOnlyButton {
-    border: 2px solid #8e1515;
-    background: linear-gradient(#ffd7d7, #ef8d8d);
-    box-shadow: 0 4px 0 #831515;
+    border:
+      2px solid #8e1515;
+
+    background:
+      linear-gradient(
+        #ffd7d7,
+        #ef8d8d
+      );
+
+    box-shadow:
+      0 4px 0 #831515;
+
     color: #711313;
   }
 
   .reviewAnswerSummary {
     margin-top: 15px;
+
     padding: 14px;
+
     display: grid;
+
     gap: 7px;
-    border: 1px solid #9aa5ac;
+
+    border:
+      1px solid #9aa5ac;
+
     border-radius: 9px;
-    background: #f4f7f8;
+
+    background:
+      #f4f7f8;
+
     line-height: 1.45;
   }
 
   /* RESPONSIVE */
 
   @media (max-width: 900px) {
+
+    .introInformation {
+      grid-template-columns:
+        repeat(2, 1fr);
+    }
+
     .question3DCard {
-      padding: 36px 22px 24px;
-      border-radius: 17px;
+      padding:
+        36px 22px 24px;
+
+      border-radius:
+        17px;
     }
 
     .question3DLabel {
       left: 20px;
+
       min-width: 135px;
+
       font-size: 12px;
     }
 
     .questionHtml {
       font-size: 21px;
+
       line-height: 1.6;
     }
 
     .testLayout {
-      grid-template-columns: 1fr;
+      grid-template-columns:
+        1fr;
     }
 
     .navigator {
@@ -3233,445 +4473,519 @@ const pageStyles = `
   }
 
   @media (max-width: 650px) {
-  .page {
-    padding: 10px 6px 50px;
-  }
 
-  .topHeader,
-  .testHeader {
-    width: 100%;
-    min-height: auto;
-    padding: 12px;
-    flex-direction: column;
-    gap: 12px;
-    border-radius: 16px;
-  }
-
-  .headerName {
-    width: 100%;
-    min-width: 0;
-    min-height: 50px;
-    padding: 8px 12px;
-    font-size: 21px;
-  }
-
-  .topHeader .grayButton {
-    width: 100%;
-    min-height: 46px;
-  }
-
-  .testHeaderLeft {
-    width: 100%;
-    text-align: center;
-  }
-
-  .testHeaderLeft strong {
-    font-size: 20px;
-  }
-
-  .timer {
-    width: 100%;
-    min-width: 0;
-    padding: 8px 12px;
-  }
-
-  .timer strong {
-    font-size: 24px;
-  }
-
-  .progressPanel {
-    width: 100%;
-    margin-top: 18px;
-    padding: 12px 14px;
-  }
-
-  .progressTrack {
-    height: 10px;
-  }
-
-  .panel,
-  .reviewPanel {
-    width: 100%;
-    margin-top: 65px;
-    padding: 55px 8px 15px;
-    border-radius: 18px;
-  }
-
-  .floatingTitle {
-    top: -27px;
-    min-width: 190px;
-    min-height: 52px;
-    padding: 7px 18px;
-    font-size: 20px;
-    border-radius: 12px;
-  }
-
-  .introCard,
-  .resultBox,
-  .reviewInner {
-    padding: 16px 10px;
-    border-radius: 13px;
-  }
-
-  .introCard h1,
-  .resultBox h1 {
-    margin: 8px 0 10px;
-    font-size: 25px;
-  }
-
-  .subject,
-  .resultSubject {
-    font-size: 17px;
-  }
-
-  .description {
-    margin-bottom: 18px;
-    font-size: 15px;
-    line-height: 1.45;
-  }
-
-  .introInformation {
-    margin: 18px 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px;
-  }
-
-  .info {
-    min-height: 72px;
-    padding: 9px;
-  }
-
-  .info strong {
-    font-size: 21px;
-  }
-
-  .instruction {
-    margin: 17px 0;
-    padding: 14px;
-  }
-
-  .instruction strong {
-    font-size: 18px;
-  }
-
-  .instruction p {
-    font-size: 14px;
-  }
-
-  .startButton {
-    min-height: 52px;
-    font-size: 16px;
-  }
-
-  .testLayout {
-    width: 100%;
-    margin-top: 18px;
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .navigator {
-    position: static;
-    padding: 16px 12px;
-  }
-
-  .navigator h3 {
-    margin-bottom: 12px;
-    font-size: 19px;
-  }
-
-  .questionNumbers {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-  }
-
-  .legend {
-    margin-top: 15px;
-    padding: 10px;
-  }
-
-  .finishSideButton {
-    min-height: 46px;
-    margin-top: 14px;
-  }
-
-  .questionPanel {
-    border-radius: 16px;
-  }
-
-  .questionTop {
-    min-height: 65px;
-    padding: 10px 14px;
-  }
-
-  .questionTop strong {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-  }
-
-  .questionContent {
-    margin: 9px;
-    padding: 16px 9px;
-  }
-
-  .question3DCard {
-    margin-bottom: 25px;
-    padding: 32px 15px 20px;
-    border-radius: 15px;
-  }
-
-  .question3DLabel {
-    top: -16px;
-    left: 14px;
-    min-width: 120px;
-    min-height: 34px;
-    padding: 5px 12px;
-    font-size: 11px;
-  }
-
-  .questionHtml {
-    font-size: 18px;
-    line-height: 1.5;
-  }
-
-  .options {
-    gap: 10px;
-  }
-
-  .option {
-    min-height: 58px;
-    grid-template-columns: 38px minmax(0, 1fr) 24px;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .optionLetter {
-    width: 34px;
-    height: 34px;
-  }
-
-  .optionText {
-    font-size: 15px;
-    line-height: 1.4;
-  }
-
-  .radio {
-    font-size: 21px;
-  }
-
-  .questionActions {
-    position: sticky;
-    bottom: 0;
-    z-index: 30;
-    padding: 10px 9px 14px;
-    flex-direction: row;
-    gap: 8px;
-    background: rgba(55, 61, 65, .96);
-    border-top: 1px solid rgba(255,255,255,.25);
-    backdrop-filter: blur(10px);
-  }
-
-  .questionActions button {
-    flex: 1;
-    width: auto;
-    min-width: 0;
-    min-height: 48px;
-    padding: 0 8px;
-    font-size: 13px;
-  }
-
-  .questionTopActions {
-    width: auto;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .flagButton {
-    min-height: 34px;
-    padding: 0 10px;
-    font-size: 11px;
-  }
-
-  /* NATIJA SAHIFASI */
-
-  .resultCircle {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 15px;
-    border-width: 6px;
-  }
-
-  .resultCircle strong {
-    font-size: 32px;
-  }
-
-  .resultCircle span {
-    font-size: 14px;
-  }
-
-  .resultGrid {
-    margin: 18px 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .resultItem {
-    min-height: 70px;
-    padding: 8px 6px;
-  }
-
-  .resultItem span {
-    margin-bottom: 4px;
-    font-size: 13px;
-  }
-
-  .resultItem strong {
-    font-size: 21px;
-  }
-
-  .resultMessage {
-    margin: 15px 0;
-    padding: 12px 10px;
-    font-size: 16px;
-  }
-
-  .resultActions {
-    gap: 9px;
-  }
-
-  .resultActions button {
-    width: 100%;
-    min-height: 48px;
-    padding: 0 12px;
-  }
-
-  /* JAVOBLARNI KO‘RIB CHIQISH */
-
-  .reviewQuestion {
-    margin-bottom: 15px;
-    padding: 14px 10px;
-  }
-
-  .reviewNumber {
-    margin-bottom: 10px;
-    font-size: 15px;
-  }
-
-  .reviewOption {
-    padding: 10px;
-    gap: 8px;
-    font-size: 14px;
-  }
-
-  .answerStatus {
-    margin-top: 10px;
-    padding: 9px;
-    font-size: 14px;
-  }
-
-  .shapeResultScroll {
-    margin-bottom: 18px;
-  }
-
-  .saveIndicatorWrap {
-    width: 100%;
-    margin-left: 0;
-    justify-content: center;
-  }
-
-  .zoomOverlay {
-    padding: 8px;
-  }
-
-  .zoomPanel {
-    width: 100%;
-    max-height: 96vh;
-    padding: 58px 10px 16px;
-    border-radius: 14px;
-  }
-
-  .zoomTitle {
-    left: 14px;
-    font-size: 15px;
-  }
-
-  .reviewAnswerSummary {
-    padding: 10px;
-    font-size: 13px;
-  }
-}
+    .page {
+      padding:
+        10px 6px 50px;
     }
 
     .topHeader,
     .testHeader {
-      flex-direction: column;
-      padding: 15px;
+      width: 100%;
+
+      min-height: auto;
+
+      padding: 12px;
+
+      flex-direction:
+        column;
+
+      gap: 12px;
+
+      border-radius: 16px;
     }
 
     .headerName {
       width: 100%;
+
       min-width: 0;
+
+      min-height: 50px;
+
+      padding:
+        8px 12px;
+
+      font-size: 21px;
+    }
+
+    .topHeader .grayButton {
+      width: 100%;
+
+      min-height: 46px;
+    }
+
+    .testHeaderLeft {
+      width: 100%;
+
+      text-align: center;
+    }
+
+    .testHeaderLeft strong {
+      font-size: 20px;
     }
 
     .timer {
       width: 100%;
+
+      min-width: 0;
+
+      padding:
+        8px 12px;
+    }
+
+    .timer strong {
+      font-size: 24px;
+    }
+
+    .progressPanel {
+      width: 100%;
+
+      margin-top: 18px;
+
+      padding:
+        12px 14px;
+    }
+
+    .progressTrack {
+      height: 10px;
     }
 
     .panel,
     .reviewPanel {
-      width: 99%;
-      padding: 70px 12px 20px;
+      width: 100%;
+
+      margin-top: 65px;
+
+      padding:
+        55px 8px 15px;
+
+      border-radius: 18px;
     }
 
     .floatingTitle {
-      min-width: 230px;
-      font-size: 22px;
+      top: -27px;
+
+      min-width: 190px;
+
+      min-height: 52px;
+
+      padding:
+        7px 18px;
+
+      font-size: 20px;
+
+      border-radius: 12px;
     }
 
     .introCard,
     .resultBox,
     .reviewInner {
-      padding: 20px 12px;
+      padding:
+        16px 10px;
+
+      border-radius:
+        13px;
+    }
+
+    .introCard h1,
+    .resultBox h1 {
+      margin:
+        8px 0 10px;
+
+      font-size: 25px;
+    }
+
+    .subject,
+    .resultSubject {
+      font-size: 17px;
+    }
+
+    .description {
+      margin-bottom:
+        18px;
+
+      font-size: 15px;
+
+      line-height: 1.45;
     }
 
     .introInformation {
-      grid-template-columns: 1fr;
+      margin:
+        18px 0;
+
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+      gap: 9px;
+    }
+
+    .info {
+      min-height: 72px;
+
+      padding: 9px;
+    }
+
+    .info strong {
+      font-size: 21px;
+    }
+
+    .instruction {
+      margin:
+        17px 0;
+
+      padding: 14px;
+    }
+
+    .instruction strong {
+      font-size: 18px;
+    }
+
+    .instruction p {
+      font-size: 14px;
+    }
+
+    .startButton {
+      min-height: 52px;
+
+      font-size: 16px;
     }
 
     .testLayout {
-      width: 99%;
+      width: 100%;
+
+      margin-top: 18px;
+
+      grid-template-columns:
+        1fr;
+
+      gap: 18px;
+    }
+
+    .navigator {
+      position: static;
+
+      padding:
+        16px 12px;
+    }
+
+    .navigator h3 {
+      margin-bottom:
+        12px;
+
+      font-size: 19px;
     }
 
     .questionNumbers {
       grid-template-columns:
         repeat(5, 1fr);
+
+      gap: 6px;
     }
 
-    .questionContent {
-      margin: 12px;
-      padding: 18px 12px;
-    }
-
-    .option {
-      grid-template-columns:
-        42px minmax(0,1fr) 25px;
+    .legend {
+      margin-top:
+        15px;
 
       padding: 10px;
     }
 
+    .finishSideButton {
+      min-height: 46px;
+
+      margin-top:
+        14px;
+    }
+
+    .questionPanel {
+      border-radius:
+        16px;
+    }
+
+    .questionTop {
+      min-height: 65px;
+
+      padding:
+        10px 14px;
+    }
+
+    .questionTop strong {
+      width: 36px;
+
+      height: 36px;
+
+      font-size: 18px;
+    }
+
+    .questionTopActions {
+      width: auto;
+
+      flex-wrap: wrap;
+
+      justify-content:
+        flex-end;
+    }
+
+    .flagButton {
+      min-height: 34px;
+
+      padding:
+        0 10px;
+
+      font-size: 11px;
+    }
+
+    .questionContent {
+      margin: 9px;
+
+      padding:
+        16px 9px;
+    }
+
+    .question3DCard {
+      margin-bottom:
+        25px;
+
+      padding:
+        32px 15px 20px;
+
+      border-radius:
+        15px;
+    }
+
+    .question3DLabel {
+      top: -16px;
+
+      left: 14px;
+
+      min-width: 120px;
+
+      min-height: 34px;
+
+      padding:
+        5px 12px;
+
+      font-size: 11px;
+    }
+
+    .questionHtml {
+      font-size: 18px;
+
+      line-height: 1.5;
+    }
+
+    .options {
+      gap: 10px;
+    }
+
+    .option {
+      min-height: 58px;
+
+      grid-template-columns:
+        38px minmax(0,1fr) 24px;
+
+      gap: 8px;
+
+      padding: 8px;
+    }
+
+    .optionLetter {
+      width: 34px;
+
+      height: 34px;
+    }
+
+    .optionText {
+      font-size: 15px;
+
+      line-height: 1.4;
+    }
+
+    .radio {
+      font-size: 21px;
+    }
+
     .questionActions {
-      padding: 0 12px 20px;
-      flex-direction: column;
+      position: sticky;
+
+      bottom: 0;
+
+      z-index: 30;
+
+      padding:
+        10px 9px 14px;
+
+      flex-direction:
+        row;
+
+      gap: 8px;
+
+      background:
+        rgba(55,61,65,.96);
+
+      border-top:
+        1px solid rgba(255,255,255,.25);
+
+      backdrop-filter:
+        blur(10px);
     }
 
     .questionActions button {
-      width: 100%;
+      flex: 1;
+
+      width: auto;
+
       min-width: 0;
+
+      min-height: 48px;
+
+      padding:
+        0 8px;
+
+      font-size: 13px;
+    }
+
+    .resultCircle {
+      width: 120px;
+
+      height: 120px;
+
+      margin:
+        0 auto 15px;
+
+      border-width: 6px;
+    }
+
+    .resultCircle strong {
+      font-size: 32px;
+    }
+
+    .resultCircle span {
+      font-size: 14px;
     }
 
     .resultGrid {
-      grid-template-columns: 1fr;
+      margin:
+        18px 0;
+
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+      gap: 8px;
+    }
+
+    .resultItem {
+      min-height: 70px;
+
+      padding:
+        8px 6px;
+    }
+
+    .resultItem span {
+      margin-bottom:
+        4px;
+
+      font-size: 13px;
+    }
+
+    .resultItem strong {
+      font-size: 21px;
+    }
+
+    .resultMessage {
+      margin:
+        15px 0;
+
+      padding:
+        12px 10px;
+
+      font-size: 16px;
+    }
+
+    .resultActions {
+      gap: 9px;
+    }
+
+    .resultActions button {
+      width: 100%;
+
+      min-height: 48px;
+
+      padding:
+        0 12px;
+    }
+
+    .reviewQuestion {
+      margin-bottom:
+        15px;
+
+      padding:
+        14px 10px;
+    }
+
+    .reviewNumber {
+      margin-bottom:
+        10px;
+
+      font-size: 15px;
+    }
+
+    .reviewOption {
+      padding: 10px;
+
+      gap: 8px;
+
+      font-size: 14px;
+    }
+
+    .answerStatus {
+      margin-top:
+        10px;
+
+      padding: 9px;
+
+      font-size: 14px;
+    }
+
+    .shapeResultScroll {
+      margin-bottom:
+        18px;
+    }
+
+    .saveIndicatorWrap {
+      width: 100%;
+
+      margin-left: 0;
+
+      justify-content:
+        center;
+    }
+
+    .zoomOverlay {
+      padding: 8px;
+    }
+
+    .zoomPanel {
+      width: 100%;
+
+      max-height: 96vh;
+
+      padding:
+        58px 10px 16px;
+
+      border-radius:
+        14px;
+    }
+
+    .zoomTitle {
+      left: 14px;
+
+      font-size: 15px;
+    }
+
+    .reviewAnswerSummary {
+      padding: 10px;
+
+      font-size: 13px;
     }
   }
 `;
