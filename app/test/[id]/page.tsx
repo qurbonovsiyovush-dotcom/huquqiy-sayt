@@ -419,6 +419,164 @@ export default function TestSolvePage() {
   }
 
   /* =====================================================
+     RIM RAQAM / RAQAMLI BANDLARNI FORMATLASH
+
+     I.
+     II.
+     III.
+     IV.
+     V.
+
+     yoki
+
+     1.
+     2.
+     3.
+
+     bir qatorda yopishib qolsa, avtomatik ajratadi.
+  ===================================================== */
+
+  function formatStructuredQuestionHtml(raw: string) {
+    if (!raw) {
+      return "";
+    }
+
+    let html = String(raw);
+
+    /*
+      &nbsp; larni oddiy bo‘shliqqa aylantiramiz.
+    */
+    html = html.replace(/&nbsp;/gi, " ");
+
+    /*
+      Ketma-ket ortiqcha oddiy bo‘shliqlarni kamaytiramiz.
+      HTML teglariga tegmaydi.
+    */
+    html = html.replace(/[ \t]{2,}/g, " ");
+
+    /*
+      Rim raqamli bandlar:
+
+      I.
+      II.
+      III.
+      IV.
+      V.
+      VI.
+      VII.
+      VIII.
+      IX.
+      X.
+      ...
+
+      Birinchi band oldidan <br> qo‘ymaymiz.
+      Keyingi bandlar oldidan yangi qator qo‘yamiz.
+    */
+
+    const romanPattern =
+      /(^|[\s>])((?:M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3}))\.)\s+/g;
+
+    let romanSeen = false;
+
+    html = html.replace(
+      romanPattern,
+      (match, prefix, marker) => {
+        const normalizedMarker =
+          String(marker || "").trim();
+
+        if (!normalizedMarker) {
+          return match;
+        }
+
+        if (!romanSeen) {
+          romanSeen = true;
+
+          return `${prefix}${normalizedMarker} `;
+        }
+
+        /*
+          Agar oldinda allaqachon <br> bo‘lsa,
+          yana qo‘shmaymiz.
+        */
+        if (
+          String(prefix).includes(">") &&
+          /<br\s*\/?>\s*$/i.test(
+            html.slice(
+              0,
+              Math.max(
+                0,
+                html.indexOf(match)
+              )
+            )
+          )
+        ) {
+          return `${prefix}${normalizedMarker} `;
+        }
+
+        return `${prefix}<br class="autoListBreak">${normalizedMarker} `;
+      }
+    );
+
+    /*
+      Rim regex juda keng bo‘lgani uchun ayrim holatda
+      oddiy I. II. III. ketma-ketlikni qo‘shimcha
+      tekshiruv bilan ham ushlaymiz.
+    */
+
+    html = html.replace(
+      /(\s)(II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.\s+/g,
+      `$1<br class="autoListBreak">$2. `
+    );
+
+    /*
+      Oddiy raqamli bandlar:
+
+      1.
+      2.
+      3.
+
+      Lekin 1-modda, 2-modda kabi yozuvlarga tegmaydi,
+      chunki nuqtadan keyin bo‘shliq talab qilinadi.
+    */
+
+    let numericSeen = false;
+
+    html = html.replace(
+      /(^|[\s>])(\d{1,3}\.)\s+/g,
+      (match, prefix, marker) => {
+        if (!numericSeen) {
+          numericSeen = true;
+
+          return `${prefix}${marker} `;
+        }
+
+        return `${prefix}<br class="autoListBreak">${marker} `;
+      }
+    );
+
+    /*
+      Bir joyda tasodifan ikki yoki undan ortiq
+      autoListBreak paydo bo‘lsa bittaga tushiramiz.
+    */
+
+    html = html.replace(
+      /(?:<br class="autoListBreak">\s*){2,}/gi,
+      '<br class="autoListBreak">'
+    );
+
+    /*
+      Mavjud <br> bilan yangi <br> ustma-ust kelsa.
+    */
+
+    html = html.replace(
+      /<br\s*\/?>\s*<br class="autoListBreak">/gi,
+      '<br class="autoListBreak">'
+    );
+
+    return html;
+  }
+
+  /* =====================================================
      TESTNI BOSHLASH
   ===================================================== */
 
@@ -1851,10 +2009,12 @@ export default function TestSolvePage() {
                           className="questionHtml"
                           dangerouslySetInnerHTML={{
                             __html:
-                              getQuestionText(
-                                question
-                              ) ||
-                              "Savol matni mavjud emas.",
+                              formatStructuredQuestionHtml(
+                                getQuestionText(
+                                  question
+                                ) ||
+                                  "Savol matni mavjud emas."
+                              ),
                           }}
                         />
 
@@ -2244,10 +2404,12 @@ export default function TestSolvePage() {
                     className="questionHtml"
                     dangerouslySetInnerHTML={{
                       __html:
-                        getQuestionText(
-                          currentQuestion
-                        ) ||
-                        "Savol matni mavjud emas.",
+                        formatStructuredQuestionHtml(
+                          getQuestionText(
+                            currentQuestion
+                          ) ||
+                            "Savol matni mavjud emas."
+                        ),
                     }}
                   />
                 </div>
@@ -2556,8 +2718,6 @@ const pageStyles = `
     cursor: not-allowed;
   }
 
-  /* HEADER */
-
   .topHeader,
   .testHeader {
     width: min(1500px, 98%);
@@ -2625,8 +2785,6 @@ const pageStyles = `
     font-weight: 700;
   }
 
-  /* PANEL */
-
   .panel,
   .reviewPanel {
     position: relative;
@@ -2693,8 +2851,6 @@ const pageStyles = `
     text-align: center;
   }
 
-  /* INTRO */
-
   .introCard,
   .resultBox,
   .reviewInner {
@@ -2740,6 +2896,7 @@ const pageStyles = `
     margin: 30px 0;
 
     display: grid;
+
     grid-template-columns:
       repeat(4, 1fr);
 
@@ -2822,8 +2979,6 @@ const pageStyles = `
     font-weight: 700;
   }
 
-  /* TEST HEADER */
-
   .testHeaderLeft {
     display: flex;
     flex-direction: column;
@@ -2883,8 +3038,6 @@ const pageStyles = `
     color: #a31212;
   }
 
-  /* PROGRESS */
-
   .progressPanel {
     width: min(1500px, 98%);
     margin: 35px auto 0;
@@ -2936,8 +3089,6 @@ const pageStyles = `
       width .25s ease;
   }
 
-  /* TEST LAYOUT */
-
   .testLayout {
     width: min(1500px, 98%);
 
@@ -2952,8 +3103,6 @@ const pageStyles = `
 
     align-items: start;
   }
-
-  /* NAVIGATOR */
 
   .navigator {
     position: sticky;
@@ -2978,8 +3127,11 @@ const pageStyles = `
 
   .navigator h3 {
     margin: 0 0 20px;
+
     color: white;
+
     text-align: center;
+
     font-size: 22px;
   }
 
@@ -3052,7 +3204,9 @@ const pageStyles = `
     margin: 7px 0;
 
     display: flex;
+
     align-items: center;
+
     gap: 8px;
   }
 
@@ -3082,6 +3236,7 @@ const pageStyles = `
 
   .finishSideButton {
     width: 100%;
+
     min-height: 50px;
 
     margin-top: 20px;
@@ -3099,15 +3254,15 @@ const pageStyles = `
       0 4px 0 #831515;
 
     color: white;
+
     font-weight: 700;
   }
-
-  /* QUESTION PANEL */
 
   .questionPanel {
     overflow: hidden;
 
     border: 3px solid #303538;
+
     border-radius: 22px;
 
     background:
@@ -3127,7 +3282,9 @@ const pageStyles = `
     padding: 15px 25px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: space-between;
 
     background:
@@ -3142,7 +3299,9 @@ const pageStyles = `
 
   .questionTop div {
     display: flex;
+
     align-items: center;
+
     gap: 10px;
   }
 
@@ -3155,7 +3314,9 @@ const pageStyles = `
     height: 45px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     border:
@@ -3172,13 +3333,17 @@ const pageStyles = `
 
   .questionTopActions {
     display: flex !important;
+
     align-items: center;
+
     gap: 12px !important;
   }
 
   .flagButton {
     min-height: 38px;
-    padding: 0 14px;
+
+    padding:
+      0 14px;
 
     border:
       2px solid #805600;
@@ -3195,6 +3360,7 @@ const pageStyles = `
       0 3px 0 #805600;
 
     color: #624200;
+
     font-weight: 800;
   }
 
@@ -3208,6 +3374,7 @@ const pageStyles = `
 
   .questionTop p {
     margin: 0;
+
     font-weight: 700;
   }
 
@@ -3216,6 +3383,7 @@ const pageStyles = `
     padding: 30px;
 
     border: 2px solid #555;
+
     border-radius: 15px;
 
     background:
@@ -3309,6 +3477,7 @@ const pageStyles = `
     color: #073b68;
 
     font-size: 14px;
+
     font-weight: 800;
 
     letter-spacing: 1.2px;
@@ -3316,7 +3485,6 @@ const pageStyles = `
 
   /* =====================================================
      SAVOL MATNI
-     HAMMASI TO‘Q QORA
   ===================================================== */
 
   .questionHtml {
@@ -3327,33 +3495,31 @@ const pageStyles = `
 
     direction: ltr;
 
-    color: #000000 !important;
+    color:
+      #000000 !important;
 
     -webkit-text-fill-color:
       #000000 !important;
 
-    opacity: 1 !important;
+    opacity:
+      1 !important;
 
     font-family:
       "Bell MT",
       "Times New Roman",
       serif;
 
-    /*
-      400 juda ingichka chiqayotgan edi.
-      600 matnni to‘q va aniq qiladi.
-    */
-    font-weight: 600 !important;
+    font-weight:
+      600 !important;
 
     font-size:
       clamp(22px, 2vw, 30px);
 
-    line-height: 1.55;
+    line-height:
+      1.55;
 
-    /*
-      Ikki chetidan tekis.
-    */
-    text-align: justify !important;
+    text-align:
+      justify !important;
 
     text-align-last:
       left !important;
@@ -3361,9 +3527,6 @@ const pageStyles = `
     text-justify:
       inter-word;
 
-    /*
-      Ortiqcha Enter / bo‘shliq muammosi.
-    */
     white-space:
       normal !important;
 
@@ -3382,10 +3545,6 @@ const pageStyles = `
     text-shadow:
       none !important;
   }
-
-  /*
-    SAVOL ICHIDAGI HAMMA ELEMENT QORA
-  */
 
   .questionHtml :global(*) {
     color:
@@ -3407,25 +3566,7 @@ const pageStyles = `
       none !important;
   }
 
-  /*
-    INLINE STYLE HAM RANGNI O‘ZGARTIRA OLMAYDI
-  */
-
-  .questionHtml :global([style]) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    opacity:
-      1 !important;
-  }
-
-  /*
-    ESKI FONT TAG
-  */
-
+  .questionHtml :global([style]),
   .questionHtml :global(font) {
     color:
       #000000 !important;
@@ -3437,13 +3578,7 @@ const pageStyles = `
       1 !important;
   }
 
-  /*
-    PARAGRAF
-  */
-
   .questionHtml :global(p) {
-    display: block;
-
     width: 100%;
 
     margin:
@@ -3457,17 +3592,11 @@ const pageStyles = `
     -webkit-text-fill-color:
       #000000 !important;
 
-    opacity:
-      1 !important;
-
     text-align:
       justify !important;
 
     text-align-last:
       left !important;
-
-    text-justify:
-      inter-word;
 
     white-space:
       normal !important;
@@ -3477,33 +3606,18 @@ const pageStyles = `
 
     overflow-wrap:
       break-word;
-
-    letter-spacing:
-      0 !important;
-
-    word-spacing:
-      normal !important;
   }
 
   .questionHtml :global(p:last-child) {
     margin-bottom: 0;
   }
 
-  /*
-    DIV
-  */
-
   .questionHtml :global(div) {
-    max-width: 100%;
-
     color:
       #000000 !important;
 
     -webkit-text-fill-color:
       #000000 !important;
-
-    opacity:
-      1 !important;
 
     text-align:
       justify !important;
@@ -3511,28 +3625,9 @@ const pageStyles = `
     text-align-last:
       left !important;
 
-    text-justify:
-      inter-word;
-
     white-space:
       normal !important;
-
-    word-break:
-      normal !important;
-
-    overflow-wrap:
-      break-word;
-
-    letter-spacing:
-      0 !important;
-
-    word-spacing:
-      normal !important;
   }
-
-  /*
-    SPAN
-  */
 
   .questionHtml :global(span) {
     color:
@@ -3541,22 +3636,9 @@ const pageStyles = `
     -webkit-text-fill-color:
       #000000 !important;
 
-    opacity:
-      1 !important;
-
     white-space:
       normal !important;
-
-    letter-spacing:
-      0 !important;
-
-    word-spacing:
-      normal !important;
   }
-
-  /*
-    BOLD
-  */
 
   .questionHtml :global(strong),
   .questionHtml :global(b) {
@@ -3568,14 +3650,7 @@ const pageStyles = `
 
     font-weight:
       800 !important;
-
-    opacity:
-      1 !important;
   }
-
-  /*
-    ITALIC
-  */
 
   .questionHtml :global(i),
   .questionHtml :global(em) {
@@ -3587,14 +3662,7 @@ const pageStyles = `
 
     font-style:
       italic !important;
-
-    opacity:
-      1 !important;
   }
-
-  /*
-    BOLD + ITALIC
-  */
 
   .questionHtml :global(strong i),
   .questionHtml :global(strong em),
@@ -3611,14 +3679,7 @@ const pageStyles = `
 
     font-style:
       italic !important;
-
-    opacity:
-      1 !important;
   }
-
-  /*
-    UNDERLINE
-  */
 
   .questionHtml :global(u) {
     color:
@@ -3632,31 +3693,32 @@ const pageStyles = `
   }
 
   /*
-    HEADINGS
+    AVTOMATIK ANIQLANGAN
+    RIM / RAQAMLI BANDLAR
   */
 
-  .questionHtml :global(h1),
-  .questionHtml :global(h2),
-  .questionHtml :global(h3),
-  .questionHtml :global(h4),
-  .questionHtml :global(h5),
-  .questionHtml :global(h6) {
-    color:
-      #000000 !important;
+  .questionHtml :global(.autoListBreak) {
+    display: block;
 
-    -webkit-text-fill-color:
-      #000000 !important;
+    content: "";
 
-    font-weight:
-      800 !important;
+    height: 0;
 
-    opacity:
-      1 !important;
+    margin: 0;
   }
 
   /*
-    LIST
+    <br> dan keyingi qator orasiga juda katta
+    bo‘shliq bermaymiz.
   */
+
+  .questionHtml :global(br.autoListBreak) {
+    display: block;
+
+    content: "";
+
+    margin-top: 5px;
+  }
 
   .questionHtml :global(ul),
   .questionHtml :global(ol) {
@@ -3670,9 +3732,6 @@ const pageStyles = `
 
     color:
       #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
   }
 
   .questionHtml :global(li) {
@@ -3685,28 +3744,12 @@ const pageStyles = `
     -webkit-text-fill-color:
       #000000 !important;
 
-    opacity:
-      1 !important;
-
     text-align:
       justify !important;
 
     text-align-last:
       left !important;
-
-    white-space:
-      normal !important;
-
-    word-break:
-      normal !important;
-
-    overflow-wrap:
-      break-word;
   }
-
-  /*
-    LINK
-  */
 
   .questionHtml :global(a) {
     color:
@@ -3721,28 +3764,12 @@ const pageStyles = `
       underline;
   }
 
-  /*
-    BR
-  */
-
-  .questionHtml :global(br) {
-    display: initial;
-  }
-
-  /*
-    RASM
-  */
-
   .questionHtml :global(img),
   .optionText :global(img) {
     max-width: 100%;
 
     height: auto;
   }
-
-  /*
-    JADVAL
-  */
 
   .questionHtml :global(table),
   .optionText :global(table) {
@@ -3775,17 +3802,7 @@ const pageStyles = `
 
     -webkit-text-fill-color:
       #000000 !important;
-
-    opacity:
-      1 !important;
   }
-
-  .questionHtml :global(th) {
-    font-weight:
-      800 !important;
-  }
-
-  /* SHAPES */
 
   .shapeResultScroll {
     width: 100%;
@@ -3884,8 +3901,6 @@ const pageStyles = `
     right: 5%;
   }
 
-  /* OPTIONS */
-
   .options {
     display: grid;
 
@@ -3972,10 +3987,6 @@ const pageStyles = `
     font-weight: 700;
   }
 
-  /*
-    JAVOB VARIANTLARI HAM QORA
-  */
-
   .optionText {
     min-width: 0;
 
@@ -4031,9 +4042,6 @@ const pageStyles = `
 
     opacity:
       1 !important;
-
-    text-shadow:
-      none !important;
   }
 
   .optionText :global([style]),
@@ -4043,9 +4051,6 @@ const pageStyles = `
 
     -webkit-text-fill-color:
       #000000 !important;
-
-    opacity:
-      1 !important;
   }
 
   .optionText :global(strong),
@@ -4079,8 +4084,6 @@ const pageStyles = `
 
     font-size: 25px;
   }
-
-  /* QUESTION ACTIONS */
 
   .questionActions {
     padding:
@@ -4157,8 +4160,6 @@ const pageStyles = `
 
     color: #125a32;
   }
-
-  /* RESULT */
 
   .resultCircle {
     width: 180px;
@@ -4334,8 +4335,6 @@ const pageStyles = `
 
     color: #125a32;
   }
-
-  /* REVIEW */
 
   .reviewQuestion {
     margin-bottom:
@@ -4628,10 +4627,7 @@ const pageStyles = `
     line-height: 1.45;
   }
 
-  /* RESPONSIVE */
-
   @media (max-width: 900px) {
-
     .introInformation {
       grid-template-columns:
         repeat(2, 1fr);
@@ -4680,7 +4676,6 @@ const pageStyles = `
   }
 
   @media (max-width: 650px) {
-
     .page {
       padding:
         10px 6px 50px;
