@@ -355,7 +355,9 @@ button {
 
 /* =========================================================
    GERBNING O‘ZI
-   QIYSHAYISH OLIB TASHLANDI
+
+   -12px = GERB SAL TEPAGA KO‘TARILDI
+   -0.8deg = OPTIK QIYSHIQLIK TUZATILDI
 ========================================================= */
 
 .emblemImage {
@@ -377,7 +379,9 @@ button {
     drop-shadow(0 7px 4px rgba(0, 0, 0, 0.32))
     drop-shadow(0 15px 12px rgba(0, 0, 0, 0.35));
 
-  transform: none;
+  transform:
+    translateY(-12px)
+    rotate(-0.8deg);
 
   transform-origin: center center;
 }
