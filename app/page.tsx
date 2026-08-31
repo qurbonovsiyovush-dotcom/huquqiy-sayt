@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "./home.css";
 
 type UserRole = "admin" | "user" | null;
@@ -8,68 +8,6 @@ type UserRole = "admin" | "user" | null;
 export default function Home() {
   const [role, setRole] = useState<UserRole>(null);
   const [roleLoading, setRoleLoading] = useState(true);
-
-  const clockRef = useRef<HTMLDivElement>(null);
-  const dateRef = useRef<HTMLDivElement>(null);
-
-  /* =========================================
-     SOAT — OPTIMALLASHTIRILGAN
-  ========================================= */
-
-  useEffect(() => {
-    const uzMonths = [
-      "yanvar",
-      "fevral",
-      "mart",
-      "aprel",
-      "may",
-      "iyun",
-      "iyul",
-      "avgust",
-      "sentabr",
-      "oktabr",
-      "noyabr",
-      "dekabr",
-    ];
-
-    const uzWeekdays = [
-      "Yakshanba",
-      "Dushanba",
-      "Seshanba",
-      "Chorshanba",
-      "Payshanba",
-      "Juma",
-      "Shanba",
-    ];
-
-    function updateClock() {
-      const current = new Date();
-
-      const timeText = `${String(current.getHours()).padStart(2, "0")}:${String(
-        current.getMinutes()
-      ).padStart(2, "0")}:${String(current.getSeconds()).padStart(2, "0")}`;
-
-      const dateText = `${uzWeekdays[current.getDay()]}, ${current.getDate()}-${
-        uzMonths[current.getMonth()]
-      } ${current.getFullYear()}`;
-
-      if (clockRef.current) {
-        clockRef.current.textContent = timeText;
-      }
-
-      if (dateRef.current) {
-        dateRef.current.textContent = dateText;
-      }
-    }
-
-    updateClock();
-
-    const timer = window.setInterval(updateClock, 1000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, []);
 
   /* =========================================
      ADMIN / USER ROLINI ANIQLASH
@@ -230,7 +168,7 @@ export default function Home() {
         </nav>
       </header>
 
-      {/* ================= SOAT ================= */}
+      {/* ================= GERB ================= */}
 
       <section className="clockSection">
         <div className="clockPanel">
@@ -238,13 +176,16 @@ export default function Home() {
             Huquqiy ta’lim platformasi
           </div>
 
-          <div ref={clockRef} className="clockTime">
-            --:--:--
-          </div>
-
-          <div className="calendarBox">
-            <div ref={dateRef} className="dateText">
-              Sana yuklanmoqda...
+          <div className="emblemArea">
+            <div className="emblem3D">
+              <div className="emblemInner">
+                <img
+                  src="/gerb.png"
+                  alt="O‘zbekiston Respublikasi Davlat gerbi"
+                  className="emblemImage"
+                  draggable={false}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -253,11 +194,15 @@ export default function Home() {
       {/* ================= TALABALAR ================= */}
 
       <section id="talabalar" className="mainSection">
-        <div className="sectionTitle">Talabalar</div>
+        <div className="sectionTitle">
+          Talabalar
+        </div>
 
         <div className="cards">
           <article className="card">
-            <h2>Normativ-huquqiy hujjatlar</h2>
+            <h2>
+              Normativ-huquqiy hujjatlar
+            </h2>
 
             <button
               type="button"
@@ -281,7 +226,8 @@ export default function Home() {
               type="button"
               className="openButton"
               onClick={() => {
-                window.location.href = "/talabalar/kazuslar";
+                window.location.href =
+                  "/talabalar/kazuslar";
               }}
             >
               Ochish
@@ -304,25 +250,32 @@ export default function Home() {
 
       {/* ================= ABITURIYENT ================= */}
 
-      <section id="abituriyent" className="mainSection">
-        <div className="sectionTitle">Abituriyent</div>
+      <section
+        id="abituriyent"
+        className="mainSection"
+      >
+        <div className="sectionTitle">
+          Abituriyent
+        </div>
 
         <div className="cards">
           <article className="card">
             <h2>Testlar</h2>
 
-            {!roleLoading && role === "admin" && (
-              <div className="adminLabel">
-                Administrator boshqaruvi
-              </div>
-            )}
+            {!roleLoading &&
+              role === "admin" && (
+                <div className="adminLabel">
+                  Administrator boshqaruvi
+                </div>
+              )}
 
             <button
               type="button"
               className="openButton testButton"
               onClick={openTests}
             >
-              {!roleLoading && role === "admin"
+              {!roleLoading &&
+              role === "admin"
                 ? "Boshqarish"
                 : "Ochish"}
             </button>
@@ -355,14 +308,24 @@ export default function Home() {
 
       {/* ================= SAVOL-JAVOB ================= */}
 
-      <section id="savoljavob" className="mainSection">
-        <div className="sectionTitle">Savol-javob</div>
+      <section
+        id="savoljavob"
+        className="mainSection"
+      >
+        <div className="sectionTitle">
+          Savol-javob
+        </div>
 
         <div className="cards">
           <article className="card">
-            <h2>Ko‘p beriladigan savollar</h2>
+            <h2>
+              Ko‘p beriladigan savollar
+            </h2>
 
-            <button type="button" className="openButton">
+            <button
+              type="button"
+              className="openButton"
+            >
               Ochish
             </button>
           </article>
@@ -370,22 +333,30 @@ export default function Home() {
           <article className="card">
             <h2>Savol yuborish</h2>
 
-            <button type="button" className="openButton">
+            <button
+              type="button"
+              className="openButton"
+            >
               Ochish
             </button>
           </article>
 
           <article className="card">
-            <h2>Sud qarorlari tahlili</h2>
+            <h2>
+              Sud qarorlari tahlili
+            </h2>
 
-            <button type="button" className="openButton">
+            <button
+              type="button"
+              className="openButton"
+            >
               Ochish
             </button>
           </article>
         </div>
       </section>
 
-      {/* Qo‘llanmalar endi alohida /qollanmalar sahifasida */}
+      {/* ================= FOOTER ================= */}
 
       <footer className="footerBlue">
         Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi
