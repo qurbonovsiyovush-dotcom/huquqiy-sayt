@@ -63,29 +63,10 @@ button {
     );
 
   box-shadow:
-    inset 0 7px 6px
-      rgba(
-        255,
-        255,
-        255,
-        0.75
-      ),
-    inset 0 -8px 8px
-      rgba(
-        0,
-        0,
-        0,
-        0.18
-      ),
-    0 7px 0
-      #173c55,
-    0 12px 18px
-      rgba(
-        0,
-        0,
-        0,
-        0.22
-      );
+    inset 0 7px 6px rgba(255, 255, 255, 0.75),
+    inset 0 -8px 8px rgba(0, 0, 0, 0.18),
+    0 7px 0 #173c55,
+    0 12px 18px rgba(0, 0, 0, 0.22);
 }
 
 /* =========================================================
@@ -124,29 +105,10 @@ button {
     );
 
   box-shadow:
-    inset 0 6px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.95
-      ),
-    inset 0 -6px 6px
-      rgba(
-        0,
-        0,
-        0,
-        0.2
-      ),
-    0 5px 0
-      #4b5256,
-    0 9px 11px
-      rgba(
-        0,
-        0,
-        0,
-        0.23
-      );
+    inset 0 6px 5px rgba(255, 255, 255, 0.95),
+    inset 0 -6px 6px rgba(0, 0, 0, 0.2),
+    0 5px 0 #4b5256,
+    0 9px 11px rgba(0, 0, 0, 0.23);
 }
 
 /* =========================================================
@@ -186,16 +148,11 @@ button {
   font-weight: 700;
 
   transition:
-    transform
-      0.15s ease,
-    filter
-      0.15s ease,
-    background
-      0.2s ease,
-    box-shadow
-      0.2s ease,
-    border-color
-      0.2s ease;
+    transform 0.15s ease,
+    filter 0.15s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 /* =========================================================
@@ -219,43 +176,20 @@ button {
     );
 
   box-shadow:
-    inset 0 5px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.95
-      ),
-    inset 0 -6px 6px
-      rgba(
-        0,
-        0,
-        0,
-        0.2
-      ),
-    0 5px 0
-      #4b5256,
-    0 8px 10px
-      rgba(
-        0,
-        0,
-        0,
-        0.22
-      );
+    inset 0 5px 5px rgba(255, 255, 255, 0.95),
+    inset 0 -6px 6px rgba(0, 0, 0, 0.2),
+    0 5px 0 #4b5256,
+    0 8px 10px rgba(0, 0, 0, 0.22);
 }
 
 /* =========================================================
    AKTIV BO‘LIM TUGMASI
-
-   TALABALAR / ABITURIYENT / SAVOL-JAVOB
-   QAYSI BO‘LIM OCHIQ BO‘LSA KO‘K BO‘LADI
 ========================================================= */
 
 .grayButton.activeNavButton {
   color: #073b68;
 
-  border-color:
-    #174461;
+  border-color: #174461;
 
   background:
     linear-gradient(
@@ -267,29 +201,10 @@ button {
     );
 
   box-shadow:
-    inset 0 5px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.85
-      ),
-    inset 0 -5px 6px
-      rgba(
-        0,
-        0,
-        0,
-        0.15
-      ),
-    0 5px 0
-      #17415c,
-    0 9px 13px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      );
+    inset 0 5px 5px rgba(255, 255, 255, 0.85),
+    inset 0 -5px 6px rgba(0, 0, 0, 0.15),
+    0 5px 0 #17415c,
+    0 9px 13px rgba(0, 0, 0, 0.25);
 }
 
 /* =========================================================
@@ -313,27 +228,14 @@ button {
     );
 
   box-shadow:
-    inset 0 5px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.45
-      ),
-    0 5px 0
-      #17415c,
-    0 8px 10px
-      rgba(
-        0,
-        0,
-        0,
-        0.22
-      );
+    inset 0 5px 5px rgba(255, 255, 255, 0.45),
+    0 5px 0 #17415c,
+    0 8px 10px rgba(0, 0, 0, 0.22);
 }
 
 /* =========================================================
    CHIQISH
-   TO‘Q QIZIL + QORA YOZUV
+   YUMSHOQROQ QIZIL + QORA YOZUV
 ========================================================= */
 
 .logoutButton {
@@ -341,48 +243,28 @@ button {
 
   border:
     3px solid
-    #4f0808;
+    #9d3b3b;
 
   background:
     linear-gradient(
       180deg,
-      #a92b2b 0%,
-      #851919 40%,
-      #681010 72%,
-      #4b0808 100%
+      #f58a8a 0%,
+      #ea6b6b 35%,
+      #db5353 68%,
+      #c84141 100%
     );
 
   box-shadow:
-    inset 0 5px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.25
-      ),
-    inset 0 -5px 6px
-      rgba(
-        0,
-        0,
-        0,
-        0.28
-      ),
-    0 5px 0
-      #3b0606,
-    0 8px 10px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      );
+    inset 0 5px 5px rgba(255, 255, 255, 0.42),
+    inset 0 -5px 6px rgba(0, 0, 0, 0.14),
+    0 5px 0 #8c3030,
+    0 8px 10px rgba(0, 0, 0, 0.22);
 }
 
 .grayButton:hover,
 .adminButton:hover,
 .logoutButton:hover {
-  filter:
-    brightness(1.07);
+  filter: brightness(1.07);
 
   transform:
     translateY(-2px);
@@ -444,29 +326,10 @@ button {
     );
 
   box-shadow:
-    inset 0 7px 6px
-      rgba(
-        255,
-        255,
-        255,
-        0.23
-      ),
-    inset 0 -8px 8px
-      rgba(
-        0,
-        0,
-        0,
-        0.32
-      ),
-    0 7px 0
-      #272b2e,
-    0 15px 24px
-      rgba(
-        0,
-        0,
-        0,
-        0.3
-      );
+    inset 0 7px 6px rgba(255, 255, 255, 0.23),
+    inset 0 -8px 8px rgba(0, 0, 0, 0.32),
+    0 7px 0 #272b2e,
+    0 15px 24px rgba(0, 0, 0, 0.3);
 }
 
 /* =========================================================
@@ -527,29 +390,10 @@ button {
     );
 
   box-shadow:
-    inset 0 6px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.75
-      ),
-    inset 0 -6px 6px
-      rgba(
-        0,
-        0,
-        0,
-        0.16
-      ),
-    0 5px 0
-      #17415c,
-    0 9px 13px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      );
+    inset 0 6px 5px rgba(255, 255, 255, 0.75),
+    inset 0 -6px 6px rgba(0, 0, 0, 0.16),
+    0 5px 0 #17415c,
+    0 9px 13px rgba(0, 0, 0, 0.25);
 }
 
 /* =========================================================
@@ -587,8 +431,7 @@ button {
 
   background:
     radial-gradient(
-      circle at
-        50% 42%,
+      circle at 50% 42%,
       #55595c 0%,
       #45494c 46%,
       #313538 70%,
@@ -600,57 +443,14 @@ button {
     #1d2022;
 
   box-shadow:
-    inset 0 8px 12px
-      rgba(
-        255,
-        255,
-        255,
-        0.08
-      ),
-    inset 0 -15px 20px
-      rgba(
-        0,
-        0,
-        0,
-        0.62
-      ),
-    inset 8px 0 18px
-      rgba(
-        255,
-        255,
-        255,
-        0.03
-      ),
-    inset -8px 0 18px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      ),
-    0 3px 0
-      rgba(
-        255,
-        255,
-        255,
-        0.06
-      ),
-    0 8px 0
-      #202427,
-    0 17px 25px
-      rgba(
-        0,
-        0,
-        0,
-        0.42
-      ),
-    0 28px 40px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      );
+    inset 0 8px 12px rgba(255, 255, 255, 0.08),
+    inset 0 -15px 20px rgba(0, 0, 0, 0.62),
+    inset 8px 0 18px rgba(255, 255, 255, 0.03),
+    inset -8px 0 18px rgba(0, 0, 0, 0.25),
+    0 3px 0 rgba(255, 255, 255, 0.06),
+    0 8px 0 #202427,
+    0 17px 25px rgba(0, 0, 0, 0.42),
+    0 28px 40px rgba(0, 0, 0, 0.25);
 }
 
 .emblemRecess::before {
@@ -664,28 +464,11 @@ button {
 
   border:
     3px solid
-    rgba(
-      0,
-      0,
-      0,
-      0.48
-    );
+    rgba(0, 0, 0, 0.48);
 
   box-shadow:
-    inset 0 6px 10px
-      rgba(
-        0,
-        0,
-        0,
-        0.55
-      ),
-    inset 0 -3px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.07
-      );
+    inset 0 6px 10px rgba(0, 0, 0, 0.55),
+    inset 0 -3px 5px rgba(255, 255, 255, 0.07);
 
   pointer-events: none;
 }
@@ -713,34 +496,19 @@ button {
       0
       3px
       1px
-      rgba(
-        255,
-        255,
-        255,
-        0.12
-      )
+      rgba(255, 255, 255, 0.12)
     )
     drop-shadow(
       0
       7px
       4px
-      rgba(
-        0,
-        0,
-        0,
-        0.32
-      )
+      rgba(0, 0, 0, 0.32)
     )
     drop-shadow(
       0
       15px
       12px
-      rgba(
-        0,
-        0,
-        0,
-        0.35
-      )
+      rgba(0, 0, 0, 0.35)
     );
 
   transform:
@@ -794,29 +562,10 @@ button {
     );
 
   box-shadow:
-    inset 0 7px 6px
-      rgba(
-        255,
-        255,
-        255,
-        0.23
-      ),
-    inset 0 -8px 8px
-      rgba(
-        0,
-        0,
-        0,
-        0.32
-      ),
-    0 7px 0
-      #272b2e,
-    0 15px 24px
-      rgba(
-        0,
-        0,
-        0,
-        0.3
-      );
+    inset 0 7px 6px rgba(255, 255, 255, 0.23),
+    inset 0 -8px 8px rgba(0, 0, 0, 0.32),
+    0 7px 0 #272b2e,
+    0 15px 24px rgba(0, 0, 0, 0.3);
 }
 
 /* =========================================================
@@ -862,29 +611,10 @@ button {
     );
 
   box-shadow:
-    inset 0 6px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.75
-      ),
-    inset 0 -6px 6px
-      rgba(
-        0,
-        0,
-        0,
-        0.16
-      ),
-    0 5px 0
-      #17415c,
-    0 9px 13px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      );
+    inset 0 6px 5px rgba(255, 255, 255, 0.75),
+    inset 0 -6px 6px rgba(0, 0, 0, 0.16),
+    0 5px 0 #17415c,
+    0 9px 13px rgba(0, 0, 0, 0.25);
 }
 
 /* =========================================================
@@ -937,29 +667,10 @@ button {
     );
 
   box-shadow:
-    inset 0 6px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.86
-      ),
-    inset 0 -7px 7px
-      rgba(
-        0,
-        0,
-        0,
-        0.18
-      ),
-    0 6px 0
-      #4a5054,
-    0 11px 16px
-      rgba(
-        0,
-        0,
-        0,
-        0.25
-      );
+    inset 0 6px 5px rgba(255, 255, 255, 0.86),
+    inset 0 -7px 7px rgba(0, 0, 0, 0.18),
+    0 6px 0 #4a5054,
+    0 11px 16px rgba(0, 0, 0, 0.25);
 }
 
 .card h2 {
@@ -1050,16 +761,12 @@ button {
     );
 
   box-shadow:
-    inset 0 4px 4px
-      white,
-    0 4px 0
-      #555d61;
+    inset 0 4px 4px white,
+    0 4px 0 #555d61;
 
   transition:
-    transform
-      0.15s ease,
-    filter
-      0.15s ease;
+    transform 0.15s ease,
+    filter 0.15s ease;
 }
 
 .openButton:hover {
@@ -1093,15 +800,8 @@ button {
     );
 
   box-shadow:
-    inset 0 4px 4px
-      rgba(
-        255,
-        255,
-        255,
-        0.8
-      ),
-    0 4px 0
-      #17415c;
+    inset 0 4px 4px rgba(255, 255, 255, 0.8),
+    0 4px 0 #17415c;
 }
 
 /* =========================================================
@@ -1158,41 +858,19 @@ button {
     );
 
   box-shadow:
-    inset 0 6px 5px
-      rgba(
-        255,
-        255,
-        255,
-        0.72
-      ),
-    inset 0 -7px 7px
-      rgba(
-        0,
-        0,
-        0,
-        0.17
-      ),
-    0 6px 0
-      #16415b,
-    0 12px 17px
-      rgba(
-        0,
-        0,
-        0,
-        0.22
-      );
+    inset 0 6px 5px rgba(255, 255, 255, 0.72),
+    inset 0 -7px 7px rgba(0, 0, 0, 0.17),
+    0 6px 0 #16415b,
+    0 12px 17px rgba(0, 0, 0, 0.22);
 }
 
 /* =========================================================
    RESPONSIVE
 ========================================================= */
 
-@media (
-  max-width: 1350px
-) {
+@media (max-width: 1350px) {
   .topPanel {
-    flex-direction:
-      column;
+    flex-direction: column;
   }
 
   .namePlate {
@@ -1203,23 +881,17 @@ button {
   .navButtons {
     width: 100%;
 
-    justify-content:
-      center;
+    justify-content: center;
   }
 }
 
-@media (
-  max-width: 950px
-) {
+@media (max-width: 950px) {
   .cards {
-    grid-template-columns:
-      1fr;
+    grid-template-columns: 1fr;
   }
 }
 
-@media (
-  max-width: 700px
-) {
+@media (max-width: 700px) {
   .page {
     padding: 10px;
   }
@@ -1234,8 +906,7 @@ button {
     width: 100%;
     min-width: 0;
 
-    white-space:
-      normal;
+    white-space: normal;
 
     font-size: 21px;
   }
@@ -1303,9 +974,7 @@ button {
   }
 }
 
-@media (
-  max-width: 450px
-) {
+@media (max-width: 450px) {
   .navButtons {
     grid-template-columns:
       1fr;
