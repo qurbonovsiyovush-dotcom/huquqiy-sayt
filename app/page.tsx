@@ -176,16 +176,14 @@ export default function Home() {
             Huquqiy ta’lim platformasi
           </div>
 
-          <div className="emblemArea">
-            <div className="emblem3D">
-              <div className="emblemInner">
-                <img
-                  src="/gerb.png"
-                  alt="O‘zbekiston Respublikasi Davlat gerbi"
-                  className="emblemImage"
-                  draggable={false}
-                />
-              </div>
+          <div className="emblemHolder">
+            <div className="emblemRecess">
+              <img
+                src="/gerb.png"
+                alt="O‘zbekiston Respublikasi Davlat gerbi"
+                className="emblemImage"
+                draggable={false}
+              />
             </div>
           </div>
         </div>
