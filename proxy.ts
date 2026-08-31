@@ -46,6 +46,7 @@ export function proxy(
     pathname.startsWith(
       "/images"
     ) ||
+    pathname === "/gerb.png" ||
     pathname.startsWith(
       "/icons"
     )
