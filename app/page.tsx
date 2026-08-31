@@ -262,20 +262,18 @@ export default function Home() {
           <article className="card">
             <h2>Testlar</h2>
 
-            {!roleLoading &&
-              role === "admin" && (
-                <div className="adminLabel">
-                  Administrator boshqaruvi
-                </div>
-              )}
+            {!roleLoading && role === "admin" && (
+              <div className="adminLabel">
+                Administrator boshqaruvi
+              </div>
+            )}
 
             <button
               type="button"
               className="openButton testButton"
               onClick={openTests}
             >
-              {!roleLoading &&
-              role === "admin"
+              {!roleLoading && role === "admin"
                 ? "Boshqarish"
                 : "Ochish"}
             </button>
