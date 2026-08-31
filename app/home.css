@@ -4,14 +4,19 @@
 
 .page {
   min-height: 100vh;
-  padding: 15px 18px 40px;
 
-  background: linear-gradient(
-    180deg,
-    #ffffff 0%,
-    #f3f5f6 55%,
-    #e5e8ea 100%
-  );
+  padding:
+    15px
+    18px
+    40px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f3f5f6 55%,
+      #e5e8ea 100%
+    );
 
   color: #111;
 
@@ -39,23 +44,48 @@ button {
 
   gap: 28px;
 
-  padding: 25px 32px;
+  padding:
+    25px
+    32px;
 
-  border: 3px solid #173e58;
+  border:
+    3px solid
+    #173e58;
+
   border-radius: 28px;
 
-  background: linear-gradient(
-    180deg,
-    #8bd3ff 0%,
-    #69b7e8 40%,
-    #4999ce 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #8bd3ff 0%,
+      #69b7e8 40%,
+      #4999ce 100%
+    );
 
   box-shadow:
-    inset 0 7px 6px rgba(255, 255, 255, 0.75),
-    inset 0 -8px 8px rgba(0, 0, 0, 0.18),
-    0 7px 0 #173c55,
-    0 12px 18px rgba(0, 0, 0, 0.22);
+    inset 0 7px 6px
+      rgba(
+        255,
+        255,
+        255,
+        0.75
+      ),
+    inset 0 -8px 8px
+      rgba(
+        0,
+        0,
+        0,
+        0.18
+      ),
+    0 7px 0
+      #173c55,
+    0 12px 18px
+      rgba(
+        0,
+        0,
+        0,
+        0.22
+      );
 }
 
 /* =========================================================
@@ -65,9 +95,12 @@ button {
 .namePlate {
   min-width: 440px;
 
-  padding: 20px 27px;
+  padding:
+    20px
+    27px;
 
   text-align: center;
+
   white-space: nowrap;
 
   color: #080808;
@@ -75,22 +108,45 @@ button {
   font-size: 28px;
   font-weight: 700;
 
-  border: 3px solid #42494e;
+  border:
+    3px solid
+    #42494e;
+
   border-radius: 16px;
 
-  background: linear-gradient(
-    180deg,
-    #f7f7f7 0%,
-    #dedede 30%,
-    #b9b9b9 70%,
-    #9f9f9f 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #f7f7f7 0%,
+      #dedede 30%,
+      #b9b9b9 70%,
+      #9f9f9f 100%
+    );
 
   box-shadow:
-    inset 0 6px 5px rgba(255, 255, 255, 0.95),
-    inset 0 -6px 6px rgba(0, 0, 0, 0.2),
-    0 5px 0 #4b5256,
-    0 9px 11px rgba(0, 0, 0, 0.23);
+    inset 0 6px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.95
+      ),
+    inset 0 -6px 6px
+      rgba(
+        0,
+        0,
+        0,
+        0.2
+      ),
+    0 5px 0
+      #4b5256,
+    0 9px 11px
+      rgba(
+        0,
+        0,
+        0,
+        0.23
+      );
 }
 
 /* =========================================================
@@ -99,10 +155,12 @@ button {
 
 .navButtons {
   display: flex;
+
   align-items: center;
   justify-content: flex-end;
 
   gap: 14px;
+
   flex-wrap: wrap;
 }
 
@@ -116,7 +174,9 @@ button {
   align-items: center;
   justify-content: center;
 
-  padding: 0 10px;
+  padding:
+    0
+    10px;
 
   border-radius: 14px;
 
@@ -126,72 +186,206 @@ button {
   font-weight: 700;
 
   transition:
-    transform 0.15s ease,
-    filter 0.15s ease;
+    transform
+      0.15s ease,
+    filter
+      0.15s ease,
+    background
+      0.2s ease,
+    box-shadow
+      0.2s ease,
+    border-color
+      0.2s ease;
 }
+
+/* =========================================================
+   ODDIY NAV TUGMASI
+========================================================= */
 
 .grayButton {
   color: #111;
 
-  border: 3px solid #464c50;
+  border:
+    3px solid
+    #464c50;
 
-  background: linear-gradient(
-    180deg,
-    #f8f8f8 0%,
-    #dedede 30%,
-    #b8b8b8 70%,
-    #999999 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #f8f8f8 0%,
+      #dedede 30%,
+      #b8b8b8 70%,
+      #999999 100%
+    );
 
   box-shadow:
-    inset 0 5px 5px rgba(255, 255, 255, 0.95),
-    inset 0 -6px 6px rgba(0, 0, 0, 0.2),
-    0 5px 0 #4b5256,
-    0 8px 10px rgba(0, 0, 0, 0.22);
+    inset 0 5px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.95
+      ),
+    inset 0 -6px 6px
+      rgba(
+        0,
+        0,
+        0,
+        0.2
+      ),
+    0 5px 0
+      #4b5256,
+    0 8px 10px
+      rgba(
+        0,
+        0,
+        0,
+        0.22
+      );
 }
+
+/* =========================================================
+   AKTIV BO‘LIM TUGMASI
+
+   TALABALAR / ABITURIYENT / SAVOL-JAVOB
+   QAYSI BO‘LIM OCHIQ BO‘LSA KO‘K BO‘LADI
+========================================================= */
+
+.grayButton.activeNavButton {
+  color: #073b68;
+
+  border-color:
+    #174461;
+
+  background:
+    linear-gradient(
+      180deg,
+      #b8ecff 0%,
+      #82cdef 35%,
+      #58a8d7 72%,
+      #398bbd 100%
+    );
+
+  box-shadow:
+    inset 0 5px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.85
+      ),
+    inset 0 -5px 6px
+      rgba(
+        0,
+        0,
+        0,
+        0.15
+      ),
+    0 5px 0
+      #17415c,
+    0 9px 13px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      );
+}
+
+/* =========================================================
+   ADMIN
+   KO‘K TUGMA + QORA YOZUV
+========================================================= */
 
 .adminButton {
-  color: white;
+  color: #111;
 
-  border: 3px solid #174461;
+  border:
+    3px solid
+    #174461;
 
-  background: linear-gradient(
-    180deg,
-    #9bd9ff 0%,
-    #59a9d9 55%,
-    #2d7eae 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #9bd9ff 0%,
+      #59a9d9 55%,
+      #2d7eae 100%
+    );
 
   box-shadow:
-    inset 0 5px 5px rgba(255, 255, 255, 0.45),
-    0 5px 0 #17415c,
-    0 8px 10px rgba(0, 0, 0, 0.22);
+    inset 0 5px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.45
+      ),
+    0 5px 0
+      #17415c,
+    0 8px 10px
+      rgba(
+        0,
+        0,
+        0,
+        0.22
+      );
 }
 
+/* =========================================================
+   CHIQISH
+   TO‘Q QIZIL + QORA YOZUV
+========================================================= */
+
 .logoutButton {
-  color: white;
+  color: #111;
 
-  border: 3px solid #7c1515;
+  border:
+    3px solid
+    #4f0808;
 
-  background: linear-gradient(
-    180deg,
-    #ff8080 0%,
-    #e54646 40%,
-    #c32121 72%,
-    #981313 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #a92b2b 0%,
+      #851919 40%,
+      #681010 72%,
+      #4b0808 100%
+    );
 
   box-shadow:
-    inset 0 5px 5px rgba(255, 255, 255, 0.45),
-    0 5px 0 #761010,
-    0 8px 10px rgba(0, 0, 0, 0.22);
+    inset 0 5px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.25
+      ),
+    inset 0 -5px 6px
+      rgba(
+        0,
+        0,
+        0,
+        0.28
+      ),
+    0 5px 0
+      #3b0606,
+    0 8px 10px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      );
 }
 
 .grayButton:hover,
 .adminButton:hover,
 .logoutButton:hover {
-  filter: brightness(1.07);
-  transform: translateY(-2px);
+  filter:
+    brightness(1.07);
+
+  transform:
+    translateY(-2px);
 }
 
 /* =========================================================
@@ -201,9 +395,13 @@ button {
 .clockSection {
   width: 100%;
 
-  padding: 55px 0 90px;
+  padding:
+    55px
+    0
+    90px;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 }
@@ -211,31 +409,64 @@ button {
 .clockPanel {
   position: relative;
 
-  width: min(1400px, 95%);
+  width:
+    min(
+      1400px,
+      95%
+    );
+
   min-height: 500px;
 
-  padding: 70px 50px 45px;
+  padding:
+    70px
+    50px
+    45px;
 
   display: flex;
+
   flex-direction: column;
+
   align-items: center;
   justify-content: center;
 
-  border: 3px solid #303538;
+  border:
+    3px solid
+    #303538;
+
   border-radius: 30px;
 
-  background: linear-gradient(
-    145deg,
-    #686c6f 0%,
-    #505457 45%,
-    #363a3d 100%
-  );
+  background:
+    linear-gradient(
+      145deg,
+      #686c6f 0%,
+      #505457 45%,
+      #363a3d 100%
+    );
 
   box-shadow:
-    inset 0 7px 6px rgba(255, 255, 255, 0.23),
-    inset 0 -8px 8px rgba(0, 0, 0, 0.32),
-    0 7px 0 #272b2e,
-    0 15px 24px rgba(0, 0, 0, 0.3);
+    inset 0 7px 6px
+      rgba(
+        255,
+        255,
+        255,
+        0.23
+      ),
+    inset 0 -8px 8px
+      rgba(
+        0,
+        0,
+        0,
+        0.32
+      ),
+    0 7px 0
+      #272b2e,
+    0 15px 24px
+      rgba(
+        0,
+        0,
+        0,
+        0.3
+      );
 }
 
 /* =========================================================
@@ -248,14 +479,23 @@ button {
   top: -35px;
   left: 50%;
 
-  transform: translateX(-50%);
+  transform:
+    translateX(-50%);
 
-  width: min(650px, 80%);
+  width:
+    min(
+      650px,
+      80%
+    );
+
   min-height: 68px;
 
-  padding: 10px 25px;
+  padding:
+    10px
+    25px;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 
@@ -263,24 +503,53 @@ button {
 
   color: #073b68;
 
-  font-size: clamp(25px, 2.8vw, 38px);
+  font-size:
+    clamp(
+      25px,
+      2.8vw,
+      38px
+    );
+
   font-weight: 700;
 
-  border: 3px solid #174461;
+  border:
+    3px solid
+    #174461;
+
   border-radius: 17px;
 
-  background: linear-gradient(
-    180deg,
-    #9bd9ff 0%,
-    #73bdea 45%,
-    #4e9ccc 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #9bd9ff 0%,
+      #73bdea 45%,
+      #4e9ccc 100%
+    );
 
   box-shadow:
-    inset 0 6px 5px rgba(255, 255, 255, 0.75),
-    inset 0 -6px 6px rgba(0, 0, 0, 0.16),
-    0 5px 0 #17415c,
-    0 9px 13px rgba(0, 0, 0, 0.25);
+    inset 0 6px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.75
+      ),
+    inset 0 -6px 6px
+      rgba(
+        0,
+        0,
+        0,
+        0.16
+      ),
+    0 5px 0
+      #17415c,
+    0 9px 13px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      );
 }
 
 /* =========================================================
@@ -291,12 +560,13 @@ button {
   width: 100%;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 }
 
 /* =========================================================
-   GERB UCHUN O‘YILGAN 3D JOY
+   GERBNING 3D JOYI
 ========================================================= */
 
 .emblemRecess {
@@ -309,30 +579,78 @@ button {
   max-height: 75vw;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 
   border-radius: 50%;
 
-  background: radial-gradient(
-    circle at 50% 42%,
-    #55595c 0%,
-    #45494c 46%,
-    #313538 70%,
-    #202326 100%
-  );
+  background:
+    radial-gradient(
+      circle at
+        50% 42%,
+      #55595c 0%,
+      #45494c 46%,
+      #313538 70%,
+      #202326 100%
+    );
 
-  border: 4px solid #1d2022;
+  border:
+    4px solid
+    #1d2022;
 
   box-shadow:
-    inset 0 8px 12px rgba(255, 255, 255, 0.08),
-    inset 0 -15px 20px rgba(0, 0, 0, 0.62),
-    inset 8px 0 18px rgba(255, 255, 255, 0.03),
-    inset -8px 0 18px rgba(0, 0, 0, 0.25),
-    0 3px 0 rgba(255, 255, 255, 0.06),
-    0 8px 0 #202427,
-    0 17px 25px rgba(0, 0, 0, 0.42),
-    0 28px 40px rgba(0, 0, 0, 0.25);
+    inset 0 8px 12px
+      rgba(
+        255,
+        255,
+        255,
+        0.08
+      ),
+    inset 0 -15px 20px
+      rgba(
+        0,
+        0,
+        0,
+        0.62
+      ),
+    inset 8px 0 18px
+      rgba(
+        255,
+        255,
+        255,
+        0.03
+      ),
+    inset -8px 0 18px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      ),
+    0 3px 0
+      rgba(
+        255,
+        255,
+        255,
+        0.06
+      ),
+    0 8px 0
+      #202427,
+    0 17px 25px
+      rgba(
+        0,
+        0,
+        0,
+        0.42
+      ),
+    0 28px 40px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      );
 }
 
 .emblemRecess::before {
@@ -344,20 +662,36 @@ button {
 
   border-radius: 50%;
 
-  border: 3px solid rgba(0, 0, 0, 0.48);
+  border:
+    3px solid
+    rgba(
+      0,
+      0,
+      0,
+      0.48
+    );
 
   box-shadow:
-    inset 0 6px 10px rgba(0, 0, 0, 0.55),
-    inset 0 -3px 5px rgba(255, 255, 255, 0.07);
+    inset 0 6px 10px
+      rgba(
+        0,
+        0,
+        0,
+        0.55
+      ),
+    inset 0 -3px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.07
+      );
 
   pointer-events: none;
 }
 
 /* =========================================================
-   GERBNING O‘ZI
-
-   -12px = GERB SAL TEPAGA KO‘TARILDI
-   -0.8deg = OPTIK QIYSHIQLIK TUZATILDI
+   GERB
 ========================================================= */
 
 .emblemImage {
@@ -375,15 +709,46 @@ button {
   user-select: none;
 
   filter:
-    drop-shadow(0 3px 1px rgba(255, 255, 255, 0.12))
-    drop-shadow(0 7px 4px rgba(0, 0, 0, 0.32))
-    drop-shadow(0 15px 12px rgba(0, 0, 0, 0.35));
+    drop-shadow(
+      0
+      3px
+      1px
+      rgba(
+        255,
+        255,
+        255,
+        0.12
+      )
+    )
+    drop-shadow(
+      0
+      7px
+      4px
+      rgba(
+        0,
+        0,
+        0,
+        0.32
+      )
+    )
+    drop-shadow(
+      0
+      15px
+      12px
+      rgba(
+        0,
+        0,
+        0,
+        0.35
+      )
+    );
 
   transform:
     translateY(-12px)
     rotate(-0.8deg);
 
-  transform-origin: center center;
+  transform-origin:
+    center center;
 }
 
 /* =========================================================
@@ -393,30 +758,65 @@ button {
 .mainSection {
   position: relative;
 
-  width: min(1400px, 96%);
+  width:
+    min(
+      1400px,
+      96%
+    );
+
   min-height: 330px;
 
-  margin: 0 auto 95px;
+  margin:
+    0
+    auto
+    95px;
 
-  padding: 65px 32px 45px;
+  padding:
+    65px
+    32px
+    45px;
 
-  scroll-margin-top: 60px;
+  scroll-margin-top:
+    60px;
 
-  border: 3px solid #303538;
+  border:
+    3px solid
+    #303538;
+
   border-radius: 28px;
 
-  background: linear-gradient(
-    145deg,
-    #686c6f 0%,
-    #505457 45%,
-    #363a3d 100%
-  );
+  background:
+    linear-gradient(
+      145deg,
+      #686c6f 0%,
+      #505457 45%,
+      #363a3d 100%
+    );
 
   box-shadow:
-    inset 0 7px 6px rgba(255, 255, 255, 0.23),
-    inset 0 -8px 8px rgba(0, 0, 0, 0.32),
-    0 7px 0 #272b2e,
-    0 15px 24px rgba(0, 0, 0, 0.3);
+    inset 0 7px 6px
+      rgba(
+        255,
+        255,
+        255,
+        0.23
+      ),
+    inset 0 -8px 8px
+      rgba(
+        0,
+        0,
+        0,
+        0.32
+      ),
+    0 7px 0
+      #272b2e,
+    0 15px 24px
+      rgba(
+        0,
+        0,
+        0,
+        0.3
+      );
 }
 
 /* =========================================================
@@ -429,12 +829,14 @@ button {
   top: -35px;
   left: 50%;
 
-  transform: translateX(-50%);
+  transform:
+    translateX(-50%);
 
   width: 310px;
   height: 66px;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 
@@ -445,21 +847,44 @@ button {
   font-size: 28px;
   font-weight: 700;
 
-  border: 3px solid #174461;
+  border:
+    3px solid
+    #174461;
+
   border-radius: 15px;
 
-  background: linear-gradient(
-    180deg,
-    #9bd9ff 0%,
-    #73bdea 45%,
-    #4e9ccc 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #9bd9ff 0%,
+      #73bdea 45%,
+      #4e9ccc 100%
+    );
 
   box-shadow:
-    inset 0 6px 5px rgba(255, 255, 255, 0.75),
-    inset 0 -6px 6px rgba(0, 0, 0, 0.16),
-    0 5px 0 #17415c,
-    0 9px 13px rgba(0, 0, 0, 0.25);
+    inset 0 6px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.75
+      ),
+    inset 0 -6px 6px
+      rgba(
+        0,
+        0,
+        0,
+        0.16
+      ),
+    0 5px 0
+      #17415c,
+    0 9px 13px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      );
 }
 
 /* =========================================================
@@ -470,7 +895,13 @@ button {
   display: grid;
 
   grid-template-columns:
-    repeat(3, minmax(0, 1fr));
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
 
   gap: 30px;
 }
@@ -478,64 +909,111 @@ button {
 .card {
   min-height: 230px;
 
-  padding: 30px 22px;
+  padding:
+    30px
+    22px;
 
   display: flex;
+
   flex-direction: column;
+
   align-items: center;
   justify-content: center;
 
   text-align: center;
 
-  border: 2px solid #3d4347;
+  border:
+    2px solid
+    #3d4347;
+
   border-radius: 20px;
 
-  background: linear-gradient(
-    145deg,
-    #e1e1e1 0%,
-    #c5c5c5 50%,
-    #a6a6a6 100%
-  );
+  background:
+    linear-gradient(
+      145deg,
+      #e1e1e1 0%,
+      #c5c5c5 50%,
+      #a6a6a6 100%
+    );
 
   box-shadow:
-    inset 0 6px 5px rgba(255, 255, 255, 0.86),
-    inset 0 -7px 7px rgba(0, 0, 0, 0.18),
-    0 6px 0 #4a5054,
-    0 11px 16px rgba(0, 0, 0, 0.25);
+    inset 0 6px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.86
+      ),
+    inset 0 -7px 7px
+      rgba(
+        0,
+        0,
+        0,
+        0.18
+      ),
+    0 6px 0
+      #4a5054,
+    0 11px 16px
+      rgba(
+        0,
+        0,
+        0,
+        0.25
+      );
 }
 
 .card h2 {
   flex: 1;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 
-  margin: 10px 0 28px;
+  margin:
+    10px
+    0
+    28px;
 
   color: #111;
 
-  font-size: clamp(22px, 2vw, 28px);
+  font-size:
+    clamp(
+      22px,
+      2vw,
+      28px
+    );
 }
 
 .adminLabel {
-  margin: -15px 0 18px;
+  margin:
+    -15px
+    0
+    18px;
 
-  padding: 7px 14px;
+  padding:
+    7px
+    14px;
 
   color: #125a32;
 
   font-size: 14px;
   font-weight: 700;
 
-  border: 1px solid #2d8450;
+  border:
+    1px solid
+    #2d8450;
+
   border-radius: 8px;
 
   background: #d8f1df;
 }
 
 .vocabularySubtitle {
-  margin: -18px 0 22px;
+  margin:
+    -18px
+    0
+    22px;
 
   color: #173e58;
 
@@ -551,7 +1029,10 @@ button {
   width: 165px;
   height: 48px;
 
-  border: 2px solid #4e565b;
+  border:
+    2px solid
+    #4e565b;
+
   border-radius: 9px;
 
   cursor: pointer;
@@ -561,44 +1042,66 @@ button {
   font-size: 17px;
   font-weight: 700;
 
-  background: linear-gradient(
-    180deg,
-    #f8f8f8 0%,
-    #bdbdbd 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #f8f8f8 0%,
+      #bdbdbd 100%
+    );
 
   box-shadow:
-    inset 0 4px 4px white,
-    0 4px 0 #555d61;
+    inset 0 4px 4px
+      white,
+    0 4px 0
+      #555d61;
 
   transition:
-    transform 0.15s ease,
-    filter 0.15s ease;
+    transform
+      0.15s ease,
+    filter
+      0.15s ease;
 }
 
 .openButton:hover {
-  filter: brightness(1.06);
-  transform: translateY(-2px);
+  filter:
+    brightness(1.06);
+
+  transform:
+    translateY(-2px);
 }
 
 .openButton:active {
-  transform: translateY(2px);
+  transform:
+    translateY(2px);
 }
+
+/* =========================================================
+   BOSHQARISH
+========================================================= */
 
 .testButton {
   color: #073b68;
 
-  border-color: #174461;
+  border-color:
+    #174461;
 
-  background: linear-gradient(
-    180deg,
-    #b8ecff 0%,
-    #58a8d7 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #b8ecff 0%,
+      #58a8d7 100%
+    );
 
   box-shadow:
-    inset 0 4px 4px rgba(255, 255, 255, 0.8),
-    0 4px 0 #17415c;
+    inset 0 4px 4px
+      rgba(
+        255,
+        255,
+        255,
+        0.8
+      ),
+    0 4px 0
+      #17415c;
 }
 
 /* =========================================================
@@ -606,14 +1109,24 @@ button {
 ========================================================= */
 
 .footerBlue {
-  width: min(1400px, 96%);
+  width:
+    min(
+      1400px,
+      96%
+    );
+
   min-height: 100px;
 
-  margin: 10px auto;
+  margin:
+    10px
+    auto;
 
-  padding: 20px 30px;
+  padding:
+    20px
+    30px;
 
   display: flex;
+
   align-items: center;
   justify-content: center;
 
@@ -621,33 +1134,65 @@ button {
 
   color: #073b68;
 
-  font-size: clamp(24px, 2.7vw, 35px);
+  font-size:
+    clamp(
+      24px,
+      2.7vw,
+      35px
+    );
+
   font-weight: 700;
 
-  border: 3px solid #17425e;
+  border:
+    3px solid
+    #17425e;
+
   border-radius: 20px;
 
-  background: linear-gradient(
-    180deg,
-    #91d5ff 0%,
-    #67b7e8 50%,
-    #4998cd 100%
-  );
+  background:
+    linear-gradient(
+      180deg,
+      #91d5ff 0%,
+      #67b7e8 50%,
+      #4998cd 100%
+    );
 
   box-shadow:
-    inset 0 6px 5px rgba(255, 255, 255, 0.72),
-    inset 0 -7px 7px rgba(0, 0, 0, 0.17),
-    0 6px 0 #16415b,
-    0 12px 17px rgba(0, 0, 0, 0.22);
+    inset 0 6px 5px
+      rgba(
+        255,
+        255,
+        255,
+        0.72
+      ),
+    inset 0 -7px 7px
+      rgba(
+        0,
+        0,
+        0,
+        0.17
+      ),
+    0 6px 0
+      #16415b,
+    0 12px 17px
+      rgba(
+        0,
+        0,
+        0,
+        0.22
+      );
 }
 
 /* =========================================================
    RESPONSIVE
 ========================================================= */
 
-@media (max-width: 1350px) {
+@media (
+  max-width: 1350px
+) {
   .topPanel {
-    flex-direction: column;
+    flex-direction:
+      column;
   }
 
   .namePlate {
@@ -657,30 +1202,40 @@ button {
 
   .navButtons {
     width: 100%;
-    justify-content: center;
+
+    justify-content:
+      center;
   }
 }
 
-@media (max-width: 950px) {
+@media (
+  max-width: 950px
+) {
   .cards {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
 }
 
-@media (max-width: 700px) {
+@media (
+  max-width: 700px
+) {
   .page {
     padding: 10px;
   }
 
   .topPanel {
-    padding: 20px 15px;
+    padding:
+      20px
+      15px;
   }
 
   .namePlate {
     width: 100%;
     min-width: 0;
 
-    white-space: normal;
+    white-space:
+      normal;
 
     font-size: 21px;
   }
@@ -690,7 +1245,9 @@ button {
 
     display: grid;
 
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns:
+      1fr
+      1fr;
   }
 
   .grayButton,
@@ -704,11 +1261,15 @@ button {
 
     min-height: 390px;
 
-    padding: 70px 15px 30px;
+    padding:
+      70px
+      15px
+      30px;
   }
 
   .clockTopLabel {
     width: 90%;
+
     font-size: 23px;
   }
 
@@ -723,7 +1284,10 @@ button {
   .mainSection {
     width: 97%;
 
-    padding: 60px 18px 35px;
+    padding:
+      60px
+      18px
+      35px;
   }
 
   .sectionTitle {
@@ -739,9 +1303,12 @@ button {
   }
 }
 
-@media (max-width: 450px) {
+@media (
+  max-width: 450px
+) {
   .navButtons {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
 
   .emblemRecess {
