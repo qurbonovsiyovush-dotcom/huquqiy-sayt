@@ -1,706 +1,1047 @@
+/* =========================================================
+   UMUMIY
+========================================================= */
+
 * {
-          box-sizing: border-box;
-        }
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
 
-        .page {
-          min-height: 100vh;
-          padding: 15px 18px 40px;
-
-          background: linear-gradient(
-            180deg,
-            #ffffff 0%,
-            #f3f5f6 55%,
-            #e5e8ea 100%
-          );
+body {
+  margin: 0;
+  background: #f4f4f4;
+  color: #111111;
+}
 
-          color: #111;
+button {
+  font: inherit;
+}
+
+.page {
+  min-height: 100vh;
+  width: 100%;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f7f7f7 55%,
+      #eeeeee 100%
+    );
+
+  font-family:
+    "Bell MT",
+    Georgia,
+    "Times New Roman",
+    serif;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.topPanel {
+  width: calc(100% - 36px);
+
+  margin:
+    18px
+    auto
+    0;
 
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            serif;
-        }
+  min-height: 145px;
 
-        button {
-          font-family: inherit;
-        }
+  padding:
+    28px
+    32px;
 
-        /* ================= HEADER ================= */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 30px;
 
-        .topPanel {
-          width: 100%;
-          min-height: 145px;
+  border-radius: 28px;
 
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+  border:
+    3px solid
+    #164c69;
 
-          gap: 28px;
+  background:
+    linear-gradient(
+      180deg,
+      #86d1fb 0%,
+      #55b4e8 48%,
+      #3498ce 100%
+    );
+
+  box-shadow:
+    inset 0 4px 3px
+      rgba(255, 255, 255, 0.8),
+    inset 0 -10px 0
+      rgba(0, 57, 92, 0.42),
+    0 12px 20px
+      rgba(0, 0, 0, 0.22);
+}
 
-          padding: 25px 32px;
 
-          border: 3px solid #173e58;
-          border-radius: 28px;
+/* =========================================================
+   ISM
+========================================================= */
 
-          background: linear-gradient(
-            180deg,
-            #8bd3ff 0%,
-            #69b7e8 40%,
-            #4999ce 100%
-          );
+.namePlate {
+  min-width: 475px;
 
-          box-shadow:
-            inset 0 7px 6px rgba(255, 255, 255, 0.75),
-            inset 0 -8px 8px rgba(0, 0, 0, 0.18),
-            0 7px 0 #173c55,
-            0 12px 18px rgba(0, 0, 0, 0.22);
-        }
+  padding:
+    24px
+    28px;
 
-        /* ================= ISM ================= */
+  text-align: center;
 
-        .namePlate {
-          min-width: 440px;
-
-          padding: 20px 27px;
+  font-size: 27px;
+  font-weight: 700;
 
-          text-align: center;
-          white-space: nowrap;
+  color: #050505;
 
-          color: #080808;
+  border-radius: 16px;
 
-          font-size: 28px;
-          font-weight: 700;
+  border:
+    2px solid
+    #4a4a4a;
 
-          border: 3px solid #42494e;
-          border-radius: 16px;
-
-          background: linear-gradient(
-            180deg,
-            #f7f7f7 0%,
-            #dedede 30%,
-            #b9b9b9 70%,
-            #9f9f9f 100%
-          );
-
-          box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.95),
-            inset 0 -6px 6px rgba(0, 0, 0, 0.2),
-            0 5px 0 #4b5256,
-            0 9px 11px rgba(0, 0, 0, 0.23);
-        }
-
-        /* ================= NAV ================= */
-
-        .navButtons {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #ededed 45%,
+      #c8c8c8 100%
+    );
 
-          gap: 14px;
-          flex-wrap: wrap;
-        }
-
-        .grayButton,
-        .adminButton,
-        .logoutButton {
-          width: 155px;
-          height: 62px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
+  box-shadow:
+    inset 0 3px 3px
+      rgba(255, 255, 255, 0.95),
+    inset 0 -6px 6px
+      rgba(0, 0, 0, 0.12),
+    0 8px 0
+      #4d5559,
+    0 12px 18px
+      rgba(0, 0, 0, 0.24);
 
-          padding: 0 10px;
+  text-shadow:
+    0 1px 0 #ffffff;
+}
 
-          border-radius: 14px;
 
-          cursor: pointer;
+/* =========================================================
+   NAVIGATION
+========================================================= */
 
-          font-size: 16px;
-          font-weight: 700;
+.navButtons {
+  flex: 1;
 
-          transition:
-            transform 0.15s ease,
-            filter 0.15s ease;
-        }
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 
-        .grayButton {
-          color: #111;
+  gap: 16px;
 
-          border: 3px solid #464c50;
-
-          background: linear-gradient(
-            180deg,
-            #f8f8f8 0%,
-            #dedede 30%,
-            #b8b8b8 70%,
-            #999999 100%
-          );
-
-          box-shadow:
-            inset 0 5px 5px rgba(255, 255, 255, 0.95),
-            inset 0 -6px 6px rgba(0, 0, 0, 0.2),
-            0 5px 0 #4b5256,
-            0 8px 10px rgba(0, 0, 0, 0.22);
-        }
+  flex-wrap: wrap;
+}
 
-        .adminButton {
-          color: white;
 
-          border: 3px solid #174461;
+/* =========================================================
+   UMUMIY TUGMALAR
+========================================================= */
 
-          background: linear-gradient(
-            180deg,
-            #9bd9ff 0%,
-            #59a9d9 55%,
-            #2d7eae 100%
-          );
+.grayButton,
+.adminButton,
+.logoutButton,
+.openButton {
+  cursor: pointer;
 
-          box-shadow:
-            inset 0 5px 5px rgba(255, 255, 255, 0.45),
-            0 5px 0 #17415c,
-            0 8px 10px rgba(0, 0, 0, 0.22);
-        }
+  border: none;
 
-        .logoutButton {
-          color: white;
+  font-weight: 700;
 
-          border: 3px solid #7c1515;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
 
-          background: linear-gradient(
-            180deg,
-            #ff8080 0%,
-            #e54646 40%,
-            #c32121 72%,
-            #981313 100%
-          );
+.grayButton:active,
+.adminButton:active,
+.logoutButton:active,
+.openButton:active {
+  transform: translateY(3px);
+}
 
-          box-shadow:
-            inset 0 5px 5px rgba(255, 255, 255, 0.45),
-            0 5px 0 #761010,
-            0 8px 10px rgba(0, 0, 0, 0.22);
-        }
 
-        .grayButton:hover,
-        .adminButton:hover,
-        .logoutButton:hover {
-          filter: brightness(1.07);
-          transform: translateY(-2px);
-        }
+/* =========================================================
+   KULRANG NAV TUGMALAR
+========================================================= */
 
-        /* ================= SOAT ================= */
+.grayButton {
+  min-width: 145px;
 
-        .clockSection {
-          width: 100%;
+  min-height: 62px;
 
-          padding: 55px 0 90px;
+  padding:
+    12px
+    20px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
+  border-radius: 15px;
 
-        .clockPanel {
-          position: relative;
+  color: #111111;
 
-          width: min(1400px, 95%);
-          min-height: 500px;
+  border:
+    2px solid
+    #555555;
 
-          padding: 70px 50px 45px;
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #eeeeee 48%,
+      #bdbdbd 100%
+    );
 
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
+  box-shadow:
+    inset 0 3px 2px
+      rgba(255, 255, 255, 0.95),
+    inset 0 -5px 5px
+      rgba(0, 0, 0, 0.12),
+    0 7px 0
+      #50585b,
+    0 10px 14px
+      rgba(0, 0, 0, 0.18);
+}
 
-          gap: 32px;
+.grayButton:hover {
+  transform: translateY(-2px);
+}
 
-          border: 3px solid #303538;
-          border-radius: 30px;
 
-          background: linear-gradient(
-            145deg,
-            #686c6f 0%,
-            #505457 45%,
-            #363a3d 100%
-          );
+/* =========================================================
+   ADMIN
+========================================================= */
 
-          box-shadow:
-            inset 0 7px 6px rgba(255, 255, 255, 0.23),
-            inset 0 -8px 8px rgba(0, 0, 0, 0.32),
-            0 7px 0 #272b2e,
-            0 15px 24px rgba(0, 0, 0, 0.3);
-        }
+.adminButton {
+  min-width: 145px;
 
-        .clockTopLabel {
-          position: absolute;
+  min-height: 62px;
 
-          top: -35px;
-          left: 50%;
+  padding:
+    12px
+    20px;
 
-          transform: translateX(-50%);
+  border-radius: 15px;
 
-          width: min(650px, 80%);
-          min-height: 68px;
+  color: #ffffff;
 
-          padding: 10px 25px;
+  border:
+    2px solid
+    #155076;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+  background:
+    linear-gradient(
+      180deg,
+      #6bc9f5 0%,
+      #2698d1 55%,
+      #1675a7 100%
+    );
 
-          text-align: center;
+  box-shadow:
+    inset 0 3px 2px
+      rgba(255, 255, 255, 0.55),
+    inset 0 -5px 5px
+      rgba(0, 0, 0, 0.15),
+    0 7px 0
+      #14516f,
+    0 10px 14px
+      rgba(0, 0, 0, 0.20);
+}
 
-          color: #073b68;
+.adminButton:hover {
+  transform: translateY(-2px);
+}
 
-          font-size: clamp(25px, 2.8vw, 38px);
-          font-weight: 700;
 
-          border: 3px solid #174461;
-          border-radius: 17px;
+/* =========================================================
+   CHIQISH
+========================================================= */
 
-          background: linear-gradient(
-            180deg,
-            #9bd9ff 0%,
-            #73bdea 45%,
-            #4e9ccc 100%
-          );
+.logoutButton {
+  min-width: 145px;
 
-          box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.75),
-            inset 0 -6px 6px rgba(0, 0, 0, 0.16),
-            0 5px 0 #17415c,
-            0 9px 13px rgba(0, 0, 0, 0.25);
-        }
+  min-height: 62px;
 
-        .clockTime {
-          width: min(850px, 90%);
-          min-height: 185px;
+  padding:
+    12px
+    20px;
 
-          padding: 25px 30px;
+  border-radius: 15px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+  color: #ffffff;
 
-          text-align: center;
+  border:
+    2px solid
+    #9e1717;
 
-          color: #0c0c0c;
+  background:
+    linear-gradient(
+      180deg,
+      #ff6464 0%,
+      #ed2929 50%,
+      #bd0c0c 100%
+    );
 
-          font-size: clamp(65px, 8vw, 130px);
-          font-weight: 700;
-          letter-spacing: 8px;
+  box-shadow:
+    inset 0 3px 2px
+      rgba(255, 255, 255, 0.55),
+    inset 0 -5px 5px
+      rgba(0, 0, 0, 0.18),
+    0 7px 0
+      #841111,
+    0 10px 14px
+      rgba(0, 0, 0, 0.20);
+}
 
-          border: 4px solid #42494e;
-          border-radius: 25px;
+.logoutButton:hover {
+  transform: translateY(-2px);
+}
 
-          background: linear-gradient(
-            180deg,
-            #f5f5f5 0%,
-            #dddddd 30%,
-            #b8b8b8 72%,
-            #989898 100%
-          );
 
-          box-shadow:
-            inset 0 8px 7px rgba(255, 255, 255, 0.96),
-            inset 0 -8px 8px rgba(0, 0, 0, 0.22),
-            0 7px 0 #4b5256,
-            0 13px 18px rgba(0, 0, 0, 0.27);
-        }
+/* =========================================================
+   GERB BO‘LIMI
+========================================================= */
 
-        .calendarBox {
-          width: min(850px, 90%);
-          min-height: 130px;
+.clockSection {
+  width: 100%;
 
-          padding: 20px 30px;
+  padding:
+    50px
+    8%
+    45px;
+}
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+.clockPanel {
+  position: relative;
 
-          border: 3px solid #174461;
-          border-radius: 20px;
+  width: 100%;
 
-          background: linear-gradient(
-            180deg,
-            #a7deff 0%,
-            #72bde9 55%,
-            #4d9bcb 100%
-          );
+  min-height: 490px;
 
-          box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.72),
-            inset 0 -6px 6px rgba(0, 0, 0, 0.15),
-            0 5px 0 #17415c,
-            0 10px 14px rgba(0, 0, 0, 0.22);
-        }
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-        .dateText {
-          width: 100%;
+  border-radius: 28px;
 
-          color: #073b68;
+  border:
+    3px solid
+    #33383b;
 
-          text-align: center;
+  background:
+    linear-gradient(
+      145deg,
+      #5b6063 0%,
+      #45494b 48%,
+      #333638 100%
+    );
 
-          font-size: clamp(26px, 3vw, 40px);
-          font-weight: 700;
-        }
+  box-shadow:
+    inset 0 4px 4px
+      rgba(255, 255, 255, 0.20),
+    inset 0 -8px 7px
+      rgba(0, 0, 0, 0.40),
+    0 12px 24px
+      rgba(0, 0, 0, 0.25);
+}
 
-        /* ================= BO‘LIM ================= */
 
-        .mainSection {
-          position: relative;
+/* =========================================================
+   HUQUQIY TA'LIM PLATFORMASI
+========================================================= */
 
-          width: min(1400px, 96%);
-          min-height: 330px;
+.clockTopLabel {
+  position: absolute;
 
-          margin: 0 auto 95px;
+  top: -35px;
+  left: 50%;
 
-          padding: 65px 32px 45px;
+  transform:
+    translateX(-50%);
 
-          scroll-margin-top: 60px;
+  z-index: 10;
 
-          border: 3px solid #303538;
-          border-radius: 28px;
+  width: min(
+    630px,
+    calc(100% - 40px)
+  );
 
-          background: linear-gradient(
-            145deg,
-            #686c6f 0%,
-            #505457 45%,
-            #363a3d 100%
-          );
+  padding:
+    12px
+    25px;
 
-          box-shadow:
-            inset 0 7px 6px rgba(255, 255, 255, 0.23),
-            inset 0 -8px 8px rgba(0, 0, 0, 0.32),
-            0 7px 0 #272b2e,
-            0 15px 24px rgba(0, 0, 0, 0.3);
-        }
+  text-align: center;
 
-        .sectionTitle {
-          position: absolute;
+  font-size: 37px;
+  line-height: 1.15;
+
+  font-weight: 700;
+
+  color: #064875;
+
+  border-radius: 16px;
+
+  border:
+    2px solid
+    #175579;
+
+  background:
+    linear-gradient(
+      180deg,
+      #a8ddfb 0%,
+      #6fc2ef 48%,
+      #42a4d8 100%
+    );
 
-          top: -35px;
-          left: 50%;
+  box-shadow:
+    inset 0 3px 3px
+      rgba(255, 255, 255, 0.75),
+    inset 0 -5px 4px
+      rgba(0, 0, 0, 0.12),
+    0 8px 0
+      #155879,
+    0 12px 18px
+      rgba(0, 0, 0, 0.25);
 
-          transform: translateX(-50%);
+  text-shadow:
+    0 1px 0
+      rgba(255, 255, 255, 0.6);
+}
 
-          width: 310px;
-          height: 66px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+/* =========================================================
+   GERB JOYLASHUV
+========================================================= */
 
-          text-align: center;
+.emblemArea {
+  width: 100%;
 
-          color: #073b68;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-          font-size: 28px;
-          font-weight: 700;
+  padding:
+    55px
+    20px
+    25px;
+}
 
-          border: 3px solid #174461;
-          border-radius: 15px;
 
-          background: linear-gradient(
-            180deg,
-            #9bd9ff 0%,
-            #73bdea 45%,
-            #4e9ccc 100%
-          );
+/* =========================================================
+   GERBNING 3D CHUQURLIGI
+========================================================= */
 
-          box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.75),
-            inset 0 -6px 6px rgba(0, 0, 0, 0.16),
-            0 5px 0 #17415c,
-            0 9px 13px rgba(0, 0, 0, 0.25);
-        }
+.emblem3D {
+  position: relative;
 
-        /* ================= KARTALAR ================= */
+  width: 400px;
+  height: 400px;
 
-        .cards {
-          display: grid;
+  max-width: 80vw;
+  max-height: 80vw;
 
-          grid-template-columns:
-            repeat(3, minmax(0, 1fr));
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-          gap: 30px;
-        }
+  border-radius: 50%;
 
-        .card {
-          min-height: 230px;
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      #555a5d 0%,
+      #3d4143 43%,
+      #292c2e 68%,
+      #151718 100%
+    );
 
-          padding: 30px 22px;
+  border:
+    4px solid
+    rgba(20, 22, 23, 0.95);
 
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
+  box-shadow:
+    inset 0 7px 8px
+      rgba(255, 255, 255, 0.10),
+    inset 0 -15px 22px
+      rgba(0, 0, 0, 0.65),
+    inset 8px 0 16px
+      rgba(255, 255, 255, 0.03),
+    inset -8px 0 16px
+      rgba(0, 0, 0, 0.30),
+    0 3px 0
+      rgba(255, 255, 255, 0.10),
+    0 9px 0
+      rgba(0, 0, 0, 0.35),
+    0 18px 24px
+      rgba(0, 0, 0, 0.38),
+    0 30px 45px
+      rgba(0, 0, 0, 0.25);
+}
 
-          text-align: center;
 
-          border: 2px solid #3d4347;
-          border-radius: 20px;
+/* =========================================================
+   GERBNING ICHKI O‘YILGAN HALQASI
+========================================================= */
 
-          background: linear-gradient(
-            145deg,
-            #e1e1e1 0%,
-            #c5c5c5 50%,
-            #a6a6a6 100%
-          );
+.emblem3D::before {
+  content: "";
 
-          box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.86),
-            inset 0 -7px 7px rgba(0, 0, 0, 0.18),
-            0 6px 0 #4a5054,
-            0 11px 16px rgba(0, 0, 0, 0.25);
-        }
+  position: absolute;
 
-        .card h2 {
-          flex: 1;
+  inset: 15px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+  border-radius: 50%;
 
-          margin: 10px 0 28px;
+  border:
+    3px solid
+    rgba(0, 0, 0, 0.55);
 
-          color: #111;
+  box-shadow:
+    inset 0 5px 9px
+      rgba(0, 0, 0, 0.60),
+    inset 0 -3px 5px
+      rgba(255, 255, 255, 0.07),
+    0 2px 2px
+      rgba(255, 255, 255, 0.07);
 
-          font-size: clamp(22px, 2vw, 28px);
-        }
+  pointer-events: none;
+}
 
-        .adminLabel {
-          margin: -15px 0 18px;
 
-          padding: 7px 14px;
+/* =========================================================
+   GERBNING ICHKI QISMI
+========================================================= */
 
-          color: #125a32;
+.emblemInner {
+  position: relative;
 
-          font-size: 14px;
-          font-weight: 700;
+  z-index: 2;
 
-          border: 1px solid #2d8450;
-          border-radius: 8px;
+  width: 92%;
+  height: 92%;
 
-          background: #d8f1df;
-        }
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-        .vocabularySubtitle {
-          margin: -18px 0 22px;
+  border-radius: 50%;
 
-          color: #173e58;
+  perspective: 1200px;
+}
 
-          font-size: 16px;
-          font-weight: 700;
-        }
 
-        /* ================= TUGMALAR ================= */
+/* =========================================================
+   GERB RASMI
+========================================================= */
 
-        .openButton {
-          width: 165px;
-          height: 48px;
+.emblemImage {
+  display: block;
 
-          border: 2px solid #4e565b;
-          border-radius: 9px;
+  width: 92%;
+  height: 92%;
 
-          cursor: pointer;
+  object-fit: contain;
 
-          color: #111;
+  user-select: none;
 
-          font-size: 17px;
-          font-weight: 700;
+  transform:
+    perspective(1200px)
+    rotateX(2deg)
+    translateZ(24px);
 
-          background: linear-gradient(
-            180deg,
-            #f8f8f8 0%,
-            #bdbdbd 100%
-          );
+  transform-origin:
+    center center;
 
-          box-shadow:
-            inset 0 4px 4px white,
-            0 4px 0 #555d61;
+  filter:
+    drop-shadow(
+      0 2px 0
+      rgba(255, 255, 255, 0.12)
+    )
+    drop-shadow(
+      0 5px 2px
+      rgba(0, 0, 0, 0.28)
+    )
+    drop-shadow(
+      0 12px 8px
+      rgba(0, 0, 0, 0.38)
+    )
+    drop-shadow(
+      0 23px 20px
+      rgba(0, 0, 0, 0.28)
+    );
+}
 
-          transition:
-            transform 0.15s ease,
-            filter 0.15s ease;
-        }
 
-        .openButton:hover {
-          filter: brightness(1.06);
-          transform: translateY(-2px);
-        }
+/* =========================================================
+   ASOSIY BO‘LIMLAR
+========================================================= */
 
-        .openButton:active {
-          transform: translateY(2px);
-        }
+.mainSection {
+  width: 84%;
 
-        .testButton {
-          color: #073b68;
+  margin:
+    0
+    auto
+    45px;
 
-          border-color: #174461;
+  scroll-margin-top: 30px;
+}
 
-          background: linear-gradient(
-            180deg,
-            #b8ecff 0%,
-            #58a8d7 100%
-          );
 
-          box-shadow:
-            inset 0 4px 4px rgba(255, 255, 255, 0.8),
-            0 4px 0 #17415c;
-        }
+/* =========================================================
+   BO‘LIM NOMI
+========================================================= */
 
-        /* ================= FOOTER ================= */
+.sectionTitle {
+  width: fit-content;
 
-        .footerBlue {
-          width: min(1400px, 96%);
-          min-height: 100px;
+  min-width: 260px;
 
-          margin: 10px auto;
+  margin-bottom: 22px;
 
-          padding: 20px 30px;
+  padding:
+    12px
+    30px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+  text-align: center;
 
-          text-align: center;
+  font-size: 31px;
+  font-weight: 700;
 
-          color: #073b68;
+  color: #073d63;
 
-          font-size: clamp(24px, 2.7vw, 35px);
-          font-weight: 700;
+  border-radius: 15px;
 
-          border: 3px solid #17425e;
-          border-radius: 20px;
+  border:
+    2px solid
+    #175579;
 
-          background: linear-gradient(
-            180deg,
-            #91d5ff 0%,
-            #67b7e8 50%,
-            #4998cd 100%
-          );
+  background:
+    linear-gradient(
+      180deg,
+      #a7ddfb 0%,
+      #6bc0ed 50%,
+      #43a4d7 100%
+    );
 
-          box-shadow:
-            inset 0 6px 5px rgba(255, 255, 255, 0.72),
-            inset 0 -7px 7px rgba(0, 0, 0, 0.17),
-            0 6px 0 #16415b,
-            0 12px 17px rgba(0, 0, 0, 0.22);
-        }
+  box-shadow:
+    inset 0 3px 3px
+      rgba(255, 255, 255, 0.75),
+    inset 0 -5px 4px
+      rgba(0, 0, 0, 0.12),
+    0 7px 0
+      #155879,
+    0 11px 16px
+      rgba(0, 0, 0, 0.20);
+}
 
-        /* ================= RESPONSIVE ================= */
 
-        @media (max-width: 1350px) {
-          .topPanel {
-            flex-direction: column;
-          }
+/* =========================================================
+   CARD GRID
+========================================================= */
 
-          .namePlate {
-            width: 100%;
-            min-width: 0;
-          }
+.cards {
+  display: grid;
 
-          .navButtons {
-            width: 100%;
-            justify-content: center;
-          }
-        }
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
 
-        @media (max-width: 950px) {
-          .cards {
-            grid-template-columns: 1fr;
-          }
-        }
+  gap: 26px;
+}
 
-        @media (max-width: 700px) {
-          .page {
-            padding: 10px;
-          }
 
-          .topPanel {
-            padding: 20px 15px;
-          }
+/* =========================================================
+   CARD
+========================================================= */
 
-          .namePlate {
-            width: 100%;
-            min-width: 0;
+.card {
+  min-height: 180px;
 
-            white-space: normal;
+  padding:
+    28px
+    26px;
 
-            font-size: 21px;
-          }
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
 
-          .navButtons {
-            width: 100%;
+  border-radius: 20px;
 
-            display: grid;
+  border:
+    2px solid
+    #c8c8c8;
 
-            grid-template-columns: 1fr 1fr;
-          }
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff 0%,
+      #f3f3f3 50%,
+      #dddddd 100%
+    );
 
-          .grayButton,
-          .adminButton,
-          .logoutButton {
-            width: 100%;
-          }
+  box-shadow:
+    inset 0 3px 3px
+      rgba(255, 255, 255, 0.95),
+    inset 0 -5px 5px
+      rgba(0, 0, 0, 0.08),
+    0 7px 0
+      #aeb3b5,
+    0 13px 20px
+      rgba(0, 0, 0, 0.16);
+}
 
-          .clockPanel {
-            width: 97%;
+.card h2 {
+  margin:
+    0
+    0
+    22px;
 
-            padding: 70px 15px 30px;
-          }
+  font-size: 25px;
+  line-height: 1.25;
 
-          .clockTopLabel {
-            width: 90%;
-            font-size: 23px;
-          }
+  color: #111111;
+}
 
-          .clockTime {
-            width: 96%;
-            min-height: 130px;
 
-            font-size: 50px;
+/* =========================================================
+   OCHISH
+========================================================= */
 
-            letter-spacing: 2px;
-          }
+.openButton {
+  min-width: 135px;
 
-          .calendarBox {
-            width: 96%;
-            min-height: 110px;
-          }
+  min-height: 50px;
 
-          .dateText {
-            font-size: 22px;
-          }
+  padding:
+    10px
+    24px;
 
-          .mainSection {
-            width: 97%;
+  border-radius: 10px;
 
-            padding: 60px 18px 35px;
-          }
+  color: #ffffff;
 
-          .sectionTitle {
-            width: 88%;
+  border:
+    2px solid
+    #115384;
 
-            font-size: 23px;
-          }
+  background:
+    linear-gradient(
+      180deg,
+      #45b6f4 0%,
+      #168bd0 50%,
+      #0569aa 100%
+    );
 
-          .footerBlue {
-            width: 97%;
+  box-shadow:
+    inset 0 2px 2px
+      rgba(255, 255, 255, 0.5),
+    inset 0 -4px 4px
+      rgba(0, 0, 0, 0.15),
+    0 5px 0
+      #075381,
+    0 8px 12px
+      rgba(0, 0, 0, 0.18);
+}
 
-            font-size: 22px;
-          }
-        }
+.openButton:hover {
+  transform:
+    translateY(-2px);
+}
 
-        @media (max-width: 450px) {
-          .navButtons {
-            grid-template-columns: 1fr;
-          }
 
-          .clockTime {
-            font-size: 42px;
-            letter-spacing: 1px;
-          }
-        }
+/* =========================================================
+   ADMIN LABEL
+========================================================= */
+
+.adminLabel {
+  display: inline-block;
+
+  margin:
+    -10px
+    0
+    18px;
+
+  padding:
+    7px
+    12px;
+
+  border-radius: 8px;
+
+  background: #f5e6b7;
+
+  color: #3d3214;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  border:
+    1px solid
+    #d6bd73;
+}
+
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.footerBlue {
+  width: 100%;
+
+  margin-top: 60px;
+
+  padding:
+    30px
+    20px;
+
+  text-align: center;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  color: #ffffff;
+
+  background:
+    linear-gradient(
+      180deg,
+      #165f91 0%,
+      #0a426b 100%
+    );
+
+  box-shadow:
+    inset 0 3px 3px
+      rgba(255, 255, 255, 0.15);
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (
+  max-width: 1250px
+) {
+  .topPanel {
+    flex-direction: column;
+
+    align-items: stretch;
+  }
+
+  .namePlate {
+    min-width: 0;
+
+    width: 100%;
+  }
+
+  .navButtons {
+    justify-content: center;
+  }
+
+  .cards {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+
+/* =========================================================
+   TELEFON
+========================================================= */
+
+@media (
+  max-width: 700px
+) {
+  .page {
+    overflow-x: hidden;
+  }
+
+  .topPanel {
+    width:
+      calc(100% - 20px);
+
+    margin-top: 10px;
+
+    padding:
+      20px
+      14px;
+
+    border-radius: 20px;
+  }
+
+  .namePlate {
+    padding:
+      18px
+      12px;
+
+    font-size: 21px;
+  }
+
+  .navButtons {
+    display: grid;
+
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+
+    width: 100%;
+
+    gap: 12px;
+  }
+
+  .grayButton,
+  .adminButton,
+  .logoutButton {
+    min-width: 0;
+
+    width: 100%;
+
+    min-height: 52px;
+
+    padding:
+      10px
+      8px;
+
+    font-size: 14px;
+  }
+
+  .clockSection {
+    padding:
+      55px
+      18px
+      35px;
+  }
+
+  .clockPanel {
+    min-height: 350px;
+
+    border-radius: 22px;
+  }
+
+  .clockTopLabel {
+    top: -27px;
+
+    width:
+      calc(100% - 30px);
+
+    padding:
+      10px
+      12px;
+
+    font-size: 24px;
+  }
+
+  .emblemArea {
+    padding:
+      45px
+      10px
+      15px;
+  }
+
+  .emblem3D {
+    width: 280px;
+    height: 280px;
+  }
+
+  .emblem3D::before {
+    inset: 10px;
+  }
+
+  .mainSection {
+    width:
+      calc(100% - 30px);
+
+    margin-bottom: 35px;
+  }
+
+  .sectionTitle {
+    min-width: 0;
+
+    width: 100%;
+
+    padding:
+      10px
+      18px;
+
+    font-size: 25px;
+  }
+
+  .cards {
+    grid-template-columns:
+      1fr;
+
+    gap: 20px;
+  }
+
+  .card {
+    min-height: 155px;
+
+    padding:
+      22px
+      20px;
+  }
+
+  .card h2 {
+    font-size: 21px;
+  }
+
+  .footerBlue {
+    margin-top: 40px;
+
+    padding:
+      24px
+      15px;
+
+    font-size: 15px;
+  }
+}
+
+
+/* =========================================================
+   JUDA KICHIK EKRAN
+========================================================= */
+
+@media (
+  max-width: 430px
+) {
+  .navButtons {
+    grid-template-columns:
+      1fr;
+  }
+
+  .emblem3D {
+    width: 240px;
+    height: 240px;
+  }
+
+  .clockPanel {
+    min-height: 310px;
+  }
+
+  .clockTopLabel {
+    font-size: 21px;
+  }
+}
