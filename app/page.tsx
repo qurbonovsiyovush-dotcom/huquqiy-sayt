@@ -5,9 +5,21 @@ import "./home.css";
 
 type UserRole = "admin" | "user" | null;
 
+type ActiveSection =
+  | "talabalar"
+  | "abituriyent"
+  | "savoljavob"
+  | null;
+
 export default function Home() {
-  const [role, setRole] = useState<UserRole>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
+  const [role, setRole] =
+    useState<UserRole>(null);
+
+  const [roleLoading, setRoleLoading] =
+    useState(true);
+
+  const [activeSection, setActiveSection] =
+    useState<ActiveSection>(null);
 
   /* =========================================
      ADMIN / USER ROLINI ANIQLASH
@@ -18,24 +30,35 @@ export default function Home() {
 
     async function loadRole() {
       try {
-        const response = await fetch("/api/me", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",
-        });
+        const response = await fetch(
+          "/api/me",
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+          }
+        );
 
         if (response.status === 401) {
-          window.location.replace("/login");
+          window.location.replace(
+            "/login"
+          );
+
           return;
         }
 
         if (!response.ok) {
-          throw new Error("Rolni aniqlab bo‘lmadi.");
+          throw new Error(
+            "Rolni aniqlab bo‘lmadi."
+          );
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         if (data.role === "admin") {
           setRole("admin");
@@ -43,7 +66,10 @@ export default function Home() {
           setRole("user");
         }
       } catch (error) {
-        console.error("ROLE LOAD ERROR:", error);
+        console.error(
+          "ROLE LOAD ERROR:",
+          error
+        );
 
         if (!cancelled) {
           setRole("user");
@@ -63,17 +89,102 @@ export default function Home() {
   }, []);
 
   /* =========================================
+     QAYSI BO‘LIM KO‘RINIB TURGANINI ANIQLASH
+  ========================================= */
+
+  useEffect(() => {
+    const sectionIds = [
+      "talabalar",
+      "abituriyent",
+      "savoljavob",
+    ] as const;
+
+    const sections =
+      sectionIds
+        .map((id) =>
+          document.getElementById(id)
+        )
+        .filter(
+          (
+            element
+          ): element is HTMLElement =>
+            Boolean(element)
+        );
+
+    if (sections.length === 0) {
+      return;
+    }
+
+    const observer =
+      new IntersectionObserver(
+        (entries) => {
+          const visibleEntries =
+            entries
+              .filter(
+                (entry) =>
+                  entry.isIntersecting
+              )
+              .sort(
+                (a, b) =>
+                  b.intersectionRatio -
+                  a.intersectionRatio
+              );
+
+          if (
+            visibleEntries.length > 0
+          ) {
+            const id =
+              visibleEntries[0]
+                .target.id as ActiveSection;
+
+            setActiveSection(id);
+          }
+        },
+        {
+          root: null,
+
+          rootMargin:
+            "-25% 0px -55% 0px",
+
+          threshold: [
+            0,
+            0.1,
+            0.25,
+            0.5,
+            0.75,
+            1,
+          ],
+        }
+      );
+
+    sections.forEach(
+      (section) => {
+        observer.observe(section);
+      }
+    );
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  /* =========================================
      CHIQISH
   ========================================= */
 
   async function logout() {
     try {
-      await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch(
+        "/api/logout",
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
     } finally {
-      window.location.replace("/login");
+      window.location.replace(
+        "/login"
+      );
     }
   }
 
@@ -81,11 +192,20 @@ export default function Home() {
      BO‘LIMGA TUSHISH
   ========================================= */
 
-  function scrollToSection(id: string) {
-    document.getElementById(id)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  function scrollToSection(
+    id:
+      | "talabalar"
+      | "abituriyent"
+      | "savoljavob"
+  ) {
+    setActiveSection(id);
+
+    document
+      .getElementById(id)
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
   }
 
   /* =========================================
@@ -93,7 +213,8 @@ export default function Home() {
   ========================================= */
 
   function openTests() {
-    window.location.href = "/test-entry";
+    window.location.href =
+      "/test-entry";
   }
 
   /* =========================================
@@ -101,7 +222,8 @@ export default function Home() {
   ========================================= */
 
   function openGuides() {
-    window.location.href = "/qollanmalar";
+    window.location.href =
+      "/qollanmalar";
   }
 
   return (
@@ -116,24 +238,51 @@ export default function Home() {
         <nav className="navButtons">
           <button
             type="button"
-            className="grayButton"
-            onClick={() => scrollToSection("talabalar")}
+            className={`grayButton ${
+              activeSection ===
+              "talabalar"
+                ? "activeNavButton"
+                : ""
+            }`}
+            onClick={() =>
+              scrollToSection(
+                "talabalar"
+              )
+            }
           >
             Talabalar
           </button>
 
           <button
             type="button"
-            className="grayButton"
-            onClick={() => scrollToSection("abituriyent")}
+            className={`grayButton ${
+              activeSection ===
+              "abituriyent"
+                ? "activeNavButton"
+                : ""
+            }`}
+            onClick={() =>
+              scrollToSection(
+                "abituriyent"
+              )
+            }
           >
             Abituriyent
           </button>
 
           <button
             type="button"
-            className="grayButton"
-            onClick={() => scrollToSection("savoljavob")}
+            className={`grayButton ${
+              activeSection ===
+              "savoljavob"
+                ? "activeNavButton"
+                : ""
+            }`}
+            onClick={() =>
+              scrollToSection(
+                "savoljavob"
+              )
+            }
           >
             Savol-javob
           </button>
@@ -146,17 +295,19 @@ export default function Home() {
             Qo‘llanmalar
           </button>
 
-          {!roleLoading && role === "admin" && (
-            <button
-              type="button"
-              className="adminButton"
-              onClick={() => {
-                window.location.href = "/admin";
-              }}
-            >
-              Admin
-            </button>
-          )}
+          {!roleLoading &&
+            role === "admin" && (
+              <button
+                type="button"
+                className="adminButton"
+                onClick={() => {
+                  window.location.href =
+                    "/admin";
+                }}
+              >
+                Admin
+              </button>
+            )}
 
           <button
             type="button"
@@ -191,7 +342,10 @@ export default function Home() {
 
       {/* ================= TALABALAR ================= */}
 
-      <section id="talabalar" className="mainSection">
+      <section
+        id="talabalar"
+        className="mainSection"
+      >
         <div className="sectionTitle">
           Talabalar
         </div>
@@ -199,7 +353,8 @@ export default function Home() {
         <div className="cards">
           <article className="card">
             <h2>
-              Normativ-huquqiy hujjatlar
+              Normativ-huquqiy
+              hujjatlar
             </h2>
 
             <button
@@ -233,7 +388,9 @@ export default function Home() {
           </article>
 
           <article className="card">
-            <h2>Qo‘llanmalar</h2>
+            <h2>
+              Qo‘llanmalar
+            </h2>
 
             <button
               type="button"
@@ -260,25 +417,30 @@ export default function Home() {
           <article className="card">
             <h2>Testlar</h2>
 
-            {!roleLoading && role === "admin" && (
-              <div className="adminLabel">
-                Administrator boshqaruvi
-              </div>
-            )}
+            {!roleLoading &&
+              role === "admin" && (
+                <div className="adminLabel">
+                  Administrator
+                  boshqaruvi
+                </div>
+              )}
 
             <button
               type="button"
               className="openButton testButton"
               onClick={openTests}
             >
-              {!roleLoading && role === "admin"
+              {!roleLoading &&
+              role === "admin"
                 ? "Boshqarish"
                 : "Ochish"}
             </button>
           </article>
 
           <article className="card">
-            <h2>Qo‘llanmalar</h2>
+            <h2>
+              Qo‘llanmalar
+            </h2>
 
             <button
               type="button"
@@ -290,7 +452,9 @@ export default function Home() {
           </article>
 
           <article className="card">
-            <h2>Video darslar</h2>
+            <h2>
+              Video darslar
+            </h2>
 
             <button
               type="button"
@@ -315,7 +479,8 @@ export default function Home() {
         <div className="cards">
           <article className="card">
             <h2>
-              Ko‘p beriladigan savollar
+              Ko‘p beriladigan
+              savollar
             </h2>
 
             <button
@@ -327,7 +492,9 @@ export default function Home() {
           </article>
 
           <article className="card">
-            <h2>Savol yuborish</h2>
+            <h2>
+              Savol yuborish
+            </h2>
 
             <button
               type="button"
@@ -355,7 +522,9 @@ export default function Home() {
       {/* ================= FOOTER ================= */}
 
       <footer className="footerBlue">
-        Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi
+        Qurbonov Siyovush
+        Jamaliddinzodaning huquqiy
+        ta’lim platformasi
       </footer>
     </main>
   );
