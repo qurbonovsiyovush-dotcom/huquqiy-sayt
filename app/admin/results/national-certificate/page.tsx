@@ -141,16 +141,9 @@ export default function NationalCertificateResultsPage() {
       <div className="container">
         <div className="topbar">
           <div>
-            <p className="eyebrow">
-              MILLIY SERTIFIKAT
-            </p>
-
-            <h1>Natijalar</h1>
-
-            <p className="subtitle">
-              Foydalanuvchilarning Milliy sertifikat test
-              natijalarini boshqarish.
-            </p>
+            <div className="mainTitleButton">
+              MILLIY SERTIFIKAT NATIJALARI
+            </div>
           </div>
 
           <div className="topActions">
@@ -386,9 +379,9 @@ export default function NationalCertificateResultsPage() {
           align-items: center;
           justify-content: space-between;
           gap: 28px;
-          min-height: 158px;
+          min-height: 118px;
           margin-bottom: 26px;
-          padding: 24px 28px 26px;
+          padding: 20px 28px 22px;
           border: 3px solid #21445d;
           border-radius: 22px;
           color: #102f49;
@@ -436,46 +429,34 @@ export default function NationalCertificateResultsPage() {
           padding: 4px 0 2px 2px;
         }
 
-        .eyebrow {
+        .mainTitleButton {
+          min-height: 58px;
           display: inline-flex;
-          margin: 0 0 8px;
-          padding: 5px 11px;
-          border: 1px solid #2b607f;
-          border-radius: 8px;
-          color: #0f476b;
+          align-items: center;
+          justify-content: center;
+          padding: 13px 24px;
+          border: 2px solid #414b52;
+          border-radius: 12px;
           background:
             linear-gradient(
               180deg,
-              #e8f8ff 0%,
-              #b9e4f8 100%
+              #ffffff 0%,
+              #f1f1f1 42%,
+              #c6c9cb 100%
             );
-          font-size: 12px;
+          color: #162333;
+          font-size: 20px;
           font-weight: 900;
-          letter-spacing: 0.12em;
-          text-shadow: 0 1px 0 #fff;
-          box-shadow:
-            inset 0 1px 0 #fff,
-            0 2px 0 #2a6d8d;
-        }
-
-        h1 {
-          margin: 2px 0 0;
-          font-size: 40px;
-          line-height: 1.06;
-          color: #10263c;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
           text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.8),
-            0 2px 3px rgba(0, 0, 0, 0.12);
-        }
-
-        .subtitle {
-          max-width: 760px;
-          margin: 11px 0 0;
-          color: #173f5a;
-          font-size: 16px;
-          font-weight: 800;
-          line-height: 1.4;
-          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+            0 1px 0 rgba(255, 255, 255, 0.95);
+          box-shadow:
+            inset 0 2px 0 rgba(255, 255, 255, 0.95),
+            inset 0 -5px 0 rgba(61, 67, 71, 0.18),
+            0 6px 0 #525b61,
+            0 10px 14px rgba(0, 0, 0, 0.17);
+          white-space: nowrap;
         }
 
         .topActions {
@@ -940,6 +921,12 @@ export default function NationalCertificateResultsPage() {
             padding-right: 0;
           }
 
+          .mainTitleButton {
+            width: 100%;
+            white-space: normal;
+            text-align: center;
+          }
+
           .topActions {
             justify-content: flex-start;
           }
@@ -952,10 +939,6 @@ export default function NationalCertificateResultsPage() {
         @media (max-width: 560px) {
           .page {
             padding: 16px 10px 40px;
-          }
-
-          h1 {
-            font-size: 30px;
           }
 
           .statsGrid {
