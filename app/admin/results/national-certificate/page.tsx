@@ -248,6 +248,7 @@ export default function NationalCertificateResultsPage() {
                     <th>Foiz</th>
                     <th>Boshlangan</th>
                     <th>Yakunlangan</th>
+                    <th>Batafsil</th>
                   </tr>
                 </thead>
 
@@ -333,6 +334,15 @@ export default function NationalCertificateResultsPage() {
 
                       <td>
                         {formatDate(item.submitted_at)}
+                      </td>
+
+                      <td>
+                        <Link
+                          href={`/admin/results/national-certificate/${item.id}`}
+                          className="detailButton"
+                        >
+                          Batafsil
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -580,6 +590,38 @@ export default function NationalCertificateResultsPage() {
         .incorrect {
           color: #b42318;
           font-weight: 800;
+        }
+
+        .detailButton {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 82px;
+          height: 34px;
+          padding: 0 12px;
+          border: 1px solid #b9c9dc;
+          border-radius: 8px;
+          background: #e9f0f8;
+          color: #1f5594;
+          font-size: 12px;
+          font-weight: 800;
+          text-decoration: none;
+          white-space: nowrap;
+          transition:
+            transform 0.15s ease,
+            background 0.15s ease,
+            box-shadow 0.15s ease;
+        }
+
+        .detailButton:hover {
+          background: #dce9f7;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(31, 85, 148, 0.14);
+        }
+
+        .detailButton:active {
+          transform: translateY(0);
+          box-shadow: none;
         }
 
         .emptyState {
