@@ -41,13 +41,15 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Urinish ID topilmadi.",
+          message: "Urinish ID topilmadi.",
         },
         { status: 400 }
       );
     }
 
+    /*
+     * 1. URINISH VA TEST MA'LUMOTLARI
+     */
     const attempts = await sql`
       SELECT
         a.id,
@@ -83,16 +85,20 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Natija topilmadi.",
+          message: "Natija topilmadi.",
         },
         { status: 404 }
       );
     }
 
-    const attempt =
-      attempts[0];
+    const attempt = attempts[0];
 
+    /*
+     * 2. TESTNING BARCHA SAVOLLARI
+     *
+     * Foydalanuvchi javob bergan bo‘lsa,
+     * attempt_answers bilan birlashtiriladi.
+     */
     const questions = await sql`
       SELECT
         q.id,
@@ -104,7 +110,6 @@ export async function GET(
 
         aa.selected_option_id,
         aa.open_answer_text,
-        aa.open_answer_normalized,
         aa.is_correct,
         aa.awarded_points,
         aa.answered_at
@@ -120,12 +125,13 @@ export async function GET(
       ORDER BY q.question_number ASC
     `;
 
-    const questionIds =
-      questions.map(
-        (question) =>
-          String(question.id)
-      );
+    const questionIds = questions.map(
+      (question) => String(question.id)
+    );
 
+    /*
+     * 3. YOPIQ SAVOLLAR VARIANTLARI
+     */
     let options: any[] = [];
 
     if (questionIds.length > 0) {
@@ -133,9 +139,11 @@ export async function GET(
         SELECT
           id,
           question_id,
-          option_key,
-          option_text,
-          option_html,
+
+          "key" AS option_key,
+          "text" AS option_text,
+          "html" AS option_html,
+
           is_correct,
           sort_order
 
@@ -150,6 +158,10 @@ export async function GET(
       `;
     }
 
+    /*
+     * 4. OCHIQ SAVOLLARNING
+     * QABUL QILINADIGAN JAVOBLARI
+     */
     let acceptedAnswers: any[] = [];
 
     if (questionIds.length > 0) {
@@ -167,10 +179,14 @@ export async function GET(
 
         ORDER BY
           question_id,
-          id
+          answer_text
       `;
     }
 
+    /*
+     * 5. VARIANTLARNI SAVOLLAR BO‘YICHA
+     * GURUHLASH
+     */
     const optionsByQuestion =
       new Map<string, any[]>();
 
@@ -178,11 +194,7 @@ export async function GET(
       const questionId =
         String(option.question_id);
 
-      if (
-        !optionsByQuestion.has(
-          questionId
-        )
-      ) {
+      if (!optionsByQuestion.has(questionId)) {
         optionsByQuestion.set(
           questionId,
           []
@@ -195,7 +207,7 @@ export async function GET(
           id: String(option.id),
 
           key:
-            option.option_key,
+            option.option_key || "",
 
           text:
             option.option_text || "",
@@ -204,32 +216,25 @@ export async function GET(
             option.option_html || "",
 
           isCorrect:
-            Boolean(
-              option.is_correct
-            ),
+            Boolean(option.is_correct),
 
           sortOrder:
-            Number(
-              option.sort_order
-            ),
+            Number(option.sort_order || 0),
         });
     }
 
+    /*
+     * 6. OCHIQ JAVOBLARNI
+     * SAVOLLAR BO‘YICHA GURUHLASH
+     */
     const answersByQuestion =
       new Map<string, any[]>();
 
-    for (
-      const answer
-      of acceptedAnswers
-    ) {
+    for (const answer of acceptedAnswers) {
       const questionId =
         String(answer.question_id);
 
-      if (
-        !answersByQuestion.has(
-          questionId
-        )
-      ) {
+      if (!answersByQuestion.has(questionId)) {
         answersByQuestion.set(
           questionId,
           []
@@ -242,126 +247,143 @@ export async function GET(
           id: String(answer.id),
 
           answerText:
-            answer.answer_text,
+            answer.answer_text || "",
 
           normalizedAnswer:
-            answer.normalized_answer,
+            answer.normalized_answer || "",
         });
     }
 
+    /*
+     * 7. HAR BIR SAVOL UCHUN
+     * BATAFSIL NATIJA TAYYORLASH
+     */
     const detailedQuestions =
-      questions.map(
-        (question) => {
-          const questionId =
-            String(question.id);
+      questions.map((question) => {
+        const questionId =
+          String(question.id);
 
-          const questionOptions =
-            optionsByQuestion.get(
-              questionId
-            ) || [];
+        const questionOptions =
+          optionsByQuestion.get(questionId) || [];
 
-          const accepted =
-            answersByQuestion.get(
-              questionId
-            ) || [];
+        const accepted =
+          answersByQuestion.get(questionId) || [];
 
-          const selectedOption =
-            question.selected_option_id
-              ? questionOptions.find(
-                  (option) =>
-                    option.id ===
-                    String(
-                      question.selected_option_id
-                    )
-                ) || null
-              : null;
-
-          const correctOption =
-            question.question_type ===
-            "closed"
-              ? questionOptions.find(
-                  (option) =>
-                    option.isCorrect
-                ) || null
-              : null;
-
-          const answered =
-            question.question_type ===
-            "closed"
-              ? Boolean(
-                  question.selected_option_id
-                )
-              : Boolean(
+        /*
+         * Foydalanuvchi tanlagan variant
+         */
+        const selectedOption =
+          question.selected_option_id
+            ? questionOptions.find(
+                (option) =>
+                  option.id ===
                   String(
-                    question.open_answer_text ||
-                      ""
-                  ).trim()
-                );
+                    question.selected_option_id
+                  )
+              ) || null
+            : null;
 
-          return {
-            id: questionId,
+        /*
+         * To‘g‘ri variant
+         */
+        const correctOption =
+          question.question_type === "closed"
+            ? questionOptions.find(
+                (option) =>
+                  option.isCorrect
+              ) || null
+            : null;
 
-            questionNumber:
-              Number(
-                question.question_number
-              ),
+        /*
+         * Savolga umuman javob berilganmi?
+         */
+        const answered =
+          question.question_type === "closed"
+            ? Boolean(
+                question.selected_option_id
+              )
+            : Boolean(
+                String(
+                  question.open_answer_text || ""
+                ).trim()
+              );
 
-            questionType:
-              question.question_type,
+        /*
+         * Agar javobsiz bo‘lsa,
+         * isCorrect = null bo‘ladi.
+         */
+        const isCorrect =
+          !answered
+            ? null
+            : question.is_correct === null ||
+              question.is_correct === undefined
+            ? null
+            : Boolean(question.is_correct);
 
-            questionText:
-              question.question_text || "",
+        return {
+          id: questionId,
 
-            questionHtml:
-              question.question_html || "",
+          questionNumber:
+            Number(
+              question.question_number
+            ),
 
-            points:
-              Number(
-                question.points || 0
-              ),
+          questionType:
+            question.question_type,
 
-            answered,
+          questionText:
+            question.question_text || "",
 
-            isCorrect:
-              question.is_correct ===
-              null
-                ? null
-                : Boolean(
-                    question.is_correct
-                  ),
+          questionHtml:
+            question.question_html || "",
 
-            awardedPoints:
-              Number(
-                question.awarded_points ||
-                  0
-              ),
+          points:
+            Number(
+              question.points || 0
+            ),
 
-            answeredAt:
-              question.answered_at
-                ? new Date(
-                    String(
-                      question.answered_at
-                    )
-                  ).toISOString()
-                : null,
+          answered,
 
-            selectedOption,
+          isCorrect,
 
-            openAnswerText:
-              question.open_answer_text ||
-              "",
+          awardedPoints:
+            Number(
+              question.awarded_points || 0
+            ),
 
-            correctOption,
+          answeredAt:
+            question.answered_at
+              ? new Date(
+                  String(
+                    question.answered_at
+                  )
+                ).toISOString()
+              : null,
 
-            acceptedAnswers:
-              accepted,
+          /*
+           * Yopiq savol
+           */
+          selectedOption,
 
-            options:
-              questionOptions,
-          };
-        }
-      );
+          correctOption,
 
+          options:
+            questionOptions,
+
+          /*
+           * Ochiq savol
+           */
+          openAnswerText:
+            question.open_answer_text || "",
+
+          acceptedAnswers:
+            accepted,
+        };
+      });
+
+    /*
+     * 8. FRONTENDGA NATIJA
+     */
     return NextResponse.json(
       {
         success: true,
@@ -371,19 +393,16 @@ export async function GET(
             String(attempt.id),
 
           testId:
-            String(
-              attempt.test_id
-            ),
+            String(attempt.test_id),
 
           testTitle:
-            attempt.test_title,
+            attempt.test_title || "",
 
           testDescription:
-            attempt.test_description ||
-            "",
+            attempt.test_description || "",
 
           userName:
-            attempt.user_name ||
+            attempt.user_name?.trim() ||
             "Noma’lum foydalanuvchi",
 
           status:
@@ -391,30 +410,27 @@ export async function GET(
 
           durationMinutes:
             Number(
-              attempt.duration_minutes
+              attempt.duration_minutes || 0
             ),
 
           totalQuestions:
             Number(
-              attempt.total_questions
+              attempt.total_questions || 0
             ),
 
           correctCount:
             Number(
-              attempt.correct_count ||
-                0
+              attempt.correct_count || 0
             ),
 
           incorrectCount:
             Number(
-              attempt.incorrect_count ||
-                0
+              attempt.incorrect_count || 0
             ),
 
           unansweredCount:
             Number(
-              attempt.unanswered_count ||
-                0
+              attempt.unanswered_count || 0
             ),
 
           rawScore:
@@ -430,9 +446,7 @@ export async function GET(
           startedAt:
             attempt.started_at
               ? new Date(
-                  String(
-                    attempt.started_at
-                  )
+                  String(attempt.started_at)
                 ).toISOString()
               : null,
 
@@ -451,6 +465,7 @@ export async function GET(
       },
       {
         status: 200,
+
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate",
@@ -469,7 +484,9 @@ export async function GET(
         message:
           "Batafsil natijani yuklashda xatolik yuz berdi.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
