@@ -34,8 +34,7 @@ export async function GET(
       );
     }
 
-    const { attemptId } =
-      await context.params;
+    const { attemptId } = await context.params;
 
     if (!attemptId) {
       return NextResponse.json(
@@ -48,7 +47,7 @@ export async function GET(
     }
 
     /*
-     * 1. URINISH VA TEST MA'LUMOTLARI
+     * 1. URINISH VA TEST
      */
     const attempts = await sql`
       SELECT
@@ -94,10 +93,7 @@ export async function GET(
     const attempt = attempts[0];
 
     /*
-     * 2. TESTNING BARCHA SAVOLLARI
-     *
-     * Foydalanuvchi javob bergan bo‘lsa,
-     * attempt_answers bilan birlashtiriladi.
+     * 2. BARCHA SAVOLLAR
      */
     const questions = await sql`
       SELECT
@@ -130,7 +126,7 @@ export async function GET(
     );
 
     /*
-     * 3. YOPIQ SAVOLLAR VARIANTLARI
+     * 3. YOPIQ SAVOL VARIANTLARI
      */
     let options: any[] = [];
 
@@ -139,11 +135,9 @@ export async function GET(
         SELECT
           id,
           question_id,
-
-          "key" AS option_key,
-          "text" AS option_text,
-          "html" AS option_html,
-
+          option_key,
+          option_text,
+          option_html,
           is_correct,
           sort_order
 
@@ -159,7 +153,7 @@ export async function GET(
     }
 
     /*
-     * 4. OCHIQ SAVOLLARNING
+     * 4. OCHIQ SAVOLNING
      * QABUL QILINADIGAN JAVOBLARI
      */
     let acceptedAnswers: any[] = [];
@@ -184,8 +178,7 @@ export async function GET(
     }
 
     /*
-     * 5. VARIANTLARNI SAVOLLAR BO‘YICHA
-     * GURUHLASH
+     * 5. VARIANTLARNI GURUHLASH
      */
     const optionsByQuestion =
       new Map<string, any[]>();
@@ -224,8 +217,7 @@ export async function GET(
     }
 
     /*
-     * 6. OCHIQ JAVOBLARNI
-     * SAVOLLAR BO‘YICHA GURUHLASH
+     * 6. OCHIQ JAVOBLARNI GURUHLASH
      */
     const answersByQuestion =
       new Map<string, any[]>();
@@ -255,8 +247,7 @@ export async function GET(
     }
 
     /*
-     * 7. HAR BIR SAVOL UCHUN
-     * BATAFSIL NATIJA TAYYORLASH
+     * 7. BATAFSIL NATIJA
      */
     const detailedQuestions =
       questions.map((question) => {
@@ -269,9 +260,6 @@ export async function GET(
         const accepted =
           answersByQuestion.get(questionId) || [];
 
-        /*
-         * Foydalanuvchi tanlagan variant
-         */
         const selectedOption =
           question.selected_option_id
             ? questionOptions.find(
@@ -283,9 +271,6 @@ export async function GET(
               ) || null
             : null;
 
-        /*
-         * To‘g‘ri variant
-         */
         const correctOption =
           question.question_type === "closed"
             ? questionOptions.find(
@@ -294,9 +279,6 @@ export async function GET(
               ) || null
             : null;
 
-        /*
-         * Savolga umuman javob berilganmi?
-         */
         const answered =
           question.question_type === "closed"
             ? Boolean(
@@ -308,10 +290,6 @@ export async function GET(
                 ).trim()
               );
 
-        /*
-         * Agar javobsiz bo‘lsa,
-         * isCorrect = null bo‘ladi.
-         */
         const isCorrect =
           !answered
             ? null
@@ -360,9 +338,6 @@ export async function GET(
                 ).toISOString()
               : null,
 
-          /*
-           * Yopiq savol
-           */
           selectedOption,
 
           correctOption,
@@ -370,9 +345,6 @@ export async function GET(
           options:
             questionOptions,
 
-          /*
-           * Ochiq savol
-           */
           openAnswerText:
             question.open_answer_text || "",
 
@@ -382,7 +354,7 @@ export async function GET(
       });
 
     /*
-     * 8. FRONTENDGA NATIJA
+     * 8. JAVOB
      */
     return NextResponse.json(
       {
@@ -484,9 +456,7 @@ export async function GET(
         message:
           "Batafsil natijani yuklashda xatolik yuz berdi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
