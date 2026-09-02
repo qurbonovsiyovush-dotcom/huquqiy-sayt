@@ -11,6 +11,11 @@ type ClosedOptionInput = {
   isCorrect?: boolean;
 };
 
+type NormalizedAnswer = {
+  answer_text: string;
+  normalized_answer: string;
+};
+
 function isAdmin(request: NextRequest) {
   const session = request.cookies.get("qurbonov_session")?.value;
   const role = request.cookies.get("qurbonov_role")?.value;
@@ -162,8 +167,9 @@ export async function POST(
     // ============================================================
 
     if (questionType === "closed") {
-      const rawOptions: ClosedOptionInput[] =
-        Array.isArray(body.options) ? body.options : [];
+      const rawOptions: ClosedOptionInput[] = Array.isArray(body.options)
+        ? body.options
+        : [];
 
       if (rawOptions.length !== 4) {
         return NextResponse.json(
@@ -176,7 +182,7 @@ export async function POST(
         );
       }
 
-      const expectedKeys = ["A", "B", "C", "D"];
+      const expectedKeys = ["A", "B", "C", "D"] as const;
 
       const options = rawOptions.map((option, index) => {
         const key = String(option?.key || expectedKeys[index])
@@ -184,14 +190,10 @@ export async function POST(
           .toUpperCase();
 
         const text =
-          typeof option?.text === "string"
-            ? option.text.trim()
-            : "";
+          typeof option?.text === "string" ? option.text.trim() : "";
 
         const html =
-          typeof option?.html === "string"
-            ? option.html.trim()
-            : "";
+          typeof option?.html === "string" ? option.html.trim() : "";
 
         return {
           option_key: key,
@@ -202,11 +204,10 @@ export async function POST(
         };
       });
 
-      const actualKeys = options.map(
-        (option) => option.option_key
-      );
+      const actualKeys = options.map((option) => option.option_key);
 
       if (
+        actualKeys.length !== 4 ||
         !expectedKeys.every(
           (key, index) => actualKeys[index] === key
         )
@@ -221,11 +222,7 @@ export async function POST(
         );
       }
 
-      if (
-        options.some(
-          (option) => !option.option_text
-        )
-      ) {
+      if (options.some((option) => !option.option_text)) {
         return NextResponse.json(
           {
             success: false,
@@ -245,14 +242,15 @@ export async function POST(
           {
             success: false,
             message:
-              "Yopiq savolda aynan bitta to‘g‘ri javob belgilanashi kerak.",
+              "Yopiq savolda aynan bitta to‘g‘ri javob belgilanishi kerak.",
           },
           { status: 400 }
         );
       }
 
-      // Savolni UPSERT qilamiz.
-      // Oldingi ID saqlanib qoladi.
+      // ============================================================
+      // 5.1 SAVOLNI UPSERT QILISH
+      // ============================================================
 
       const questionResult = await sql`
         INSERT INTO national_certificate_questions (
@@ -287,14 +285,17 @@ export async function POST(
 
       const questionId = String(questionResult[0].id);
 
-      // Agar eski noto‘g‘ri ma’lumot qolgan bo‘lsa tozalaymiz.
+      // Agar bu savol ilgari ochiq bo‘lgan bo‘lsa,
+      // ochiq javoblarini tozalaymiz.
 
       await sql`
         DELETE FROM national_certificate_open_answers
         WHERE question_id = ${questionId}
       `;
 
-      // A
+      // ============================================================
+      // 5.2 A VARIANT
+      // ============================================================
 
       await sql`
         INSERT INTO national_certificate_options (
@@ -321,7 +322,9 @@ export async function POST(
           sort_order = EXCLUDED.sort_order
       `;
 
-      // B
+      // ============================================================
+      // 5.3 B VARIANT
+      // ============================================================
 
       await sql`
         INSERT INTO national_certificate_options (
@@ -348,7 +351,9 @@ export async function POST(
           sort_order = EXCLUDED.sort_order
       `;
 
-      // C
+      // ============================================================
+      // 5.4 C VARIANT
+      // ============================================================
 
       await sql`
         INSERT INTO national_certificate_options (
@@ -375,7 +380,9 @@ export async function POST(
           sort_order = EXCLUDED.sort_order
       `;
 
-      // D
+      // ============================================================
+      // 5.5 D VARIANT
+      // ============================================================
 
       await sql`
         INSERT INTO national_certificate_options (
@@ -408,47 +415,48 @@ export async function POST(
         WHERE id = ${testId}
       `;
 
-      return NextResponse.json({
-        success: true,
-        message: `${questionNumber}-savol saqlandi.`,
-        question: {
-          id: questionId,
-          question_number: questionNumber,
-          question_type: "closed",
+      return NextResponse.json(
+        {
+          success: true,
+          message: `${questionNumber}-savol saqlandi.`,
+          question: {
+            id: questionId,
+            question_number: questionNumber,
+            question_type: "closed",
+          },
         },
-      });
+        { status: 200 }
+      );
     }
 
     // ============================================================
     // 6. OCHIQ SAVOL
     // ============================================================
 
-    const rawAcceptedAnswers = Array.isArray(
+    const rawAcceptedAnswers: unknown[] = Array.isArray(
       body.acceptedAnswers
     )
       ? body.acceptedAnswers
       : [];
 
-    const acceptedAnswers = rawAcceptedAnswers
-      .map((value: unknown) => {
-        const answerText =
-          typeof value === "string"
-            ? value.trim()
-            : "";
+    const acceptedAnswers: NormalizedAnswer[] =
+      rawAcceptedAnswers
+        .map((value: unknown): NormalizedAnswer => {
+          const answerText =
+            typeof value === "string" ? value.trim() : "";
 
-        return {
-          answer_text: answerText,
-          normalized_answer: normalizeAnswer(answerText),
-        };
-      })
-      .filter(
-        (answer: {
-          answer_text: string;
-          normalized_answer: string;
-        }) =>
-          answer.answer_text &&
-          answer.normalized_answer
-      );
+          return {
+            answer_text: answerText,
+            normalized_answer: normalizeAnswer(answerText),
+          };
+        })
+        .filter(
+          (answer: NormalizedAnswer) =>
+            Boolean(
+              answer.answer_text &&
+                answer.normalized_answer
+            )
+        );
 
     if (acceptedAnswers.length === 0) {
       return NextResponse.json(
@@ -461,23 +469,23 @@ export async function POST(
       );
     }
 
-    // Bir xil normalizatsiyalangan javoblarni bittaga tushiramiz.
+    // ============================================================
+    // 6.1 TAKRORIY JAVOBLARNI OLIB TASHLASH
+    // ============================================================
 
-    const uniqueAnswers = Array.from(
-      new Map(
-        acceptedAnswers.map(
-          (answer: {
-            answer_text: string;
-            normalized_answer: string;
-          }) => [
-            answer.normalized_answer,
-            answer,
-          ]
-        )
-      ).values()
+    const answerMap = new Map<string, NormalizedAnswer>();
+
+    for (const answer of acceptedAnswers) {
+      answerMap.set(answer.normalized_answer, answer);
+    }
+
+    const uniqueAnswers: NormalizedAnswer[] = Array.from(
+      answerMap.values()
     );
 
-    // Savolni UPSERT qilamiz.
+    // ============================================================
+    // 6.2 SAVOLNI UPSERT QILISH
+    // ============================================================
 
     const questionResult = await sql`
       INSERT INTO national_certificate_questions (
@@ -512,30 +520,23 @@ export async function POST(
 
     const questionId = String(questionResult[0].id);
 
-    // Ochiq savolda variant bo‘lmasligi kerak.
+    // Ochiq savolda A/B/C/D bo‘lmasligi kerak.
 
     await sql`
       DELETE FROM national_certificate_options
       WHERE question_id = ${questionId}
     `;
 
-    /*
-      Eski qabul qilinadigan javoblarni alohida statementda
-      o‘chiramiz.
-
-      Oldingi xatoda DELETE va INSERT bitta statement ichida
-      bajarilgandi. Endi ular alohida bajariladi.
-    */
+    // Eski ochiq javoblarni tozalaymiz.
 
     await sql`
       DELETE FROM national_certificate_open_answers
       WHERE question_id = ${questionId}
     `;
 
-    /*
-      Endi yangi qabul qilinadigan javoblarni bittadan yozamiz.
-      Ochiq savollarda odatda javoblar soni juda kam bo‘ladi.
-    */
+    // ============================================================
+    // 6.3 YANGI QABUL QILINADIGAN JAVOBLARNI YOZISH
+    // ============================================================
 
     for (const answer of uniqueAnswers) {
       await sql`
@@ -558,15 +559,18 @@ export async function POST(
       WHERE id = ${testId}
     `;
 
-    return NextResponse.json({
-      success: true,
-      message: `${questionNumber}-savol saqlandi.`,
-      question: {
-        id: questionId,
-        question_number: questionNumber,
-        question_type: "open",
+    return NextResponse.json(
+      {
+        success: true,
+        message: `${questionNumber}-savol saqlandi.`,
+        question: {
+          id: questionId,
+          question_number: questionNumber,
+          question_type: "open",
+        },
       },
-    });
+      { status: 200 }
+    );
   } catch (error) {
     console.error(
       "National certificate question POST error:",
