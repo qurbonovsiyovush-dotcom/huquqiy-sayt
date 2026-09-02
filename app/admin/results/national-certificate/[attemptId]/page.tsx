@@ -265,13 +265,13 @@ export default function NationalCertificateDetailedResultPage() {
 
         /*
          * Saytdagi 3D ko‘rinishni aynan capture qilamiz.
-         * scale=2 matn va soyalarni aniqroq qiladi.
+         * scale=3 matn, gradient va 3D soyalarni aniqroq saqlaydi.
          */
         const canvas =
           await html2canvas(
             element,
             {
-              scale: 2,
+              scale: 3,
               useCORS: true,
               allowTaint: false,
               backgroundColor:
@@ -291,8 +291,7 @@ export default function NationalCertificateDetailedResultPage() {
 
         const imageData =
           canvas.toDataURL(
-            "image/jpeg",
-            0.96
+            "image/png"
           );
 
         /*
@@ -339,13 +338,13 @@ export default function NationalCertificateDetailedResultPage() {
 
         pdf.addImage(
           imageData,
-          "JPEG",
+          "PNG",
           margin,
           positionY,
           imageWidth,
           imageHeight,
           undefined,
-          "FAST"
+          "SLOW"
         );
 
         heightLeft -=
