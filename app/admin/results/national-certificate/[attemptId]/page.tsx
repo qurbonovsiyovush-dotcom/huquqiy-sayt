@@ -541,9 +541,81 @@ export default function NationalCertificateDetailedResultPage() {
             .slice(0, 80) ||
           "Milliy-sertifikat";
 
-        pdf.save(
-          `${safeName}-${safeTest}-natija.pdf`
-        );
+        const suggestedFileName =
+          `${safeName}-${safeTest}-natija.pdf`;
+
+        const pdfBlob =
+          pdf.output("blob");
+
+        type SaveFilePickerOptions = {
+          suggestedName?: string;
+          types?: Array<{
+            description?: string;
+            accept: Record<string, string[]>;
+          }>;
+        };
+
+        type WritableLike = {
+          write: (data: Blob) => Promise<void>;
+          close: () => Promise<void>;
+        };
+
+        type FileHandleLike = {
+          createWritable: () => Promise<WritableLike>;
+        };
+
+        const browserWindow =
+          window as typeof window & {
+            showSaveFilePicker?: (
+              options?: SaveFilePickerOptions
+            ) => Promise<FileHandleLike>;
+          };
+
+        if (
+          typeof browserWindow.showSaveFilePicker ===
+          "function"
+        ) {
+          try {
+            const handle =
+              await browserWindow.showSaveFilePicker({
+                suggestedName:
+                  suggestedFileName,
+                types: [
+                  {
+                    description:
+                      "PDF hujjat",
+                    accept: {
+                      "application/pdf": [
+                        ".pdf",
+                      ],
+                    },
+                  },
+                ],
+              });
+
+            const writable =
+              await handle.createWritable();
+
+            await writable.write(
+              pdfBlob
+            );
+
+            await writable.close();
+          } catch (saveError) {
+            if (
+              saveError instanceof DOMException &&
+              saveError.name === "AbortError"
+            ) {
+              return;
+            }
+
+            throw saveError;
+          }
+        } else {
+          pdf.save(
+            suggestedFileName
+          );
+        }
       } catch (err) {
         console.error(
           "PDF export error:",
@@ -1838,11 +1910,59 @@ function PageStyles() {
       }
 
       .questionText {
-        padding: 24px 22px 6px;
+        position: relative;
+        margin: 18px 22px 11px;
+        padding: 18px 18px 19px;
+        border: 2px solid #506977;
+        border-radius: 13px;
+        background:
+          linear-gradient(
+            180deg,
+            #fbfdff 0%,
+            #e8f5fb 47%,
+            #c9dfe9 100%
+          );
+        color: #14263a;
         font-size: 18px;
         font-weight: 900;
         line-height: 1.62;
-        color: #162335;
+        text-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.95);
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.95),
+          inset 0 -4px 0 rgba(60, 88, 103, 0.16),
+          0 5px 0 #687f8b,
+          0 10px 15px rgba(26, 46, 60, 0.16);
+      }
+
+      .questionText::before {
+        content: "SAVOL";
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 25px;
+        margin: 0 10px 7px 0;
+        padding: 3px 9px;
+        border: 1px solid #2e627e;
+        border-radius: 7px;
+        background:
+          linear-gradient(
+            180deg,
+            #8bd8ff 0%,
+            #4eb4e7 52%,
+            #2c88ba 100%
+          );
+        color: #103d59;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        vertical-align: middle;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.8),
+          0 2px 0 #275e79;
+        text-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.65);
       }
 
       .htmlContent img {
@@ -1858,7 +1978,7 @@ function PageStyles() {
       .optionsList {
         display: grid;
         gap: 12px;
-        padding: 18px 22px 24px;
+        padding: 13px 22px 24px;
       }
 
       .optionRow {
@@ -2220,11 +2340,11 @@ function PageStyles() {
       }
 
       .questionText {
-        padding-top: 20px;
+        padding-top: 18px;
       }
 
       .optionsList {
-        padding-top: 16px;
+        padding-top: 13px;
       }
 
       .optionRow {
