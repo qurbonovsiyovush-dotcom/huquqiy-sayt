@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
@@ -32,11 +31,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    /*
-      ============================================================
-      1. FAQAT ADMIN
-      ============================================================
-    */
+    // ============================================================
+    // 1. FAQAT ADMIN
+    // ============================================================
 
     if (!isAdmin(request)) {
       return NextResponse.json(
@@ -60,11 +57,9 @@ export async function POST(
       );
     }
 
-    /*
-      ============================================================
-      2. TESTNI TEKSHIRAMIZ
-      ============================================================
-    */
+    // ============================================================
+    // 2. TESTNI TEKSHIRISH
+    // ============================================================
 
     const tests = await sql`
       SELECT
@@ -85,28 +80,20 @@ export async function POST(
       );
     }
 
-    /*
-      E'lon qilingan testning savollarini hozircha o'zgartirmaymiz.
-      Bu foydalanuvchilarning eski natijalari buzilib ketishining
-      oldini oladi.
-    */
-
     if (tests[0].status !== "draft") {
       return NextResponse.json(
         {
           success: false,
           message:
-            "E’lon qilingan test savollarini tahrirlab bo‘lmaydi. Avval testni qoralama holatiga qaytaring.",
+            "E’lon qilingan test savollarini tahrirlab bo‘lmaydi.",
         },
         { status: 409 }
       );
     }
 
-    /*
-      ============================================================
-      3. BODY
-      ============================================================
-    */
+    // ============================================================
+    // 3. BODY
+    // ============================================================
 
     const body = await request.json();
 
@@ -129,11 +116,9 @@ export async function POST(
         ? 1
         : Number(body.points);
 
-    /*
-      ============================================================
-      4. UMUMIY VALIDATSIYA
-      ============================================================
-    */
+    // ============================================================
+    // 4. UMUMIY VALIDATSIYA
+    // ============================================================
 
     if (
       !Number.isInteger(questionNumber) ||
@@ -169,24 +154,12 @@ export async function POST(
       );
     }
 
-    /*
-      Savol turi CLIENT yuborgan qiymatdan olinmaydi.
-
-      1–35  = yopiq
-      36–45 = ochiq
-
-      Shuning uchun foydalanuvchi requestni o'zgartirib ham
-      formatni buzolmaydi.
-    */
-
-    const questionType =
+    const questionType: "closed" | "open" =
       questionNumber <= 35 ? "closed" : "open";
 
-    /*
-      ============================================================
-      5. YOPIQ SAVOL
-      ============================================================
-    */
+    // ============================================================
+    // 5. YOPIQ SAVOL
+    // ============================================================
 
     if (questionType === "closed") {
       const rawOptions: ClosedOptionInput[] =
@@ -206,9 +179,7 @@ export async function POST(
       const expectedKeys = ["A", "B", "C", "D"];
 
       const options = rawOptions.map((option, index) => {
-        const key = String(
-          option?.key || expectedKeys[index]
-        )
+        const key = String(option?.key || expectedKeys[index])
           .trim()
           .toUpperCase();
 
@@ -231,16 +202,11 @@ export async function POST(
         };
       });
 
-      /*
-        A, B, C, D dan boshqa kalitga ruxsat bermaymiz.
-      */
-
       const actualKeys = options.map(
         (option) => option.option_key
       );
 
       if (
-        actualKeys.length !== 4 ||
         !expectedKeys.every(
           (key, index) => actualKeys[index] === key
         )
@@ -254,10 +220,6 @@ export async function POST(
           { status: 400 }
         );
       }
-
-      /*
-        Variant matni bo'sh bo'lishi mumkin emas.
-      */
 
       if (
         options.some(
@@ -274,10 +236,6 @@ export async function POST(
         );
       }
 
-      /*
-        Faqat BITTA to'g'ri javob.
-      */
-
       const correctCount = options.filter(
         (option) => option.is_correct
       ).length;
@@ -293,56 +251,52 @@ export async function POST(
         );
       }
 
-      /*
-        Yangi UUID'ni serverning o'zi yaratadi.
-      */
+      // Savolni UPSERT qilamiz.
+      // Oldingi ID saqlanib qoladi.
 
-      const questionId = randomUUID();
+      const questionResult = await sql`
+        INSERT INTO national_certificate_questions (
+          test_id,
+          question_number,
+          question_type,
+          question_text,
+          question_html,
+          points,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${testId},
+          ${questionNumber},
+          'closed',
+          ${questionText},
+          ${questionHtml},
+          ${points},
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (test_id, question_number)
+        DO UPDATE SET
+          question_type = EXCLUDED.question_type,
+          question_text = EXCLUDED.question_text,
+          question_html = EXCLUDED.question_html,
+          points = EXCLUDED.points,
+          updated_at = NOW()
+        RETURNING id
+      `;
 
-      /*
-        Bitta SQL statement ichida:
+      const questionId = String(questionResult[0].id);
 
-        1. Shu raqamdagi eski savolni o'chiramiz.
-        2. Yangi savolni yozamiz.
-        3. A/B/C/D variantlarini yozamiz.
-
-        Eski savol o'chirilganda uning eski variantlari
-        ON DELETE CASCADE orqali avtomatik o'chadi.
-      */
+      // Agar eski noto‘g‘ri ma’lumot qolgan bo‘lsa tozalaymiz.
 
       await sql`
-        WITH deleted_question AS (
-          DELETE FROM national_certificate_questions
-          WHERE
-            test_id = ${testId}
-            AND question_number = ${questionNumber}
-          RETURNING id
-        ),
-        inserted_question AS (
-          INSERT INTO national_certificate_questions (
-            id,
-            test_id,
-            question_number,
-            question_type,
-            question_text,
-            question_html,
-            points,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            ${questionId},
-            ${testId},
-            ${questionNumber},
-            'closed',
-            ${questionText},
-            ${questionHtml},
-            ${points},
-            NOW(),
-            NOW()
-          )
-          RETURNING id
-        )
+        DELETE FROM national_certificate_open_answers
+        WHERE question_id = ${questionId}
+      `;
+
+      // A
+
+      await sql`
         INSERT INTO national_certificate_options (
           question_id,
           option_key,
@@ -351,23 +305,101 @@ export async function POST(
           is_correct,
           sort_order
         )
-        SELECT
-          inserted_question.id,
-          option_data.option_key,
-          option_data.option_text,
-          option_data.option_html,
-          option_data.is_correct,
-          option_data.sort_order
-        FROM inserted_question
-        CROSS JOIN jsonb_to_recordset(
-          ${JSON.stringify(options)}::jsonb
-        ) AS option_data(
-          option_key TEXT,
-          option_text TEXT,
-          option_html TEXT,
-          is_correct BOOLEAN,
-          sort_order INTEGER
+        VALUES (
+          ${questionId},
+          'A',
+          ${options[0].option_text},
+          ${options[0].option_html},
+          ${options[0].is_correct},
+          0
         )
+        ON CONFLICT (question_id, option_key)
+        DO UPDATE SET
+          option_text = EXCLUDED.option_text,
+          option_html = EXCLUDED.option_html,
+          is_correct = EXCLUDED.is_correct,
+          sort_order = EXCLUDED.sort_order
+      `;
+
+      // B
+
+      await sql`
+        INSERT INTO national_certificate_options (
+          question_id,
+          option_key,
+          option_text,
+          option_html,
+          is_correct,
+          sort_order
+        )
+        VALUES (
+          ${questionId},
+          'B',
+          ${options[1].option_text},
+          ${options[1].option_html},
+          ${options[1].is_correct},
+          1
+        )
+        ON CONFLICT (question_id, option_key)
+        DO UPDATE SET
+          option_text = EXCLUDED.option_text,
+          option_html = EXCLUDED.option_html,
+          is_correct = EXCLUDED.is_correct,
+          sort_order = EXCLUDED.sort_order
+      `;
+
+      // C
+
+      await sql`
+        INSERT INTO national_certificate_options (
+          question_id,
+          option_key,
+          option_text,
+          option_html,
+          is_correct,
+          sort_order
+        )
+        VALUES (
+          ${questionId},
+          'C',
+          ${options[2].option_text},
+          ${options[2].option_html},
+          ${options[2].is_correct},
+          2
+        )
+        ON CONFLICT (question_id, option_key)
+        DO UPDATE SET
+          option_text = EXCLUDED.option_text,
+          option_html = EXCLUDED.option_html,
+          is_correct = EXCLUDED.is_correct,
+          sort_order = EXCLUDED.sort_order
+      `;
+
+      // D
+
+      await sql`
+        INSERT INTO national_certificate_options (
+          question_id,
+          option_key,
+          option_text,
+          option_html,
+          is_correct,
+          sort_order
+        )
+        VALUES (
+          ${questionId},
+          'D',
+          ${options[3].option_text},
+          ${options[3].option_html},
+          ${options[3].is_correct},
+          3
+        )
+        ON CONFLICT (question_id, option_key)
+        DO UPDATE SET
+          option_text = EXCLUDED.option_text,
+          option_html = EXCLUDED.option_html,
+          is_correct = EXCLUDED.is_correct,
+          sort_order = EXCLUDED.sort_order
       `;
 
       await sql`
@@ -376,35 +408,26 @@ export async function POST(
         WHERE id = ${testId}
       `;
 
-      return NextResponse.json(
-        {
-          success: true,
-          message: `${questionNumber}-savol saqlandi.`,
-          question: {
-            id: questionId,
-            question_number: questionNumber,
-            question_type: "closed",
-          },
+      return NextResponse.json({
+        success: true,
+        message: `${questionNumber}-savol saqlandi.`,
+        question: {
+          id: questionId,
+          question_number: questionNumber,
+          question_type: "closed",
         },
-        { status: 200 }
-      );
+      });
     }
 
-    /*
-      ============================================================
-      6. OCHIQ SAVOL
-      ============================================================
-    */
+    // ============================================================
+    // 6. OCHIQ SAVOL
+    // ============================================================
 
     const rawAcceptedAnswers = Array.isArray(
       body.acceptedAnswers
     )
       ? body.acceptedAnswers
       : [];
-
-    /*
-      Ochiq savolda kamida bitta qabul qilinadigan javob bo'lishi shart.
-    */
 
     const acceptedAnswers = rawAcceptedAnswers
       .map((value: unknown) => {
@@ -415,8 +438,7 @@ export async function POST(
 
         return {
           answer_text: answerText,
-          normalized_answer:
-            normalizeAnswer(answerText),
+          normalized_answer: normalizeAnswer(answerText),
         };
       })
       .filter(
@@ -439,14 +461,7 @@ export async function POST(
       );
     }
 
-    /*
-      Normalizatsiyadan keyin takroriy javoblarni chiqaramiz.
-
-      Masalan:
-      "Konstitutsiya"
-      " konstitutsiya "
-      bir xil javob hisoblanadi.
-    */
+    // Bir xil normalizatsiyalangan javoblarni bittaga tushiramiz.
 
     const uniqueAnswers = Array.from(
       new Map(
@@ -462,66 +477,80 @@ export async function POST(
       ).values()
     );
 
-    const questionId = randomUUID();
+    // Savolni UPSERT qilamiz.
+
+    const questionResult = await sql`
+      INSERT INTO national_certificate_questions (
+        test_id,
+        question_number,
+        question_type,
+        question_text,
+        question_html,
+        points,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${testId},
+        ${questionNumber},
+        'open',
+        ${questionText},
+        ${questionHtml},
+        ${points},
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (test_id, question_number)
+      DO UPDATE SET
+        question_type = EXCLUDED.question_type,
+        question_text = EXCLUDED.question_text,
+        question_html = EXCLUDED.question_html,
+        points = EXCLUDED.points,
+        updated_at = NOW()
+      RETURNING id
+    `;
+
+    const questionId = String(questionResult[0].id);
+
+    // Ochiq savolda variant bo‘lmasligi kerak.
+
+    await sql`
+      DELETE FROM national_certificate_options
+      WHERE question_id = ${questionId}
+    `;
 
     /*
-      Bitta SQL statement ichida:
+      Eski qabul qilinadigan javoblarni alohida statementda
+      o‘chiramiz.
 
-      1. Eski savolni o'chiramiz.
-      2. Ochiq savolni yozamiz.
-      3. Barcha qabul qilinadigan javoblarni yozamiz.
+      Oldingi xatoda DELETE va INSERT bitta statement ichida
+      bajarilgandi. Endi ular alohida bajariladi.
     */
 
     await sql`
-      WITH deleted_question AS (
-        DELETE FROM national_certificate_questions
-        WHERE
-          test_id = ${testId}
-          AND question_number = ${questionNumber}
-        RETURNING id
-      ),
-      inserted_question AS (
-        INSERT INTO national_certificate_questions (
-          id,
-          test_id,
-          question_number,
-          question_type,
-          question_text,
-          question_html,
-          points,
-          created_at,
-          updated_at
+      DELETE FROM national_certificate_open_answers
+      WHERE question_id = ${questionId}
+    `;
+
+    /*
+      Endi yangi qabul qilinadigan javoblarni bittadan yozamiz.
+      Ochiq savollarda odatda javoblar soni juda kam bo‘ladi.
+    */
+
+    for (const answer of uniqueAnswers) {
+      await sql`
+        INSERT INTO national_certificate_open_answers (
+          question_id,
+          answer_text,
+          normalized_answer
         )
         VALUES (
           ${questionId},
-          ${testId},
-          ${questionNumber},
-          'open',
-          ${questionText},
-          ${questionHtml},
-          ${points},
-          NOW(),
-          NOW()
+          ${answer.answer_text},
+          ${answer.normalized_answer}
         )
-        RETURNING id
-      )
-      INSERT INTO national_certificate_open_answers (
-        question_id,
-        answer_text,
-        normalized_answer
-      )
-      SELECT
-        inserted_question.id,
-        answer_data.answer_text,
-        answer_data.normalized_answer
-      FROM inserted_question
-      CROSS JOIN jsonb_to_recordset(
-        ${JSON.stringify(uniqueAnswers)}::jsonb
-      ) AS answer_data(
-        answer_text TEXT,
-        normalized_answer TEXT
-      )
-    `;
+      `;
+    }
 
     await sql`
       UPDATE national_certificate_tests
@@ -529,18 +558,15 @@ export async function POST(
       WHERE id = ${testId}
     `;
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: `${questionNumber}-savol saqlandi.`,
-        question: {
-          id: questionId,
-          question_number: questionNumber,
-          question_type: "open",
-        },
+    return NextResponse.json({
+      success: true,
+      message: `${questionNumber}-savol saqlandi.`,
+      question: {
+        id: questionId,
+        question_number: questionNumber,
+        question_type: "open",
       },
-      { status: 200 }
-    );
+    });
   } catch (error) {
     console.error(
       "National certificate question POST error:",
