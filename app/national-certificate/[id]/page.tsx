@@ -1776,17 +1776,26 @@ function PageStyles() {
           0 9px 14px rgba(90, 20, 20, 0.18);
       }
 
-      .startWrapper,
-      .resultWrapper {
+      .startWrapper {
         width: min(94%, 940px);
         margin: 0 auto;
         padding: 48px 0 70px;
       }
 
-      .startCard,
-      .resultCard {
+      .resultWrapper {
+        width: min(96%, 1120px);
+        margin: 0 auto;
+        padding: 46px 0 72px;
+      }
+
+      .startCard {
         border-radius: 24px;
         padding: 34px;
+      }
+
+      .resultCard {
+        border-radius: 24px;
+        padding: 30px 32px 34px;
       }
 
       .eyebrow {
@@ -1833,11 +1842,17 @@ function PageStyles() {
         line-height: 1.7;
       }
 
-      .startStats,
-      .resultStats {
+      .startStats {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 14px;
+        margin-top: 30px;
+      }
+
+      .resultStats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
         margin-top: 30px;
       }
 
@@ -1887,6 +1902,26 @@ function PageStyles() {
       .resultStat.empty {
         background: linear-gradient(180deg, #ffffff, #e5e8eb);
       }
+
+      .resultStat {
+        min-height: 86px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 17px 18px 19px;
+      }
+
+      .resultStat span {
+        margin-bottom: 7px;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .resultStat strong {
+        font-size: 24px;
+        line-height: 1.05;
+      }
+
 
       .instructions {
         margin-top: 28px;
@@ -2719,110 +2754,177 @@ function PageStyles() {
       /* ===== NATIJA ===== */
 
       .resultTop {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 158px;
         align-items: center;
-        justify-content: space-between;
-        gap: 24px;
-        padding: 24px;
+        gap: 28px;
+        padding: 26px 28px 28px;
         border: 2px solid #064785;
         border-radius: 18px;
         background:
           linear-gradient(
             180deg,
-            #2f89e1 0%,
-            #146bc0 55%,
-            #0753a2 100%
+            #338ee5 0%,
+            #176fc5 52%,
+            #0752a0 100%
           );
         color: #fff;
         box-shadow:
-          inset 0 2px 0 rgba(255, 255, 255, 0.28),
-          inset 0 -5px 0 rgba(0, 40, 85, 0.22),
-          0 6px 0 #06437f,
-          0 11px 17px rgba(0, 52, 105, 0.2);
+          inset 0 2px 0 rgba(255, 255, 255, 0.32),
+          inset 0 -6px 0 rgba(0, 40, 85, 0.22),
+          0 7px 0 #06437f,
+          0 12px 19px rgba(0, 52, 105, 0.21);
+      }
+
+      .resultTop > div:first-child {
+        min-width: 0;
       }
 
       .resultTop h1 {
+        margin-top: 10px;
         color: #fff;
-        text-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+        font-size: clamp(27px, 3.2vw, 39px);
+        line-height: 1.16;
+        text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
       }
 
       .resultTop p {
-        margin: 7px 0 0;
+        margin: 8px 0 0;
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 15px;
+        font-weight: 800;
       }
 
       .resultTop .eyebrow {
+        margin: 0;
+        min-height: 34px;
+        padding: 7px 13px;
         color: #172333;
+        font-size: 12px;
       }
 
       .percentCircle {
-        flex: 0 0 142px;
-        width: 142px;
-        height: 142px;
+        width: 152px;
+        height: 152px;
         display: grid;
         place-items: center;
         align-content: center;
+        justify-self: end;
         border: 3px solid #4c565d;
         border-radius: 50%;
-        background: linear-gradient(180deg, #fff, #e6e9eb 55%, #c4cacf);
+        background:
+          radial-gradient(circle at 50% 34%, #ffffff 0%, #f2f3f4 45%, #c6ccd1 100%);
         color: #152235;
         box-shadow:
           inset 0 4px 0 #fff,
-          inset 0 -8px 0 rgba(50, 58, 64, 0.16),
-          0 7px 0 #586269,
-          0 12px 18px rgba(0, 0, 0, 0.18);
+          inset 0 -9px 0 rgba(50, 58, 64, 0.16),
+          0 8px 0 #586269,
+          0 14px 20px rgba(0, 0, 0, 0.2);
       }
 
       .percentCircle strong {
-        font-size: 30px;
+        font-size: 31px;
+        line-height: 1;
       }
 
       .percentCircle span {
-        margin-top: 2px;
+        margin-top: 6px;
         color: #66717d;
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 900;
       }
 
       .resultQuestionGrid {
         display: grid;
         grid-template-columns: repeat(9, minmax(0, 1fr));
         gap: 10px;
-        margin-top: 28px;
+        margin-top: 30px;
+        padding: 18px;
+        border: 2px solid #5b666d;
+        border-radius: 16px;
+        background:
+          linear-gradient(
+            180deg,
+            #f9fafb 0%,
+            #e4e8eb 100%
+          );
+        box-shadow:
+          inset 0 2px 0 #fff,
+          inset 0 -5px 0 rgba(53, 62, 68, 0.1),
+          0 6px 0 #6b757c,
+          0 10px 16px rgba(0, 0, 0, 0.12);
       }
 
       .resultQuestion {
-        aspect-ratio: 1;
+        min-height: 54px;
         display: grid;
         place-items: center;
-        border: 2px solid #626d75;
+        border: 2px solid #587663;
         border-radius: 9px;
-        background: linear-gradient(180deg, #fff, #d7dce0);
+        background:
+          linear-gradient(
+            180deg,
+            #fbfffc 0%,
+            #e2f0e5 55%,
+            #c8ddcd 100%
+          );
+        color: #385845;
+        font-size: 14px;
         font-weight: 900;
         box-shadow:
-          inset 0 2px 0 #fff,
-          0 4px 0 #747e85;
+          inset 0 2px 0 #ffffff,
+          inset 0 -4px 0 rgba(48, 92, 59, 0.12),
+          0 4px 0 #698273,
+          0 7px 10px rgba(42, 84, 52, 0.13);
       }
 
       .resultQuestion.right {
         border-color: #467251;
-        background: linear-gradient(180deg, #f7fff8, #cbe4d0);
+        background:
+          linear-gradient(
+            180deg,
+            #f8fff9 0%,
+            #d8eadb 58%,
+            #bfdcc5 100%
+          );
         color: #24562f;
         box-shadow:
           inset 0 2px 0 #fff,
-          0 4px 0 #5c8065;
+          0 4px 0 #5c8065,
+          0 7px 10px rgba(38, 105, 54, 0.12);
       }
 
       .resultQuestion.incorrect {
         border-color: #934a4a;
-        background: linear-gradient(180deg, #fff8f8, #ebcaca);
+        background:
+          linear-gradient(
+            180deg,
+            #fff9f9 0%,
+            #ecd0d0 58%,
+            #dfb8b8 100%
+          );
         color: #852929;
         box-shadow:
           inset 0 2px 0 #fff,
-          0 4px 0 #9a5a5a;
+          0 4px 0 #9a5a5a,
+          0 7px 10px rgba(125, 38, 38, 0.12);
       }
 
       .resultQuestion.unanswered {
-        color: #697582;
+        border-color: #667d6d;
+        background:
+          linear-gradient(
+            180deg,
+            #fcfffc 0%,
+            #e5efe7 58%,
+            #cedbd1 100%
+          );
+        color: #536b5b;
+        box-shadow:
+          inset 0 2px 0 #ffffff,
+          inset 0 -4px 0 rgba(55, 91, 63, 0.10),
+          0 4px 0 #75877a,
+          0 7px 10px rgba(48, 76, 55, 0.12);
       }
 
       /* ===== MODAL ===== */
@@ -2878,7 +2980,7 @@ function PageStyles() {
       @media (max-width: 760px) {
         .startWrapper,
         .resultWrapper {
-          width: min(94%, 640px);
+          width: min(94%, 760px);
           padding-top: 28px;
         }
 
@@ -2943,13 +3045,15 @@ function PageStyles() {
         }
 
         .resultTop {
-          align-items: flex-start;
+          grid-template-columns: minmax(0, 1fr) 120px;
+          align-items: center;
+          gap: 18px;
+          padding: 22px;
         }
 
         .percentCircle {
-          flex-basis: 112px;
-          width: 112px;
-          height: 112px;
+          width: 118px;
+          height: 118px;
         }
 
         .percentCircle strong {
@@ -2958,6 +3062,7 @@ function PageStyles() {
 
         .resultQuestionGrid {
           grid-template-columns: repeat(7, minmax(0, 1fr));
+          padding: 14px;
         }
       }
 
@@ -3040,7 +3145,13 @@ function PageStyles() {
         }
 
         .resultTop {
-          display: grid;
+          grid-template-columns: 1fr;
+          text-align: center;
+        }
+
+        .resultTop .eyebrow {
+          margin-left: auto;
+          margin-right: auto;
         }
 
         .percentCircle {
@@ -3063,3 +3174,4 @@ function PageStyles() {
     `}</style>
   );
 }
+
