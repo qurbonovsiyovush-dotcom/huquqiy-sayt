@@ -203,27 +203,27 @@ export default function NationalCertificateDetailedResultPage() {
 
       try {
         /*
-         * PDF har doim 45 ta savolni olishi uchun
-         * avval "Barchasi" filtriga qaytamiz.
+         * PDFda barcha 45 ta savol bo‘lishi uchun
+         * har doim "Barchasi" holatiga qaytamiz.
          */
         if (filter !== "all") {
           setFilter("all");
 
           await new Promise<void>(
             (resolve) => {
-              requestAnimationFrame(
-                () => {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
                   requestAnimationFrame(
                     () => resolve()
                   );
-                }
-              );
+                });
+              });
             }
           );
         }
 
         /*
-         * Web-fontlar bo‘lsa, yuklanishini kutamiz.
+         * Shriftlar yuklanishini kutamiz.
          */
         if (
           typeof document !== "undefined" &&
@@ -236,7 +236,7 @@ export default function NationalCertificateDetailedResultPage() {
               }
             ).fonts.ready;
           } catch {
-            // Font kutish xatosi PDFni to‘xtatmaydi.
+            // Font xatosi PDF eksportini to‘xtatmaydi.
           }
         }
 
@@ -254,51 +254,45 @@ export default function NationalCertificateDetailedResultPage() {
         const jsPDF =
           jsPdfModule.jsPDF;
 
-        const element =
+        const root =
           pdfContentRef.current;
 
-        if (!element) {
+        if (!root) {
           throw new Error(
             "PDF uchun natija paneli topilmadi."
           );
         }
 
         /*
-         * Saytdagi 3D ko‘rinishni aynan capture qilamiz.
-         * scale=2 matn va soyalarni aniqroq qiladi.
+         * Butun 45 savolli sahifani bitta ulkan rasmga
+         * aylantirmaymiz. Har bir 3D blokni alohida
+         * yuqori sifatda capture qilamiz.
+         *
+         * Bu usul:
+         * - 3D soyalarni yaxshiroq saqlaydi;
+         * - matnni tiniqroq qiladi;
+         * - barcha 45 savolni saqlaydi;
+         * - wrong PNG signature muammosini chetlab o‘tadi.
          */
-        const canvas =
-          await html2canvas(
-            element,
-            {
-              scale: 2,
-              useCORS: true,
-              allowTaint: false,
-              backgroundColor:
-                "#eef2f6",
-              logging: false,
-              scrollX: 0,
-              scrollY:
-                -window.scrollY,
-              windowWidth:
-                document.documentElement
-                  .scrollWidth,
-              windowHeight:
-                document.documentElement
-                  .scrollHeight,
-            }
-          );
+        const blocks = Array.from(
+          root.querySelectorAll<HTMLElement>(
+            [
+              ".heroCard",
+              ".statsGrid",
+              ".infoCard",
+              ".filterCard",
+              ".sectionTitle",
+              ".questionCard",
+            ].join(",")
+          )
+        );
 
-        const imageData =
-          canvas.toDataURL(
-            "image/jpeg",
-            0.96
+        if (blocks.length === 0) {
+          throw new Error(
+            "PDF uchun bloklar topilmadi."
           );
+        }
 
-        /*
-         * A4 portrait.
-         * Uzun panel A4 sahifalarga ketma-ket bo‘linadi.
-         */
         const pdf =
           new jsPDF({
             orientation: "portrait",
@@ -313,65 +307,216 @@ export default function NationalCertificateDetailedResultPage() {
         const pageHeight =
           pdf.internal.pageSize.getHeight();
 
-        const margin = 6;
+        const marginX = 7;
+        const marginTop = 7;
+        const marginBottom = 7;
+        const blockGap = 3.5;
 
         const printableWidth =
           pageWidth -
-          margin * 2;
+          marginX * 2;
 
         const printableHeight =
           pageHeight -
-          margin * 2;
+          marginTop -
+          marginBottom;
 
-        const imageWidth =
-          printableWidth;
+        let cursorY = marginTop;
+        let isFirstBlock = true;
 
-        const imageHeight =
-          (canvas.height *
-            imageWidth) /
-          canvas.width;
+        /*
+         * 3D soya kesilib qolmasligi uchun elementni
+         * 18px bo‘sh joyli vaqtinchalik konteynerga
+         * klonlab, shu konteynerni capture qilamiz.
+         */
+        async function captureBlock(
+          source: HTMLElement
+        ) {
+          const rect =
+            source.getBoundingClientRect();
 
-        let heightLeft =
-          imageHeight;
+          const wrapper =
+            document.createElement("div");
 
-        let positionY =
-          margin;
+          wrapper.style.position =
+            "absolute";
+          wrapper.style.left =
+            "-100000px";
+          wrapper.style.top =
+            "0";
+          wrapper.style.width =
+            `${Math.ceil(rect.width) + 36}px`;
+          wrapper.style.padding =
+            "18px";
+          wrapper.style.margin =
+            "0";
+          wrapper.style.background =
+            "#eef2f6";
+          wrapper.style.boxSizing =
+            "border-box";
+          wrapper.style.zIndex =
+            "-9999";
+          wrapper.style.pointerEvents =
+            "none";
 
-        pdf.addImage(
-          imageData,
-          "JPEG",
-          margin,
-          positionY,
-          imageWidth,
-          imageHeight,
-          undefined,
-          "FAST"
-        );
+          const clone =
+            source.cloneNode(
+              true
+            ) as HTMLElement;
 
-        heightLeft -=
-          printableHeight;
+          clone.style.width =
+            "100%";
+          clone.style.maxWidth =
+            "none";
+          clone.style.margin =
+            "0";
+          clone.style.boxSizing =
+            "border-box";
 
-        while (heightLeft > 0) {
-          pdf.addPage();
+          wrapper.appendChild(
+            clone
+          );
 
-          positionY =
-            margin -
-            (imageHeight -
-              heightLeft);
+          document.body.appendChild(
+            wrapper
+          );
+
+          try {
+            const canvas =
+              await html2canvas(
+                wrapper,
+                {
+                  scale: 3,
+                  useCORS: true,
+                  allowTaint: false,
+                  backgroundColor:
+                    "#eef2f6",
+                  logging: false,
+                  scrollX: 0,
+                  scrollY: 0,
+                  windowWidth:
+                    Math.ceil(
+                      wrapper.scrollWidth
+                    ),
+                  windowHeight:
+                    Math.ceil(
+                      wrapper.scrollHeight
+                    ),
+                }
+              );
+
+            return canvas;
+          } finally {
+            wrapper.remove();
+          }
+        }
+
+        for (
+          let index = 0;
+          index < blocks.length;
+          index++
+        ) {
+          const block =
+            blocks[index];
+
+          const canvas =
+            await captureBlock(
+              block
+            );
+
+          /*
+           * JPEG 0.99:
+           * PNGdagi signature muammosidan qochamiz,
+           * lekin sifatni maksimal darajada saqlaymiz.
+           */
+          const imageData =
+            canvas.toDataURL(
+              "image/jpeg",
+              0.99
+            );
+
+          let imageWidth =
+            printableWidth;
+
+          let imageHeight =
+            (canvas.height *
+              imageWidth) /
+            canvas.width;
+
+          /*
+           * Juda baland bitta savol bo‘lsa,
+           * uni bitta A4 sahifaga sig‘diramiz.
+           * Javoblar yo‘qolmaydi.
+           */
+          if (
+            imageHeight >
+            printableHeight
+          ) {
+            const ratio =
+              printableHeight /
+              imageHeight;
+
+            imageHeight *=
+              ratio;
+            imageWidth *=
+              ratio;
+          }
+
+          /*
+           * Joriy sahifada joy yetmasa,
+           * yangi sahifadan boshlaymiz.
+           */
+          if (
+            !isFirstBlock &&
+            cursorY +
+              imageHeight >
+              pageHeight -
+                marginBottom
+          ) {
+            pdf.addPage();
+            cursorY =
+              marginTop;
+          }
+
+          const x =
+            marginX +
+            (printableWidth -
+              imageWidth) /
+              2;
 
           pdf.addImage(
             imageData,
             "JPEG",
-            margin,
-            positionY,
+            x,
+            cursorY,
             imageWidth,
             imageHeight,
             undefined,
-            "FAST"
+            "SLOW"
           );
 
-          heightLeft -=
-            printableHeight;
+          cursorY +=
+            imageHeight +
+            blockGap;
+
+          isFirstBlock =
+            false;
+
+          /*
+           * Juda uzun eksportda brauzerga
+           * nafas beramiz.
+           */
+          if (
+            index % 6 === 5
+          ) {
+            await new Promise<void>(
+              (resolve) =>
+                setTimeout(
+                  resolve,
+                  0
+                )
+            );
+          }
         }
 
         const safeName =
@@ -1084,8 +1229,9 @@ function PageStyles() {
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        margin-bottom: 16px;
-        padding: 10px 12px;
+        margin-bottom: 18px;
+        padding: 14px 16px;
+        min-height: 72px;
         border: 2px solid #25394a;
         border-radius: 16px;
         background:
@@ -1106,11 +1252,11 @@ function PageStyles() {
       .refreshButton,
       .pdfButton,
       .primaryButton {
-        min-height: 42px;
+        min-height: 46px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 9px 16px;
+        padding: 10px 19px;
         border: 2px solid #3b4a56;
         border-radius: 12px;
         color: #102138;
