@@ -5,10 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function getUserKey(request: NextRequest) {
-  const session =
-    request.cookies.get("qurbonov_session")?.value;
-
-  return session || "";
+  return request.cookies.get("qurbonov_session")?.value || "";
 }
 
 export async function POST(
@@ -25,6 +22,43 @@ export async function POST(
           message: "Testni boshlash uchun tizimga kirish kerak.",
         },
         { status: 401 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+
+    const userName =
+      typeof body?.userName === "string"
+        ? body.userName.trim().replace(/\s+/g, " ")
+        : "";
+
+    if (!userName) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Ism va familiyangizni kiriting.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (userName.length < 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Ism juda qisqa.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (userName.length > 100) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Ism juda uzun.",
+        },
+        { status: 400 }
       );
     }
 
@@ -78,7 +112,8 @@ export async function POST(
       SELECT
         id,
         started_at,
-        status
+        status,
+        user_name
       FROM national_certificate_attempts
       WHERE
         test_id = ${testId}
@@ -89,48 +124,44 @@ export async function POST(
     `;
 
     if (activeAttempts.length > 0) {
-      const activeAttempt =
-        activeAttempts[0];
+      const activeAttempt = activeAttempts[0];
 
-      const startedAt =
-        new Date(
-          String(activeAttempt.started_at)
-        );
+      const startedAt = new Date(
+        String(activeAttempt.started_at)
+      );
 
       const durationMinutes =
         Number(test.duration_minutes);
 
-      const expiresAt =
-        new Date(
-          startedAt.getTime() +
-            durationMinutes *
-              60 *
-              1000
-        );
+      const expiresAt = new Date(
+        startedAt.getTime() +
+          durationMinutes * 60 * 1000
+      );
 
       const now = new Date();
 
       if (expiresAt.getTime() > now.getTime()) {
+        await sql`
+          UPDATE national_certificate_attempts
+          SET
+            user_name = ${userName},
+            updated_at = NOW()
+          WHERE id = ${activeAttempt.id}
+        `;
+
         return NextResponse.json({
           success: true,
           resumed: true,
-
           message:
             "Avval boshlangan test davom ettirilmoqda.",
-
           attempt: {
             id: activeAttempt.id,
             testId,
-            status:
-              activeAttempt.status,
-
-            startedAt:
-              startedAt.toISOString(),
-
-            expiresAt:
-              expiresAt.toISOString(),
-
+            status: activeAttempt.status,
+            startedAt: startedAt.toISOString(),
+            expiresAt: expiresAt.toISOString(),
             durationMinutes,
+            userName,
           },
         });
       }
@@ -164,11 +195,9 @@ export async function POST(
           )
       `;
 
-      const usedCount =
-        Number(
-          attemptStats[0]?.used_count ??
-            0
-        );
+      const usedCount = Number(
+        attemptStats[0]?.used_count ?? 0
+      );
 
       if (usedCount >= attemptLimit) {
         return NextResponse.json(
@@ -177,10 +206,8 @@ export async function POST(
             code: "ATTEMPT_LIMIT_REACHED",
             message:
               "Bu test uchun urinishlar soni tugagan.",
-
             attemptLimit,
-            attemptsUsed:
-              usedCount,
+            attemptsUsed: usedCount,
             attemptsRemaining: 0,
           },
           { status: 403 }
@@ -192,6 +219,7 @@ export async function POST(
       INSERT INTO national_certificate_attempts (
         test_id,
         user_key,
+        user_name,
         status,
         started_at,
         created_at,
@@ -200,6 +228,7 @@ export async function POST(
       VALUES (
         ${testId},
         ${userKey},
+        ${userName},
         'in_progress',
         NOW(),
         NOW(),
@@ -208,49 +237,37 @@ export async function POST(
       RETURNING
         id,
         started_at,
-        status
+        status,
+        user_name
     `;
 
-    const attempt =
-      created[0];
+    const attempt = created[0];
 
-    const startedAt =
-      new Date(
-        String(attempt.started_at)
-      );
+    const startedAt = new Date(
+      String(attempt.started_at)
+    );
 
     const durationMinutes =
       Number(test.duration_minutes);
 
-    const expiresAt =
-      new Date(
-        startedAt.getTime() +
-          durationMinutes *
-            60 *
-            1000
-      );
+    const expiresAt = new Date(
+      startedAt.getTime() +
+        durationMinutes * 60 * 1000
+    );
 
     return NextResponse.json(
       {
         success: true,
         resumed: false,
-
-        message:
-          "Test boshlandi.",
-
+        message: "Test boshlandi.",
         attempt: {
           id: attempt.id,
           testId,
-          status:
-            attempt.status,
-
-          startedAt:
-            startedAt.toISOString(),
-
-          expiresAt:
-            expiresAt.toISOString(),
-
+          status: attempt.status,
+          startedAt: startedAt.toISOString(),
+          expiresAt: expiresAt.toISOString(),
           durationMinutes,
+          userName: attempt.user_name,
         },
       },
       { status: 201 }
