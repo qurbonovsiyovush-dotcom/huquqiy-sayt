@@ -1737,7 +1737,7 @@ function PageStyles() {
 
       .loader {
         width: 46px;
-        height: 46px;
+        height: 50px;
         margin: 0 auto 20px;
         border-radius: 50%;
         border: 5px solid #cbd3da;
@@ -2133,7 +2133,7 @@ function PageStyles() {
       }
 
       .headerInner {
-        width: min(98%, 1560px);
+        width: min(98.5%, 1640px);
         min-height: 78px;
         margin: 0 auto;
         display: flex;
@@ -2240,18 +2240,18 @@ function PageStyles() {
       /* ===== LAYOUT ===== */
 
       .testLayout {
-        width: min(98%, 1560px);
+        width: min(98.5%, 1640px);
         margin: 30px auto 52px;
         display: grid;
-        grid-template-columns: 340px minmax(0, 1fr);
-        gap: 32px;
+        grid-template-columns: 290px minmax(0, 1fr);
+        gap: 26px;
         align-items: start;
       }
 
       .navigatorCard {
         position: sticky;
         top: 118px;
-        padding: 22px;
+        padding: 17px;
         border-radius: 18px;
       }
 
@@ -2295,14 +2295,14 @@ function PageStyles() {
 
       .questionNavigator {
         display: grid;
-        grid-template-columns: repeat(5, minmax(48px, 1fr));
+        grid-template-columns: repeat(5, minmax(40px, 1fr));
         gap: 10px;
       }
 
       .navNumber {
         aspect-ratio: 1;
-        min-width: 48px;
-        min-height: 48px;
+        min-width: 40px;
+        min-height: 40px;
         border: 2px solid #657078;
         border-radius: 9px;
         background:
@@ -2438,7 +2438,7 @@ function PageStyles() {
       .questionNumber {
         display: inline-block;
         margin-right: 10px;
-        font-size: 18px;
+        font-size: 19px;
         font-weight: 900;
       }
 
@@ -2470,7 +2470,7 @@ function PageStyles() {
       .questionText {
         position: relative;
         margin-top: 30px;
-        padding: 30px 30px 31px;
+        padding: 34px 34px 36px;
         border: 3px solid #3e596a;
         border-radius: 16px;
         background:
@@ -2481,7 +2481,7 @@ function PageStyles() {
             #d5e3ed 100%
           );
         color: #10233a;
-        font-size: clamp(21px, 2.1vw, 27px);
+        font-size: clamp(24px, 2.25vw, 31px);
         line-height: 1.65;
         font-weight: 900;
         overflow-wrap: anywhere;
@@ -2491,32 +2491,6 @@ function PageStyles() {
           inset 0 -7px 0 rgba(57, 78, 91, 0.13),
           0 8px 0 #647783,
           0 14px 22px rgba(21, 45, 61, 0.19);
-      }
-
-      .questionText::before {
-        content: "SAVOL";
-        display: block;
-        width: max-content;
-        min-height: 25px;
-        margin: 0 0 14px 0;
-        padding: 5px 11px;
-        border: 1px solid #344957;
-        border-radius: 7px;
-        background:
-          linear-gradient(
-            180deg,
-            #657b89 0%,
-            #455b68 100%
-          );
-        color: #fff;
-        font-size: 10px;
-        line-height: 1.2;
-        letter-spacing: 0.1em;
-        font-weight: 900;
-        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
-        box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.28),
-          0 3px 0 #354a56;
       }
 
       .htmlContent img {
@@ -2541,7 +2515,7 @@ function PageStyles() {
         display: flex;
         align-items: center;
         gap: 15px;
-        min-height: 76px;
+        min-height: 82px;
         padding: 17px 20px;
         border: 3px solid #626e76;
         border-radius: 14px;
@@ -2589,7 +2563,7 @@ function PageStyles() {
       }
 
       .optionKey {
-        flex: 0 0 46px;
+        flex: 0 0 50px;
         height: 46px;
         display: grid;
         place-items: center;
@@ -2603,7 +2577,7 @@ function PageStyles() {
             #c5ccd1 100%
           );
         font-weight: 900;
-        font-size: 17px;
+        font-size: 18px;
         box-shadow:
           inset 0 2px 0 #fff,
           inset 0 -4px 0 rgba(50, 58, 64, 0.12),
@@ -2629,8 +2603,8 @@ function PageStyles() {
       .optionText {
         min-width: 0;
         color: #17263a;
-        font-size: 17px;
-        line-height: 1.58;
+        font-size: 20px;
+        line-height: 1.6;
         font-weight: 700;
       }
 
@@ -3034,7 +3008,7 @@ function PageStyles() {
 
         .questionText {
           padding: 20px 16px 22px;
-          font-size: 18px;
+          font-size: 21px;
         }
 
         .option {
@@ -3089,4 +3063,3 @@ function PageStyles() {
     `}</style>
   );
 }
-
