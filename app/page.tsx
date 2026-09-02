@@ -218,6 +218,15 @@ export default function Home() {
   }
 
   /* =========================================
+     MILLIY SERTIFIKATNI OCHISH
+  ========================================= */
+
+  function openNationalCertificate() {
+    window.location.href =
+      "/national-certificate";
+  }
+
+  /* =========================================
      QO‘LLANMALARNI OCHISH
   ========================================= */
 
@@ -382,6 +391,22 @@ export default function Home() {
                 window.location.href =
                   "/talabalar/kazuslar";
               }}
+            >
+              Ochish
+            </button>
+          </article>
+
+          <article className="card">
+            <h2>
+              Milliy sertifikat
+            </h2>
+
+            <button
+              type="button"
+              className="openButton testButton"
+              onClick={
+                openNationalCertificate
+              }
             >
               Ochish
             </button>
