@@ -385,9 +385,10 @@ export default function NationalCertificateResultsPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 24px;
+          gap: 28px;
+          min-height: 158px;
           margin-bottom: 26px;
-          padding: 22px 24px 24px;
+          padding: 24px 28px 26px;
           border: 3px solid #21445d;
           border-radius: 22px;
           color: #102f49;
@@ -425,6 +426,16 @@ export default function NationalCertificateResultsPage() {
           z-index: 1;
         }
 
+        .topbar > div:first-child {
+          min-width: 0;
+          display: flex;
+          flex: 1;
+          flex-direction: column;
+          justify-content: center;
+          align-items: flex-start;
+          padding: 4px 0 2px 2px;
+        }
+
         .eyebrow {
           display: inline-flex;
           margin: 0 0 8px;
@@ -448,9 +459,9 @@ export default function NationalCertificateResultsPage() {
         }
 
         h1 {
-          margin: 0;
-          font-size: 38px;
-          line-height: 1.05;
+          margin: 2px 0 0;
+          font-size: 40px;
+          line-height: 1.06;
           color: #10263c;
           text-shadow:
             0 1px 0 rgba(255, 255, 255, 0.8),
@@ -458,10 +469,13 @@ export default function NationalCertificateResultsPage() {
         }
 
         .subtitle {
-          margin: 10px 0 0;
-          color: #214761;
-          font-size: 15px;
-          font-weight: 700;
+          max-width: 760px;
+          margin: 11px 0 0;
+          color: #173f5a;
+          font-size: 16px;
+          font-weight: 800;
+          line-height: 1.4;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
         }
 
         .topActions {
@@ -472,7 +486,7 @@ export default function NationalCertificateResultsPage() {
           justify-content: flex-end;
         }
 
-        .button {
+        :global(.button) {
           min-height: 44px;
           display: inline-flex;
           align-items: center;
@@ -496,25 +510,25 @@ export default function NationalCertificateResultsPage() {
             0 8px 12px rgba(0, 0, 0, 0.16);
         }
 
-        .button:hover {
+        :global(.button:hover) {
           transform: translateY(-1px);
           filter: brightness(1.03);
         }
 
-        .button:active {
+        :global(.button:active) {
           transform: translateY(4px);
           box-shadow:
             inset 0 2px 0 rgba(255, 255, 255, 0.85),
             0 1px 0 #566168;
         }
 
-        .button:disabled {
+        :global(.button:disabled) {
           cursor: not-allowed;
           opacity: 0.6;
           transform: none;
         }
 
-        .primary {
+        :global(.primary) {
           border-color: #174a68;
           background:
             linear-gradient(
@@ -531,7 +545,7 @@ export default function NationalCertificateResultsPage() {
             0 8px 12px rgba(0, 0, 0, 0.16);
         }
 
-        .secondary {
+        :global(.secondary) {
           background:
             linear-gradient(
               180deg,
@@ -540,6 +554,10 @@ export default function NationalCertificateResultsPage() {
               #c9ccce 100%
             );
           color: #172033;
+        }
+
+        :global(.topActions .secondary) {
+          min-width: 92px;
         }
 
         .statsGrid {
@@ -807,56 +825,63 @@ export default function NationalCertificateResultsPage() {
           font-weight: 900;
         }
 
-        .detailButton {
-          min-width: 100px;
-          min-height: 40px;
+        :global(.detailButton) {
+          min-width: 112px;
+          min-height: 42px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 8px 15px;
-          border: 2px solid #164b69;
-          border-radius: 10px;
+          padding: 9px 16px;
+          border: 2px solid #103f5b;
+          border-radius: 11px;
           background:
             linear-gradient(
               180deg,
-              #98dcff 0%,
-              #55b8ea 46%,
-              #2d8bc0 100%
+              #a7e3ff 0%,
+              #61c2f0 43%,
+              #3193c8 100%
             );
-          color: #0c324b;
-          font-size: 12px;
+          color: #082f49 !important;
+          font-size: 13px;
           font-weight: 900;
-          text-decoration: none;
+          text-decoration: none !important;
           white-space: nowrap;
           text-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.75);
+            0 1px 0 rgba(255, 255, 255, 0.8);
           box-shadow:
-            inset 0 2px 0 rgba(255, 255, 255, 0.78),
-            inset 0 -4px 0 rgba(15, 72, 104, 0.24),
-            0 5px 0 #1a5c7b,
-            0 8px 11px rgba(0, 0, 0, 0.16);
+            inset 0 2px 0 rgba(255, 255, 255, 0.86),
+            inset 0 -4px 0 rgba(12, 66, 97, 0.26),
+            0 5px 0 #155676,
+            0 9px 13px rgba(0, 0, 0, 0.2);
           transition:
             transform 0.12s ease,
             filter 0.12s ease,
             box-shadow 0.12s ease;
         }
 
-        .detailButton::after {
+        :global(.detailButton::after) {
           content: " →";
-          margin-left: 5px;
+          margin-left: 7px;
+          font-size: 14px;
           font-weight: 900;
         }
 
-        .detailButton:hover {
-          transform: translateY(-1px);
-          filter: brightness(1.04);
+        :global(.detailButton:hover) {
+          transform: translateY(-2px);
+          filter: brightness(1.06);
+          box-shadow:
+            inset 0 2px 0 rgba(255, 255, 255, 0.9),
+            inset 0 -4px 0 rgba(12, 66, 97, 0.24),
+            0 7px 0 #155676,
+            0 12px 16px rgba(0, 0, 0, 0.22);
         }
 
-        .detailButton:active {
+        :global(.detailButton:active) {
           transform: translateY(4px);
           box-shadow:
-            inset 0 2px 0 rgba(255, 255, 255, 0.75),
-            0 1px 0 #1a5c7b;
+            inset 0 2px 0 rgba(255, 255, 255, 0.78),
+            0 1px 0 #155676,
+            0 4px 7px rgba(0, 0, 0, 0.16);
         }
 
         .emptyState {
@@ -910,6 +935,11 @@ export default function NationalCertificateResultsPage() {
             align-items: stretch;
           }
 
+          .topbar > div:first-child {
+            align-items: flex-start;
+            padding-right: 0;
+          }
+
           .topActions {
             justify-content: flex-start;
           }
@@ -936,7 +966,7 @@ export default function NationalCertificateResultsPage() {
             width: 100%;
           }
 
-          .button {
+          :global(.button) {
             flex: 1;
             text-align: center;
           }
