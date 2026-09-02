@@ -265,13 +265,13 @@ export default function NationalCertificateDetailedResultPage() {
 
         /*
          * Saytdagi 3D ko‘rinishni aynan capture qilamiz.
-         * scale=3 matn, gradient va 3D soyalarni aniqroq saqlaydi.
+         * scale=2 matn va soyalarni aniqroq qiladi.
          */
         const canvas =
           await html2canvas(
             element,
             {
-              scale: 3,
+              scale: 2,
               useCORS: true,
               allowTaint: false,
               backgroundColor:
@@ -291,7 +291,8 @@ export default function NationalCertificateDetailedResultPage() {
 
         const imageData =
           canvas.toDataURL(
-            "image/png"
+            "image/jpeg",
+            0.96
           );
 
         /*
@@ -338,13 +339,13 @@ export default function NationalCertificateDetailedResultPage() {
 
         pdf.addImage(
           imageData,
-          "PNG",
+          "JPEG",
           margin,
           positionY,
           imageWidth,
           imageHeight,
           undefined,
-          "SLOW"
+          "FAST"
         );
 
         heightLeft -=
@@ -1073,9 +1074,9 @@ function PageStyles() {
       }
 
       .pageInner {
-        width: min(96%, 1320px);
+        width: min(94%, 1240px);
         margin: 0 auto;
-        padding: 12px 0 60px;
+        padding: 8px 0 56px;
       }
 
       .topActions {
@@ -1083,10 +1084,10 @@ function PageStyles() {
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        margin-bottom: 18px;
-        padding: 12px 14px;
+        margin-bottom: 16px;
+        padding: 10px 12px;
         border: 2px solid #25394a;
-        border-radius: 18px;
+        border-radius: 16px;
         background:
           linear-gradient(
             180deg,
@@ -1105,11 +1106,11 @@ function PageStyles() {
       .refreshButton,
       .pdfButton,
       .primaryButton {
-        min-height: 44px;
+        min-height: 42px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 10px 18px;
+        padding: 9px 16px;
         border: 2px solid #3b4a56;
         border-radius: 12px;
         color: #102138;
@@ -1212,10 +1213,10 @@ function PageStyles() {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 28px;
-        padding: 34px 36px;
+        gap: 18px;
+        padding: 26px 30px;
         border: 3px solid #30383d;
-        border-radius: 24px;
+        border-radius: 20px;
         background:
           linear-gradient(
             180deg,
@@ -1307,9 +1308,9 @@ function PageStyles() {
       }
 
       .heroResult {
-        flex: 0 0 164px;
-        width: 164px;
-        height: 164px;
+        flex: 0 0 142px;
+        width: 142px;
+        height: 142px;
         display: grid;
         place-content: center;
         text-align: center;
@@ -1332,7 +1333,7 @@ function PageStyles() {
       }
 
       .heroResult strong {
-        font-size: 31px;
+        font-size: 22px;
         text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
       }
 
@@ -1346,14 +1347,14 @@ function PageStyles() {
       .statsGrid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
-        margin-top: 24px;
+        gap: 12px;
+        margin-top: 18px;
       }
 
       .statCard {
         position: relative;
-        min-height: 112px;
-        padding: 19px 20px;
+        min-height: 96px;
+        padding: 15px 17px;
         border: 2px solid #465159;
         border-radius: 16px;
         background:
@@ -1379,7 +1380,7 @@ function PageStyles() {
       }
 
       .statCard strong {
-        font-size: 27px;
+        font-size: 22px;
         color: #172334;
         text-shadow: 0 1px 0 #fff;
       }
@@ -1395,11 +1396,11 @@ function PageStyles() {
       .infoCard {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
-        margin-top: 24px;
-        padding: 18px;
+        gap: 12px;
+        margin-top: 18px;
+        padding: 14px;
         border: 2px solid #3d474e;
-        border-radius: 18px;
+        border-radius: 16px;
         background:
           linear-gradient(
             180deg,
@@ -1416,7 +1417,7 @@ function PageStyles() {
 
       .infoCard > div {
         min-width: 0;
-        padding: 13px 14px;
+        padding: 11px 12px;
         border: 1px solid #c6ccd0;
         border-radius: 12px;
         background:
@@ -1449,8 +1450,8 @@ function PageStyles() {
         display: flex;
         flex-wrap: wrap;
         gap: 11px;
-        margin-top: 26px;
-        padding: 16px;
+        margin-top: 18px;
+        padding: 12px 14px;
         border: 2px solid #30404b;
         border-radius: 17px;
         background:
@@ -1467,10 +1468,10 @@ function PageStyles() {
       }
 
       .filterButton {
-        min-height: 40px;
+        min-height: 38px;
         border: 2px solid #4d5960;
         border-radius: 12px;
-        padding: 8px 15px;
+        padding: 7px 14px;
         background:
           linear-gradient(
             180deg,
@@ -1525,15 +1526,15 @@ function PageStyles() {
       }
 
       .questionsSection {
-        margin-top: 30px;
+        margin-top: 22px;
       }
 
       .sectionTitle {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 16px;
-        padding: 15px 18px;
+        margin-bottom: 14px;
+        padding: 12px 16px;
         border: 2px solid #133d57;
         border-radius: 15px;
         background:
@@ -1553,7 +1554,7 @@ function PageStyles() {
 
       .sectionTitle h2 {
         margin: 0;
-        font-size: 24px;
+        font-size: 22px;
         text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
       }
 
@@ -1566,14 +1567,14 @@ function PageStyles() {
 
       .questionsList {
         display: grid;
-        gap: 22px;
+        gap: 18px;
       }
 
       .questionCard {
         position: relative;
         overflow: hidden;
         border: 2px solid #4a555c;
-        border-radius: 18px;
+        border-radius: 16px;
         background:
           linear-gradient(
             180deg,
@@ -2016,6 +2017,74 @@ function PageStyles() {
           0 10px 18px rgba(0, 0, 0, 0.17);
       }
 
+
+      /* Admin natija sahifasini ixcham va tartibli qilish */
+      .topActions {
+        position: relative;
+      }
+
+      .actionButtons {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .heroCard {
+        min-height: 188px;
+      }
+
+      .heroLeft {
+        max-width: calc(100% - 170px);
+      }
+
+      .heroCard h1 {
+        max-width: 900px;
+      }
+
+      .statsGrid .statCard {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .infoCard > div {
+        display: flex;
+        min-height: 64px;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .filterCard {
+        align-items: center;
+      }
+
+      .questionsSection {
+        padding-bottom: 8px;
+      }
+
+      .sectionTitle {
+        min-height: 66px;
+      }
+
+      .questionCard {
+        margin-bottom: 2px;
+      }
+
+      .questionTop {
+        min-height: 58px;
+      }
+
+      .questionText {
+        padding-top: 20px;
+      }
+
+      .optionsList {
+        padding-top: 16px;
+      }
+
+      .optionRow {
+        min-height: 54px;
+      }
+
       @media (max-width: 900px) {
         .statsGrid,
         .infoCard {
@@ -2034,7 +2103,7 @@ function PageStyles() {
         }
 
         .pageInner {
-          width: min(94%, 1320px);
+          width: min(94%, 1240px);
           padding-top: 8px;
         }
 
