@@ -198,6 +198,102 @@ export default function NationalCertificateDetailedResultPage() {
         return;
       }
 
+      /*
+       * MUHIM:
+       * showSaveFilePicker foydalanuvchi tugmani bosgan
+       * ayni "user gesture" ichida chaqirilishi kerak.
+       * Shuning uchun Save As oynasini PDF generatsiyasidan
+       * OLDIN ochamiz.
+       */
+      const safeName =
+        result.userName
+          .trim()
+          .replace(
+            /[<>:"/\\|?*\u0000-\u001F]/g,
+            ""
+          )
+          .replace(/\s+/g, "-")
+          .slice(0, 80) ||
+        "Foydalanuvchi";
+
+      const safeTest =
+        result.testTitle
+          .trim()
+          .replace(
+            /[<>:"/\\|?*\u0000-\u001F]/g,
+            ""
+          )
+          .replace(/\s+/g, "-")
+          .slice(0, 80) ||
+        "Milliy-sertifikat";
+
+      const suggestedFileName =
+        `${safeName}-${safeTest}-natija.pdf`;
+
+      type SaveFilePickerOptions = {
+        suggestedName?: string;
+        types?: Array<{
+          description?: string;
+          accept: Record<string, string[]>;
+        }>;
+      };
+
+      type WritableLike = {
+        write: (data: Blob) => Promise<void>;
+        close: () => Promise<void>;
+      };
+
+      type FileHandleLike = {
+        createWritable: () => Promise<WritableLike>;
+      };
+
+      const browserWindow =
+        window as typeof window & {
+          showSaveFilePicker?: (
+            options?: SaveFilePickerOptions
+          ) => Promise<FileHandleLike>;
+        };
+
+      let chosenHandle:
+        | FileHandleLike
+        | null = null;
+
+      /*
+       * Save As oynasini darhol ochamiz.
+       */
+      if (
+        typeof browserWindow.showSaveFilePicker ===
+        "function"
+      ) {
+        try {
+          chosenHandle =
+            await browserWindow.showSaveFilePicker({
+              suggestedName:
+                suggestedFileName,
+              types: [
+                {
+                  description:
+                    "PDF hujjat",
+                  accept: {
+                    "application/pdf": [
+                      ".pdf",
+                    ],
+                  },
+                },
+              ],
+            });
+        } catch (pickerError) {
+          if (
+            pickerError instanceof DOMException &&
+            pickerError.name === "AbortError"
+          ) {
+            return;
+          }
+
+          throw pickerError;
+        }
+      }
+
       setIsExportingPdf(true);
       setError("");
 
@@ -264,15 +360,7 @@ export default function NationalCertificateDetailedResultPage() {
         }
 
         /*
-         * Butun 45 savolli sahifani bitta ulkan rasmga
-         * aylantirmaymiz. Har bir 3D blokni alohida
-         * yuqori sifatda capture qilamiz.
-         *
-         * Bu usul:
-         * - 3D soyalarni yaxshiroq saqlaydi;
-         * - matnni tiniqroq qiladi;
-         * - barcha 45 savolni saqlaydi;
-         * - wrong PNG signature muammosini chetlab o‘tadi.
+         * Har bir 3D blokni alohida yuqori sifatda capture qilamiz.
          */
         const blocks = Array.from(
           root.querySelectorAll<HTMLElement>(
@@ -324,11 +412,6 @@ export default function NationalCertificateDetailedResultPage() {
         let cursorY = marginTop;
         let isFirstBlock = true;
 
-        /*
-         * 3D soya kesilib qolmasligi uchun elementni
-         * 18px bo‘sh joyli vaqtinchalik konteynerga
-         * klonlab, shu konteynerni capture qilamiz.
-         */
         async function captureBlock(
           source: HTMLElement
         ) {
@@ -382,30 +465,27 @@ export default function NationalCertificateDetailedResultPage() {
           );
 
           try {
-            const canvas =
-              await html2canvas(
-                wrapper,
-                {
-                  scale: 3,
-                  useCORS: true,
-                  allowTaint: false,
-                  backgroundColor:
-                    "#eef2f6",
-                  logging: false,
-                  scrollX: 0,
-                  scrollY: 0,
-                  windowWidth:
-                    Math.ceil(
-                      wrapper.scrollWidth
-                    ),
-                  windowHeight:
-                    Math.ceil(
-                      wrapper.scrollHeight
-                    ),
-                }
-              );
-
-            return canvas;
+            return await html2canvas(
+              wrapper,
+              {
+                scale: 3,
+                useCORS: true,
+                allowTaint: false,
+                backgroundColor:
+                  "#eef2f6",
+                logging: false,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth:
+                  Math.ceil(
+                    wrapper.scrollWidth
+                  ),
+                windowHeight:
+                  Math.ceil(
+                    wrapper.scrollHeight
+                  ),
+              }
+            );
           } finally {
             wrapper.remove();
           }
@@ -416,19 +496,11 @@ export default function NationalCertificateDetailedResultPage() {
           index < blocks.length;
           index++
         ) {
-          const block =
-            blocks[index];
-
           const canvas =
             await captureBlock(
-              block
+              blocks[index]
             );
 
-          /*
-           * JPEG 0.99:
-           * PNGdagi signature muammosidan qochamiz,
-           * lekin sifatni maksimal darajada saqlaymiz.
-           */
           const imageData =
             canvas.toDataURL(
               "image/jpeg",
@@ -443,11 +515,6 @@ export default function NationalCertificateDetailedResultPage() {
               imageWidth) /
             canvas.width;
 
-          /*
-           * Juda baland bitta savol bo‘lsa,
-           * uni bitta A4 sahifaga sig‘diramiz.
-           * Javoblar yo‘qolmaydi.
-           */
           if (
             imageHeight >
             printableHeight
@@ -462,10 +529,6 @@ export default function NationalCertificateDetailedResultPage() {
               ratio;
           }
 
-          /*
-           * Joriy sahifada joy yetmasa,
-           * yangi sahifadan boshlaymiz.
-           */
           if (
             !isFirstBlock &&
             cursorY +
@@ -502,10 +565,6 @@ export default function NationalCertificateDetailedResultPage() {
           isFirstBlock =
             false;
 
-          /*
-           * Juda uzun eksportda brauzerga
-           * nafas beramiz.
-           */
           if (
             index % 6 === 5
           ) {
@@ -519,99 +578,27 @@ export default function NationalCertificateDetailedResultPage() {
           }
         }
 
-        const safeName =
-          result.userName
-            .trim()
-            .replace(
-              /[<>:"/\\|?*\u0000-\u001F]/g,
-              ""
-            )
-            .replace(/\s+/g, "-")
-            .slice(0, 80) ||
-          "Foydalanuvchi";
-
-        const safeTest =
-          result.testTitle
-            .trim()
-            .replace(
-              /[<>:"/\\|?*\u0000-\u001F]/g,
-              ""
-            )
-            .replace(/\s+/g, "-")
-            .slice(0, 80) ||
-          "Milliy-sertifikat";
-
-        const suggestedFileName =
-          `${safeName}-${safeTest}-natija.pdf`;
-
         const pdfBlob =
           pdf.output("blob");
 
-        type SaveFilePickerOptions = {
-          suggestedName?: string;
-          types?: Array<{
-            description?: string;
-            accept: Record<string, string[]>;
-          }>;
-        };
+        /*
+         * Agar Save As oynasi mavjud bo‘lsa,
+         * avval tanlangan joyga yozamiz.
+         */
+        if (chosenHandle) {
+          const writable =
+            await chosenHandle.createWritable();
 
-        type WritableLike = {
-          write: (data: Blob) => Promise<void>;
-          close: () => Promise<void>;
-        };
+          await writable.write(
+            pdfBlob
+          );
 
-        type FileHandleLike = {
-          createWritable: () => Promise<WritableLike>;
-        };
-
-        const browserWindow =
-          window as typeof window & {
-            showSaveFilePicker?: (
-              options?: SaveFilePickerOptions
-            ) => Promise<FileHandleLike>;
-          };
-
-        if (
-          typeof browserWindow.showSaveFilePicker ===
-          "function"
-        ) {
-          try {
-            const handle =
-              await browserWindow.showSaveFilePicker({
-                suggestedName:
-                  suggestedFileName,
-                types: [
-                  {
-                    description:
-                      "PDF hujjat",
-                    accept: {
-                      "application/pdf": [
-                        ".pdf",
-                      ],
-                    },
-                  },
-                ],
-              });
-
-            const writable =
-              await handle.createWritable();
-
-            await writable.write(
-              pdfBlob
-            );
-
-            await writable.close();
-          } catch (saveError) {
-            if (
-              saveError instanceof DOMException &&
-              saveError.name === "AbortError"
-            ) {
-              return;
-            }
-
-            throw saveError;
-          }
+          await writable.close();
         } else {
+          /*
+           * showSaveFilePicker mavjud bo‘lmagan brauzerlar
+           * uchun oddiy yuklab olish fallback.
+           */
           pdf.save(
             suggestedFileName
           );
