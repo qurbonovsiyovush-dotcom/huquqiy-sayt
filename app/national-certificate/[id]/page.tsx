@@ -2495,12 +2495,11 @@ function PageStyles() {
 
       .questionText::before {
         content: "SAVOL";
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        display: block;
+        width: max-content;
         min-height: 25px;
-        margin-bottom: 12px;
-        padding: 4px 10px;
+        margin: 0 0 14px 0;
+        padding: 5px 11px;
         border: 1px solid #344957;
         border-radius: 7px;
         background:
