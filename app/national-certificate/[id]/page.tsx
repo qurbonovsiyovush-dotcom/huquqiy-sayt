@@ -1492,7 +1492,7 @@ export default function NationalCertificateTestPage() {
               <div className="questionActions">
                 <button
                   type="button"
-                  className="secondaryButton"
+                  className="stepButton"
                   onClick={() =>
                     goToQuestion(
                       currentIndex -
@@ -1522,7 +1522,7 @@ export default function NationalCertificateTestPage() {
                   1 ? (
                   <button
                     type="button"
-                    className="primaryButton"
+                    className="stepButton"
                     onClick={() =>
                       goToQuestion(
                         currentIndex +
@@ -1556,22 +1556,24 @@ export default function NationalCertificateTestPage() {
             </article>
           )}
 
-          <div className="bottomFinish">
-            <button
-              type="button"
-              className="finishOutlineButton"
-              onClick={() =>
-                setConfirmFinish(
-                  true
-                )
-              }
-              disabled={
-                submitting
-              }
-            >
-              Testni yakunlash
-            </button>
-          </div>
+          {currentIndex < test.questions.length - 1 && (
+            <div className="bottomFinish">
+              <button
+                type="button"
+                className="finishOutlineButton"
+                onClick={() =>
+                  setConfirmFinish(
+                    true
+                  )
+                }
+                disabled={
+                  submitting
+                }
+              >
+                Testni yakunlash
+              </button>
+            </div>
+          )}
         </section>
       </div>
 
@@ -1767,6 +1769,7 @@ function PageStyles() {
         color: #8d2020;
         font-size: 32px;
         font-weight: 900;
+        font-size: 14px;
         box-shadow:
           inset 0 2px 0 #fff,
           0 5px 0 #8d4c4c,
@@ -1787,9 +1790,10 @@ function PageStyles() {
       }
 
       .eyebrow {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         justify-content: center;
+        width: max-content;
         min-height: 38px;
         margin-bottom: 14px;
         padding: 8px 16px;
@@ -1973,6 +1977,7 @@ function PageStyles() {
       .startButton,
       .primaryButton,
       .secondaryButton,
+      .stepButton,
       .finishButton,
       .finishOutlineButton {
         min-height: 47px;
@@ -2029,6 +2034,27 @@ function PageStyles() {
           0 8px 12px rgba(0, 0, 0, 0.14);
       }
 
+      .stepButton {
+        min-width: 190px;
+        min-height: 52px;
+        border-color: #064887;
+        background:
+          linear-gradient(
+            180deg,
+            #4ba0f0 0%,
+            #1a79d3 46%,
+            #0758ac 100%
+          );
+        color: #fff;
+        font-size: 15px;
+        letter-spacing: 0.01em;
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.46),
+          inset 0 -5px 0 rgba(0, 45, 96, 0.22),
+          0 6px 0 #063f78,
+          0 10px 14px rgba(0, 52, 105, 0.22);
+      }
+
       .finishButton {
         background:
           linear-gradient(
@@ -2061,6 +2087,7 @@ function PageStyles() {
         .startButton:not(:disabled):hover,
         .primaryButton:not(:disabled):hover,
         .secondaryButton:not(:disabled):hover,
+        .stepButton:not(:disabled):hover,
         .finishButton:not(:disabled):hover,
         .finishOutlineButton:not(:disabled):hover,
         .navNumber:not(:disabled):hover,
@@ -2073,6 +2100,7 @@ function PageStyles() {
       .startButton:not(:disabled):active,
       .primaryButton:not(:disabled):active,
       .secondaryButton:not(:disabled):active,
+      .stepButton:not(:disabled):active,
       .finishButton:not(:disabled):active,
       .finishOutlineButton:not(:disabled):active,
       .navNumber:not(:disabled):active {
@@ -2105,8 +2133,8 @@ function PageStyles() {
       }
 
       .headerInner {
-        width: min(96%, 1380px);
-        min-height: 66px;
+        width: min(98%, 1560px);
+        min-height: 78px;
         margin: 0 auto;
         display: flex;
         align-items: center;
@@ -2116,7 +2144,7 @@ function PageStyles() {
 
       .headerTitle {
         min-width: 0;
-        padding: 12px 20px;
+        padding: 14px 24px;
         border: 2px solid #4f5960;
         border-radius: 12px;
         background:
@@ -2136,7 +2164,7 @@ function PageStyles() {
       .headerTitle strong {
         display: block;
         color: #142235;
-        font-size: 19px;
+        font-size: 22px;
         font-weight: 900;
         letter-spacing: 0.02em;
         white-space: nowrap;
@@ -2145,7 +2173,7 @@ function PageStyles() {
 
       .timer {
         flex: 0 0 auto;
-        min-width: 160px;
+        min-width: 178px;
         padding: 10px 17px;
         text-align: center;
         border: 2px solid #4f5960;
@@ -2175,7 +2203,7 @@ function PageStyles() {
       .timer strong {
         display: block;
         margin-top: 2px;
-        font-size: 23px;
+        font-size: 25px;
         letter-spacing: 0.05em;
       }
 
@@ -2212,18 +2240,18 @@ function PageStyles() {
       /* ===== LAYOUT ===== */
 
       .testLayout {
-        width: min(96%, 1380px);
+        width: min(98%, 1560px);
         margin: 30px auto 52px;
         display: grid;
-        grid-template-columns: 310px minmax(0, 1fr);
-        gap: 28px;
+        grid-template-columns: 340px minmax(0, 1fr);
+        gap: 32px;
         align-items: start;
       }
 
       .navigatorCard {
         position: sticky;
         top: 118px;
-        padding: 19px;
+        padding: 22px;
         border-radius: 18px;
       }
 
@@ -2267,13 +2295,14 @@ function PageStyles() {
 
       .questionNavigator {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 9px;
+        grid-template-columns: repeat(5, minmax(48px, 1fr));
+        gap: 10px;
       }
 
       .navNumber {
         aspect-ratio: 1;
-        min-width: 0;
+        min-width: 48px;
+        min-height: 48px;
         border: 2px solid #657078;
         border-radius: 9px;
         background:
@@ -2330,7 +2359,7 @@ function PageStyles() {
 
       .legend {
         display: grid;
-        gap: 9px;
+        gap: 10px;
         margin-top: 20px;
         padding-top: 16px;
         border-top: 2px groove #d3d8dc;
@@ -2369,10 +2398,18 @@ function PageStyles() {
         min-width: 0;
       }
 
+      .questionArea {
+        width: 100%;
+      }
+
+      .questionCard {
+        width: 100%;
+      }
+
       /* ===== QUESTION CARD ===== */
 
       .questionCard {
-        padding: 28px;
+        padding: 32px;
         border-radius: 20px;
       }
 
@@ -2401,7 +2438,7 @@ function PageStyles() {
       .questionNumber {
         display: inline-block;
         margin-right: 10px;
-        font-size: 17px;
+        font-size: 18px;
         font-weight: 900;
       }
 
@@ -2433,7 +2470,7 @@ function PageStyles() {
       .questionText {
         position: relative;
         margin-top: 30px;
-        padding: 26px 25px 27px;
+        padding: 30px 30px 31px;
         border: 3px solid #3e596a;
         border-radius: 16px;
         background:
@@ -2444,7 +2481,7 @@ function PageStyles() {
             #d5e3ed 100%
           );
         color: #10233a;
-        font-size: clamp(19px, 2.3vw, 24px);
+        font-size: clamp(21px, 2.1vw, 27px);
         line-height: 1.65;
         font-weight: 900;
         overflow-wrap: anywhere;
@@ -2497,7 +2534,7 @@ function PageStyles() {
 
       .options {
         display: grid;
-        gap: 16px;
+        gap: 18px;
         margin-top: 32px;
       }
 
@@ -2505,8 +2542,8 @@ function PageStyles() {
         display: flex;
         align-items: center;
         gap: 15px;
-        min-height: 68px;
-        padding: 15px 18px;
+        min-height: 76px;
+        padding: 17px 20px;
         border: 3px solid #626e76;
         border-radius: 14px;
         background:
@@ -2553,8 +2590,8 @@ function PageStyles() {
       }
 
       .optionKey {
-        flex: 0 0 42px;
-        height: 42px;
+        flex: 0 0 46px;
+        height: 46px;
         display: grid;
         place-items: center;
         border: 2px solid #657078;
@@ -2567,7 +2604,7 @@ function PageStyles() {
             #c5ccd1 100%
           );
         font-weight: 900;
-        font-size: 16px;
+        font-size: 17px;
         box-shadow:
           inset 0 2px 0 #fff,
           inset 0 -4px 0 rgba(50, 58, 64, 0.12),
@@ -2593,14 +2630,14 @@ function PageStyles() {
       .optionText {
         min-width: 0;
         color: #17263a;
-        font-size: 16px;
-        line-height: 1.55;
+        font-size: 17px;
+        line-height: 1.58;
         font-weight: 700;
       }
 
       .openAnswer {
         margin-top: 32px;
-        padding: 19px;
+        padding: 22px;
         border: 2px solid #626d75;
         border-radius: 14px;
         background:
@@ -2617,7 +2654,7 @@ function PageStyles() {
       }
 
       .openAnswer textarea {
-        min-height: 145px;
+        min-height: 175px;
         padding: 15px;
         border-radius: 11px;
         resize: vertical;
@@ -2627,7 +2664,7 @@ function PageStyles() {
 
       .questionActions {
         display: grid;
-        grid-template-columns: 1fr auto 1fr;
+        grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
         align-items: center;
         gap: 14px;
         margin-top: 40px;
@@ -2635,13 +2672,17 @@ function PageStyles() {
         border-top: 2px groove #d9dde1;
       }
 
+      .questionActions > button:first-child {
+        justify-self: start;
+      }
+
       .questionActions > button:last-child {
         justify-self: end;
       }
 
       .positionText {
-        min-width: 72px;
-        padding: 8px 12px;
+        min-width: 82px;
+        padding: 10px 14px;
         border: 2px solid #69747c;
         border-radius: 8px;
         background:
@@ -2664,7 +2705,7 @@ function PageStyles() {
       .bottomFinish {
         display: flex;
         justify-content: flex-end;
-        margin-top: 23px;
+        margin-top: 28px;
       }
 
       .errorMessage,
@@ -2688,6 +2729,9 @@ function PageStyles() {
       }
 
       .successMessage {
+        min-height: 52px;
+        display: flex;
+        align-items: center;
         background: linear-gradient(180deg, #f8fff9, #d6ead9);
         border-color: #65906e;
         color: #2e6039;
@@ -2769,7 +2813,7 @@ function PageStyles() {
       .resultQuestionGrid {
         display: grid;
         grid-template-columns: repeat(9, minmax(0, 1fr));
-        gap: 9px;
+        gap: 10px;
         margin-top: 28px;
       }
 
@@ -2978,7 +3022,7 @@ function PageStyles() {
         }
 
         .questionNavigator {
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(48px, 1fr));
         }
 
         .questionMeta {
@@ -3005,13 +3049,17 @@ function PageStyles() {
         }
 
         .questionActions {
-          gap: 9px;
+          gap: 10px;
         }
 
         .questionActions button {
           width: 100%;
           padding-left: 10px;
           padding-right: 10px;
+        }
+
+        .stepButton {
+          min-width: 0;
         }
 
         .bottomFinish .finishOutlineButton {
@@ -3027,7 +3075,7 @@ function PageStyles() {
         }
 
         .resultQuestionGrid {
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(48px, 1fr));
         }
 
         .modalActions {
