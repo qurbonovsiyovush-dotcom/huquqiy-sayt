@@ -160,6 +160,9 @@ export default function NationalCertificateTestPage() {
   const [starting, setStarting] =
     useState(false);
 
+  const [userName, setUserName] =
+    useState("");
+
   const [submitting, setSubmitting] =
     useState(false);
 
@@ -367,6 +370,31 @@ export default function NationalCertificateTestPage() {
         return;
       }
 
+      const cleanName = userName
+        .trim()
+        .replace(/\s+/g, " " );
+
+      if (!cleanName) {
+        setError(
+          "Ism, familiya va otangiz ismini kiriting."
+        );
+        return;
+      }
+
+      if (cleanName.length < 3) {
+        setError(
+          "F.I.Sh. juda qisqa."
+        );
+        return;
+      }
+
+      if (cleanName.length > 100) {
+        setError(
+          "F.I.Sh. 100 ta belgidan oshmasligi kerak."
+        );
+        return;
+      }
+
       setStarting(true);
       setError("");
       setMessage("");
@@ -380,6 +408,9 @@ export default function NationalCertificateTestPage() {
               "Content-Type":
                 "application/json",
             },
+            body: JSON.stringify({
+              userName: cleanName,
+            }),
           }
         );
 
@@ -485,6 +516,7 @@ export default function NationalCertificateTestPage() {
       testId,
       storageKey,
       test,
+      userName,
     ]);
 
   const submitTest =
@@ -1078,6 +1110,49 @@ export default function NationalCertificateTestPage() {
                   </strong>
                 </p>
               )}
+            </div>
+
+            <div className="nameField">
+              <label
+                htmlFor="national-certificate-user-name"
+              >
+                Ism, familiya va otangiz ismi
+              </label>
+
+              <input
+                id="national-certificate-user-name"
+                type="text"
+                value={userName}
+                onChange={(event) => {
+                  setUserName(
+                    event.target.value
+                  );
+
+                  if (error) {
+                    setError("");
+                  }
+                }}
+                placeholder="Masalan: Ali Valiyev Nurali o‘g‘li"
+                maxLength={100}
+                autoComplete="name"
+                disabled={starting}
+                onKeyDown={(event) => {
+                  if (
+                    event.key ===
+                      "Enter" &&
+                    !starting &&
+                    userName.trim()
+                  ) {
+                    startTest();
+                  }
+                }}
+              />
+
+              <span>
+                Natijangiz administrator
+                panelida shu F.I.Sh. bilan
+                saqlanadi.
+              </span>
             </div>
 
             {error && (
@@ -1780,6 +1855,56 @@ function PageStyles() {
         margin: 8px 0;
         line-height: 1.6;
         color: #4e5869;
+      }
+
+      .nameField {
+        margin-top: 22px;
+      }
+
+      .nameField label {
+        display: block;
+        margin-bottom: 8px;
+        color: #263448;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .nameField input {
+        width: 100%;
+        height: 52px;
+        padding: 0 15px;
+        border: 1px solid #cbd4df;
+        border-radius: 11px;
+        background: #ffffff;
+        color: #172033;
+        font-size: 16px;
+        outline: none;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .nameField input:focus {
+        border-color: #527fbd;
+        box-shadow:
+          0 0 0 3px
+          rgba(36, 88, 166, 0.12);
+      }
+
+      .nameField input::placeholder {
+        color: #98a2b3;
+      }
+
+      .nameField input:disabled {
+        background: #f3f5f7;
+      }
+
+      .nameField span {
+        display: block;
+        margin-top: 7px;
+        color: #737d8d;
+        font-size: 12px;
+        line-height: 1.5;
       }
 
       .startButton,
