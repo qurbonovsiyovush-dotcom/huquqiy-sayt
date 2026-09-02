@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useParams } from "next/navigation";
@@ -123,6 +124,12 @@ export default function NationalCertificateDetailedResultPage() {
   const [error, setError] =
     useState("");
 
+  const [isExportingPdf, setIsExportingPdf] =
+    useState(false);
+
+  const pdfContentRef =
+    useRef<HTMLDivElement | null>(null);
+
   const [filter, setFilter] =
     useState<
       | "all"
@@ -180,6 +187,237 @@ export default function NationalCertificateDetailedResultPage() {
   useEffect(() => {
     loadResult();
   }, [loadResult]);
+
+  const saveAsPdf =
+    useCallback(async () => {
+      if (
+        !result ||
+        !pdfContentRef.current ||
+        isExportingPdf
+      ) {
+        return;
+      }
+
+      setIsExportingPdf(true);
+      setError("");
+
+      try {
+        /*
+         * PDF har doim 45 ta savolni olishi uchun
+         * avval "Barchasi" filtriga qaytamiz.
+         */
+        if (filter !== "all") {
+          setFilter("all");
+
+          await new Promise<void>(
+            (resolve) => {
+              requestAnimationFrame(
+                () => {
+                  requestAnimationFrame(
+                    () => resolve()
+                  );
+                }
+              );
+            }
+          );
+        }
+
+        /*
+         * Web-fontlar bo‘lsa, yuklanishini kutamiz.
+         */
+        if (
+          typeof document !== "undefined" &&
+          "fonts" in document
+        ) {
+          try {
+            await (
+              document as Document & {
+                fonts: FontFaceSet;
+              }
+            ).fonts.ready;
+          } catch {
+            // Font kutish xatosi PDFni to‘xtatmaydi.
+          }
+        }
+
+        const [
+          html2canvasModule,
+          jsPdfModule,
+        ] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
+
+        const html2canvas =
+          html2canvasModule.default;
+
+        const jsPDF =
+          jsPdfModule.jsPDF;
+
+        const element =
+          pdfContentRef.current;
+
+        if (!element) {
+          throw new Error(
+            "PDF uchun natija paneli topilmadi."
+          );
+        }
+
+        /*
+         * Saytdagi 3D ko‘rinishni aynan capture qilamiz.
+         * scale=2 matn va soyalarni aniqroq qiladi.
+         */
+        const canvas =
+          await html2canvas(
+            element,
+            {
+              scale: 2,
+              useCORS: true,
+              allowTaint: false,
+              backgroundColor:
+                "#eef2f6",
+              logging: false,
+              scrollX: 0,
+              scrollY:
+                -window.scrollY,
+              windowWidth:
+                document.documentElement
+                  .scrollWidth,
+              windowHeight:
+                document.documentElement
+                  .scrollHeight,
+            }
+          );
+
+        const imageData =
+          canvas.toDataURL(
+            "image/jpeg",
+            0.96
+          );
+
+        /*
+         * A4 portrait.
+         * Uzun panel A4 sahifalarga ketma-ket bo‘linadi.
+         */
+        const pdf =
+          new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4",
+            compress: true,
+          });
+
+        const pageWidth =
+          pdf.internal.pageSize.getWidth();
+
+        const pageHeight =
+          pdf.internal.pageSize.getHeight();
+
+        const margin = 6;
+
+        const printableWidth =
+          pageWidth -
+          margin * 2;
+
+        const printableHeight =
+          pageHeight -
+          margin * 2;
+
+        const imageWidth =
+          printableWidth;
+
+        const imageHeight =
+          (canvas.height *
+            imageWidth) /
+          canvas.width;
+
+        let heightLeft =
+          imageHeight;
+
+        let positionY =
+          margin;
+
+        pdf.addImage(
+          imageData,
+          "JPEG",
+          margin,
+          positionY,
+          imageWidth,
+          imageHeight,
+          undefined,
+          "FAST"
+        );
+
+        heightLeft -=
+          printableHeight;
+
+        while (heightLeft > 0) {
+          pdf.addPage();
+
+          positionY =
+            margin -
+            (imageHeight -
+              heightLeft);
+
+          pdf.addImage(
+            imageData,
+            "JPEG",
+            margin,
+            positionY,
+            imageWidth,
+            imageHeight,
+            undefined,
+            "FAST"
+          );
+
+          heightLeft -=
+            printableHeight;
+        }
+
+        const safeName =
+          result.userName
+            .trim()
+            .replace(
+              /[<>:"/\\|?*\u0000-\u001F]/g,
+              ""
+            )
+            .replace(/\s+/g, "-")
+            .slice(0, 80) ||
+          "Foydalanuvchi";
+
+        const safeTest =
+          result.testTitle
+            .trim()
+            .replace(
+              /[<>:"/\\|?*\u0000-\u001F]/g,
+              ""
+            )
+            .replace(/\s+/g, "-")
+            .slice(0, 80) ||
+          "Milliy-sertifikat";
+
+        pdf.save(
+          `${safeName}-${safeTest}-natija.pdf`
+        );
+      } catch (err) {
+        console.error(
+          "PDF export error:",
+          err
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "PDFni saqlashda xatolik yuz berdi."
+        );
+      } finally {
+        setIsExportingPdf(false);
+      }
+    }, [
+      result,
+      filter,
+      isExportingPdf,
+    ]);
 
   const filteredQuestions =
     useMemo(() => {
@@ -281,17 +519,33 @@ export default function NationalCertificateDetailedResultPage() {
             ← Natijalarga qaytish
           </a>
 
-          <button
-            type="button"
-            className="refreshButton"
-            onClick={
-              loadResult
-            }
-          >
-            Yangilash
-          </button>
+          <div className="actionButtons">
+            <button
+              type="button"
+              className="pdfButton"
+              onClick={saveAsPdf}
+              disabled={isExportingPdf}
+            >
+              {isExportingPdf
+                ? "PDF tayyorlanmoqda..."
+                : "PDF saqlash"}
+            </button>
+
+            <button
+              type="button"
+              className="refreshButton"
+              onClick={loadResult}
+              disabled={isExportingPdf}
+            >
+              Yangilash
+            </button>
+          </div>
         </div>
 
+        <div
+          ref={pdfContentRef}
+          className="pdfContent"
+        >
         <section className="heroCard">
           <div className="heroLeft">
             <div className="eyebrow">
@@ -766,6 +1020,7 @@ export default function NationalCertificateDetailedResultPage() {
             )}
           </div>
         </section>
+        </div>
       </div>
 
       <PageStyles />
@@ -849,6 +1104,7 @@ function PageStyles() {
 
       .backLink,
       .refreshButton,
+      .pdfButton,
       .primaryButton {
         min-height: 44px;
         display: inline-flex;
@@ -880,6 +1136,7 @@ function PageStyles() {
       }
 
       .refreshButton,
+      .pdfButton,
       .primaryButton {
         border-color: #123f5c;
         color: #0d2a44;
@@ -899,6 +1156,7 @@ function PageStyles() {
 
       .backLink:hover,
       .refreshButton:hover,
+      .pdfButton:hover,
       .primaryButton:hover {
         transform: translateY(-1px);
         filter: brightness(1.025);
@@ -906,6 +1164,7 @@ function PageStyles() {
 
       .backLink:active,
       .refreshButton:active,
+      .pdfButton:active,
       .primaryButton:active {
         transform: translateY(4px);
         box-shadow:
@@ -913,6 +1172,40 @@ function PageStyles() {
           inset 0 -2px 0 rgba(0, 0, 0, 0.18),
           0 1px 0 #4b565d,
           0 3px 7px rgba(0, 0, 0, 0.15);
+      }
+
+      .actionButtons {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .pdfButton {
+        border-color: #28502f;
+        color: #17361d;
+        background:
+          linear-gradient(
+            180deg,
+            #c9f2d1 0%,
+            #83d394 45%,
+            #4ca966 100%
+          );
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.76),
+          inset 0 -4px 0 rgba(34, 103, 49, 0.25),
+          0 5px 0 #357645,
+          0 8px 13px rgba(0, 0, 0, 0.17);
+      }
+
+      .refreshButton:disabled,
+      .pdfButton:disabled,
+      .primaryButton:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+
+      .pdfContent {
+        width: 100%;
       }
 
       .heroCard {
@@ -1751,8 +2044,15 @@ function PageStyles() {
           flex-direction: column;
         }
 
+        .actionButtons {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+
         .backLink,
         .refreshButton,
+        .pdfButton,
         .primaryButton {
           width: 100%;
         }
