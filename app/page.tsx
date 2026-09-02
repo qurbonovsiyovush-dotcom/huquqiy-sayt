@@ -398,22 +398,6 @@ export default function Home() {
 
           <article className="card">
             <h2>
-              Milliy sertifikat
-            </h2>
-
-            <button
-              type="button"
-              className="openButton testButton"
-              onClick={
-                openNationalCertificate
-              }
-            >
-              Ochish
-            </button>
-          </article>
-
-          <article className="card">
-            <h2>
               Qo‘llanmalar
             </h2>
 
@@ -459,6 +443,20 @@ export default function Home() {
               role === "admin"
                 ? "Boshqarish"
                 : "Ochish"}
+            </button>
+          </article>
+
+          <article className="card">
+            <h2>
+              Milliy sertifikat
+            </h2>
+
+            <button
+              type="button"
+              className="openButton testButton"
+              onClick={openNationalCertificate}
+            >
+              Ochish
             </button>
           </article>
 
