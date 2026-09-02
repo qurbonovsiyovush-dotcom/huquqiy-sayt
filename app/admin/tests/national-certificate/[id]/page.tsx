@@ -25,7 +25,7 @@ type Question = {
   question_type: "closed" | "open";
   question_text: string;
   question_html?: string;
-  points?: number;
+  points?: number | string;
   options?: TestOption[];
   acceptedAnswers?: AcceptedAnswer[];
 };
@@ -44,6 +44,15 @@ type TestData = {
   questions: Question[];
 };
 
+type PublishDetails = {
+  total?: number;
+  requiredTotal?: number;
+  closed?: number;
+  requiredClosed?: number;
+  open?: number;
+  requiredOpen?: number;
+};
+
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
 function createEmptyOptions(): TestOption[] {
@@ -54,6 +63,20 @@ function createEmptyOptions(): TestOption[] {
     is_correct: index === 0,
     sort_order: index,
   }));
+}
+
+function formatPoints(value: number | string | undefined) {
+  if (value === undefined || value === null || value === "") {
+    return "1";
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "1";
+  }
+
+  return String(number);
 }
 
 export default function NationalCertificateEditorPage() {
@@ -71,7 +94,10 @@ export default function NationalCertificateEditorPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [currentNumber, setCurrentNumber] = useState(1);
 
@@ -103,7 +129,6 @@ export default function NationalCertificateEditorPage() {
     }
 
     setLoading(true);
-    setError("");
 
     try {
       const response = await fetch(
@@ -158,6 +183,7 @@ export default function NationalCertificateEditorPage() {
   function loadQuestionIntoEditor(questionNumber: number) {
     setCurrentNumber(questionNumber);
     setError("");
+    setSuccessMessage("");
 
     const existing =
       savedQuestions.get(questionNumber);
@@ -176,7 +202,7 @@ export default function NationalCertificateEditorPage() {
     }
 
     setQuestionText(existing.question_text || "");
-    setPoints(String(existing.points ?? 1));
+    setPoints(formatPoints(existing.points));
 
     if (questionNumber <= 35) {
       const existingOptions =
@@ -187,19 +213,15 @@ export default function NationalCertificateEditorPage() {
       const loadedOptions = OPTION_KEYS.map(
         (key, index) => {
           const found = existingOptions.find(
-            (option) =>
-              option.option_key === key
+            (option) => option.option_key === key
           );
 
           return {
             id: found?.id,
             option_key: key,
-            option_text:
-              found?.option_text || "",
-            option_html:
-              found?.option_html || "",
-            is_correct:
-              found?.is_correct === true,
+            option_text: found?.option_text || "",
+            option_html: found?.option_html || "",
+            is_correct: found?.is_correct === true,
             sort_order: index,
           };
         }
@@ -210,11 +232,9 @@ export default function NationalCertificateEditorPage() {
           (option) => option.is_correct
         ).length !== 1
       ) {
-        loadedOptions.forEach(
-          (option, index) => {
-            option.is_correct = index === 0;
-          }
-        );
+        loadedOptions.forEach((option, index) => {
+          option.is_correct = index === 0;
+        });
       }
 
       setOptions(loadedOptions);
@@ -263,8 +283,7 @@ export default function NationalCertificateEditorPage() {
     setOptions((current) =>
       current.map((option, optionIndex) => ({
         ...option,
-        is_correct:
-          optionIndex === index,
+        is_correct: optionIndex === index,
       }))
     );
   }
@@ -289,9 +308,7 @@ export default function NationalCertificateEditorPage() {
     ]);
   }
 
-  function removeAcceptedAnswer(
-    index: number
-  ) {
+  function removeAcceptedAnswer(index: number) {
     setAcceptedAnswers((current) => {
       if (current.length === 1) {
         return [""];
@@ -310,7 +327,7 @@ export default function NationalCertificateEditorPage() {
     }
 
     if (test.status !== "draft") {
-      window.alert(
+      setError(
         "E’lon qilingan testni tahrirlab bo‘lmaydi."
       );
       return;
@@ -378,13 +395,13 @@ export default function NationalCertificateEditorPage() {
 
     setSaving(true);
     setError("");
+    setSuccessMessage("");
 
     try {
       const body =
         currentType === "closed"
           ? {
-              questionNumber:
-                currentNumber,
+              questionNumber: currentNumber,
               questionText:
                 cleanQuestionText,
               questionHtml: "",
@@ -442,11 +459,21 @@ export default function NationalCertificateEditorPage() {
         return;
       }
 
+      setSuccessMessage(
+        `${currentNumber}-savol muvaffaqiyatli saqlandi.`
+      );
+
+      const savedNumber = currentNumber;
+
       await loadTest();
 
-      window.alert(
-        `${currentNumber}-savol saqlandi.`
-      );
+      if (savedNumber < 45) {
+        setTimeout(() => {
+          loadQuestionIntoEditor(
+            savedNumber + 1
+          );
+        }, 150);
+      }
     } catch (error) {
       console.error(error);
 
@@ -455,6 +482,110 @@ export default function NationalCertificateEditorPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function publishTest() {
+    if (!test) {
+      return;
+    }
+
+    if (test.status === "published") {
+      setSuccessMessage(
+        "Test allaqachon e’lon qilingan."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Testni e’lon qilmoqchimisiz?\n\nServer barcha 45 ta savolni tekshiradi."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPublishing(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/national-certificate/tests/${encodeURIComponent(
+          test.id
+        )}/publish`,
+        {
+          method: "POST",
+        }
+      );
+
+      const data = await readJson(response);
+
+      if (!response.ok || !data.success) {
+        let message =
+          data.message ||
+          "Testni e’lon qilib bo‘lmadi.";
+
+        const details =
+          data.details as
+            | PublishDetails
+            | undefined;
+
+        if (details) {
+          message += `\n\nHozir:
+Jami: ${details.total ?? 0}/${
+            details.requiredTotal ?? 45
+          }
+Yopiq: ${details.closed ?? 0}/${
+            details.requiredClosed ?? 35
+          }
+Ochiq: ${details.open ?? 0}/${
+            details.requiredOpen ?? 10
+          }`;
+        }
+
+        if (
+          Array.isArray(
+            data.invalidQuestions
+          ) &&
+          data.invalidQuestions.length > 0
+        ) {
+          const numbers =
+            data.invalidQuestions
+              .map(
+                (
+                  item: {
+                    question_number?: number;
+                  }
+                ) =>
+                  item.question_number
+              )
+              .filter(Boolean)
+              .join(", ");
+
+          if (numbers) {
+            message += `\n\nMuammoli savollar: ${numbers}`;
+          }
+        }
+
+        setError(message);
+        return;
+      }
+
+      setSuccessMessage(
+        data.message ||
+          "Test muvaffaqiyatli e’lon qilindi."
+      );
+
+      await loadTest();
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        "Testni e’lon qilishda server bilan bog‘lanib bo‘lmadi."
+      );
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -572,12 +703,30 @@ export default function NationalCertificateEditorPage() {
           <h1>{test.title}</h1>
 
           <p>
-            35 ta yopiq + 10 ta ochiq
-            savol
+            35 ta yopiq + 10 ta ochiq savol
           </p>
         </div>
 
         <div className="headerActions">
+          {test.status === "draft" ? (
+            <button
+              type="button"
+              className="publishButton"
+              onClick={publishTest}
+              disabled={
+                publishing || saving
+              }
+            >
+              {publishing
+                ? "E’LON QILINMOQDA..."
+                : "TESTNI E’LON QILISH"}
+            </button>
+          ) : (
+            <div className="publishedBadge">
+              ✓ E’LON QILINGAN
+            </div>
+          )}
+
           <button
             type="button"
             className="grayButton"
@@ -630,6 +779,18 @@ export default function NationalCertificateEditorPage() {
           </strong>
         </div>
       </section>
+
+      {error && (
+        <div className="globalMessage errorBox">
+          {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="globalMessage successBox">
+          {successMessage}
+        </div>
+      )}
 
       <section className="workspace">
         <aside className="navigator">
@@ -733,10 +894,20 @@ export default function NationalCertificateEditorPage() {
                     event.target.value
                   )
                 }
-                disabled={saving}
+                disabled={
+                  saving ||
+                  test.status !== "draft"
+                }
               />
             </label>
           </div>
+
+          {test.status === "published" && (
+            <div className="lockedBox">
+              Test e’lon qilingan. Savollarni
+              tahrirlash bloklangan.
+            </div>
+          )}
 
           <div className="field">
             <label>
@@ -752,12 +923,14 @@ export default function NationalCertificateEditorPage() {
                 )
               }
               placeholder="Savol matnini kiriting..."
-              disabled={saving}
+              disabled={
+                saving ||
+                test.status !== "draft"
+              }
             />
           </div>
 
-          {currentType ===
-          "closed" ? (
+          {currentType === "closed" ? (
             <div className="closedBlock">
               <div className="blockTitle">
                 JAVOB VARIANTLARI
@@ -783,6 +956,11 @@ export default function NationalCertificateEditorPage() {
                           index
                         )
                       }
+                      disabled={
+                        saving ||
+                        test.status !==
+                          "draft"
+                      }
                       title="To‘g‘ri javob sifatida belgilash"
                     >
                       {option.is_correct
@@ -805,13 +983,14 @@ export default function NationalCertificateEditorPage() {
                       ) =>
                         updateOptionText(
                           index,
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                       placeholder={`${option.option_key} variantini kiriting`}
                       disabled={
-                        saving
+                        saving ||
+                        test.status !==
+                          "draft"
                       }
                     />
                   </div>
@@ -827,15 +1006,14 @@ export default function NationalCertificateEditorPage() {
           ) : (
             <div className="openBlock">
               <div className="blockTitle">
-                QABUL QILINADIGAN
-                TO‘G‘RI JAVOBLAR
+                QABUL QILINADIGAN TO‘G‘RI
+                JAVOBLAR
               </div>
 
               <p className="helper">
-                Bir ma’noni ifodalovchi
-                bir nechta yozilish
-                variantini qo‘shishingiz
-                mumkin.
+                Bir ma’noni ifodalovchi bir
+                nechta yozilish variantini
+                qo‘shishingiz mumkin.
               </p>
 
               {acceptedAnswers.map(
@@ -858,13 +1036,14 @@ export default function NationalCertificateEditorPage() {
                       ) =>
                         updateAcceptedAnswer(
                           index,
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                       placeholder="To‘g‘ri javob..."
                       disabled={
-                        saving
+                        saving ||
+                        test.status !==
+                          "draft"
                       }
                     />
 
@@ -877,7 +1056,9 @@ export default function NationalCertificateEditorPage() {
                         )
                       }
                       disabled={
-                        saving
+                        saving ||
+                        test.status !==
+                          "draft"
                       }
                     >
                       ×
@@ -892,16 +1073,13 @@ export default function NationalCertificateEditorPage() {
                 onClick={
                   addAcceptedAnswer
                 }
-                disabled={saving}
+                disabled={
+                  saving ||
+                  test.status !== "draft"
+                }
               >
                 + Yana javob qo‘shish
               </button>
-            </div>
-          )}
-
-          {error && (
-            <div className="errorBox">
-              {error}
             </div>
           )}
 
@@ -930,12 +1108,14 @@ export default function NationalCertificateEditorPage() {
               }
               disabled={
                 saving ||
-                test.status !==
-                  "draft"
+                test.status !== "draft"
               }
             >
               {saving
                 ? "SAQLANMOQDA..."
+                : test.status ===
+                  "published"
+                ? "TAHRIRLASH BLOKLANGAN"
                 : "SAVOLNI SAQLASH"}
             </button>
 
@@ -966,17 +1146,13 @@ export default function NationalCertificateEditorPage() {
         .page {
           min-height: 100vh;
           padding: 24px;
-          background:
-            linear-gradient(
-              180deg,
-              #edf3f6 0%,
-              #dce6eb 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #edf3f6 0%,
+            #dce6eb 100%
+          );
           color: #142d3b;
-          font-family:
-            Arial,
-            "Times New Roman",
-            sans-serif;
+          font-family: Arial, sans-serif;
         }
 
         .topHeader {
@@ -989,12 +1165,11 @@ export default function NationalCertificateEditorPage() {
           gap: 20px;
           border: 1px solid #285a76;
           border-radius: 18px;
-          background:
-            linear-gradient(
-              180deg,
-              #7dc6e9 0%,
-              #50a7d3 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #7dc6e9 0%,
+            #50a7d3 100%
+          );
           box-shadow:
             inset 0 4px 4px
               rgba(255, 255, 255, 0.65),
@@ -1024,31 +1199,64 @@ export default function NationalCertificateEditorPage() {
 
         .headerActions {
           display: flex;
+          align-items: center;
           gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
         }
 
         button {
           font-family: inherit;
         }
 
-        .grayButton {
+        .grayButton,
+        .publishButton {
           min-height: 42px;
           padding: 0 18px;
-          border: 1px solid #657983;
           border-radius: 10px;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #d9e0e3 100%
-            );
-          color: #173344;
           font-weight: 900;
           cursor: pointer;
+        }
+
+        .grayButton {
+          border: 1px solid #657983;
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #d9e0e3 100%
+          );
+          color: #173344;
           box-shadow:
             inset 0 3px 3px
               rgba(255, 255, 255, 0.8),
             0 3px 0 #74858d;
+        }
+
+        .publishButton {
+          border: 1px solid #337044;
+          background: linear-gradient(
+            180deg,
+            #dff5e5 0%,
+            #85c99b 100%
+          );
+          color: #17452b;
+          box-shadow:
+            inset 0 3px 3px
+              rgba(255, 255, 255, 0.8),
+            0 3px 0 #4c825d;
+        }
+
+        .publishedBadge {
+          min-height: 42px;
+          padding: 0 16px;
+          display: flex;
+          align-items: center;
+          border: 1px solid #37764c;
+          border-radius: 10px;
+          background: #d9f3e1;
+          color: #1e6036;
+          font-size: 12px;
+          font-weight: 900;
         }
 
         .stats {
@@ -1056,10 +1264,7 @@ export default function NationalCertificateEditorPage() {
           margin: 0 auto 18px;
           display: grid;
           grid-template-columns:
-            repeat(
-              5,
-              minmax(0, 1fr)
-            );
+            repeat(5, minmax(0, 1fr));
           gap: 10px;
         }
 
@@ -1072,12 +1277,11 @@ export default function NationalCertificateEditorPage() {
           align-items: center;
           border: 1px solid #94a5ad;
           border-radius: 12px;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #e8eef1 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #e8eef1 100%
+          );
           box-shadow:
             inset 0 3px 3px
               rgba(255, 255, 255, 0.9),
@@ -1097,6 +1301,29 @@ export default function NationalCertificateEditorPage() {
           font-size: 17px;
         }
 
+        .globalMessage {
+          width: min(1280px, 100%);
+          margin: 0 auto 18px;
+          padding: 14px 16px;
+          border-radius: 11px;
+          white-space: pre-line;
+          font-size: 13px;
+          font-weight: 800;
+          line-height: 1.6;
+        }
+
+        .errorBox {
+          border: 1px solid #b45e5e;
+          background: #fff0f0;
+          color: #8e2828;
+        }
+
+        .successBox {
+          border: 1px solid #4c8b62;
+          background: #ebf9ef;
+          color: #24633a;
+        }
+
         .workspace {
           width: min(1280px, 100%);
           margin: 0 auto;
@@ -1113,12 +1340,11 @@ export default function NationalCertificateEditorPage() {
           padding: 16px;
           border: 1px solid #899ca7;
           border-radius: 16px;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #e8eef1 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #e8eef1 100%
+          );
           box-shadow:
             inset 0 4px 4px
               rgba(255, 255, 255, 0.9),
@@ -1138,10 +1364,7 @@ export default function NationalCertificateEditorPage() {
         .questionGrid {
           display: grid;
           grid-template-columns:
-            repeat(
-              5,
-              minmax(0, 1fr)
-            );
+            repeat(5, minmax(0, 1fr));
           gap: 7px;
         }
 
@@ -1149,12 +1372,11 @@ export default function NationalCertificateEditorPage() {
           aspect-ratio: 1;
           border: 1px solid #889aa4;
           border-radius: 8px;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #dfe6e9 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #dfe6e9 100%
+          );
           color: #243f4e;
           font-size: 12px;
           font-weight: 900;
@@ -1167,32 +1389,29 @@ export default function NationalCertificateEditorPage() {
 
         .questionButton.openQuestion {
           border-color: #986b35;
-          background:
-            linear-gradient(
-              180deg,
-              #fff7e5 0%,
-              #edd7a8 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #fff7e5 0%,
+            #edd7a8 100%
+          );
         }
 
         .questionButton.saved {
           border-color: #407856;
-          background:
-            linear-gradient(
-              180deg,
-              #e8f8ee 0%,
-              #b9ddc5 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #e8f8ee 0%,
+            #b9ddc5 100%
+          );
         }
 
         .questionButton.active {
           border: 2px solid #174e70;
-          background:
-            linear-gradient(
-              180deg,
-              #9bdcff 0%,
-              #4ba6d7 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #9bdcff 0%,
+            #4ba6d7 100%
+          );
           color: #0c2f44;
           box-shadow:
             inset 0 3px 3px
@@ -1239,12 +1458,11 @@ export default function NationalCertificateEditorPage() {
           padding: 22px;
           border: 1px solid #8b9fa9;
           border-radius: 18px;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #edf2f4 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #edf2f4 100%
+          );
           box-shadow:
             inset 0 4px 5px
               rgba(255, 255, 255, 0.95),
@@ -1262,12 +1480,11 @@ export default function NationalCertificateEditorPage() {
           gap: 16px;
           border: 1px solid #32627c;
           border-radius: 11px;
-          background:
-            linear-gradient(
-              180deg,
-              #bce9fc 0%,
-              #7fc4e1 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #bce9fc 0%,
+            #7fc4e1 100%
+          );
           box-shadow:
             inset 0 3px 3px
               rgba(255, 255, 255, 0.75),
@@ -1301,6 +1518,17 @@ export default function NationalCertificateEditorPage() {
         .pointsBox input {
           width: 85px;
           height: 38px;
+        }
+
+        .lockedBox {
+          margin-bottom: 18px;
+          padding: 12px 14px;
+          border: 1px solid #9b7a39;
+          border-radius: 9px;
+          background: #fff6dd;
+          color: #72531d;
+          font-size: 12px;
+          font-weight: 800;
         }
 
         .field {
@@ -1352,18 +1580,23 @@ export default function NationalCertificateEditorPage() {
               rgba(0, 0, 0, 0.04);
         }
 
+        input:disabled,
+        textarea:disabled {
+          background: #edf1f3;
+          color: #65747c;
+        }
+
         .closedBlock,
         .openBlock {
           margin-top: 10px;
           padding: 17px;
           border: 1px solid #98a8af;
           border-radius: 13px;
-          background:
-            linear-gradient(
-              180deg,
-              #f9fbfc 0%,
-              #e6ecef 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #f9fbfc 0%,
+            #e6ecef 100%
+          );
         }
 
         .optionRow,
@@ -1376,14 +1609,12 @@ export default function NationalCertificateEditorPage() {
 
         .optionRow {
           grid-template-columns:
-            38px 38px
-            minmax(0, 1fr);
+            38px 38px minmax(0, 1fr);
         }
 
         .answerRow {
           grid-template-columns:
-            36px minmax(0, 1fr)
-            38px;
+            36px minmax(0, 1fr) 38px;
         }
 
         .correctSelector {
@@ -1391,12 +1622,11 @@ export default function NationalCertificateEditorPage() {
           height: 38px;
           border: 1px solid #748a95;
           border-radius: 9px;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #dde5e9 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #dde5e9 100%
+          );
           color: #17633d;
           font-size: 20px;
           font-weight: 900;
@@ -1406,12 +1636,11 @@ export default function NationalCertificateEditorPage() {
         .optionRow.correct
           .correctSelector {
           border-color: #2e8052;
-          background:
-            linear-gradient(
-              180deg,
-              #ddf5e6 0%,
-              #9ed0ae 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ddf5e6 0%,
+            #9ed0ae 100%
+          );
         }
 
         .optionLetter,
@@ -1423,12 +1652,11 @@ export default function NationalCertificateEditorPage() {
           justify-content: center;
           border: 1px solid #728a96;
           border-radius: 8px;
-          background:
-            linear-gradient(
-              180deg,
-              #bce7fa 0%,
-              #76bad9 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #bce7fa 0%,
+            #76bad9 100%
+          );
           color: #123a50;
           font-weight: 900;
         }
@@ -1443,12 +1671,11 @@ export default function NationalCertificateEditorPage() {
           height: 38px;
           border: 1px solid #a15d5d;
           border-radius: 8px;
-          background:
-            linear-gradient(
-              180deg,
-              #fff5f5 0%,
-              #efc4c4 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #fff5f5 0%,
+            #efc4c4 100%
+          );
           color: #8c2929;
           font-size: 20px;
           font-weight: 900;
@@ -1461,12 +1688,11 @@ export default function NationalCertificateEditorPage() {
           padding: 0 16px;
           border: 1px solid #46765a;
           border-radius: 9px;
-          background:
-            linear-gradient(
-              180deg,
-              #e8f6ed 0%,
-              #b7d9c2 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #e8f6ed 0%,
+            #b7d9c2 100%
+          );
           color: #24553a;
           font-weight: 900;
           cursor: pointer;
@@ -1479,23 +1705,11 @@ export default function NationalCertificateEditorPage() {
           line-height: 1.5;
         }
 
-        .errorBox {
-          margin-top: 18px;
-          padding: 12px 14px;
-          border: 1px solid #b45e5e;
-          border-radius: 9px;
-          background: #fff0f0;
-          color: #8e2828;
-          font-size: 12px;
-          font-weight: 800;
-        }
-
         .bottomActions {
           margin-top: 22px;
           display: grid;
           grid-template-columns:
-            140px minmax(0, 1fr)
-            140px;
+            140px minmax(0, 1fr) 140px;
           gap: 12px;
         }
 
@@ -1509,12 +1723,11 @@ export default function NationalCertificateEditorPage() {
 
         .navButton {
           border: 1px solid #778993;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #d9e0e4 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #d9e0e4 100%
+          );
           color: #273f4d;
           box-shadow:
             inset 0 3px 3px
@@ -1524,12 +1737,11 @@ export default function NationalCertificateEditorPage() {
 
         .saveButton {
           border: 1px solid #215f7f;
-          background:
-            linear-gradient(
-              180deg,
-              #8bd4f1 0%,
-              #49a6d3 100%
-            );
+          background: linear-gradient(
+            180deg,
+            #8bd4f1 0%,
+            #49a6d3 100%
+          );
           color: #102f42;
           box-shadow:
             inset 0 3px 3px
@@ -1542,15 +1754,10 @@ export default function NationalCertificateEditorPage() {
           cursor: not-allowed;
         }
 
-        @media (
-          max-width: 900px
-        ) {
+        @media (max-width: 900px) {
           .stats {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              );
+              repeat(2, minmax(0, 1fr));
           }
 
           .workspace {
@@ -1563,16 +1770,11 @@ export default function NationalCertificateEditorPage() {
 
           .questionGrid {
             grid-template-columns:
-              repeat(
-                9,
-                minmax(0, 1fr)
-              );
+              repeat(9, minmax(0, 1fr));
           }
         }
 
-        @media (
-          max-width: 600px
-        ) {
+        @media (max-width: 600px) {
           .page {
             padding: 12px;
           }
@@ -1582,16 +1784,18 @@ export default function NationalCertificateEditorPage() {
             align-items: flex-start;
           }
 
+          .headerActions {
+            width: 100%;
+            justify-content: flex-start;
+          }
+
           .stats {
             grid-template-columns: 1fr;
           }
 
           .questionGrid {
             grid-template-columns:
-              repeat(
-                5,
-                minmax(0, 1fr)
-              );
+              repeat(5, minmax(0, 1fr));
           }
 
           .editorCard {
@@ -1605,8 +1809,7 @@ export default function NationalCertificateEditorPage() {
 
           .optionRow {
             grid-template-columns:
-              34px 34px
-              minmax(0, 1fr);
+              34px 34px minmax(0, 1fr);
           }
 
           .bottomActions {
