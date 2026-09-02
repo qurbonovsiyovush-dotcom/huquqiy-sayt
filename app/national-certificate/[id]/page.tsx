@@ -995,6 +995,29 @@ export default function NationalCertificateTestPage() {
                 )
               )}
             </div>
+
+            <div className="resultActions">
+              <button
+                type="button"
+                className="resultBackButton"
+                onClick={() => {
+                  window.location.href =
+                    "/national-certificate";
+                }}
+              >
+                ← Testlar ro‘yxatiga
+              </button>
+
+              <button
+                type="button"
+                className="resultHomeButton"
+                onClick={() => {
+                  window.location.href = "/";
+                }}
+              >
+                Asosiy sahifa
+              </button>
+            </div>
           </section>
         </div>
 
@@ -3171,6 +3194,72 @@ function PageStyles() {
           width: 100%;
         }
       }
+
+      .resultActions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 28px;
+      }
+
+      .resultBackButton,
+      .resultHomeButton {
+        min-height: 58px;
+        padding: 13px 22px;
+        border-radius: 11px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 16px;
+        font-weight: 900;
+        transition: transform 0.12s ease, filter 0.12s ease;
+      }
+
+      .resultBackButton {
+        border: 2px solid #07508d;
+        background: linear-gradient(180deg, #4aa6f0 0%, #1d7ed4 48%, #075bad 100%);
+        color: #ffffff;
+        box-shadow:
+          inset 0 2px 0 rgba(255,255,255,.45),
+          inset 0 -5px 0 rgba(0,46,94,.22),
+          0 6px 0 #064178,
+          0 10px 15px rgba(0,53,101,.20);
+      }
+
+      .resultHomeButton {
+        border: 2px solid #59656d;
+        background: linear-gradient(180deg, #ffffff 0%, #eceff1 54%, #cbd1d5 100%);
+        color: #152337;
+        box-shadow:
+          inset 0 2px 0 #ffffff,
+          inset 0 -5px 0 rgba(50,60,68,.13),
+          0 6px 0 #69737a,
+          0 10px 15px rgba(0,0,0,.14);
+      }
+
+      .resultBackButton:hover,
+      .resultHomeButton:hover {
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+      }
+
+      .resultBackButton:active,
+      .resultHomeButton:active {
+        transform: translateY(4px);
+      }
+
+      @media (max-width: 620px) {
+        .resultActions {
+          grid-template-columns: 1fr;
+          gap: 13px;
+        }
+
+        .resultBackButton,
+        .resultHomeButton {
+          width: 100%;
+          min-height: 54px;
+        }
+      }
+
     `}</style>
   );
 }
