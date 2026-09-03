@@ -845,7 +845,7 @@ export default function NationalCertificatePdfImportPage() {
 
                   <div className="designerPanel unifiedDesignerPanel">
                     <div className="designerPanelTitle">
-                      SAVOL MATNI — BARCHASI BIR JOYDA
+                      SAVOL MATNI — TO‘LIQ MUHARRIR
                     </div>
 
                     <p className="designerHelp">
@@ -863,25 +863,6 @@ export default function NationalCertificatePdfImportPage() {
                             ...question,
                             questionText: htmlToPlainText(html),
                             questionTextHtml: "",
-                            questionHtml: html,
-                          })
-                        )
-                      }
-                    />
-                  </div>
-
-                    <p className="designerHelp">
-                      PDFdan kelgan savolni shu yerda boyiting: matn formatlash, rasm, jadval,
-                      qo‘lda jadval/chiziq, Eyler–Venn, shakllar, rang, copy/paste va 8 nuqtadan resize.
-                    </p>
-
-                    <QuestionDesigner
-                      value={current.questionHtml || ""}
-                      onChange={(html) =>
-                        updateQuestion(
-                          current.id,
-                          (question) => ({
-                            ...question,
                             questionHtml: html,
                           })
                         )
