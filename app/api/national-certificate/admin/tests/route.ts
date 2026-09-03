@@ -74,12 +74,12 @@ export async function GET() {
 
         COUNT(q.id)
           FILTER (
-            WHERE q.type = 'closed'
+            WHERE q.question_type = 'closed'
           )::int AS saved_closed_count,
 
         COUNT(q.id)
           FILTER (
-            WHERE q.type = 'open'
+            WHERE q.question_type = 'open'
           )::int AS saved_open_count,
 
         (
