@@ -724,12 +724,6 @@ export default function QuestionDesigner({
     const id = uid();
     const clipId = `clip-${id}`;
 
-    /*
-      MUHIM:
-      Venn ichidagi HAMMA narsa bitta SVG ichida.
-      Shuning uchun obyektni kichraytirganda aylana va yozuvlar
-      bir xil nisbatda kichrayadi, bir-biriga yopishib ketmaydi.
-    */
     insertHtml(
       `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" data-lock-ratio="true" contenteditable="false"
         style="position:relative;width:760px;max-width:96%;height:420px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
@@ -742,46 +736,53 @@ export default function QuestionDesigner({
             </clipPath>
           </defs>
 
-          <text x="180" y="35" text-anchor="middle"
-            font-family="Georgia,Times New Roman,serif"
-            font-size="18" font-weight="800">I — Unitar davlatga xos</text>
+          <foreignObject x="30" y="8" width="300" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
+              I — Unitar davlatga xos
+            </div>
+          </foreignObject>
 
-          <text x="580" y="35" text-anchor="middle"
-            font-family="Georgia,Times New Roman,serif"
-            font-size="18" font-weight="800">II — Federativ davlatga xos</text>
+          <foreignObject x="430" y="8" width="300" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
+              II — Federativ davlatga xos
+            </div>
+          </foreignObject>
 
           <ellipse cx="460" cy="220" rx="205" ry="125"
-            fill="#bca7e8"
-            fill-opacity="0.72"
+            fill="#bca7e8" fill-opacity="0.72"
             clip-path="url(#${clipId})"></ellipse>
 
           <ellipse cx="300" cy="220" rx="205" ry="125"
-            fill="white"
-            fill-opacity="0.01"
-            stroke="#263b46"
-            stroke-width="3"></ellipse>
+            fill="white" fill-opacity="0.01"
+            stroke="#263b46" stroke-width="3"></ellipse>
 
           <ellipse cx="460" cy="220" rx="205" ry="125"
-            fill="white"
-            fill-opacity="0.01"
-            stroke="#263b46"
-            stroke-width="3"></ellipse>
+            fill="white" fill-opacity="0.01"
+            stroke="#263b46" stroke-width="3"></ellipse>
 
-          <text x="225" y="229" text-anchor="middle"
-            font-family="Georgia,Times New Roman,serif"
-            font-size="25" font-weight="800">I</text>
+          <foreignObject x="175" y="196" width="100" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">I</div>
+          </foreignObject>
 
-          <text x="535" y="229" text-anchor="middle"
-            font-family="Georgia,Times New Roman,serif"
-            font-size="25" font-weight="800">II</text>
+          <foreignObject x="485" y="196" width="100" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">II</div>
+          </foreignObject>
 
-          <text x="380" y="229" text-anchor="middle"
-            font-family="Georgia,Times New Roman,serif"
-            font-size="25" font-weight="900">III</text>
+          <foreignObject x="330" y="196" width="100" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:900;outline:none;overflow:hidden;">III</div>
+          </foreignObject>
 
-          <text x="380" y="400" text-anchor="middle"
-            font-family="Georgia,Times New Roman,serif"
-            font-size="18" font-weight="800">III — har ikkalasiga xos</text>
+          <foreignObject x="190" y="372" width="380" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
+              III — har ikkalasiga xos
+            </div>
+          </foreignObject>
         </svg>
       </div><p><br></p>`
     );
@@ -790,10 +791,6 @@ export default function QuestionDesigner({
   function insertVenn3() {
     const id = uid();
 
-    /*
-      3 doirali Venn ham to'liq SVG.
-      Resize paytida barcha doira va yozuvlar proporsional o'zgaradi.
-    */
     insertHtml(
       `<div class="nc-object nc-venn3" data-object-id="${id}" data-kind="venn3" data-lock-ratio="true" contenteditable="false"
         style="position:relative;width:720px;max-width:96%;height:470px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
@@ -802,31 +799,29 @@ export default function QuestionDesigner({
           style="display:block;width:100%;height:100%;overflow:visible;">
 
           <ellipse cx="285" cy="195" rx="170" ry="125"
-            fill="rgba(77,176,225,.12)"
-            stroke="#263b46" stroke-width="3"></ellipse>
-
+            fill="rgba(77,176,225,.12)" stroke="#263b46" stroke-width="3"></ellipse>
           <ellipse cx="435" cy="195" rx="170" ry="125"
-            fill="rgba(85,204,155,.12)"
-            stroke="#263b46" stroke-width="3"></ellipse>
-
+            fill="rgba(85,204,155,.12)" stroke="#263b46" stroke-width="3"></ellipse>
           <ellipse cx="360" cy="310" rx="170" ry="125"
-            fill="rgba(241,187,74,.12)"
-            stroke="#263b46" stroke-width="3"></ellipse>
+            fill="rgba(241,187,74,.12)" stroke="#263b46" stroke-width="3"></ellipse>
 
-          <g font-family="Georgia,Times New Roman,serif"
-             font-size="18" font-weight="800" text-anchor="middle">
-            <text x="170" y="38">A to‘plam</text>
-            <text x="550" y="38">B to‘plam</text>
-            <text x="360" y="458">C to‘plam</text>
+          <foreignObject x="70" y="8" width="220" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">A to‘plam</div>
+          </foreignObject>
+          <foreignObject x="430" y="8" width="220" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">B to‘plam</div>
+          </foreignObject>
+          <foreignObject x="250" y="425" width="220" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">C to‘plam</div>
+          </foreignObject>
 
-            <text x="205" y="185">I</text>
-            <text x="515" y="185">II</text>
-            <text x="360" y="390">III</text>
-            <text x="360" y="155">IV</text>
-            <text x="280" y="285">V</text>
-            <text x="440" y="285">VI</text>
-            <text x="360" y="245" font-weight="900">VII</text>
-          </g>
+          <foreignObject x="155" y="157" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">I</div></foreignObject>
+          <foreignObject x="465" y="157" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">II</div></foreignObject>
+          <foreignObject x="310" y="362" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">III</div></foreignObject>
+          <foreignObject x="310" y="127" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">IV</div></foreignObject>
+          <foreignObject x="230" y="257" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">V</div></foreignObject>
+          <foreignObject x="390" y="257" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">VI</div></foreignObject>
+          <foreignObject x="310" y="217" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:900;outline:none;overflow:hidden;">VII</div></foreignObject>
         </svg>
       </div><p><br></p>`
     );
@@ -1488,6 +1483,22 @@ export default function QuestionDesigner({
 
     const target =
       event.target as HTMLElement;
+
+    /*
+      Venn ichidagi yozuv yoki jadval katagi tahrirlanayotgan bo‘lsa,
+      obyektni sudrashni boshlamaymiz. Shunda kursor bilan matnni
+      bemalol belgilash va o‘zgartirish mumkin.
+    */
+    if (
+      target.closest(
+        '[data-nc-editable="true"]'
+      ) ||
+      target.closest(
+        'td[contenteditable="true"],th[contenteditable="true"]'
+      )
+    ) {
+      return;
+    }
 
     const object =
       ensureObjectForTarget(
