@@ -462,7 +462,11 @@ export default function QuestionDesigner({
     );
   }
 
-  function applyObjectStyle() {
+  function applyObjectStyleValues(
+    nextFill: string,
+    nextStroke: string,
+    nextStrokeWidth: number
+  ) {
     const node =
       selectedObject();
 
@@ -474,9 +478,9 @@ export default function QuestionDesigner({
       ) || "";
 
     node.style.borderColor =
-      stroke;
+      nextStroke;
 
-    node.style.borderWidth = `${strokeWidth}px`;
+    node.style.borderWidth = `${nextStrokeWidth}px`;
 
     node.style.borderStyle =
       "solid";
@@ -485,7 +489,7 @@ export default function QuestionDesigner({
       kind === "line"
     ) {
       node.style.background =
-        stroke;
+        nextStroke;
 
       node.style.boxShadow =
         "0 2px 2px rgba(0,0,0,.25)";
@@ -496,20 +500,28 @@ export default function QuestionDesigner({
     ) {
       node.style.background =
         threeDBackground(
-          fill
+          nextFill
         );
 
       node.style.boxShadow =
         threeDShadow(
-          stroke
+          nextStroke
         );
     } else {
       node.style.background =
-        fill;
+        nextFill;
     }
 
     emit();
     syncSelectionSoon();
+  }
+
+  function applyObjectStyle() {
+    applyObjectStyleValues(
+      fill,
+      stroke,
+      strokeWidth
+    );
   }
 
   function threeDBackground(
@@ -1862,11 +1874,18 @@ export default function QuestionDesigner({
                 ? fill
                 : "#ffffff"
             }
-            onChange={(e) =>
-              setFill(
-                e.target.value
-              )
-            }
+            onChange={(e) => {
+              const value =
+                e.target.value;
+
+              setFill(value);
+
+              applyObjectStyleValues(
+                value,
+                stroke,
+                strokeWidth
+              );
+            }}
             disabled={
               disabled ||
               !selectedId
@@ -1885,11 +1904,18 @@ export default function QuestionDesigner({
                 ? stroke
                 : "#263b46"
             }
-            onChange={(e) =>
-              setStroke(
-                e.target.value
-              )
-            }
+            onChange={(e) => {
+              const value =
+                e.target.value;
+
+              setStroke(value);
+
+              applyObjectStyleValues(
+                fill,
+                value,
+                strokeWidth
+              );
+            }}
             disabled={
               disabled ||
               !selectedId
@@ -1907,13 +1933,22 @@ export default function QuestionDesigner({
             value={
               strokeWidth
             }
-            onChange={(e) =>
-              setStrokeWidth(
+            onChange={(e) => {
+              const value =
                 Number(
                   e.target.value
-                ) || 0
-              )
-            }
+                ) || 0;
+
+              setStrokeWidth(
+                value
+              );
+
+              applyObjectStyleValues(
+                fill,
+                stroke,
+                value
+              );
+            }}
             disabled={
               disabled ||
               !selectedId
