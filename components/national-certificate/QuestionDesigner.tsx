@@ -331,12 +331,6 @@ export default function QuestionDesigner({
         selectedId
       );
 
-    const root =
-      editorRef.current;
-
-    const wrap =
-      root?.parentElement as HTMLElement | null;
-
     window.addEventListener(
       "resize",
       handle
