@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import QuestionDesigner from "@/components/national-certificate/QuestionDesigner";
+import QuestionTextEditor from "@/components/national-certificate/QuestionTextEditor";
 
 type ImportedOption = {
   id: string;
@@ -16,6 +17,7 @@ type ImportedQuestion = {
   number: number;
   type: "closed" | "open";
   questionText: string;
+  questionTextHtml?: string;
   questionHtml?: string;
   options: ImportedOption[];
   acceptedAnswers: string[];
@@ -197,6 +199,14 @@ export default function NationalCertificatePdfImportPage() {
                     ? question.acceptedAnswers
                     : []
                   : [],
+              questionTextHtml:
+                typeof question.questionTextHtml === "string"
+                  ? question.questionTextHtml
+                  : "",
+              questionHtml:
+                typeof question.questionHtml === "string"
+                  ? question.questionHtml
+                  : "",
             }))
             .sort((a, b) => a.number - b.number)
         : [];
@@ -376,7 +386,15 @@ export default function NationalCertificatePdfImportPage() {
                 number: question.number,
                 type: "closed",
                 questionText: question.questionText.trim(),
-                questionHtml: (question.questionHtml || "").trim(),
+                questionHtml: `${
+                  question.questionTextHtml
+                    ? `<div data-nc-question-body="true">${question.questionTextHtml}</div>`
+                    : ""
+                }${
+                  question.questionHtml
+                    ? `<div data-nc-question-elements="true">${question.questionHtml}</div>`
+                    : ""
+                }`.trim(),
                 points: 1,
                 options: question.options.map((option) => ({
                   key: option.label,
@@ -393,7 +411,15 @@ export default function NationalCertificatePdfImportPage() {
                 number: question.number,
                 type: "open",
                 questionText: question.questionText.trim(),
-                questionHtml: (question.questionHtml || "").trim(),
+                questionHtml: `${
+                  question.questionTextHtml
+                    ? `<div data-nc-question-body="true">${question.questionTextHtml}</div>`
+                    : ""
+                }${
+                  question.questionHtml
+                    ? `<div data-nc-question-elements="true">${question.questionHtml}</div>`
+                    : ""
+                }`.trim(),
                 points: 1,
                 acceptedAnswers: question.acceptedAnswers
                   .map((answer) => answer.trim())
@@ -771,23 +797,24 @@ export default function NationalCertificatePdfImportPage() {
                     </div>
                   )}
 
-                  <label className="questionTextField">
-                    <span>Savol matni</span>
+                  <div className="questionTextField">
+                    <span>Savol matni — Word uslubida to‘liq tahrirlash</span>
 
-                    <textarea
-                      value={current.questionText}
-                      onChange={(event) =>
+                    <QuestionTextEditor
+                      valueHtml={current.questionTextHtml || ""}
+                      fallbackText={current.questionText}
+                      onChange={(plainText, html) =>
                         updateQuestion(
                           current.id,
                           (question) => ({
                             ...question,
-                            questionText:
-                              event.target.value,
+                            questionText: plainText,
+                            questionTextHtml: html,
                           })
                         )
                       }
                     />
-                  </label>
+                  </div>
 
                   <div className="designerPanel">
                     <div className="designerPanelTitle">
