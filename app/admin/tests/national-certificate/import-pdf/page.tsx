@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import QuestionDesigner from "@/components/national-certificate/QuestionDesigner";
 
 type ImportedOption = {
   id: string;
@@ -15,6 +16,7 @@ type ImportedQuestion = {
   number: number;
   type: "closed" | "open";
   questionText: string;
+  questionHtml?: string;
   options: ImportedOption[];
   acceptedAnswers: string[];
   warning?: string;
@@ -374,7 +376,7 @@ export default function NationalCertificatePdfImportPage() {
                 number: question.number,
                 type: "closed",
                 questionText: question.questionText.trim(),
-                questionHtml: question.questionText.trim(),
+                questionHtml: (question.questionHtml || "").trim(),
                 points: 1,
                 options: question.options.map((option) => ({
                   key: option.label,
@@ -391,7 +393,7 @@ export default function NationalCertificatePdfImportPage() {
                 number: question.number,
                 type: "open",
                 questionText: question.questionText.trim(),
-                questionHtml: question.questionText.trim(),
+                questionHtml: (question.questionHtml || "").trim(),
                 points: 1,
                 acceptedAnswers: question.acceptedAnswers
                   .map((answer) => answer.trim())
@@ -786,6 +788,26 @@ export default function NationalCertificatePdfImportPage() {
                       }
                     />
                   </label>
+
+                  <div className="designerPanel">
+                    <div className="designerPanelTitle">
+                      KUCHLI SAVOL MUHARRIRI
+                    </div>
+
+                    <p className="designerHelp">
+                      PDFdan kelgan savolni shu yerda boyiting: matn formatlash, rasm, jadval,
+                      qo‘lda jadval/chiziq, Eyler–Venn, shakllar, rang, copy/paste va 8 nuqtadan resize.
+                    </p>
+
+                    <QuestionDesigner
+                      value={current.questionHtml || ""}
+                      onChange={(html) =>
+                        updateCurrent({
+                          questionHtml: html,
+                        })
+                      }
+                    />
+                  </div>
 
                   {current.type === "closed" ? (
                     <div className="optionsEditor">
@@ -1616,6 +1638,33 @@ export default function NationalCertificatePdfImportPage() {
           box-shadow:
             inset 0 3px 2px rgba(255,255,255,.8),
             0 3px 0 #a88420;
+        }
+
+        .designerPanel {
+          margin-top: 16px;
+          padding: 14px;
+          border: 2px solid #536a75;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #eef4f7, #cbd7dd);
+          box-shadow: inset 0 3px 2px rgba(255,255,255,.85), 0 4px 0 #687b85;
+        }
+
+        .designerPanelTitle {
+          display: inline-block;
+          padding: 8px 13px;
+          border: 2px solid #36515e;
+          border-radius: 9px;
+          color: #fff;
+          font-weight: 900;
+          background: linear-gradient(180deg, #62d3ff, #087fc8);
+          box-shadow: inset 0 3px 2px rgba(255,255,255,.65), 0 3px 0 #36515e;
+        }
+
+        .designerHelp {
+          margin: 10px 0;
+          font-size: 12px;
+          font-weight: 700;
+          color: #485b65;
         }
 
         .questionTextField {
