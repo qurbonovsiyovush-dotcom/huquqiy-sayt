@@ -55,6 +55,7 @@ type ImportedQuestion = {
   number: number;
   type: "closed" | "open";
   questionText: string;
+  questionHtml?: string;
   options: ImportedOption[];
   acceptedAnswers: string[];
   pdfCrop?: PdfCrop;
@@ -66,6 +67,7 @@ type PdfTextItem = {
   transform: number[];
   width?: number;
   height?: number;
+  fontName?: string;
 };
 
 type PositionedText = {
@@ -75,6 +77,9 @@ type PositionedText = {
   width: number;
   height: number;
   pageNumber: number;
+  fontFamily: string;
+  isBold: boolean;
+  isItalic: boolean;
 };
 
 type TextLine = {
@@ -85,6 +90,9 @@ type TextLine = {
   height: number;
   pageNumber: number;
   column: "left" | "right" | "full";
+  fontFamily: string;
+  isBold: boolean;
+  isItalic: boolean;
 };
 
 type HighlightRect = {
@@ -469,9 +477,120 @@ async function pageHighlights(
    TEXT ITEMS -> LINES
 ========================================================= */
 
+
+type PdfTextStyle = {
+  fontFamily?: string;
+};
+
+function safeFontFamily(value: string) {
+  const cleaned = String(value || "")
+    .replace(/["'<>;{}]/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return "Times New Roman";
+  }
+
+  return cleaned;
+}
+
+function fontLooksBold(
+  fontName: string,
+  family: string
+) {
+  return /bold|black|heavy|semibold|demi|extrabold|bd\b|boldmt/i.test(
+    `${fontName} ${family}`
+  );
+}
+
+function fontLooksItalic(
+  fontName: string,
+  family: string
+) {
+  return /italic|oblique|kursiv/i.test(
+    `${fontName} ${family}`
+  );
+}
+
+function escapeHtml(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function questionHtmlFromText(
+  questionText: string,
+  sourceLines: TextLine[]
+) {
+  if (!questionText) {
+    return "";
+  }
+
+  const boldLines =
+    sourceLines.filter(
+      (line) => line.isBold
+    ).length;
+
+  const italicLines =
+    sourceLines.filter(
+      (line) => line.isItalic
+    ).length;
+
+  const bold =
+    sourceLines.length > 0 &&
+    boldLines >=
+      Math.ceil(
+        sourceLines.length * 0.45
+      );
+
+  const italic =
+    sourceLines.length > 0 &&
+    italicLines >=
+      Math.ceil(
+        sourceLines.length * 0.45
+      );
+
+  const familyCounts =
+    new Map<string, number>();
+
+  for (const line of sourceLines) {
+    const family =
+      safeFontFamily(
+        line.fontFamily
+      );
+
+    familyCounts.set(
+      family,
+      (familyCounts.get(
+        family
+      ) || 0) + 1
+    );
+  }
+
+  const family =
+    [...familyCounts.entries()]
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+      )[0]?.[0] ||
+    "Times New Roman";
+
+  return `<div data-pdf-text="true" style="font-family:'${family}',Georgia,'Times New Roman',serif;font-weight:${
+    bold ? 700 : 400
+  };font-style:${
+    italic ? "italic" : "normal"
+  };white-space:normal;">${escapeHtml(
+    questionText
+  ).replace(/\n/g, "<br>")}</div>`;
+}
+
 function buildPositionedItems(
   textItems: PdfTextItem[],
-  pageNumber: number
+  pageNumber: number,
+  styles: Record<string, PdfTextStyle>
 ): PositionedText[] {
   return textItems
     .filter(
@@ -484,6 +603,19 @@ function buildPositionedItems(
         item.transform ?? [
           1, 0, 0, 1, 0, 0,
         ];
+
+      const fontName =
+        String(
+          item.fontName || ""
+        );
+
+      const fontFamily =
+        safeFontFamily(
+          styles?.[
+            fontName
+          ]?.fontFamily ||
+            fontName
+        );
 
       return {
         text: item.str.trim(),
@@ -504,6 +636,17 @@ function buildPositionedItems(
             )
           ),
         pageNumber,
+        fontFamily,
+        isBold:
+          fontLooksBold(
+            fontName,
+            fontFamily
+          ),
+        isItalic:
+          fontLooksItalic(
+            fontName,
+            fontFamily
+          ),
       };
     });
 }
@@ -639,6 +782,70 @@ function groupItemsIntoLines(
           )
         );
 
+      const boldWeight =
+        group.reduce(
+          (sum, item) =>
+            sum +
+            (item.isBold
+              ? Math.max(
+                  item.width,
+                  1
+                )
+              : 0),
+          0
+        );
+
+      const italicWeight =
+        group.reduce(
+          (sum, item) =>
+            sum +
+            (item.isItalic
+              ? Math.max(
+                  item.width,
+                  1
+                )
+              : 0),
+          0
+        );
+
+      const totalWeight =
+        group.reduce(
+          (sum, item) =>
+            sum +
+            Math.max(
+              item.width,
+              1
+            ),
+          0
+        );
+
+      const familyCounts =
+        new Map<
+          string,
+          number
+        >();
+
+      for (const item of group) {
+        familyCounts.set(
+          item.fontFamily,
+          (familyCounts.get(
+            item.fontFamily
+          ) || 0) +
+            Math.max(
+              item.width,
+              1
+            )
+        );
+      }
+
+      const fontFamily =
+        [...familyCounts.entries()]
+          .sort(
+            (a, b) =>
+              b[1] - a[1]
+          )[0]?.[0] ||
+        "Times New Roman";
+
       return {
         text:
           normalizeOneLine(text),
@@ -650,6 +857,17 @@ function groupItemsIntoLines(
         pageNumber:
           group[0].pageNumber,
         column,
+        fontFamily,
+        isBold:
+          totalWeight > 0 &&
+          boldWeight /
+            totalWeight >=
+            0.45,
+        isItalic:
+          totalWeight > 0 &&
+          italicWeight /
+            totalWeight >=
+            0.45,
       };
     })
     .filter(
@@ -1183,6 +1401,7 @@ function parseQuestion(
     block.number <= 45
   ) {
     const questionParts: string[] = [];
+    const questionLines: TextLine[] = [];
     const acceptedAnswers: string[] = [];
 
     const answerLinePattern =
@@ -1257,6 +1476,10 @@ function parseQuestion(
       questionParts.push(
         rawText
       );
+
+      questionLines.push(
+        line
+      );
     }
 
     const questionText =
@@ -1284,6 +1507,11 @@ function parseQuestion(
       type:
         "open" as const,
       questionText,
+      questionHtml:
+        questionHtmlFromText(
+          questionText,
+          questionLines
+        ),
       options:
         [] as ImportedOption[],
       acceptedAnswers,
@@ -1683,6 +1911,18 @@ function parseQuestion(
     questionText:
       normalizeQuestionText(
         promptParts
+      ),
+    questionHtml:
+      questionHtmlFromText(
+        normalizeQuestionText(
+          promptParts
+        ),
+        shouldRenderImage
+          ? questionLines.slice(
+              0,
+              promptEndIndex + 1
+            )
+          : questionLines
       ),
     options,
     acceptedAnswers:
@@ -2266,7 +2506,12 @@ export async function POST(
       const items =
         buildPositionedItems(
           rawItems,
-          pageNumber
+          pageNumber,
+          (textContent.styles ||
+            {}) as Record<
+            string,
+            PdfTextStyle
+          >
         );
 
       const highlights =
@@ -2357,6 +2602,8 @@ export async function POST(
           parsed.type,
         questionText:
           parsed.questionText,
+        questionHtml:
+          parsed.questionHtml,
         options:
           parsed.options,
         acceptedAnswers:
