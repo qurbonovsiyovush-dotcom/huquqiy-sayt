@@ -66,9 +66,6 @@ export async function GET() {
         t.subject,
         t.status,
         t.duration_minutes,
-        t.closed_question_count,
-        t.open_question_count,
-        t.total_question_count,
         t.attempt_limit,
         t.created_at,
         t.updated_at,
@@ -124,9 +121,6 @@ export async function GET() {
         t.subject,
         t.status,
         t.duration_minutes,
-        t.closed_question_count,
-        t.open_question_count,
-        t.total_question_count,
         t.attempt_limit,
         t.created_at,
         t.updated_at
@@ -165,20 +159,9 @@ export async function GET() {
         durationMinutes:
           toNumber(row.duration_minutes),
 
-        expectedClosedCount:
-          toNumber(
-            row.closed_question_count
-          ),
-
-        expectedOpenCount:
-          toNumber(
-            row.open_question_count
-          ),
-
-        expectedTotalCount:
-          toNumber(
-            row.total_question_count
-          ),
+        expectedClosedCount: 35,
+        expectedOpenCount: 10,
+        expectedTotalCount: 45,
 
         savedClosedCount,
         savedOpenCount,
@@ -289,4 +272,3 @@ export async function GET() {
     );
   }
 }
-
