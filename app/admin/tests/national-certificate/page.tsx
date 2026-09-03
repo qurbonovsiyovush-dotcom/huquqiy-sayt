@@ -46,6 +46,7 @@ export default function NationalCertificateAdminTestsPage() {
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [unpublishingId, setUnpublishingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -151,6 +152,69 @@ export default function NationalCertificateAdminTestsPage() {
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
+  }
+
+  async function createNewTest() {
+    if (creating) return;
+
+    try {
+      setCreating(true);
+      setMessage("");
+
+      const response = await fetch(
+        "/api/national-certificate/tests",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Yangi Milliy sertifikat testi",
+            description: "",
+            duration: 90,
+            durationMinutes: 90,
+            attemptLimit: null,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(
+          data?.message || "Yangi testni yaratib bo‘lmadi."
+        );
+      }
+
+      const createdTestId =
+        data?.test?.id || data?.id || "";
+
+      if (!createdTestId) {
+        throw new Error(
+          "Yaratilgan testning ID raqami qaytmadi."
+        );
+      }
+
+      router.push(
+        `/admin/tests/national-certificate/${encodeURIComponent(
+          createdTestId
+        )}`
+      );
+    } catch (error) {
+      console.error(
+        "CREATE NATIONAL CERTIFICATE TEST ERROR:",
+        error
+      );
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Yangi testni yaratishda xatolik yuz berdi."
+      );
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function publishTest(test: NationalCertificateTest) {
@@ -354,11 +418,10 @@ export default function NationalCertificateAdminTestsPage() {
         <button
           type="button"
           className="blueButton bigAction"
-          onClick={() =>
-            router.push("/admin/tests/national-certificate/new")
-          }
+          onClick={createNewTest}
+          disabled={creating}
         >
-          + Yangi test
+          {creating ? "Yaratilmoqda..." : "+ Yangi test"}
         </button>
 
         <button
