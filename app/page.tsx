@@ -268,12 +268,7 @@ export default function Home() {
           >
 
             <div className="loginField">
-
-              <label>
-                Maxsus kirish kodi
-              </label>
-
-              <div className="loginInputWrapper">
+<div className="loginInputWrapper">
 
                 <span className="loginIcon">
                   🔐
