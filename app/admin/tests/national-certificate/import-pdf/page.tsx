@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import QuestionDesigner from "@/components/national-certificate/QuestionDesigner";
-import QuestionTextEditor from "@/components/national-certificate/QuestionTextEditor";
 
 type ImportedOption = {
   id: string;
@@ -36,6 +35,59 @@ type ImportResponse = {
   missingNumbers?: number[];
   ready?: boolean;
 };
+
+
+function escapeHtml(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function htmlToPlainText(html: string) {
+  if (typeof document === "undefined") {
+    return String(html ?? "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(div|p|li|tr)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n\s+/g, "\n")
+      .replace(/[ \t]+/g, " ")
+      .trim();
+  }
+
+  const box = document.createElement("div");
+  box.innerHTML = html;
+
+  // Visual objects should not pollute the plain question text used by validation/search.
+  box
+    .querySelectorAll("[data-object-id]")
+    .forEach((node) => node.remove());
+
+  return (box.innerText || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function initialUnifiedHtml(question: ImportedQuestion) {
+  if (question.questionHtml?.trim()) {
+    return question.questionHtml;
+  }
+
+  if (question.questionTextHtml?.trim()) {
+    return question.questionTextHtml;
+  }
+
+  return `<div>${escapeHtml(
+    question.questionText || ""
+  ).replace(/\n/g, "<br>")}</div>`;
+}
 
 export default function NationalCertificatePdfImportPage() {
   const router = useRouter();
@@ -386,15 +438,12 @@ export default function NationalCertificatePdfImportPage() {
                 number: question.number,
                 type: "closed",
                 questionText: question.questionText.trim(),
-                questionHtml: `${
-                  question.questionTextHtml
-                    ? `<div data-nc-question-body="true">${question.questionTextHtml}</div>`
-                    : ""
-                }${
-                  question.questionHtml
-                    ? `<div data-nc-question-elements="true">${question.questionHtml}</div>`
-                    : ""
-                }`.trim(),
+                questionHtml:
+                  question.questionHtml?.trim() ||
+                  question.questionTextHtml?.trim() ||
+                  `<div>${escapeHtml(
+                    question.questionText.trim()
+                  ).replace(/\n/g, "<br>")}</div>`,
                 points: 1,
                 options: question.options.map((option) => ({
                   key: option.label,
@@ -411,15 +460,12 @@ export default function NationalCertificatePdfImportPage() {
                 number: question.number,
                 type: "open",
                 questionText: question.questionText.trim(),
-                questionHtml: `${
-                  question.questionTextHtml
-                    ? `<div data-nc-question-body="true">${question.questionTextHtml}</div>`
-                    : ""
-                }${
-                  question.questionHtml
-                    ? `<div data-nc-question-elements="true">${question.questionHtml}</div>`
-                    : ""
-                }`.trim(),
+                questionHtml:
+                  question.questionHtml?.trim() ||
+                  question.questionTextHtml?.trim() ||
+                  `<div>${escapeHtml(
+                    question.questionText.trim()
+                  ).replace(/\n/g, "<br>")}</div>`,
                 points: 1,
                 acceptedAnswers: question.acceptedAnswers
                   .map((answer) => answer.trim())
@@ -797,29 +843,32 @@ export default function NationalCertificatePdfImportPage() {
                     </div>
                   )}
 
-                  <div className="questionTextField">
-                    <span>Savol matni — Word uslubida to‘liq tahrirlash</span>
+                  <div className="designerPanel unifiedDesignerPanel">
+                    <div className="designerPanelTitle">
+                      SAVOL MATNI — BARCHASI BIR JOYDA
+                    </div>
 
-                    <QuestionTextEditor
-                      valueHtml={current.questionTextHtml || ""}
-                      fallbackText={current.questionText}
-                      onChange={(plainText, html) =>
+                    <p className="designerHelp">
+                      Matnni shu maydonning o‘zida yozing va formatlang. Rasm, jadval,
+                      qo‘lda jadval/chiziq, Eyler–Venn, shakllar, rang, copy/paste,
+                      3D ko‘rinish, erkin joylashtirish va 8 nuqtadan resize ham shu yerning o‘zida ishlaydi.
+                    </p>
+
+                    <QuestionDesigner
+                      value={initialUnifiedHtml(current)}
+                      onChange={(html) =>
                         updateQuestion(
                           current.id,
                           (question) => ({
                             ...question,
-                            questionText: plainText,
-                            questionTextHtml: html,
+                            questionText: htmlToPlainText(html),
+                            questionTextHtml: "",
+                            questionHtml: html,
                           })
                         )
                       }
                     />
                   </div>
-
-                  <div className="designerPanel">
-                    <div className="designerPanelTitle">
-                      KUCHLI SAVOL MUHARRIRI
-                    </div>
 
                     <p className="designerHelp">
                       PDFdan kelgan savolni shu yerda boyiting: matn formatlash, rasm, jadval,
@@ -1671,6 +1720,10 @@ export default function NationalCertificatePdfImportPage() {
             0 3px 0 #a88420;
         }
 
+        .unifiedDesignerPanel {
+          margin-top: 8px;
+        }
+
         .designerPanel {
           margin-top: 16px;
           padding: 14px;
@@ -1696,11 +1749,6 @@ export default function NationalCertificatePdfImportPage() {
           font-size: 12px;
           font-weight: 700;
           color: #485b65;
-        }
-
-        .questionTextField {
-          display: grid;
-          gap: 8px;
         }
 
         .questionTextField textarea {
