@@ -342,14 +342,7 @@ export default function Home() {
               30px
               20px;
 
-            background:
-              radial-gradient(
-                circle at 50% 0%,
-                #16547d 0%,
-                #0b3b5a 35%,
-                #05283e 65%,
-                #021824 100%
-              );
+            background: #ffffff;
 
             font-family:
               "Bell MT",
