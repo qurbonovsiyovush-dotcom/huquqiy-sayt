@@ -368,29 +368,60 @@ export default function Home() {
 
             border-radius: 40px;
 
+            /*
+              Eski ko‘rinish:
+              kirish blokining atrofi kulrang/metall 3D panel.
+            */
             background:
               linear-gradient(
                 145deg,
-                #16496d 0%,
-                #0b3857 45%,
-                #06273e 100%
+                #777d80 0%,
+                #62686b 30%,
+                #4d5356 62%,
+                #363b3e 100%
               );
 
             border:
-              1px solid #368bc0;
+              2px solid #2f373b;
 
             box-shadow:
-              inset 4px 4px 10px
-                rgba(255,255,255,.10),
+              inset 5px 5px 7px
+                rgba(255,255,255,.38),
 
-              inset -8px -8px 18px
+              inset -8px -8px 15px
                 rgba(0,0,0,.32),
 
-              0 30px 60px
-                rgba(0,0,0,.45);
+              0 8px 0 #272d30,
+
+              0 16px 28px
+                rgba(0,0,0,.42);
+
+            position: relative;
+          }
+
+          .loginCard::before {
+            content: "";
+
+            position: absolute;
+            inset: 12px;
+
+            border-radius: 30px;
+
+            border:
+              1px solid
+              rgba(255,255,255,.38);
+
+            box-shadow:
+              inset 0 0 0 1px
+                rgba(0,0,0,.20);
+
+            pointer-events: none;
           }
 
           .loginMetalOuter {
+            position: relative;
+            z-index: 1;
+
             padding: 5px;
 
             margin-bottom: 48px;
@@ -657,6 +688,9 @@ export default function Home() {
           }
 
           .loginInfo {
+            position: relative;
+            z-index: 1;
+
             margin-top: 35px;
 
             padding-top: 22px;
