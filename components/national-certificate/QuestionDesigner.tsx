@@ -331,15 +331,20 @@ export default function QuestionDesigner({
         selectedId
       );
 
+    const root =
+      editorRef.current;
+
+    const wrap =
+      root?.parentElement as HTMLElement | null;
+
     window.addEventListener(
       "resize",
       handle
     );
 
-    window.addEventListener(
+    wrap?.addEventListener(
       "scroll",
-      handle,
-      true
+      handle
     );
 
     return () => {
@@ -348,10 +353,9 @@ export default function QuestionDesigner({
         handle
       );
 
-      window.removeEventListener(
+      wrap?.removeEventListener(
         "scroll",
-        handle,
-        true
+        handle
       );
     };
   }, [selectedId]);
@@ -421,8 +425,12 @@ export default function QuestionDesigner({
     const root =
       editorRef.current;
 
+    const wrap =
+      root?.parentElement as HTMLElement | null;
+
     if (
       !root ||
+      !wrap ||
       !id
     ) {
       setSelectionBox(null);
@@ -442,11 +450,18 @@ export default function QuestionDesigner({
     const nodeRect =
       node.getBoundingClientRect();
 
+    const wrapRect =
+      wrap.getBoundingClientRect();
+
     setSelectionBox({
       left:
-        nodeRect.left,
+        nodeRect.left -
+        wrapRect.left +
+        wrap.scrollLeft,
       top:
-        nodeRect.top,
+        nodeRect.top -
+        wrapRect.top +
+        wrap.scrollTop,
       width:
         nodeRect.width,
       height:
@@ -2406,7 +2421,7 @@ export default function QuestionDesigner({
         }
 
         .selectionUi {
-          position: fixed;
+          position: absolute;
           z-index: 999;
           border: 2px dashed #078bcf;
           box-sizing: border-box;
