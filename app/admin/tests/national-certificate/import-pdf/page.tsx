@@ -549,8 +549,12 @@ export default function NationalCertificatePdfImportPage() {
         const payload =
           question.type === "closed"
             ? {
-                number: question.number,
-                type: "closed",
+                /*
+                  /questions API aynan questionNumber kutadi.
+                  Oldingi number/type payload sabab test draft yaralib,
+                  savolni saqlash qismida xato chiqayotgan edi.
+                */
+                questionNumber: question.number,
                 questionText: question.questionText.trim(),
                 questionHtml:
                   question.questionHtml?.trim() ||
@@ -561,18 +565,13 @@ export default function NationalCertificatePdfImportPage() {
                 points: 1,
                 options: question.options.map((option) => ({
                   key: option.label,
-                  optionKey: option.label,
-                  label: option.label,
                   text: option.text.trim(),
-                  optionText: option.text.trim(),
-                  html: option.text.trim(),
+                  html: "",
                   isCorrect: option.isCorrect,
-                  correct: option.isCorrect,
                 })),
               }
             : {
-                number: question.number,
-                type: "open",
+                questionNumber: question.number,
                 questionText: question.questionText.trim(),
                 questionHtml:
                   question.questionHtml?.trim() ||
@@ -582,9 +581,6 @@ export default function NationalCertificatePdfImportPage() {
                   ).replace(/\n/g, "<br>")}</div>`,
                 points: 1,
                 acceptedAnswers: question.acceptedAnswers
-                  .map((answer) => answer.trim())
-                  .filter(Boolean),
-                answers: question.acceptedAnswers
                   .map((answer) => answer.trim())
                   .filter(Boolean),
               };
@@ -615,7 +611,7 @@ export default function NationalCertificatePdfImportPage() {
       }
 
       window.alert(
-        "PDFdan Milliy sertifikat testi muvaffaqiyatli yaratildi."
+        "PDFdan Milliy sertifikat testi qoralama sifatida muvaffaqiyatli saqlandi."
       );
 
       router.push(
@@ -633,8 +629,19 @@ export default function NationalCertificatePdfImportPage() {
       );
 
       if (createdTestId) {
+        const detail =
+          error instanceof Error
+            ? error.message
+            : "Noma’lum xatolik";
+
         window.alert(
-          "Test yaratildi, lekin ayrim savollarni saqlashda xatolik yuz berdi. Test muharririga kirib tekshirib chiqing."
+          `Test qoralama sifatida yaratildi, lekin savollarni saqlashda xatolik yuz berdi.\n\n${detail}\n\nQoralama muharriri ochiladi.`
+        );
+
+        router.push(
+          `/admin/tests/national-certificate/${encodeURIComponent(
+            createdTestId
+          )}`
         );
       }
     } finally {
