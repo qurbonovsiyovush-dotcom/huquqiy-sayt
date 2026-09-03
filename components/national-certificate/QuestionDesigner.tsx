@@ -1140,6 +1140,129 @@ export default function QuestionDesigner({
     emit();
   }
 
+  function ensureObjectForTarget(
+    target: HTMLElement
+  ) {
+    const existing =
+      target.closest(
+        "[data-object-id]"
+      ) as HTMLElement | null;
+
+    if (existing) {
+      return existing;
+    }
+
+    if (
+      target.tagName !== "IMG"
+    ) {
+      return null;
+    }
+
+    const img =
+      target as HTMLImageElement;
+
+    const id = uid();
+
+    const rect =
+      img.getBoundingClientRect();
+
+    const width =
+      Math.max(
+        80,
+        Math.round(
+          rect.width ||
+            img.width ||
+            img.naturalWidth ||
+            320
+        )
+      );
+
+    const height =
+      Math.max(
+        60,
+        Math.round(
+          rect.height ||
+            img.height ||
+            img.naturalHeight ||
+            220
+        )
+      );
+
+    const wrapper =
+      document.createElement(
+        "div"
+      );
+
+    wrapper.className =
+      "nc-object nc-image-object nc-3d-object";
+
+    wrapper.setAttribute(
+      "data-object-id",
+      id
+    );
+
+    wrapper.setAttribute(
+      "data-kind",
+      "image"
+    );
+
+    wrapper.setAttribute(
+      "contenteditable",
+      "false"
+    );
+
+    wrapper.style.position =
+      "relative";
+
+    wrapper.style.display =
+      "inline-block";
+
+    wrapper.style.width = `${width}px`;
+    wrapper.style.height = `${height}px`;
+    wrapper.style.maxWidth =
+      "96%";
+    wrapper.style.margin =
+      "18px auto";
+    wrapper.style.border =
+      "2px solid #263b46";
+    wrapper.style.borderRadius =
+      "10px";
+    wrapper.style.background =
+      "linear-gradient(180deg,#ffffff,#e8eef2)";
+    wrapper.style.boxShadow =
+      "inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22)";
+    wrapper.style.overflow =
+      "visible";
+    wrapper.style.boxSizing =
+      "border-box";
+
+    img.parentNode?.insertBefore(
+      wrapper,
+      img
+    );
+
+    wrapper.appendChild(img);
+
+    img.style.display =
+      "block";
+    img.style.width =
+      "100%";
+    img.style.height =
+      "100%";
+    img.style.maxWidth =
+      "none";
+    img.style.objectFit =
+      "contain";
+    img.style.userSelect =
+      "none";
+    img.style.pointerEvents =
+      "none";
+
+    emit();
+
+    return wrapper;
+  }
+
   function onEditorClick(
     event: React.MouseEvent<HTMLDivElement>
   ) {
@@ -1156,9 +1279,9 @@ export default function QuestionDesigner({
     );
 
     const object =
-      target.closest(
-        "[data-object-id]"
-      ) as HTMLElement | null;
+      ensureObjectForTarget(
+        target
+      );
 
     editorRef.current
       ?.querySelectorAll(
@@ -1223,9 +1346,9 @@ export default function QuestionDesigner({
       event.target as HTMLElement;
 
     const object =
-      target.closest(
-        "[data-object-id]"
-      ) as HTMLElement | null;
+      ensureObjectForTarget(
+        target
+      );
 
     if (!object) {
       return;
@@ -1255,7 +1378,18 @@ export default function QuestionDesigner({
       rect.bottom -
         event.clientY <= edge;
 
-    if (!nearEdge) {
+    const kind =
+      object.getAttribute(
+        "data-kind"
+      ) || "";
+
+    const dragAnywhere =
+      kind === "image";
+
+    if (
+      !nearEdge &&
+      !dragAnywhere
+    ) {
       return;
     }
 
@@ -1271,11 +1405,29 @@ export default function QuestionDesigner({
       object.style.position !==
       "absolute"
     ) {
+      const rootRect =
+        root.getBoundingClientRect();
+
+      const objectRect =
+        object.getBoundingClientRect();
+
       object.style.position =
         "absolute";
 
-      object.style.left = `${object.offsetLeft}px`;
-      object.style.top = `${object.offsetTop}px`;
+      object.style.left = `${Math.max(
+        0,
+        objectRect.left -
+          rootRect.left +
+          root.scrollLeft
+      )}px`;
+
+      object.style.top = `${Math.max(
+        0,
+        objectRect.top -
+          rootRect.top +
+          root.scrollTop
+      )}px`;
+
       object.style.margin = "0";
     }
 
@@ -1314,19 +1466,38 @@ export default function QuestionDesigner({
 
     if (!node) return;
 
-    const parent =
-      node.offsetParent as HTMLElement | null;
+    const root =
+      editorRef.current;
+
+    if (!root) return;
 
     if (
-      !parent ||
       node.style.position !==
         "absolute"
     ) {
+      const rootRect =
+        root.getBoundingClientRect();
+
+      const nodeRect =
+        node.getBoundingClientRect();
+
       node.style.position =
         "absolute";
 
-      node.style.left = `${node.offsetLeft}px`;
-      node.style.top = `${node.offsetTop}px`;
+      node.style.left = `${Math.max(
+        0,
+        nodeRect.left -
+          rootRect.left +
+          root.scrollLeft
+      )}px`;
+
+      node.style.top = `${Math.max(
+        0,
+        nodeRect.top -
+          rootRect.top +
+          root.scrollTop
+      )}px`;
+
       node.style.margin = "0";
     }
 
@@ -1365,15 +1536,38 @@ export default function QuestionDesigner({
 
     if (!node) return;
 
+    const root =
+      editorRef.current;
+
+    if (!root) return;
+
     if (
       node.style.position !==
         "absolute"
     ) {
+      const rootRect =
+        root.getBoundingClientRect();
+
+      const nodeRect =
+        node.getBoundingClientRect();
+
       node.style.position =
         "absolute";
 
-      node.style.left = `${node.offsetLeft}px`;
-      node.style.top = `${node.offsetTop}px`;
+      node.style.left = `${Math.max(
+        0,
+        nodeRect.left -
+          rootRect.left +
+          root.scrollLeft
+      )}px`;
+
+      node.style.top = `${Math.max(
+        0,
+        nodeRect.top -
+          rootRect.top +
+          root.scrollTop
+      )}px`;
+
       node.style.margin = "0";
     }
 
@@ -1420,7 +1614,7 @@ export default function QuestionDesigner({
       const id = uid();
 
       insertHtml(
-        `<div class="nc-object nc-image-object nc-3d-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;border-radius:10px;background:linear-gradient(180deg,#ffffff,#e8eef2);box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22);overflow:hidden;"><img src="${String(
+        `<div class="nc-object nc-image-object nc-3d-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;border-radius:10px;background:linear-gradient(180deg,#ffffff,#e8eef2);box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22);overflow:visible;"><img src="${String(
           reader.result || ""
         )}" alt="Savol rasmi" style="width:100%;height:100%;object-fit:contain;display:block;" /></div><p><br></p>`
       );
@@ -2196,6 +2390,15 @@ export default function QuestionDesigner({
 
         .canvas :global(.nc-object) {
           cursor: pointer;
+        }
+
+        .canvas :global(.nc-image-object) {
+          cursor: grab;
+          touch-action: none;
+        }
+
+        .canvas :global(.nc-image-object:active) {
+          cursor: grabbing;
         }
 
         .canvas :global(.nc-selected) {
