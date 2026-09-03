@@ -53,8 +53,11 @@ type PdfCrop = {
 type ImportedQuestion = {
   id: string;
   number: number;
+  type: "closed" | "open";
   questionText: string;
+  questionHtml?: string;
   options: ImportedOption[];
+  acceptedAnswers: string[];
   pdfCrop?: PdfCrop;
   warning?: string;
 };
@@ -64,6 +67,7 @@ type PdfTextItem = {
   transform: number[];
   width?: number;
   height?: number;
+  fontName?: string;
 };
 
 type PositionedText = {
@@ -73,6 +77,9 @@ type PositionedText = {
   width: number;
   height: number;
   pageNumber: number;
+  fontFamily: string;
+  isBold: boolean;
+  isItalic: boolean;
 };
 
 type TextLine = {
@@ -83,6 +90,9 @@ type TextLine = {
   height: number;
   pageNumber: number;
   column: "left" | "right" | "full";
+  fontFamily: string;
+  isBold: boolean;
+  isItalic: boolean;
 };
 
 type HighlightRect = {
@@ -176,37 +186,6 @@ function normalizeQuestionText(parts: string[]) {
   const paragraphs: string[] = [];
   let current = "";
 
-  /*
-    Moslashtirish / hukmli savollarda quyidagilar alohida satr bo‘lib qoladi:
-
-      I. ...
-      II. ...
-      III. ...
-      IV. ...
-      V. ... va h.k.
-
-      a) ...
-      b) ...
-      c) ...
-      d) ...
-
-      1) ...
-      2) ...
-      3) ...
-
-    MUHIM:
-    Katta A), B), C), D) bu yerga kelmaydi — ular parseQuestion()
-    ichida javob variantlari sifatida alohida ajratiladi.
-  */
-  const ROMAN_ITEM_RE =
-    /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)[\)\.\-:]\s+\S/;
-
-  const LOWER_MATCH_ITEM_RE =
-    /^[a-z][\)\.\-:]\s+\S/;
-
-  const NUMBERED_ITEM_RE =
-    /^\d{1,3}[\)\.]\s+\S/;
-
   function appendLine(line: string) {
     if (!current) {
       current = line;
@@ -225,31 +204,13 @@ function normalizeQuestionText(parts: string[]) {
     }
   }
 
-  function cleanQuestionPunctuation(value: string) {
-    return value
-      /*
-        Vergul, nuqta, nuqtali vergul va ikki nuqtadan oldingi
-        ortiqcha bo‘shliq olib tashlanadi.
-      */
-      .replace(/\s+([,.;:!])/g, "$1")
-
-      /*
-        So‘roq belgisi matnga yopishib qolmasin:
-          "tayaniladi?"  ->  "tayaniladi ?"
-
-        PDFdan nechta bo‘shliq kelishidan qat’i nazar aynan bitta
-        ko‘rinadigan masofa qoldiramiz.
-      */
-      .replace(/\s*\?/g, " ?")
-
+  function flushCurrent() {
+    const cleaned = current
+      .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/\(\s+/g, "(")
       .replace(/\s+\)/g, ")")
-      .replace(/[ \t]{2,}/g, " ")
+      .replace(/\s{2,}/g, " ")
       .trim();
-  }
-
-  function flushCurrent() {
-    const cleaned = cleanQuestionPunctuation(current);
 
     if (cleaned) {
       paragraphs.push(cleaned);
@@ -259,10 +220,19 @@ function normalizeQuestionText(parts: string[]) {
   }
 
   for (const line of rawLines) {
+    /*
+      Yangi ichki band boshlanishi:
+        1) ...
+        2) ...
+        a) ...
+        b) ...
+
+      MUHIM:
+      Bandning keyingi vizual PDF qatorlari shu bandning DAVOMI
+      hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
+    */
     const startsInnerListItem =
-      ROMAN_ITEM_RE.test(line) ||
-      LOWER_MATCH_ITEM_RE.test(line) ||
-      NUMBERED_ITEM_RE.test(line);
+      /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
 
     if (startsInnerListItem) {
       flushCurrent();
@@ -280,8 +250,8 @@ function normalizeQuestionText(parts: string[]) {
   flushCurrent();
 
   return paragraphs
-    .map((paragraph) => cleanQuestionPunctuation(paragraph))
     .join("\n")
+    .replace(/\s+([,.;:!?])/g, "$1")
     .trim();
 }
 
@@ -507,9 +477,132 @@ async function pageHighlights(
    TEXT ITEMS -> LINES
 ========================================================= */
 
+
+type PdfTextStyle = {
+  fontFamily?: string;
+};
+
+function safeFontFamily(value: string) {
+  const cleaned = String(value || "")
+    .replace(/["'<>;{}]/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return "Times New Roman";
+  }
+
+  return cleaned;
+}
+
+function fontLooksBold(
+  fontName: string,
+  family: string
+) {
+  return /bold|black|heavy|semibold|demi|extrabold|bd\b|boldmt/i.test(
+    `${fontName} ${family}`
+  );
+}
+
+function fontLooksItalic(
+  fontName: string,
+  family: string
+) {
+  return /italic|oblique|kursiv/i.test(
+    `${fontName} ${family}`
+  );
+}
+
+function escapeHtml(value: string) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function questionHtmlFromText(
+  questionText: string,
+  sourceLines: TextLine[]
+) {
+  if (!questionText) {
+    return "";
+  }
+
+  const lines = String(questionText)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  /*
+    BMBA huquq PDFlarida savolning asosiy jumlasi ko‘pincha BOLD,
+    undan keyingi 1., 2., 3., 4. hukmlar esa regular bo‘ladi.
+    PDF ichki font nomi ba'zan subset/kodlangan bo‘lib keladi va
+    "Bold" so‘zi umuman bo‘lmaydi. Shu sabab source font aniqlanmasa,
+    birinchi raqamlangan hukmgacha bo‘lgan qismni savol stem deb
+    hisoblab, uni qalin ko‘rsatamiz.
+  */
+  const firstNumberedIndex =
+    lines.findIndex((line) =>
+      /^\s*\d{1,2}[.)]\s+/.test(line)
+    );
+
+  const familyCounts =
+    new Map<string, number>();
+
+  for (const line of sourceLines) {
+    const family = safeFontFamily(
+      line.fontFamily
+    );
+
+    familyCounts.set(
+      family,
+      (familyCounts.get(family) || 0) + 1
+    );
+  }
+
+  const fallbackFamily =
+    [...familyCounts.entries()]
+      .sort((a, b) => b[1] - a[1])[0]?.[0] ||
+    "Times New Roman";
+
+  return `<div data-pdf-text="true" style="font-family:'${fallbackFamily}',Georgia,'Times New Roman',serif;white-space:normal;">${lines
+    .map((text, index) => {
+      const source =
+        sourceLines[index] || null;
+
+      const isStem =
+        firstNumberedIndex === -1
+          ? index === 0
+          : index < firstNumberedIndex;
+
+      const bold =
+        Boolean(source?.isBold) || isStem;
+
+      const italic =
+        Boolean(source?.isItalic);
+
+      const family =
+        safeFontFamily(
+          source?.fontFamily ||
+            fallbackFamily
+        );
+
+      return `<div style="font-family:'${family}',Georgia,'Times New Roman',serif;font-weight:${
+        bold ? 700 : 400
+      };font-style:${
+        italic ? "italic" : "normal"
+      };line-height:1.42;margin:0 0 3px 0;">${escapeHtml(
+        text
+      )}</div>`;
+    })
+    .join("")}</div>`;
+}
+
 function buildPositionedItems(
   textItems: PdfTextItem[],
-  pageNumber: number
+  pageNumber: number,
+  styles: Record<string, PdfTextStyle>
 ): PositionedText[] {
   return textItems
     .filter(
@@ -522,6 +615,19 @@ function buildPositionedItems(
         item.transform ?? [
           1, 0, 0, 1, 0, 0,
         ];
+
+      const fontName =
+        String(
+          item.fontName || ""
+        );
+
+      const fontFamily =
+        safeFontFamily(
+          styles?.[
+            fontName
+          ]?.fontFamily ||
+            fontName
+        );
 
       return {
         text: item.str.trim(),
@@ -542,6 +648,17 @@ function buildPositionedItems(
             )
           ),
         pageNumber,
+        fontFamily,
+        isBold:
+          fontLooksBold(
+            fontName,
+            fontFamily
+          ),
+        isItalic:
+          fontLooksItalic(
+            fontName,
+            fontFamily
+          ),
       };
     });
 }
@@ -677,6 +794,70 @@ function groupItemsIntoLines(
           )
         );
 
+      const boldWeight =
+        group.reduce(
+          (sum, item) =>
+            sum +
+            (item.isBold
+              ? Math.max(
+                  item.width,
+                  1
+                )
+              : 0),
+          0
+        );
+
+      const italicWeight =
+        group.reduce(
+          (sum, item) =>
+            sum +
+            (item.isItalic
+              ? Math.max(
+                  item.width,
+                  1
+                )
+              : 0),
+          0
+        );
+
+      const totalWeight =
+        group.reduce(
+          (sum, item) =>
+            sum +
+            Math.max(
+              item.width,
+              1
+            ),
+          0
+        );
+
+      const familyCounts =
+        new Map<
+          string,
+          number
+        >();
+
+      for (const item of group) {
+        familyCounts.set(
+          item.fontFamily,
+          (familyCounts.get(
+            item.fontFamily
+          ) || 0) +
+            Math.max(
+              item.width,
+              1
+            )
+        );
+      }
+
+      const fontFamily =
+        [...familyCounts.entries()]
+          .sort(
+            (a, b) =>
+              b[1] - a[1]
+          )[0]?.[0] ||
+        "Times New Roman";
+
       return {
         text:
           normalizeOneLine(text),
@@ -688,6 +869,17 @@ function groupItemsIntoLines(
         pageNumber:
           group[0].pageNumber,
         column,
+        fontFamily,
+        isBold:
+          totalWeight > 0 &&
+          boldWeight /
+            totalWeight >=
+            0.45,
+        isItalic:
+          totalWeight > 0 &&
+          italicWeight /
+            totalWeight >=
+            0.45,
       };
     })
     .filter(
@@ -901,153 +1093,113 @@ function buildQuestionBlocks(
 ): QuestionBlock[] {
   const blocks: QuestionBlock[] = [];
 
-  type Phase = "main" | "variant1" | "variant2";
-
-  let phase: Phase = "main";
-  let expectedLocalNumber = 1;
-  let currentLocalNumber: number | null = null;
-  let currentGlobalNumber: number | null = null;
+  const MAX_QUESTION = 45;
+  let expectedNumber = 1;
+  let currentNumber: number | null = null;
   let currentLines: TextLine[] = [];
-
-  function globalNumberFor(
-    currentPhase: Phase,
-    localNumber: number
-  ) {
-    if (currentPhase === "main") {
-      return localNumber;
-    }
-
-    if (currentPhase === "variant1") {
-      return 780 + localNumber;
-    }
-
-    return 810 + localNumber;
-  }
 
   function flushCurrent() {
     if (
-      currentGlobalNumber !== null &&
+      currentNumber !== null &&
       currentLines.length > 0
     ) {
       blocks.push({
-        number: currentGlobalNumber,
+        number: currentNumber,
         lines: currentLines,
       });
     }
 
-    currentLocalNumber = null;
-    currentGlobalNumber = null;
+    currentNumber = null;
     currentLines = [];
   }
 
   function startQuestion(
-    localNumber: number,
+    number: number,
     line: TextLine
   ) {
-    currentLocalNumber = localNumber;
-    currentGlobalNumber = globalNumberFor(
-      phase,
-      localNumber
-    );
+    currentNumber = number;
     currentLines = [line];
-    expectedLocalNumber = localNumber + 1;
+    expectedNumber = number + 1;
   }
 
-  function isVariant1Title(value: string) {
-    const text = normalizeOneLine(value);
-    return /^1\s*[-–—]?\s*variant\s*\(\s*30\s*ta\s*\)$/i.test(text);
-  }
-
-  function isVariant2Title(value: string) {
-    const text = normalizeOneLine(value);
-    return /^2\s*[-–—]?\s*variant\s*\(\s*30\s*ta\s*\)$/i.test(text);
-  }
-
-  /*
-    VARIANTLARDA 1..30 raqamlar ichki sanalgan bandlar bilan to'qnashishi
-    mumkin. Masalan 1-savol ichida "1.", "2.", "3." bandlar bor.
-
-    Shuning uchun variantlarda:
-      - oldingi savol A/B/C/D bilan tugagan bo'lsa — keyingi raqam qabul qilinadi;
-      - 11-savoldan keyin esa kutilayotgan raqamni to'g'ridan-to'g'ri olamiz,
-        chunki ichki ro'yxatlar odatda 1..10 doirasida bo'ladi.
-
-    ASOSIY 1..780 testlarda esa raqamlar qat'iy ketma-ket keladi.
-    108-savol kabi jadval savollarida A/B/C/D text-layer ba'zan noodatiy
-    ajralgani uchun oldingi savolning "to'liq" bo'lishini kutmaymiz.
-  */
-  function mayStartExpectedQuestion(
+  function looksLikeNextQuestion(
     candidate: number,
     line: TextLine
   ) {
-    if (candidate !== expectedLocalNumber) {
+    if (
+      candidate !== expectedNumber ||
+      candidate < 1 ||
+      candidate > MAX_QUESTION
+    ) {
       return false;
     }
 
-    if (phase === "main") {
-      return candidate >= 1 && candidate <= 780;
-    }
-
-    if (candidate < 1 || candidate > 30) {
-      return false;
-    }
-
-    if (currentGlobalNumber === null) {
+    if (currentNumber === null) {
       return candidate === 1;
     }
 
-    if (blockHasAllOptions(currentLines)) {
-      return true;
-    }
+    /*
+      1–35 yopiq savollar:
+      yangi savolga o‘tishdan oldin oldingi blokda A/B/C/D
+      topilgan bo‘lsa, bu juda kuchli signal.
+    */
+    if (currentNumber <= 35) {
+      /*
+        MUHIM:
+        Yopiq savol ichida ham:
+          1. ...
+          2. ...
+          3. ...
+        kabi bandlar bo‘lishi mumkin.
 
-    if (candidate >= 11) {
-      return true;
+        Shu sabab keyingi savol FAQAT oldingi yopiq savolda
+        A/B/C/D variantlari topilgandan keyin boshlanadi.
+        Oldingi "matn uzunligi" fallbacki ichki 2., 3., 4. bandlarni
+        yangi savol deb noto‘g‘ri ajratib yuborayotgan edi.
+      */
+      return blockHasAllOptions(currentLines);
     }
 
     /*
-      Qo'shimcha ehtiyot chorasi:
-      variantning haqiqiy savol sarlavhasi odatda ancha uzun bo'ladi.
-      Bu qisqa "2. ..." ichki bandlarni xato savol deb olish ehtimolini
-      kamaytiradi. Bu shart faqat A/B/C/D hali to'liq topilmagan holatda.
+      36–45 ochiq savollarda keyingi savolni boshlashdan oldin
+      oldingi savolda "Javob:" satri bo‘lishini talab qilamiz.
+      Bu ochiq savol ichidagi 37., 38. kabi raqamlangan bandlarning
+      yangi savolga aylanib ketishini oldini oladi.
     */
-    const withoutNumber = stripQuestionNumber(line.text);
-    return withoutNumber.length >= 45;
+    const hasAcceptedAnswerLine =
+      currentLines.some((item) =>
+        /^(?:javob(?:i)?|to['’ʻʼ`]?g['’ʻʼ`]?ri\s+javob|answer)\s*[:\-–—]/i.test(
+          normalizeOneLine(
+            item.text
+          )
+        )
+      );
+
+    return hasAcceptedAnswerLine;
   }
 
   for (const line of lines) {
-    /*
-      MUHIM: variant sarlavhasini isPdfDecorationLine() dan OLDIN ko'ramiz.
-      Chunki isPdfDecorationLine() ularni ataylab dekoratsiya sifatida
-      yashiradi.
-    */
-    if (isVariant1Title(line.text)) {
-      flushCurrent();
-      phase = "variant1";
-      expectedLocalNumber = 1;
-      continue;
-    }
-
-    if (isVariant2Title(line.text)) {
-      flushCurrent();
-      phase = "variant2";
-      expectedLocalNumber = 1;
-      continue;
-    }
-
     if (isPdfDecorationLine(line.text)) {
       continue;
     }
 
-    const candidate = questionNumberFromLine(
-      line.text
-    );
+    const candidate =
+      questionNumberFromLine(
+        line.text
+      );
 
-    if (currentGlobalNumber === null) {
+    if (currentNumber === null) {
       if (
         candidate !== null &&
-        mayStartExpectedQuestion(candidate, line)
+        looksLikeNextQuestion(
+          candidate,
+          line
+        )
       ) {
-        startQuestion(candidate, line);
+        startQuestion(
+          candidate,
+          line
+        );
       }
 
       continue;
@@ -1055,28 +1207,34 @@ function buildQuestionBlocks(
 
     if (
       candidate !== null &&
-      mayStartExpectedQuestion(candidate, line)
+      looksLikeNextQuestion(
+        candidate,
+        line
+      )
     ) {
       flushCurrent();
-      startQuestion(candidate, line);
+      startQuestion(
+        candidate,
+        line
+      );
       continue;
     }
 
-    /*
-      Bu haqiqiy yangi savol emas. Demak hozirgi savolning ichki bandi,
-      jadvali, diagrammasi, moslashtirish qismi yoki variant davomi.
-    */
     currentLines.push(line);
   }
 
   flushCurrent();
 
-  /*
-    Oxirgi himoya: bloklar PDFdagi real ketma-ketlikda qoladi.
-    Hech qanday Map-deduplikatsiya yoki "ko'proq variantli blokni tanlash"
-    ishlatilmaydi.
-  */
-  return blocks.sort((a, b) => a.number - b.number);
+  return blocks
+    .filter(
+      (block) =>
+        block.number >= 1 &&
+        block.number <= MAX_QUESTION
+    )
+    .sort(
+      (a, b) =>
+        a.number - b.number
+    );
 }
 
 /* =========================================================
@@ -1234,6 +1392,157 @@ function parseQuestion(
   block: QuestionBlock,
   pageInfos: Map<number, PageInfo>
 ) {
+  /*
+    Milliy sertifikat:
+      1–35  -> yopiq savol
+      36–45 -> ochiq savol
+
+    Ochiq savolda PDF ichida quyidagi ko‘rinishlardan biri bo‘lishi mumkin:
+      Javob: Toshkent
+      Javobi: Toshkent
+      To‘g‘ri javob: Toshkent
+      Answer: Toshkent
+
+    Bir nechta qabul qilinadigan javob:
+      Javob: Toshkent; Toshkent shahri
+    yoki:
+      Javob: Toshkent | Toshkent shahri
+  */
+  if (
+    block.number >= 36 &&
+    block.number <= 45
+  ) {
+    const questionParts: string[] = [];
+    const questionLines: TextLine[] = [];
+    const acceptedAnswers: string[] = [];
+
+    const answerLinePattern =
+      /^(?:javob(?:i)?|to['’ʻʼ`]?g['’ʻʼ`]?ri\s+javob|answer)\s*[:\-–—]\s*(.*)$/i;
+
+    for (
+      let index = 0;
+      index < block.lines.length;
+      index++
+    ) {
+      const line =
+        block.lines[index];
+
+      const rawText =
+        index === 0
+          ? stripQuestionNumber(
+              line.text
+            )
+          : line.text;
+
+      const normalized =
+        normalizeOneLine(
+          rawText
+        );
+
+      const answerMatch =
+        normalized.match(
+          answerLinePattern
+        );
+
+      if (answerMatch) {
+        const answerText =
+          normalizeText(
+            answerMatch[1] || ""
+          ).replace(/^\+\s*/, "");
+
+        if (answerText) {
+          for (
+            const part of
+            answerText.split(
+              /\s*[;|]\s*/
+            )
+          ) {
+            const value =
+              normalizeText(part).replace(
+                /^\+\s*/,
+                ""
+              );
+
+            if (
+              value &&
+              !acceptedAnswers.some(
+                (item) =>
+                  item.toLocaleLowerCase(
+                    "uz-UZ"
+                  ) ===
+                  value.toLocaleLowerCase(
+                    "uz-UZ"
+                  )
+              )
+            ) {
+              acceptedAnswers.push(
+                value
+              );
+            }
+          }
+        }
+
+        continue;
+      }
+
+      questionParts.push(
+        rawText
+      );
+
+      questionLines.push(
+        line
+      );
+    }
+
+    const questionText =
+      normalizeQuestionText(
+        questionParts
+      );
+
+    let warning:
+      string | undefined;
+
+    if (!questionText) {
+      warning =
+        "Ochiq savol matni topilmadi. Admin oynasida tekshiring.";
+    } else if (
+      acceptedAnswers.length ===
+      0
+    ) {
+      warning =
+        "Ochiq savol uchun qabul qilinadigan javob topilmadi. PDFda “Javob: ...” ko‘rinishida yozing yoki admin oynasida kiriting.";
+    }
+
+    return {
+      number:
+        block.number,
+      type:
+        "open" as const,
+      questionText,
+      questionHtml:
+        questionHtmlFromText(
+          questionText,
+          questionLines
+        ),
+      options:
+        [] as ImportedOption[],
+      acceptedAnswers,
+      warning,
+      firstOptionLine:
+        null as TextLine | null,
+      lastQuestionLine:
+        block.lines[
+          block.lines.length - 1
+        ] ?? null,
+      promptEndLine:
+        null as TextLine | null,
+      shouldRenderImage:
+        false,
+      fullQuestionText:
+        questionText,
+    };
+  }
+
   const labels:
     OptionLabel[] = [
       "A",
@@ -1609,11 +1918,27 @@ function parseQuestion(
   return {
     number:
       block.number,
+    type:
+      "closed" as const,
     questionText:
       normalizeQuestionText(
         promptParts
       ),
+    questionHtml:
+      questionHtmlFromText(
+        normalizeQuestionText(
+          promptParts
+        ),
+        shouldRenderImage
+          ? questionLines.slice(
+              0,
+              promptEndIndex + 1
+            )
+          : questionLines
+      ),
     options,
+    acceptedAnswers:
+      [] as string[],
     warning,
     firstOptionLine,
     lastQuestionLine,
@@ -2193,7 +2518,12 @@ export async function POST(
       const items =
         buildPositionedItems(
           rawItems,
-          pageNumber
+          pageNumber,
+          (textContent.styles ||
+            {}) as Record<
+            string,
+            PdfTextStyle
+          >
         );
 
       const highlights =
@@ -2280,10 +2610,16 @@ export async function POST(
         ),
         number:
           parsed.number,
+        type:
+          parsed.type,
         questionText:
           parsed.questionText,
+        questionHtml:
+          parsed.questionHtml,
         options:
           parsed.options,
+        acceptedAnswers:
+          parsed.acceptedAnswers,
         pdfCrop,
         warning:
           parsed.warning,
@@ -2294,7 +2630,7 @@ export async function POST(
        FINAL ORDER
 
        buildQuestionBlocks() savollarni allaqachon qat'iy ketma-ket
-       1..840 ko'rinishida global raqamlagan. Shu sababli eski
+       1..45 ko‘rinishida global raqamlagan. Shu sababli eski
        Map<number,...> deduplikatsiya QAT'IYAN ishlatilmaydi.
 
        Eski kod bir xil raqamni ko'rsa "variantlari ko'proq" bo'lgan
@@ -2313,7 +2649,7 @@ export async function POST(
 
     for (
       let expected = 1;
-      expected <= 840;
+      expected <= 45;
       expected++
     ) {
       if (
@@ -2364,18 +2700,54 @@ export async function POST(
     document.cleanup();
     document.destroy();
 
+    const closedCount =
+      finalQuestions.filter(
+        (item) =>
+          item.type ===
+          "closed"
+      ).length;
+
+    const openCount =
+      finalQuestions.filter(
+        (item) =>
+          item.type ===
+          "open"
+      ).length;
+
+    const warningCount =
+      finalQuestions.filter(
+        (item) =>
+          Boolean(
+            item.warning
+          )
+      ).length;
+
     return NextResponse.json({
       success: true,
       questions:
         finalQuestions,
       total:
         finalQuestions.length,
-      expectedTotal: 840,
+      expectedTotal: 45,
+      closedExpected: 35,
+      openExpected: 10,
+      closedCount,
+      openCount,
+      warningCount,
       missingNumbers,
+      ready:
+        finalQuestions.length ===
+          45 &&
+        closedCount ===
+          35 &&
+        openCount ===
+          10 &&
+        missingNumbers.length ===
+          0,
     });
   } catch (error) {
     console.error(
-      "PDF TEST IMPORT ERROR:",
+      "NATIONAL CERTIFICATE PDF IMPORT ERROR:",
       error
     );
 
