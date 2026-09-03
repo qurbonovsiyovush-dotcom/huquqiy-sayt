@@ -1729,7 +1729,7 @@ margin: 10px auto 12px;
                       "national-certificate"
                     ) {
                       router.push(
-                        "/admin/tests/national-certificate/new"
+                        "/admin/tests/national-certificate"
                       );
                       return;
                     }
