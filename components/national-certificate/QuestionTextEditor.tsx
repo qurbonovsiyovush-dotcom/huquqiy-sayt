@@ -245,6 +245,8 @@ export default function QuestionTextEditor({
 
     if (!img) return;
 
+    const targetImg = img;
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -254,11 +256,11 @@ export default function QuestionTextEditor({
       event.clientY;
 
     const rect =
-      img.getBoundingClientRect();
+      targetImg.getBoundingClientRect();
 
     const computed =
       window.getComputedStyle(
-        img
+        targetImg
       );
 
     const startWidth =
@@ -280,10 +282,10 @@ export default function QuestionTextEditor({
     // Explicit pixel size is important,
     // otherwise max-width / auto height can
     // fight against the resize operation.
-    img.style.width = `${startWidth}px`;
-    img.style.height = `${startHeight}px`;
-    img.style.maxWidth = "none";
-    img.style.objectFit =
+    targetImg.style.width = `${startWidth}px`;
+    targetImg.style.height = `${startHeight}px`;
+    targetImg.style.maxWidth = "none";
+    targetImg.style.objectFit =
       computed.objectFit ===
       "fill"
         ? "fill"
@@ -391,11 +393,11 @@ export default function QuestionTextEditor({
           height
         );
 
-      img.style.width = `${Math.round(
+      targetImg.style.width = `${Math.round(
         width
       )}px`;
 
-      img.style.height = `${Math.round(
+      targetImg.style.height = `${Math.round(
         height
       )}px`;
 
