@@ -52,6 +52,16 @@ function cleanHtml(root: HTMLElement) {
         "nc-selected"
       );
 
+      node.removeAttribute(
+        "data-nc-cell-selected"
+      );
+
+      if (
+        node instanceof HTMLElement
+      ) {
+        node.style.boxShadow = "";
+      }
+
       if (
         node.hasAttribute(
           "data-nc-ui"
@@ -79,8 +89,21 @@ export default function QuestionDesigner({
       null
     );
 
+  const selectedTableCellRef =
+    useRef<HTMLTableCellElement | null>(
+      null
+    );
+
   const [selectedId, setSelectedId] =
     useState<string>("");
+
+  const [selectionBox, setSelectionBox] =
+    useState<{
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    } | null>(null);
 
   const [fill, setFill] =
     useState("#ffffff");
@@ -164,6 +187,7 @@ export default function QuestionDesigner({
         )}px`;
 
         emit();
+        syncSelectionSoon(data.id);
       }
 
       if (resizeRef.current) {
@@ -254,6 +278,7 @@ export default function QuestionDesigner({
         node.style.height = `${height}px`;
 
         emit();
+        syncSelectionSoon(data.id);
       }
     }
 
@@ -284,6 +309,50 @@ export default function QuestionDesigner({
       );
     };
   }, []);
+
+  useEffect(() => {
+    const root =
+      editorRef.current;
+
+    const wrap =
+      root?.parentElement as HTMLElement | null;
+
+    if (!selectedId) {
+      setSelectionBox(null);
+      return;
+    }
+
+    syncSelectionSoon(
+      selectedId
+    );
+
+    const handle = () =>
+      updateSelectionBox(
+        selectedId
+      );
+
+    window.addEventListener(
+      "resize",
+      handle
+    );
+
+    wrap?.addEventListener(
+      "scroll",
+      handle
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        handle
+      );
+
+      wrap?.removeEventListener(
+        "scroll",
+        handle
+      );
+    };
+  }, [selectedId]);
 
   function emit() {
     const root =
@@ -341,6 +410,65 @@ export default function QuestionDesigner({
     return editorRef.current?.querySelector(
       `[data-object-id="${selectedId}"]`
     ) as HTMLElement | null;
+  }
+
+
+  function updateSelectionBox(
+    id = selectedId
+  ) {
+    const root =
+      editorRef.current;
+
+    const wrap =
+      root?.parentElement as HTMLElement | null;
+
+    if (
+      !root ||
+      !wrap ||
+      !id
+    ) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const node =
+      root.querySelector(
+        `[data-object-id="${id}"]`
+      ) as HTMLElement | null;
+
+    if (!node) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const nodeRect =
+      node.getBoundingClientRect();
+
+    const wrapRect =
+      wrap.getBoundingClientRect();
+
+    setSelectionBox({
+      left:
+        nodeRect.left -
+        wrapRect.left +
+        wrap.scrollLeft,
+      top:
+        nodeRect.top -
+        wrapRect.top +
+        wrap.scrollTop,
+      width:
+        nodeRect.width,
+      height:
+        nodeRect.height,
+    });
+  }
+
+  function syncSelectionSoon(
+    id = selectedId
+  ) {
+    requestAnimationFrame(() =>
+      updateSelectionBox(id)
+    );
   }
 
   function applyObjectStyle() {
@@ -423,18 +551,51 @@ export default function QuestionDesigner({
 
   function insertVenn2() {
     const id = uid();
+    const clipId = `clip-${id}`;
 
     insertHtml(
-      `<div class="nc-venn nc-object" data-object-id="${id}" data-kind="venn2" contenteditable="true" style="position:relative;width:720px;max-width:96%;height:390px;margin:22px auto;padding:0;border:0;background:#fff;box-sizing:border-box;">
-        <div style="position:absolute;left:40px;top:8px;width:280px;text-align:center;font-weight:700;">I — Chap to‘plamga xos</div>
-        <div style="position:absolute;right:40px;top:8px;width:280px;text-align:center;font-weight:700;">II — O‘ng to‘plamga xos</div>
-        <div style="position:absolute;left:110px;top:75px;width:330px;height:235px;border:3px solid #263b46;border-radius:50%;background:#fff;"></div>
-        <div style="position:absolute;right:110px;top:75px;width:330px;height:235px;border:3px solid #263b46;border-radius:50%;background:#fff;"></div>
-        <div style="position:absolute;left:305px;top:78px;width:110px;height:229px;border-radius:48%;background:rgba(67,168,216,.38);pointer-events:none;"></div>
-        <div style="position:absolute;left:195px;top:175px;font-size:24px;font-weight:800;">I</div>
-        <div style="position:absolute;right:195px;top:175px;font-size:24px;font-weight:800;">II</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:175px;font-size:24px;font-weight:900;">III</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:5px;width:330px;text-align:center;font-weight:700;">III — har ikkalasiga xos</div>
+      `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" contenteditable="false" style="position:relative;width:760px;max-width:96%;height:420px;margin:22px auto;border:0;background:#fff;overflow:visible;">
+        <div contenteditable="true" style="position:absolute;left:25px;top:8px;width:315px;text-align:center;font-weight:800;font-size:18px;z-index:3;">I — Unitar davlatga xos</div>
+        <div contenteditable="true" style="position:absolute;right:25px;top:8px;width:315px;text-align:center;font-weight:800;font-size:18px;z-index:3;">II — Federativ davlatga xos</div>
+
+        <svg viewBox="0 0 760 330" width="100%" height="330" style="position:absolute;left:0;top:55px;overflow:visible;">
+          <defs>
+            <clipPath id="${clipId}">
+              <ellipse cx="300" cy="155" rx="205" ry="125"></ellipse>
+            </clipPath>
+          </defs>
+
+          <ellipse cx="460" cy="155" rx="205" ry="125"
+            fill="#bca7e8"
+            fill-opacity="0.72"
+            clip-path="url(#${clipId})"></ellipse>
+
+          <ellipse cx="300" cy="155" rx="205" ry="125"
+            fill="white"
+            fill-opacity="0.01"
+            stroke="#263b46"
+            stroke-width="3"></ellipse>
+
+          <ellipse cx="460" cy="155" rx="205" ry="125"
+            fill="white"
+            fill-opacity="0.01"
+            stroke="#263b46"
+            stroke-width="3"></ellipse>
+
+          <text x="225" y="165" text-anchor="middle"
+            font-family="Georgia,Times New Roman,serif"
+            font-size="25" font-weight="800">I</text>
+
+          <text x="535" y="165" text-anchor="middle"
+            font-family="Georgia,Times New Roman,serif"
+            font-size="25" font-weight="800">II</text>
+
+          <text x="380" y="165" text-anchor="middle"
+            font-family="Georgia,Times New Roman,serif"
+            font-size="25" font-weight="900">III</text>
+        </svg>
+
+        <div contenteditable="true" style="position:absolute;left:50%;transform:translateX(-50%);bottom:3px;width:390px;text-align:center;font-weight:800;font-size:18px;">III — har ikkalasiga xos</div>
       </div><p><br></p>`
     );
   }
@@ -462,6 +623,8 @@ export default function QuestionDesigner({
   }
 
   function insertTable() {
+    const id = uid();
+
     const rows =
       Math.max(
         1,
@@ -508,7 +671,7 @@ export default function QuestionDesigner({
       ).join("");
 
     insertHtml(
-      `<div class="nc-table-wrap" style="overflow-x:auto;margin:16px 0;"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
+      `<div class="nc-table-wrap nc-object" data-object-id="${id}" data-kind="table" contenteditable="false" style="position:relative;overflow-x:auto;margin:16px 0;width:100%;box-sizing:border-box;"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
     );
   }
 
@@ -516,14 +679,296 @@ export default function QuestionDesigner({
     const id = uid();
 
     insertHtml(
-      `<div class="nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="true" style="position:relative;width:620px;max-width:96%;height:280px;margin:18px auto;border:2px dashed #6c7d86;background:#fff;">
-        <div style="position:absolute;left:0;right:0;top:33%;border-top:2px solid #263b46;"></div>
-        <div style="position:absolute;left:0;right:0;top:66%;border-top:2px solid #263b46;"></div>
-        <div style="position:absolute;top:0;bottom:0;left:33%;border-left:2px solid #263b46;"></div>
-        <div style="position:absolute;top:0;bottom:0;left:66%;border-left:2px solid #263b46;"></div>
-        <div style="padding:12px;font-weight:700;">Qo‘lda jadval: chiziqlarni tanlab o‘zgartiring yoki yangi chiziq qo‘shing.</div>
+      `<div class="nc-table-object nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="false" style="position:relative;width:620px;max-width:96%;margin:18px auto;background:#fff;padding:4px;box-sizing:border-box;">
+        <table data-manual-table="true" contenteditable="false" style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;">
+          <tbody>
+            <tr>
+              <td contenteditable="true" style="border:2px solid #263b46;height:58px;padding:8px;vertical-align:middle;"></td>
+            </tr>
+          </tbody>
+        </table>
       </div><p><br></p>`
     );
+  }
+
+  function currentTableCell() {
+    return selectedTableCellRef.current;
+  }
+
+  function currentTable() {
+    const cell = currentTableCell();
+    return cell?.closest("table") as HTMLTableElement | null;
+  }
+
+  function selectTableCell(
+    cell: HTMLTableCellElement | null
+  ) {
+    editorRef.current
+      ?.querySelectorAll("[data-nc-cell-selected='true']")
+      .forEach((node) => {
+        node.removeAttribute("data-nc-cell-selected");
+        (node as HTMLElement).style.boxShadow = "";
+      });
+
+    selectedTableCellRef.current = cell;
+
+    if (cell) {
+      cell.setAttribute("data-nc-cell-selected", "true");
+      cell.style.boxShadow = "inset 0 0 0 3px #0a9ee8";
+    }
+  }
+
+  function addTableRow() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row = cell.parentElement as HTMLTableRowElement;
+    const newRow = table.insertRow(row.rowIndex + 1);
+
+    const columns = Math.max(
+      1,
+      row.cells.length
+    );
+
+    for (let i = 0; i < columns; i++) {
+      const td = newRow.insertCell();
+      td.contentEditable = "true";
+      td.style.border = "2px solid #263b46";
+      td.style.height = "58px";
+      td.style.padding = "8px";
+      td.style.verticalAlign = "middle";
+    }
+
+    emit();
+  }
+
+  function addTableColumn() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const colIndex =
+      cell.cellIndex + 1;
+
+    Array.from(table.rows).forEach((row) => {
+      const td = row.insertCell(
+        Math.min(
+          colIndex,
+          row.cells.length
+        )
+      );
+
+      td.contentEditable = "true";
+      td.style.border = "2px solid #263b46";
+      td.style.height = "58px";
+      td.style.padding = "8px";
+      td.style.verticalAlign = "middle";
+    });
+
+    emit();
+  }
+
+  function deleteTableRow() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    if (table.rows.length <= 1) {
+      window.alert("Jadvalda kamida 1 qator qolishi kerak.");
+      return;
+    }
+
+    const row = cell.parentElement as HTMLTableRowElement;
+    table.deleteRow(row.rowIndex);
+    selectTableCell(null);
+    emit();
+  }
+
+  function deleteTableColumn() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    if (cell.parentElement && (cell.parentElement as HTMLTableRowElement).cells.length <= 1) {
+      window.alert("Jadvalda kamida 1 ustun qolishi kerak.");
+      return;
+    }
+
+    const index = cell.cellIndex;
+
+    Array.from(table.rows).forEach((row) => {
+      if (row.cells[index]) {
+        row.deleteCell(index);
+      }
+    });
+
+    selectTableCell(null);
+    emit();
+  }
+
+  function mergeCellRight() {
+    const cell = currentTableCell();
+
+    if (!cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement;
+
+    const next =
+      row.cells[cell.cellIndex + 1];
+
+    if (!next) {
+      window.alert("O‘ng tomonda qo‘shiladigan katak yo‘q.");
+      return;
+    }
+
+    cell.colSpan =
+      (cell.colSpan || 1) +
+      (next.colSpan || 1);
+
+    if (next.innerHTML.trim()) {
+      cell.innerHTML +=
+        (cell.innerHTML.trim() ? "<br>" : "") +
+        next.innerHTML;
+    }
+
+    next.remove();
+    emit();
+  }
+
+  function mergeCellDown() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement;
+
+    const nextRow =
+      table.rows[row.rowIndex + 1];
+
+    if (!nextRow) {
+      window.alert("Pastda qo‘shiladigan katak yo‘q.");
+      return;
+    }
+
+    const below =
+      nextRow.cells[
+        Math.min(
+          cell.cellIndex,
+          nextRow.cells.length - 1
+        )
+      ];
+
+    if (!below) return;
+
+    cell.rowSpan =
+      (cell.rowSpan || 1) +
+      (below.rowSpan || 1);
+
+    if (below.innerHTML.trim()) {
+      cell.innerHTML +=
+        (cell.innerHTML.trim() ? "<br>" : "") +
+        below.innerHTML;
+    }
+
+    below.remove();
+    emit();
+  }
+
+  function splitCell() {
+    const cell = currentTableCell();
+
+    if (!cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement;
+
+    if (cell.colSpan > 1) {
+      const count = cell.colSpan;
+      cell.colSpan = 1;
+
+      for (let i = 1; i < count; i++) {
+        const td = row.insertCell(
+          cell.cellIndex + i
+        );
+
+        td.contentEditable = "true";
+        td.style.border = "2px solid #263b46";
+        td.style.height = "58px";
+        td.style.padding = "8px";
+      }
+
+      emit();
+      return;
+    }
+
+    if (cell.rowSpan > 1) {
+      const table = currentTable();
+      if (!table) return;
+
+      const startRow =
+        row.rowIndex;
+
+      const count =
+        cell.rowSpan;
+
+      cell.rowSpan = 1;
+
+      for (let i = 1; i < count; i++) {
+        const targetRow =
+          table.rows[
+            startRow + i
+          ];
+
+        if (!targetRow) continue;
+
+        const td =
+          targetRow.insertCell(
+            Math.min(
+              cell.cellIndex,
+              targetRow.cells.length
+            )
+          );
+
+        td.contentEditable = "true";
+        td.style.border = "2px solid #263b46";
+        td.style.height = "58px";
+        td.style.padding = "8px";
+      }
+
+      emit();
+      return;
+    }
+
+    window.alert("Bu katak birlashtirilmagan.");
   }
 
   async function copySelected() {
@@ -635,6 +1080,15 @@ export default function QuestionDesigner({
     const target =
       event.target as HTMLElement;
 
+    const clickedCell =
+      target.closest(
+        "td,th"
+      ) as HTMLTableCellElement | null;
+
+    selectTableCell(
+      clickedCell
+    );
+
     const object =
       target.closest(
         "[data-object-id]"
@@ -652,6 +1106,7 @@ export default function QuestionDesigner({
 
     if (!object) {
       setSelectedId("");
+      setSelectionBox(null);
       return;
     }
 
@@ -665,6 +1120,8 @@ export default function QuestionDesigner({
       ) || "";
 
     setSelectedId(id);
+
+    syncSelectionSoon(id);
 
     const computed =
       getComputedStyle(object);
@@ -684,6 +1141,96 @@ export default function QuestionDesigner({
         computed.borderWidth
       ) || 2
     );
+  }
+
+  function onEditorPointerDown(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (
+      disabled ||
+      event.button !== 0
+    ) {
+      return;
+    }
+
+    const target =
+      event.target as HTMLElement;
+
+    const object =
+      target.closest(
+        "[data-object-id]"
+      ) as HTMLElement | null;
+
+    if (!object) {
+      return;
+    }
+
+    const id =
+      object.getAttribute(
+        "data-object-id"
+      ) || "";
+
+    if (!id) {
+      return;
+    }
+
+    const rect =
+      object.getBoundingClientRect();
+
+    const edge = 14;
+
+    const nearEdge =
+      event.clientX -
+        rect.left <= edge ||
+      rect.right -
+        event.clientX <= edge ||
+      event.clientY -
+        rect.top <= edge ||
+      rect.bottom -
+        event.clientY <= edge;
+
+    if (!nearEdge) {
+      return;
+    }
+
+    setSelectedId(id);
+    syncSelectionSoon(id);
+
+    const root =
+      editorRef.current;
+
+    if (!root) return;
+
+    if (
+      object.style.position !==
+      "absolute"
+    ) {
+      object.style.position =
+        "absolute";
+
+      object.style.left = `${object.offsetLeft}px`;
+      object.style.top = `${object.offsetTop}px`;
+      object.style.margin = "0";
+    }
+
+    dragRef.current = {
+      id,
+      startX:
+        event.clientX,
+      startY:
+        event.clientY,
+      left:
+        parseFloat(
+          object.style.left
+        ) || object.offsetLeft,
+      top:
+        parseFloat(
+          object.style.top
+        ) || object.offsetTop,
+    };
+
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function startDrag(
@@ -1052,6 +1599,62 @@ export default function QuestionDesigner({
 
         <button
           type="button"
+          onClick={addTableRow}
+          disabled={disabled}
+        >
+          + Qator
+        </button>
+
+        <button
+          type="button"
+          onClick={addTableColumn}
+          disabled={disabled}
+        >
+          + Ustun
+        </button>
+
+        <button
+          type="button"
+          onClick={deleteTableRow}
+          disabled={disabled}
+        >
+          − Qator
+        </button>
+
+        <button
+          type="button"
+          onClick={deleteTableColumn}
+          disabled={disabled}
+        >
+          − Ustun
+        </button>
+
+        <button
+          type="button"
+          onClick={mergeCellRight}
+          disabled={disabled}
+        >
+          Birlashtir →
+        </button>
+
+        <button
+          type="button"
+          onClick={mergeCellDown}
+          disabled={disabled}
+        >
+          Birlashtir ↓
+        </button>
+
+        <button
+          type="button"
+          onClick={splitCell}
+          disabled={disabled}
+        >
+          Katakni ajrat
+        </button>
+
+        <button
+          type="button"
           onClick={() =>
             insertObject(
               "line"
@@ -1323,6 +1926,9 @@ export default function QuestionDesigner({
           onClick={
             onEditorClick
           }
+          onPointerDown={
+            onEditorPointerDown
+          }
           onPaste={() =>
             setTimeout(
               emit,
@@ -1331,20 +1937,31 @@ export default function QuestionDesigner({
           }
         />
 
-        {selectedId && (
+        {selectedId &&
+          selectionBox && (
           <div
             className="selectionUi"
             data-nc-ui="true"
+            style={{
+              left:
+                selectionBox.left,
+              top:
+                selectionBox.top,
+              width:
+                selectionBox.width,
+              height:
+                selectionBox.height,
+            }}
           >
             <button
               type="button"
-              className="moveHandle"
-              onPointerDown={
-                startDrag
+              className="deleteBubble"
+              onClick={
+                deleteSelected
               }
-              title="Sudrash"
+              title="O‘chirish"
             >
-              ✥
+              ×
             </button>
 
             {HANDLES.map(
@@ -1373,13 +1990,13 @@ export default function QuestionDesigner({
 
       <p className="hint">
         Obyektni tanlang.
-        ✥ bilan sudrang,
-        atrofigidagi 8 ta
-        nuqtadan tortib
+        8 ta nuqtadan tortib
         o‘lchamini o‘zgartiring.
-        Rasm, shakl va Venn
-        elementlari ham shu
-        usulda ishlaydi.
+        Shakl chegarasidan
+        ushlab sudrashingiz mumkin.
+        Rasm, Venn, jadval va
+        boshqa obyektlar ham
+        bir xil ishlaydi.
       </p>
 
       <style jsx>{`
@@ -1499,86 +2116,99 @@ export default function QuestionDesigner({
 
         .selectionUi {
           position: absolute;
-          inset: 14px;
+          z-index: 999;
+          border: 2px dashed #078bcf;
+          box-sizing: border-box;
           pointer-events: none;
         }
 
-        .moveHandle {
+        .deleteBubble {
           position: absolute;
-          right: 8px;
-          top: 8px;
-          z-index: 1000;
-          width: 38px;
-          height: 38px;
-          border: 2px solid #064f7c;
-          border-radius: 8px;
-          background: #45bce9;
+          right: -19px;
+          top: -21px;
+          z-index: 1002;
+          width: 36px;
+          height: 36px;
+          padding: 0;
+          border: 2px solid #8b0f12;
+          border-radius: 50%;
+          background: linear-gradient(
+            180deg,
+            #f44343,
+            #b71218
+          );
           color: #fff;
-          font-size: 20px;
-          font-weight: 900;
+          box-shadow:
+            inset 0 2px 2px rgba(255,255,255,.55),
+            0 2px 3px rgba(0,0,0,.35);
+          font-size: 28px;
+          line-height: 30px;
+          font-weight: 400;
           pointer-events: auto;
-          cursor: move;
+          cursor: pointer;
         }
 
         .resizeHandle {
           position: absolute;
-          z-index: 1000;
-          width: 12px;
-          height: 12px;
+          z-index: 1001;
+          width: 18px;
+          height: 18px;
           padding: 0;
-          border: 2px solid #064f7c;
-          border-radius: 2px;
+          border: 2px solid #006eaa;
+          border-radius: 4px;
           background: #fff;
+          box-shadow:
+            inset 0 0 0 2px #e8f7ff;
           pointer-events: auto;
         }
 
         .resizeHandle.nw {
-          left: 2px;
-          top: 2px;
+          left: -10px;
+          top: -10px;
           cursor: nwse-resize;
         }
 
         .resizeHandle.n {
           left: 50%;
-          top: 2px;
+          top: -10px;
           transform: translateX(-50%);
           cursor: ns-resize;
         }
 
         .resizeHandle.ne {
-          right: 2px;
-          top: 2px;
+          right: -10px;
+          top: -10px;
           cursor: nesw-resize;
         }
 
         .resizeHandle.e {
-          right: 2px;
+          right: -10px;
           top: 50%;
           transform: translateY(-50%);
           cursor: ew-resize;
         }
 
         .resizeHandle.se {
-          right: 2px;
-          bottom: 2px;
+          right: -10px;
+          bottom: -10px;
           cursor: nwse-resize;
         }
 
         .resizeHandle.s {
           left: 50%;
-          bottom: 2px;
+          bottom: -10px;
           transform: translateX(-50%);
           cursor: ns-resize;
         }
 
         .resizeHandle.sw {
-          left: 2px;
-          bottom: 2px;
+          left: -10px;
+          bottom: -10px;
           cursor: nesw-resize;
         }
 
         .resizeHandle.w {
-          left: 2px;
+          left: -10px;
           top: 50%;
           transform: translateY(-50%);
           cursor: ew-resize;
@@ -1594,4 +2224,3 @@ export default function QuestionDesigner({
     </section>
   );
 }
-
