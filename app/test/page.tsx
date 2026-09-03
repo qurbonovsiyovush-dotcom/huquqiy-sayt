@@ -1,1205 +1,1091 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  useRouter,
+} from "next/navigation";
 
-type TestData = {
+type TestCategory =
+  | "legislation"
+  | "thematic"
+  | "block"
+  | "national-certificate"
+  | "thirty"
+  | "custom";
+
+type PublicTest = {
   id: string;
   title: string;
   subject: string;
+  description: string;
   duration: number;
-  description?: string;
-  status: "draft" | "published";
-  questions?: unknown[];
-  createdAt?: string;
+  testType: TestCategory;
+  customTestTypeName?: string;
+  questionCount: number;
+  attemptLimit:
+    | number
+    | null;
   updatedAt?: string;
+  source?:
+    | "classic"
+    | "national-certificate";
 };
+
+const CATEGORIES: Array<{
+  key: TestCategory;
+  title: string;
+  icon: string;
+}> = [
+  {
+    key: "legislation",
+    title:
+      "Qonunchilik hujjatlaridan test",
+    icon: "§",
+  },
+  {
+    key: "thematic",
+    title:
+      "Mavzulashtirilgan test",
+    icon: "M",
+  },
+  {
+    key: "block",
+    title: "Blok test",
+    icon: "B",
+  },
+  {
+    key:
+      "national-certificate",
+    title:
+      "Milliy sertifikat testi",
+    icon: "MS",
+  },
+  {
+    key: "thirty",
+    title: "30 talik test",
+    icon: "30",
+  },
+  {
+    key: "custom",
+    title: "Boshqa test",
+    icon: "+",
+  },
+];
+
+async function readJson(
+  response: Response
+) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+function normalizeNationalTests(
+  value: unknown
+): PublicTest[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((raw: any) => {
+      const id =
+        String(
+          raw?.id || ""
+        );
+
+      if (!id) {
+        return null;
+      }
+
+      return {
+        id,
+        title:
+          String(
+            raw?.title ||
+              "Milliy sertifikat testi"
+          ),
+        subject:
+          String(
+            raw?.subject ||
+              "Huquqshunoslik"
+          ),
+        description:
+          String(
+            raw?.description ||
+              ""
+          ),
+        duration:
+          Math.max(
+            1,
+            Number(
+              raw?.durationMinutes ??
+                raw?.duration_minutes ??
+                raw?.duration
+            ) || 90
+          ),
+        testType:
+          "national-certificate" as const,
+        questionCount:
+          Math.max(
+            45,
+            Number(
+              raw?.totalQuestions ??
+                raw?.total_questions ??
+                raw?.questionCount ??
+                45
+            ) || 45
+          ),
+        attemptLimit:
+          raw?.attemptLimit ??
+          raw?.attempt_limit ??
+          null,
+        updatedAt:
+          raw?.updatedAt ??
+          raw?.updated_at ??
+          "",
+        source:
+          "national-certificate" as const,
+      };
+    })
+    .filter(Boolean) as PublicTest[];
+}
 
 export default function TestPage() {
   const router = useRouter();
 
-  const [tests, setTests] = useState<TestData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
+  const [
+    selectedCategory,
+    setSelectedCategory,
+  ] =
+    useState<TestCategory>(
+      "legislation"
+    );
 
-  /* =====================================================
-     TESTLARNI SERVERDAN OLISH
-  ===================================================== */
+  const [tests, setTests] =
+    useState<PublicTest[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [search, setSearch] =
+    useState("");
 
   useEffect(() => {
-    loadTests();
-  }, []);
+    let cancelled = false;
 
-  async function loadTests() {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/tests", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      let data: any = {};
+    async function load() {
+      setLoading(true);
+      setError("");
 
       try {
-        data = await response.json();
-      } catch {
-        data = {};
-      }
+        /*
+          Ikkala ro‘yxat parallel yuklanadi.
+          Classic testlar: savollarsiz yengil metadata endpoint.
+          Milliy sertifikat: Neon public endpoint.
+        */
+        const [
+          classicResponse,
+          nationalResponse,
+        ] =
+          await Promise.all([
+            fetch(
+              "/api/tests/public-list",
+              {
+                method: "GET",
+                cache:
+                  "force-cache",
+              }
+            ),
+            fetch(
+              "/api/national-certificate/tests",
+              {
+                method: "GET",
+                cache:
+                  "no-store",
+              }
+            ).catch(
+              () => null
+            ),
+          ]);
 
-      if (!response.ok) {
-        throw new Error(
-          data?.message || "Testlarni yuklab bo‘lmadi."
-        );
-      }
+        const classicData =
+          await readJson(
+            classicResponse
+          );
 
-      /*
-        API ikki xil format qaytarsa ham ishlaydi:
-
-        {
-          success: true,
-          tests: [...]
+        if (
+          !classicResponse.ok ||
+          !classicData.success
+        ) {
+          throw new Error(
+            classicData.message ||
+              "Testlarni yuklab bo‘lmadi."
+          );
         }
 
-        yoki to'g'ridan-to'g'ri:
+        const classicTests:
+          PublicTest[] =
+          Array.isArray(
+            classicData.tests
+          )
+            ? classicData.tests.map(
+                (test: any) => ({
+                  ...test,
+                  source:
+                    "classic" as const,
+                })
+              )
+            : [];
 
-        [...]
-      */
+        let nationalTests:
+          PublicTest[] = [];
 
-      const receivedTests: TestData[] = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.tests)
-        ? data.tests
-        : [];
+        if (
+          nationalResponse &&
+          nationalResponse.ok
+        ) {
+          const nationalData =
+            await readJson(
+              nationalResponse
+            );
 
-      /*
-        FOYDALANUVCHI FAQAT PUBLISHED
-        TESTLARNI KO'RADI.
-      */
+          /*
+            API turli wrapper ishlatishi mumkin:
+            tests yoki data.
+          */
+          nationalTests =
+            normalizeNationalTests(
+              nationalData.tests ??
+                nationalData.data ??
+                []
+            );
+        }
 
-      const publishedTests = receivedTests.filter(
-        (test) => test.status === "published"
-      );
+        /*
+          Agar eski Blob ichida ham national-certificate test bo‘lsa,
+          duplicate id bo‘lmasligi uchun Set.
+        */
+        const merged =
+          [
+            ...classicTests,
+            ...nationalTests,
+          ];
 
-      setTests(publishedTests);
-    } catch (err) {
-      console.error("TEST LOAD ERROR:", err);
+        const seen =
+          new Set<string>();
 
-      setTests([]);
+        const unique =
+          merged.filter(
+            (test) => {
+              const key = `${
+                test.source
+              }:${test.id}`;
 
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Testlarni yuklashda xatolik yuz berdi."
-      );
-    } finally {
-      setLoading(false);
+              if (
+                seen.has(key)
+              ) {
+                return false;
+              }
+
+              seen.add(key);
+              return true;
+            }
+          );
+
+        if (!cancelled) {
+          setTests(unique);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setTests([]);
+
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Testlarni yuklashda xatolik."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
-  }
 
-  /* =====================================================
-     QIDIRUV
-  ===================================================== */
+    void load();
 
-  const filteredTests = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    if (!query) {
-      return tests;
-    }
+  const categoryCounts =
+    useMemo(() => {
+      const result:
+        Record<
+          TestCategory,
+          number
+        > = {
+        legislation: 0,
+        thematic: 0,
+        block: 0,
+        "national-certificate": 0,
+        thirty: 0,
+        custom: 0,
+      };
 
-    return tests.filter((test) => {
-      const title = String(test.title || "").toLowerCase();
-      const subject = String(test.subject || "").toLowerCase();
-      const description = String(
-        test.description || ""
-      ).toLowerCase();
+      for (const test of tests) {
+        result[
+          test.testType
+        ] += 1;
+      }
 
-      return (
-        title.includes(query) ||
-        subject.includes(query) ||
-        description.includes(query)
+      return result;
+    }, [tests]);
+
+  const visibleTests =
+    useMemo(() => {
+      const query =
+        search
+          .trim()
+          .toLowerCase();
+
+      return tests.filter(
+        (test) => {
+          if (
+            test.testType !==
+            selectedCategory
+          ) {
+            return false;
+          }
+
+          if (!query) {
+            return true;
+          }
+
+          return [
+            test.title,
+            test.subject,
+            test.description,
+            test.customTestTypeName,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+        }
       );
-    });
-  }, [tests, search]);
+    }, [
+      tests,
+      selectedCategory,
+      search,
+    ]);
 
-  /* =====================================================
-     TESTNI BOSHLASH
-  ===================================================== */
+  function openTest(
+    test: PublicTest
+  ) {
+    if (
+      test.source ===
+        "national-certificate" ||
+      test.testType ===
+        "national-certificate"
+    ) {
+      router.push(
+        `/national-certificate/${encodeURIComponent(
+          test.id
+        )}`
+      );
 
-  function startTest(id: string) {
-    if (!id) {
-      window.alert("Test ID topilmadi.");
       return;
     }
 
-    router.push(`/test/${encodeURIComponent(id)}`);
+    router.push(
+      `/test/${encodeURIComponent(
+        test.id
+      )}`
+    );
   }
-
-  /* =====================================================
-     UI
-  ===================================================== */
 
   return (
     <main className="page">
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <header className="header">
-        <div className="headerTitle">
+      <header className="topBar">
+        <div className="topLabel">
           Online testlar
         </div>
 
         <button
           type="button"
-          className="homeButton"
-          onClick={() => router.push("/")}
+          onClick={() =>
+            router.push("/")
+          }
         >
           Asosiy sahifa
         </button>
       </header>
 
-      {/* =================================================
-          TEST BO'LIMI
-      ================================================= */}
-
-      <section className="mainPanel">
-        <div className="sectionTitle">
-          Test bo‘limi
+      <section className="mainBox">
+        <div className="floatingTitle">
+          Testlar
         </div>
 
-        <div className="welcomeBox">
-          <h1>
-            Bilimingizni sinab ko‘ring
-          </h1>
+        <div className="typesPanel">
+          <div className="typesHeader">
+            <div>
+              <strong>
+                Test turlari
+              </strong>
+              <span>
+                Kerakli bo‘limni
+                tanlang
+              </span>
+            </div>
 
-          <p>
-            Kerakli testni tanlang va testni boshlang.
-          </p>
-        </div>
-      </section>
-
-      {/* =================================================
-          QIDIRUV
-      ================================================= */}
-
-      <section className="searchPanel">
-        <div className="sectionTitle">
-          Qidiruv
-        </div>
-
-        <div className="searchInner">
-          <div className="searchWrapper">
-            <input
-              type="text"
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
+            <div className="selectedName">
+              {
+                CATEGORIES.find(
+                  (item) =>
+                    item.key ===
+                    selectedCategory
+                )?.title
               }
-              placeholder="Test nomi yoki fan bo‘yicha qidirish..."
-              dir="ltr"
-            />
-
-            {search && (
-              <button
-                type="button"
-                className="clearButton"
-                onClick={() => setSearch("")}
-                title="Tozalash"
-              >
-                ×
-              </button>
-            )}
+            </div>
           </div>
 
-          <button
-            type="button"
-            className="refreshButton"
-            onClick={loadTests}
-            disabled={loading}
-          >
-            Yangilash
-          </button>
+          <div className="categoryGrid">
+            {CATEGORIES.map(
+              (category) => (
+                <button
+                  key={
+                    category.key
+                  }
+                  type="button"
+                  className={
+                    selectedCategory ===
+                    category.key
+                      ? "category activeCategory"
+                      : "category"
+                  }
+                  onClick={() => {
+                    setSelectedCategory(
+                      category.key
+                    );
+                    setSearch("");
+                  }}
+                >
+                  <span className="categoryIcon">
+                    {
+                      category.icon
+                    }
+                  </span>
+
+                  <strong>
+                    {
+                      category.title
+                    }
+                  </strong>
+
+                  <span className="count">
+                    {
+                      categoryCounts[
+                        category.key
+                      ]
+                    }
+                  </span>
+                </button>
+              )
+            )}
+          </div>
         </div>
-      </section>
 
-      {/* =================================================
-          TESTLAR
-      ================================================= */}
+        <div className="searchPanel">
+          <input
+            type="search"
+            value={search}
+            onChange={(event) =>
+              setSearch(
+                event.target
+                  .value
+              )
+            }
+            placeholder="Test nomi yoki fan bo‘yicha qidirish..."
+          />
 
-      <section className="testsPanel">
-        <div className="sectionTitle">
-          Mavjud testlar
+          {search && (
+            <button
+              type="button"
+              onClick={() =>
+                setSearch("")
+              }
+            >
+              ×
+            </button>
+          )}
         </div>
 
-        <div className="testsInner">
-          {/* LOADING */}
-
-          {loading && (
-            <div className="messageBox">
+        <section className="testsPanel">
+          {loading ? (
+            <div className="empty">
               <div className="loader" />
-
-              <h2>
+              <strong>
                 Testlar yuklanmoqda...
-              </h2>
+              </strong>
             </div>
-          )}
-
-          {/* ERROR */}
-
-          {!loading && error && (
-            <div className="messageBox errorMessage">
-              <div className="messageIcon">
-                !
-              </div>
-
-              <h2>
-                Testlarni yuklab bo‘lmadi
-              </h2>
-
-              <p>
-                {error}
-              </p>
-
-              <button
-                type="button"
-                className="retryButton"
-                onClick={loadTests}
-              >
-                Qayta urinish
-              </button>
+          ) : error ? (
+            <div className="error">
+              {error}
             </div>
-          )}
+          ) : visibleTests.length ===
+            0 ? (
+            <div className="empty">
+              <strong>
+                Hozircha ushbu
+                bo‘limda e’lon
+                qilingan test yo‘q.
+              </strong>
+            </div>
+          ) : (
+            <div className="testGrid">
+              {visibleTests.map(
+                (test) => (
+                  <article
+                    className="testCard"
+                    key={`${test.source}:${test.id}`}
+                  >
+                    <div className="cardTop">
+                      <span>
+                        {test.subject ||
+                          "Huquq"}
+                      </span>
 
-          {/* TEST YO'Q */}
+                      <b>
+                        {
+                          test.questionCount
+                        }{" "}
+                        savol
+                      </b>
+                    </div>
 
-          {!loading &&
-            !error &&
-            filteredTests.length === 0 && (
-              <div className="messageBox">
-                <div className="messageIcon">
-                  ?
-                </div>
+                    <h2>
+                      {test.title}
+                    </h2>
 
-                <h2>
-                  {search
-                    ? "Qidiruv bo‘yicha test topilmadi"
-                    : "Hozircha e’lon qilingan test yo‘q"}
-                </h2>
-
-                <p>
-                  {search
-                    ? "Boshqa test nomi yoki fan nomini yozib ko‘ring."
-                    : "Administrator testni e’lon qilgandan so‘ng shu yerda ko‘rinadi."}
-                </p>
-              </div>
-            )}
-
-          {/* TESTLAR */}
-
-          {!loading &&
-            !error &&
-            filteredTests.length > 0 && (
-              <div className="testGrid">
-                {filteredTests.map((test) => {
-                  const questionCount = Array.isArray(
-                    test.questions
-                  )
-                    ? test.questions.length
-                    : 0;
-
-                  return (
-                    <article
-                      key={test.id}
-                      className="testCard"
-                    >
-                      <div className="publishedBadge">
-                        TEST
-                      </div>
-
-                      <div className="testCardTop">
-                        <h2>
-                          {test.title ||
-                            "Nomsiz test"}
-                        </h2>
-
-                        <div className="subject">
-                          {test.subject ||
-                            "Fan ko‘rsatilmagan"}
-                        </div>
-                      </div>
-
-                      {test.description && (
-                        <p className="description">
-                          {test.description}
-                        </p>
-                      )}
-
-                      <div className="information">
-                        <div className="infoBox">
-                          <span>
-                            Savollar
-                          </span>
-
-                          <strong>
-                            {questionCount}
-                          </strong>
-                        </div>
-
-                        <div className="infoBox">
-                          <span>
-                            Vaqt
-                          </span>
-
-                          <strong>
-                            {Number(
-                              test.duration
-                            ) || 0}
-                            <small>
-                              {" "}
-                              daqiqa
-                            </small>
-                          </strong>
-                        </div>
-
-                        <div className="infoBox">
-                          <span>
-                            Holati
-                          </span>
-
-                          <strong className="ready">
-                            Tayyor
-                          </strong>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="startButton"
-                        onClick={() =>
-                          startTest(test.id)
+                    {test.description && (
+                      <p>
+                        {
+                          test.description
                         }
-                      >
-                        TESTNI BOSHLASH
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-        </div>
-      </section>
+                      </p>
+                    )}
 
-      {/* =================================================
-          CSS
-      ================================================= */}
+                    <div className="meta">
+                      <span>
+                        ⏱{" "}
+                        {
+                          test.duration
+                        }{" "}
+                        daqiqa
+                      </span>
+
+                      <span>
+                        Urinish:{" "}
+                        {test.attemptLimit ==
+                        null
+                          ? "cheklanmagan"
+                          : test.attemptLimit}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="startButton"
+                      onClick={() =>
+                        openTest(
+                          test
+                        )
+                      }
+                    >
+                      Testni boshlash
+                    </button>
+                  </article>
+                )
+              )}
+            </div>
+          )}
+        </section>
+      </section>
 
       <style jsx>{`
-        * {
-          box-sizing: border-box;
-        }
-
         .page {
-          width: 100%;
           min-height: 100vh;
-
           padding:
-            20px 20px 100px;
-
+            16px 16px 70px;
+          box-sizing:
+            border-box;
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #fafafa 50%,
-              #edf1f3 100%
+              #ffffff,
+              #eef3f6
             );
-
-          color: #111;
-
+          color: #071d2e;
           font-family:
-            "Bell MT",
+            Georgia,
             "Times New Roman",
             serif;
         }
 
-        button,
-        input {
-          font-family: inherit;
-        }
-
-        button {
-          cursor: pointer;
-        }
-
-        button:disabled {
-          opacity: 0.6;
-          cursor: wait;
-        }
-
-        /* ===============================================
-           HEADER
-        =============================================== */
-
-        .header {
-          width: 100%;
-
-          min-height: 120px;
-
-          margin: 0 auto;
-
-          padding: 22px 28px;
-
+        .topBar {
+          min-height: 56px;
+          padding: 9px 14px;
           display: flex;
-
           align-items: center;
-
-          justify-content: space-between;
-
-          gap: 25px;
-
+          justify-content:
+            space-between;
           border:
-            3px solid #16405b;
-
-          border-radius: 25px;
-
+            2px solid #194e68;
+          border-radius: 10px;
           background:
             linear-gradient(
               180deg,
-              #a9e5ff 0%,
-              #67b8e3 50%,
-              #4b9dca 100%
+              #85d6fa 0%,
+              #4bb6e7 45%,
+              #2196cc 100%
             );
-
           box-shadow:
-            inset 0 7px 5px
-              rgba(255, 255, 255, 0.75),
-            inset 0 -6px 5px
-              rgba(0, 0, 0, 0.12),
-            0 7px 0 #173e56,
-            0 15px 25px
-              rgba(0, 0, 0, 0.2);
+            inset 0 4px 3px
+              rgba(
+                255,
+                255,
+                255,
+                .75
+              ),
+            0 6px 0 #164a63,
+            0 9px 15px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
         }
 
-        .headerTitle {
-          min-width: 330px;
-
-          min-height: 72px;
-
-          padding: 15px 30px;
-
-          display: flex;
-
-          align-items: center;
-
-          justify-content: center;
-
-          border:
-            2px solid #555;
-
-          border-radius: 15px;
-
-          background:
-            linear-gradient(
-              #ffffff,
-              #d1d1d1
-            );
-
-          box-shadow:
-            inset 0 5px 5px white,
-            0 5px 0 #555;
-
-          font-size: 27px;
-
-          font-weight: 700;
-
-          text-align: center;
-        }
-
-        .homeButton {
-          min-width: 155px;
-
-          min-height: 55px;
-
-          padding: 0 22px;
-
-          border:
-            2px solid #555;
-
-          border-radius: 10px;
-
-          background:
-            linear-gradient(
-              #ffffff,
-              #c5c5c5
-            );
-
-          box-shadow:
-            0 4px 0 #555;
-
-          font-weight: 700;
-        }
-
-        .homeButton:hover {
-          filter: brightness(1.05);
-        }
-
-        /* ===============================================
-           UMUMIY PANEL
-        =============================================== */
-
-        .mainPanel,
-        .searchPanel,
-        .testsPanel {
-          position: relative;
-
-          width: min(1300px, 96%);
-
-          margin:
-            100px auto 0;
-
+        .topLabel,
+        .topBar button {
           padding:
-            80px 35px 35px;
-
+            10px 24px;
           border:
-            3px solid #303538;
-
-          border-radius: 27px;
-
+            1.5px solid
+            #526772;
+          border-radius: 7px;
           background:
             linear-gradient(
-              145deg,
-              #696d70 0%,
-              #505457 50%,
-              #363a3d 100%
+              180deg,
+              #fff,
+              #d7d7d7
             );
-
-          box-shadow:
-            inset 0 7px 6px
-              rgba(255, 255, 255, 0.23),
-            inset 0 -8px 8px
-              rgba(0, 0, 0, 0.32),
-            0 7px 0 #272b2e,
-            0 15px 25px
-              rgba(0, 0, 0, 0.24);
+          font-weight: 900;
         }
 
-        .sectionTitle {
+        .topBar button {
+          cursor: pointer;
+        }
+
+        .mainBox {
+          position: relative;
+          width:
+            min(
+              1120px,
+              96%
+            );
+          margin:
+            70px auto 0;
+          padding:
+            64px 28px 32px;
+          box-sizing:
+            border-box;
+          border:
+            2px solid #323b40;
+          border-radius: 22px;
+          background:
+            linear-gradient(
+              180deg,
+              #666b6e,
+              #444a4d
+            );
+          box-shadow:
+            inset 0 4px 3px
+              rgba(
+                255,
+                255,
+                255,
+                .22
+              ),
+            0 9px 0 #262c2f,
+            0 14px 22px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        .floatingTitle {
           position: absolute;
-
-          top: -36px;
-
+          top: -31px;
           left: 50%;
-
           transform:
             translateX(-50%);
-
-          min-width: 330px;
-
-          min-height: 70px;
-
-          padding: 10px 30px;
-
-          display: flex;
-
-          align-items: center;
-
-          justify-content: center;
-
-          border:
-            3px solid #174461;
-
-          border-radius: 16px;
-
-          background:
-            linear-gradient(
-              #abe6ff,
-              #58a8d7
-            );
-
-          box-shadow:
-            inset 0 6px 5px
-              rgba(255, 255, 255, 0.7),
-            0 5px 0 #17415c;
-
-          color: #073b68;
-
-          font-size: 28px;
-
-          font-weight: 700;
-
-          text-align: center;
-
-          z-index: 5;
-        }
-
-        /* ===============================================
-           WELCOME
-        =============================================== */
-
-        .welcomeBox {
-          width: 100%;
-
-          min-height: 210px;
-
-          padding: 35px;
-
-          display: flex;
-
-          flex-direction: column;
-
-          align-items: center;
-
-          justify-content: center;
-
-          border:
-            2px solid #555;
-
-          border-radius: 18px;
-
-          background:
-            linear-gradient(
-              #f5f5f5,
-              #c9c9c9
-            );
-
-          box-shadow:
-            inset 0 6px 5px white,
-            0 6px 0 #555d61;
-
-          text-align: center;
-        }
-
-        .welcomeBox h1 {
-          margin:
-            0 0 18px;
-
-          color: #111;
-
-          font-size:
-            clamp(32px, 4vw, 50px);
-
-          line-height: 1.1;
-        }
-
-        .welcomeBox p {
-          margin: 0;
-
-          color: #333;
-
-          font-size: 20px;
-
-          line-height: 1.5;
-        }
-
-        /* ===============================================
-           SEARCH
-        =============================================== */
-
-        .searchPanel {
-          padding-top: 75px;
-        }
-
-        .searchInner {
-          width: 100%;
-
-          padding: 25px;
-
-          display: flex;
-
-          align-items: center;
-
-          gap: 15px;
-
-          border:
-            2px solid #555;
-
-          border-radius: 18px;
-
-          background:
-            linear-gradient(
-              #f5f5f5,
-              #c9c9c9
-            );
-
-          box-shadow:
-            inset 0 6px 5px white,
-            0 6px 0 #555d61;
-        }
-
-        .searchWrapper {
-          position: relative;
-
-          flex: 1;
-        }
-
-        .searchWrapper input {
-          width: 100%;
-
-          height: 62px;
-
+          min-width: 250px;
           padding:
-            0 55px 0 20px;
-
+            14px 34px;
+          text-align: center;
           border:
-            2px solid #1597d2;
+            2px solid #1a526d;
+          border-radius: 12px;
+          background:
+            linear-gradient(
+              180deg,
+              #9ce1ff,
+              #4eb8e9 58%,
+              #218ebf
+            );
+          box-shadow:
+            inset 0 4px 3px
+              rgba(
+                255,
+                255,
+                255,
+                .7
+              ),
+            0 6px 0 #31586b,
+            0 9px 12px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+          font-size: 26px;
+          font-weight: 900;
+        }
 
-          border-radius: 11px;
+        .typesPanel,
+        .searchPanel,
+        .testsPanel {
+          padding: 16px;
+          border:
+            1.5px solid
+            #637680;
+          border-radius: 14px;
+          background:
+            linear-gradient(
+              180deg,
+              #f7fafb,
+              #dbe3e7
+            );
+          box-shadow:
+            inset 0 3px 2px
+              #fff,
+            0 5px 0 #75868e;
+        }
 
-          outline: none;
+        .typesHeader {
+          margin-bottom: 14px;
+          display: flex;
+          justify-content:
+            space-between;
+          gap: 20px;
+          align-items: center;
+        }
 
-          background: #fff;
+        .typesHeader div:first-child {
+          display: grid;
+        }
 
-          color: #111;
-
-          direction: ltr;
-
-          text-align: left;
-
-          unicode-bidi: plaintext;
-
+        .typesHeader strong {
           font-size: 19px;
         }
 
-        .searchWrapper input:focus {
-          border-color: #006ca5;
-
-          box-shadow:
-            0 0 0 3px
-              rgba(21, 151, 210, 0.15);
+        .typesHeader span {
+          font-size: 12px;
         }
 
-        .clearButton {
-          position: absolute;
-
-          top: 50%;
-
-          right: 12px;
-
-          width: 38px;
-
-          height: 38px;
-
-          transform:
-            translateY(-50%);
-
-          border: none;
-
-          background: transparent;
-
-          color: #a91919;
-
-          font-size: 29px;
-
-          font-weight: 700;
-        }
-
-        .refreshButton {
-          min-width: 140px;
-
-          height: 62px;
-
-          padding: 0 20px;
-
+        .selectedName {
+          padding:
+            7px 12px;
           border:
-            2px solid #555;
+            1px solid
+            #657780;
+          border-radius: 7px;
+          background: #fff;
+          font-size: 13px;
+          font-weight: 800;
+        }
 
-          border-radius: 10px;
+        .categoryGrid {
+          display: grid;
+          grid-template-columns:
+            repeat(
+              3,
+              minmax(0,1fr)
+            );
+          gap: 12px;
+        }
 
+        .category {
+          position: relative;
+          min-height: 95px;
+          padding:
+            14px 50px
+            14px 14px;
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          text-align: left;
+          border:
+            1.5px solid
+            #6a7a82;
+          border-radius: 12px;
           background:
             linear-gradient(
-              #ffffff,
-              #bbbbbb
+              180deg,
+              #f7f8f9,
+              #d6dde1
             );
-
           box-shadow:
-            0 4px 0 #555;
-
-          font-size: 16px;
-
-          font-weight: 700;
+            inset 0 3px 2px
+              #fff,
+            0 5px 0 #6b767c;
+          cursor: pointer;
         }
 
-        /* ===============================================
-           TESTS
-        =============================================== */
+        .categoryIcon {
+          width: 40px;
+          height: 40px;
+          flex: 0 0 40px;
+          display: grid;
+          place-items: center;
+          border:
+            1.5px solid
+            #34647b;
+          border-radius: 8px;
+          background:
+            linear-gradient(
+              180deg,
+              #e8f8ff,
+              #89cae6
+            );
+          box-shadow:
+            inset 0 2px 2px
+              #fff,
+            0 3px 0 #648493;
+          font-weight: 900;
+        }
+
+        .count {
+          position: absolute;
+          right: 12px;
+          top: 12px;
+          width: 28px;
+          height: 28px;
+          display: grid;
+          place-items: center;
+          border:
+            1.5px solid
+            #205c77;
+          border-radius: 50%;
+          background:
+            #bfeaff;
+          font-weight: 900;
+        }
+
+        .activeCategory {
+          border-color:
+            #087fb8;
+          background:
+            linear-gradient(
+              180deg,
+              #d8f5ff,
+              #7fcaea
+            );
+          box-shadow:
+            inset 0 3px 2px
+              #fff,
+            0 6px 0 #126787;
+        }
+
+        .searchPanel {
+          margin-top: 24px;
+          display: flex;
+          gap: 10px;
+        }
+
+        .searchPanel input {
+          width: 100%;
+          min-height: 48px;
+          padding:
+            0 16px;
+          border:
+            1.5px solid
+            #0b9cdf;
+          border-radius: 8px;
+          outline: none;
+          background: #fff;
+          font:
+            16px Georgia,
+            serif;
+        }
+
+        .searchPanel button {
+          min-width: 50px;
+          border:
+            1px solid
+            #65777f;
+          border-radius: 8px;
+          background:
+            linear-gradient(
+              #fff,
+              #d8dde0
+            );
+          cursor: pointer;
+          font-size: 22px;
+        }
 
         .testsPanel {
-          min-height: 400px;
-        }
-
-        .testsInner {
-          width: 100%;
-
-          min-height: 300px;
-
-          padding: 28px;
-
-          border:
-            2px solid #555;
-
-          border-radius: 18px;
-
-          background:
-            linear-gradient(
-              #f5f5f5,
-              #c9c9c9
-            );
-
-          box-shadow:
-            inset 0 6px 5px white,
-            0 6px 0 #555d61;
+          margin-top: 24px;
+          min-height: 220px;
         }
 
         .testGrid {
           display: grid;
-
           grid-template-columns:
             repeat(
-              auto-fit,
-              minmax(380px, 1fr)
+              2,
+              minmax(0,1fr)
             );
-
-          gap: 28px;
+          gap: 14px;
         }
 
-        /* ===============================================
-           TEST CARD
-        =============================================== */
-
         .testCard {
-          position: relative;
-
-          min-height: 350px;
-
-          padding:
-            50px 25px 25px;
-
-          display: flex;
-
-          flex-direction: column;
-
+          padding: 16px;
           border:
-            2px solid #596064;
-
-          border-radius: 17px;
-
+            1.5px solid
+            #647983;
+          border-radius: 13px;
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #e7e7e7 65%,
-              #cacaca 100%
+              #fff,
+              #e1e6e9
             );
-
           box-shadow:
-            inset 0 5px 5px white,
-            0 6px 0 #555d61,
-            0 12px 20px
-              rgba(0, 0, 0, 0.18);
-
-          overflow: hidden;
+            inset 0 3px 2px
+              #fff,
+            0 5px 0 #7b898f;
         }
 
-        .publishedBadge {
-          position: absolute;
-
-          top: 14px;
-
-          right: 14px;
-
-          padding:
-            7px 15px;
-
-          border:
-            1px solid #25814a;
-
-          border-radius: 8px;
-
-          background: #c9efd6;
-
-          color: #126033;
-
-          font-size: 12px;
-
-          font-weight: 700;
-        }
-
-        .testCardTop {
-          text-align: center;
-        }
-
-        .testCardTop h2 {
-          margin:
-            0 0 10px;
-
-          color: #111;
-
-          font-size: 27px;
-
-          line-height: 1.25;
-
-          overflow-wrap: anywhere;
-        }
-
-        .subject {
-          color: #07517e;
-
-          font-size: 19px;
-
-          font-weight: 700;
-        }
-
-        .description {
-          margin:
-            20px 0 0;
-
-          padding: 15px;
-
-          border:
-            1px solid #aaa;
-
-          border-radius: 9px;
-
-          background:
-            rgba(255, 255, 255, 0.65);
-
-          text-align: center;
-
-          line-height: 1.5;
-        }
-
-        /* ===============================================
-           INFO
-        =============================================== */
-
-        .information {
-          margin:
-            25px 0;
-
-          display: grid;
-
-          grid-template-columns:
-            repeat(3, 1fr);
-
-          gap: 10px;
-        }
-
-        .infoBox {
-          min-height: 85px;
-
-          padding: 12px;
-
+        .cardTop,
+        .meta {
           display: flex;
-
-          flex-direction: column;
-
-          align-items: center;
-
-          justify-content: center;
-
-          border:
-            1px solid #aaa;
-
-          border-radius: 9px;
-
-          background:
-            rgba(255, 255, 255, 0.7);
-
-          text-align: center;
-        }
-
-        .infoBox span {
-          margin-bottom: 6px;
-
-          color: #555;
-
+          justify-content:
+            space-between;
+          gap: 10px;
+          flex-wrap: wrap;
           font-size: 13px;
         }
 
-        .infoBox strong {
-          color: #07517e;
-
-          font-size: 21px;
+        .cardTop span {
+          padding:
+            4px 9px;
+          border-radius: 6px;
+          background: #d8f2ff;
+          font-weight: 800;
         }
 
-        .infoBox small {
-          font-size: 13px;
+        .testCard h2 {
+          margin:
+            14px 0 8px;
+          font-size: 20px;
         }
 
-        .infoBox .ready {
-          color: #16713a;
-
-          font-size: 16px;
+        .testCard p {
+          margin:
+            0 0 14px;
+          color: #43545c;
         }
 
-        /* ===============================================
-           START BUTTON
-        =============================================== */
+        .meta {
+          padding-top: 10px;
+          border-top:
+            1px solid
+            #b4c0c5;
+        }
 
         .startButton {
           width: 100%;
-
-          min-height: 58px;
-
-          margin-top: auto;
-
-          padding: 0 20px;
-
+          margin-top: 14px;
+          padding: 11px;
           border:
-            2px solid #174461;
-
-          border-radius: 11px;
-
+            1.5px solid
+            #1e6380;
+          border-radius: 8px;
+          color: #08263a;
           background:
             linear-gradient(
-              #b8ecff,
-              #58a8d7
+              180deg,
+              #bcecff,
+              #55bee9
             );
-
           box-shadow:
-            inset 0 4px 4px
-              rgba(255, 255, 255, 0.65),
-            0 5px 0 #17415c;
-
-          color: #073b68;
-
-          font-size: 17px;
-
-          font-weight: 700;
+            inset 0 3px 2px
+              rgba(
+                255,
+                255,
+                255,
+                .75
+              ),
+            0 4px 0 #33748f;
+          font-weight: 900;
+          cursor: pointer;
         }
 
-        .startButton:hover {
-          filter: brightness(1.05);
-
-          transform:
-            translateY(-1px);
-        }
-
-        .startButton:active {
-          transform:
-            translateY(3px);
-
-          box-shadow:
-            0 2px 0 #17415c;
-        }
-
-        /* ===============================================
-           MESSAGE
-        =============================================== */
-
-        .messageBox {
-          min-height: 280px;
-
-          padding: 30px;
-
-          display: flex;
-
-          flex-direction: column;
-
-          align-items: center;
-
-          justify-content: center;
-
+        .empty,
+        .error {
+          min-height: 190px;
+          display: grid;
+          place-items: center;
+          align-content: center;
+          gap: 12px;
           text-align: center;
         }
 
-        .messageBox h2 {
-          margin:
-            12px 0 8px;
-
-          font-size: 25px;
+        .error {
+          color: #8e1c1c;
         }
-
-        .messageBox p {
-          max-width: 600px;
-
-          margin:
-            0;
-
-          color: #555;
-
-          font-size: 17px;
-
-          line-height: 1.5;
-        }
-
-        .messageIcon {
-          width: 70px;
-
-          height: 70px;
-
-          display: flex;
-
-          align-items: center;
-
-          justify-content: center;
-
-          border:
-            3px solid #168fc9;
-
-          border-radius: 50%;
-
-          color: #07517e;
-
-          font-size: 35px;
-
-          font-weight: 700;
-        }
-
-        .errorMessage .messageIcon {
-          border-color: #bd2424;
-
-          color: #bd2424;
-        }
-
-        .retryButton {
-          min-width: 160px;
-
-          min-height: 50px;
-
-          margin-top: 20px;
-
-          border:
-            2px solid #555;
-
-          border-radius: 9px;
-
-          background:
-            linear-gradient(
-              #ffffff,
-              #bbbbbb
-            );
-
-          box-shadow:
-            0 4px 0 #555;
-
-          font-weight: 700;
-        }
-
-        /* ===============================================
-           LOADER
-        =============================================== */
 
         .loader {
-          width: 50px;
-
-          height: 50px;
-
-          margin-bottom: 15px;
-
+          width: 34px;
+          height: 34px;
           border:
-            5px solid #bbb;
-
+            4px solid #c6d3d9;
           border-top-color:
-            #168fc9;
-
+            #0793d3;
           border-radius: 50%;
-
           animation:
-            spin 0.8s linear infinite;
+            spin .8s linear
+            infinite;
         }
 
         @keyframes spin {
@@ -1209,102 +1095,27 @@ export default function TestPage() {
           }
         }
 
-        /* ===============================================
-           TABLET
-        =============================================== */
-
-        @media (max-width: 900px) {
-          .header {
-            flex-direction: column;
-          }
-
-          .headerTitle {
-            width: 100%;
-
-            min-width: 0;
-          }
-
-          .homeButton {
-            width: 100%;
-          }
-
+        @media (
+          max-width: 850px
+        ) {
+          .categoryGrid,
           .testGrid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        /* ===============================================
-           MOBILE
-        =============================================== */
-
-        @media (max-width: 650px) {
-          .page {
-            padding:
-              12px 7px 70px;
+            grid-template-columns:
+              1fr;
           }
 
-          .header {
-            padding:
-              15px;
+          .typesHeader {
+            align-items:
+              stretch;
+            flex-direction:
+              column;
           }
 
-          .mainPanel,
-          .searchPanel,
-          .testsPanel {
-            width: 99%;
-
-            margin-top: 85px;
-
-            padding:
-              70px 12px 25px;
-          }
-
-          .sectionTitle {
-            min-width: 230px;
-
-            min-height: 62px;
-
-            font-size: 22px;
-          }
-
-          .welcomeBox {
-            padding:
-              25px 15px;
-          }
-
-          .welcomeBox h1 {
-            font-size: 32px;
-          }
-
-          .searchInner {
-            padding: 15px;
-
-            flex-direction: column;
-          }
-
-          .searchWrapper {
+          .mainBox {
             width: 100%;
-          }
-
-          .refreshButton {
-            width: 100%;
-          }
-
-          .testsInner {
-            padding: 12px;
-          }
-
-          .testGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .testCard {
             padding:
-              55px 15px 20px;
-          }
-
-          .information {
-            grid-template-columns: 1fr;
+              55px 12px
+              22px;
           }
         }
       `}</style>
