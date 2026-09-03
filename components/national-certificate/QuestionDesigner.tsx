@@ -336,9 +336,10 @@ export default function QuestionDesigner({
       handle
     );
 
-    wrap?.addEventListener(
+    window.addEventListener(
       "scroll",
-      handle
+      handle,
+      true
     );
 
     return () => {
@@ -347,9 +348,10 @@ export default function QuestionDesigner({
         handle
       );
 
-      wrap?.removeEventListener(
+      window.removeEventListener(
         "scroll",
-        handle
+        handle,
+        true
       );
     };
   }, [selectedId]);
@@ -419,12 +421,8 @@ export default function QuestionDesigner({
     const root =
       editorRef.current;
 
-    const wrap =
-      root?.parentElement as HTMLElement | null;
-
     if (
       !root ||
-      !wrap ||
       !id
     ) {
       setSelectionBox(null);
@@ -444,18 +442,11 @@ export default function QuestionDesigner({
     const nodeRect =
       node.getBoundingClientRect();
 
-    const wrapRect =
-      wrap.getBoundingClientRect();
-
     setSelectionBox({
       left:
-        nodeRect.left -
-        wrapRect.left +
-        wrap.scrollLeft,
+        nodeRect.left,
       top:
-        nodeRect.top -
-        wrapRect.top +
-        wrap.scrollTop,
+        nodeRect.top,
       width:
         nodeRect.width,
       height:
@@ -477,8 +468,10 @@ export default function QuestionDesigner({
 
     if (!node) return;
 
-    node.style.backgroundColor =
-      fill;
+    const kind =
+      node.getAttribute(
+        "data-kind"
+      ) || "";
 
     node.style.borderColor =
       stroke;
@@ -488,7 +481,54 @@ export default function QuestionDesigner({
     node.style.borderStyle =
       "solid";
 
+    if (
+      kind === "line"
+    ) {
+      node.style.background =
+        stroke;
+
+      node.style.boxShadow =
+        "0 2px 2px rgba(0,0,0,.25)";
+    } else if (
+      node.classList.contains(
+        "nc-3d-object"
+      )
+    ) {
+      node.style.background =
+        threeDBackground(
+          fill
+        );
+
+      node.style.boxShadow =
+        threeDShadow(
+          stroke
+        );
+    } else {
+      node.style.background =
+        fill;
+    }
+
     emit();
+    syncSelectionSoon();
+  }
+
+  function threeDBackground(
+    base: string
+  ) {
+    return `linear-gradient(180deg,
+      color-mix(in srgb, ${base} 58%, white) 0%,
+      color-mix(in srgb, ${base} 82%, white) 18%,
+      ${base} 58%,
+      color-mix(in srgb, ${base} 82%, black) 100%)`;
+  }
+
+  function threeDShadow(
+    borderColor: string
+  ) {
+    return `inset 0 4px 3px rgba(255,255,255,.72),
+      inset 0 -3px 3px rgba(0,0,0,.12),
+      0 7px 0 color-mix(in srgb, ${borderColor} 72%, black),
+      0 10px 14px rgba(0,0,0,.22)`;
   }
 
   function insertObject(
@@ -532,8 +572,22 @@ export default function QuestionDesigner({
         ? ""
         : "Matn";
 
+    const background =
+      kind === "line"
+        ? stroke
+        : threeDBackground(
+            fill
+          );
+
+    const shadow =
+      kind === "line"
+        ? "0 2px 2px rgba(0,0,0,.25)"
+        : threeDShadow(
+            stroke
+          );
+
     insertHtml(
-      `<div class="nc-object" data-object-id="${id}" data-kind="${kind}" contenteditable="${
+      `<div class="nc-object nc-3d-object" data-object-id="${id}" data-kind="${kind}" contenteditable="${
         kind === "line"
           ? "false"
           : "true"
@@ -545,7 +599,7 @@ export default function QuestionDesigner({
         kind === "line"
           ? 0
           : 12
-      }px;border:${strokeWidth}px solid ${stroke};border-radius:${radius};background:${fill};font-weight:700;text-align:center;box-sizing:border-box;">${text}</div><p><br></p>`
+      }px;border:${strokeWidth}px solid ${stroke};border-radius:${radius};background:${background};box-shadow:${shadow};font-weight:800;text-align:center;box-sizing:border-box;">${text}</div><p><br></p>`
     );
   }
 
@@ -671,7 +725,7 @@ export default function QuestionDesigner({
       ).join("");
 
     insertHtml(
-      `<div class="nc-table-wrap nc-object" data-object-id="${id}" data-kind="table" contenteditable="false" style="position:relative;overflow-x:auto;margin:16px 0;width:100%;box-sizing:border-box;"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
+      `<div class="nc-table-wrap nc-object" data-object-id="${id}" data-kind="table" contenteditable="false" style="position:relative;overflow-x:auto;margin:16px 0;width:100%;box-sizing:border-box;border:2px solid #536a75;border-radius:10px;background:#fff;box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 6px 0 #617782,0 9px 12px rgba(0,0,0,.18);"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
     );
   }
 
@@ -679,7 +733,7 @@ export default function QuestionDesigner({
     const id = uid();
 
     insertHtml(
-      `<div class="nc-table-object nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="false" style="position:relative;width:620px;max-width:96%;margin:18px auto;background:#fff;padding:4px;box-sizing:border-box;">
+      `<div class="nc-table-object nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="false" style="position:relative;width:620px;max-width:96%;margin:18px auto;background:#fff;padding:4px;box-sizing:border-box;border:2px solid #536a75;border-radius:10px;box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 6px 0 #617782,0 9px 12px rgba(0,0,0,.18);">
         <table data-manual-table="true" contenteditable="false" style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;">
           <tbody>
             <tr>
@@ -1354,7 +1408,7 @@ export default function QuestionDesigner({
       const id = uid();
 
       insertHtml(
-        `<div class="nc-object nc-image-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;background:#fff;overflow:hidden;"><img src="${String(
+        `<div class="nc-object nc-image-object nc-3d-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;border-radius:10px;background:linear-gradient(180deg,#ffffff,#e8eef2);box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22);overflow:hidden;"><img src="${String(
           reader.result || ""
         )}" alt="Savol rasmi" style="width:100%;height:100%;object-fit:contain;display:block;" /></div><p><br></p>`
       );
@@ -2110,12 +2164,11 @@ export default function QuestionDesigner({
         }
 
         .canvas :global(.nc-selected) {
-          outline: 2px dashed #058bd6 !important;
-          outline-offset: 3px;
+          outline: none !important;
         }
 
         .selectionUi {
-          position: absolute;
+          position: fixed;
           z-index: 999;
           border: 2px dashed #078bcf;
           box-sizing: border-box;
@@ -2212,6 +2265,25 @@ export default function QuestionDesigner({
           top: 50%;
           transform: translateY(-50%);
           cursor: ew-resize;
+        }
+
+
+        .canvas :global(.nc-3d-object) {
+          transition:
+            box-shadow .08s ease,
+            filter .08s ease;
+        }
+
+        .canvas :global(.nc-3d-object:hover) {
+          filter: brightness(1.02);
+        }
+
+        .selectionUi::after {
+          content: "";
+          position: absolute;
+          inset: -4px;
+          border: 1px solid rgba(255,255,255,.8);
+          pointer-events: none;
         }
 
         .hint {
