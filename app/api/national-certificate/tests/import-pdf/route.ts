@@ -914,37 +914,38 @@ function buildQuestionBlocks(
       topilgan bo‘lsa, bu juda kuchli signal.
     */
     if (currentNumber <= 35) {
-      if (blockHasAllOptions(currentLines)) {
-        return true;
-      }
-
       /*
-        Ba’zi PDFlarda A/B/C/D text-layer noodatiy ajraladi.
-        Kutilayotgan raqam aniq kelgan va savol sarlavhasi yetarlicha
-        mazmunli bo‘lsa, yangi savol sifatida qabul qilamiz.
-      */
-      const withoutNumber =
-        normalizeOneLine(
-          stripQuestionNumber(
-            line.text
-          )
-        );
+        MUHIM:
+        Yopiq savol ichida ham:
+          1. ...
+          2. ...
+          3. ...
+        kabi bandlar bo‘lishi mumkin.
 
-      return withoutNumber.length >= 18;
+        Shu sabab keyingi savol FAQAT oldingi yopiq savolda
+        A/B/C/D variantlari topilgandan keyin boshlanadi.
+        Oldingi "matn uzunligi" fallbacki ichki 2., 3., 4. bandlarni
+        yangi savol deb noto‘g‘ri ajratib yuborayotgan edi.
+      */
+      return blockHasAllOptions(currentLines);
     }
 
     /*
-      36–45 ochiq savollarda A/B/C/D bo‘lmaydi.
-      Shu sabab qat’iy kutilayotgan raqam + savol matni mezoni ishlaydi.
+      36–45 ochiq savollarda keyingi savolni boshlashdan oldin
+      oldingi savolda "Javob:" satri bo‘lishini talab qilamiz.
+      Bu ochiq savol ichidagi 37., 38. kabi raqamlangan bandlarning
+      yangi savolga aylanib ketishini oldini oladi.
     */
-    const withoutNumber =
-      normalizeOneLine(
-        stripQuestionNumber(
-          line.text
+    const hasAcceptedAnswerLine =
+      currentLines.some((item) =>
+        /^(?:javob(?:i)?|to['’ʻʼ`]?g['’ʻʼ`]?ri\s+javob|answer)\s*[:\-–—]/i.test(
+          normalizeOneLine(
+            item.text
+          )
         )
       );
 
-    return withoutNumber.length >= 8;
+    return hasAcceptedAnswerLine;
   }
 
   for (const line of lines) {
@@ -1216,7 +1217,7 @@ function parseQuestion(
         const answerText =
           normalizeText(
             answerMatch[1] || ""
-          );
+          ).replace(/^\+\s*/, "");
 
         if (answerText) {
           for (
@@ -1226,7 +1227,10 @@ function parseQuestion(
             )
           ) {
             const value =
-              normalizeText(part);
+              normalizeText(part).replace(
+                /^\+\s*/,
+                ""
+              );
 
             if (
               value &&
