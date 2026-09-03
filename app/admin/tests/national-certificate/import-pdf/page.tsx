@@ -802,9 +802,13 @@ export default function NationalCertificatePdfImportPage() {
                     <QuestionDesigner
                       value={current.questionHtml || ""}
                       onChange={(html) =>
-                        updateCurrent({
-                          questionHtml: html,
-                        })
+                        updateQuestion(
+                          current.id,
+                          (question) => ({
+                            ...question,
+                            questionHtml: html,
+                          })
+                        )
                       }
                     />
                   </div>
