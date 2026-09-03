@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  PointerEvent as ReactPointerEvent,
+  useCallback,
   useEffect,
   useRef,
+  useState,
 } from "react";
 
 type Props = {
@@ -15,6 +18,23 @@ type Props = {
   disabled?: boolean;
 };
 
+type Box = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+type Handle =
+  | "nw"
+  | "n"
+  | "ne"
+  | "e"
+  | "se"
+  | "s"
+  | "sw"
+  | "w";
+
 function escapeHtml(value: string) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -22,6 +42,13 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function px(value: string) {
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number)
+    ? number
+    : 0;
 }
 
 export default function QuestionTextEditor({
@@ -34,6 +61,76 @@ export default function QuestionTextEditor({
     useRef<HTMLDivElement | null>(
       null
     );
+
+  const selectedImageRef =
+    useRef<HTMLImageElement | null>(
+      null
+    );
+
+  const [selectedImage, setSelectedImage] =
+    useState<HTMLImageElement | null>(
+      null
+    );
+
+  const [selectionBox, setSelectionBox] =
+    useState<Box | null>(null);
+
+  const [keepRatio, setKeepRatio] =
+    useState(true);
+
+  const syncSelection =
+    useCallback(() => {
+      const img =
+        selectedImageRef.current;
+
+      if (
+        !img ||
+        !img.isConnected
+      ) {
+        setSelectionBox(null);
+        return;
+      }
+
+      const rect =
+        img.getBoundingClientRect();
+
+      setSelectionBox({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    }, []);
+
+  function emit() {
+    const root = ref.current;
+    if (!root) return;
+
+    onChange(
+      (root.innerText || "")
+        .replace(/\u00a0/g, " ")
+        .trim(),
+      root.innerHTML
+    );
+  }
+
+  function selectImage(
+    img: HTMLImageElement | null
+  ) {
+    selectedImageRef.current =
+      img;
+
+    setSelectedImage(img);
+
+    if (!img) {
+      setSelectionBox(null);
+      return;
+    }
+
+    requestAnimationFrame(
+      syncSelection
+    );
+  }
 
   useEffect(() => {
     const root = ref.current;
@@ -54,23 +151,69 @@ export default function QuestionTextEditor({
     ) {
       root.innerHTML =
         incoming;
+
+      root
+        .querySelectorAll("img")
+        .forEach((node) => {
+          const img =
+            node as HTMLImageElement;
+
+          if (
+            !img.style.maxWidth
+          ) {
+            img.style.maxWidth =
+              "100%";
+          }
+
+          if (
+            !img.style.height &&
+            !img.getAttribute(
+              "height"
+            )
+          ) {
+            img.style.height =
+              "auto";
+          }
+
+          img.style.cursor =
+            "pointer";
+        });
     }
+
+    selectImage(null);
   }, [
     valueHtml,
     fallbackText,
   ]);
 
-  function emit() {
-    const root = ref.current;
-    if (!root) return;
+  useEffect(() => {
+    const handle = () =>
+      syncSelection();
 
-    onChange(
-      (root.innerText || "")
-        .replace(/\u00a0/g, " ")
-        .trim(),
-      root.innerHTML
+    window.addEventListener(
+      "resize",
+      handle
     );
-  }
+
+    window.addEventListener(
+      "scroll",
+      handle,
+      true
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        handle
+      );
+
+      window.removeEventListener(
+        "scroll",
+        handle,
+        true
+      );
+    };
+  }, [syncSelection]);
 
   function cmd(
     name: string,
@@ -86,6 +229,215 @@ export default function QuestionTextEditor({
       value
     );
 
+    emit();
+  }
+
+  function startResize(
+    event: ReactPointerEvent<
+      HTMLButtonElement
+    >,
+    handle: Handle
+  ) {
+    if (disabled) return;
+
+    const img =
+      selectedImageRef.current;
+
+    if (!img) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX =
+      event.clientX;
+    const startY =
+      event.clientY;
+
+    const rect =
+      img.getBoundingClientRect();
+
+    const computed =
+      window.getComputedStyle(
+        img
+      );
+
+    const startWidth =
+      rect.width;
+
+    const startHeight =
+      rect.height;
+
+    const aspect =
+      startWidth /
+      Math.max(
+        startHeight,
+        1
+      );
+
+    const minWidth = 24;
+    const minHeight = 24;
+
+    // Explicit pixel size is important,
+    // otherwise max-width / auto height can
+    // fight against the resize operation.
+    img.style.width = `${startWidth}px`;
+    img.style.height = `${startHeight}px`;
+    img.style.maxWidth = "none";
+    img.style.objectFit =
+      computed.objectFit ===
+      "fill"
+        ? "fill"
+        : "contain";
+
+    function onMove(
+      moveEvent: PointerEvent
+    ) {
+      const dx =
+        moveEvent.clientX -
+        startX;
+
+      const dy =
+        moveEvent.clientY -
+        startY;
+
+      let width =
+        startWidth;
+
+      let height =
+        startHeight;
+
+      if (
+        handle.includes("e")
+      ) {
+        width =
+          startWidth + dx;
+      }
+
+      if (
+        handle.includes("w")
+      ) {
+        width =
+          startWidth - dx;
+      }
+
+      if (
+        handle.includes("s")
+      ) {
+        height =
+          startHeight + dy;
+      }
+
+      if (
+        handle.includes("n")
+      ) {
+        height =
+          startHeight - dy;
+      }
+
+      const isCorner =
+        handle.length === 2;
+
+      if (
+        keepRatio &&
+        isCorner
+      ) {
+        const widthDelta =
+          Math.abs(
+            width -
+              startWidth
+          );
+
+        const heightDelta =
+          Math.abs(
+            height -
+              startHeight
+          );
+
+        if (
+          widthDelta >=
+          heightDelta
+        ) {
+          width =
+            Math.max(
+              minWidth,
+              width
+            );
+
+          height =
+            width /
+            aspect;
+        } else {
+          height =
+            Math.max(
+              minHeight,
+              height
+            );
+
+          width =
+            height *
+            aspect;
+        }
+      }
+
+      width =
+        Math.max(
+          minWidth,
+          width
+        );
+
+      height =
+        Math.max(
+          minHeight,
+          height
+        );
+
+      img.style.width = `${Math.round(
+        width
+      )}px`;
+
+      img.style.height = `${Math.round(
+        height
+      )}px`;
+
+      syncSelection();
+    }
+
+    function onUp() {
+      window.removeEventListener(
+        "pointermove",
+        onMove
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        onUp
+      );
+
+      syncSelection();
+      emit();
+    }
+
+    window.addEventListener(
+      "pointermove",
+      onMove
+    );
+
+    window.addEventListener(
+      "pointerup",
+      onUp,
+      { once: true }
+    );
+  }
+
+  function deleteImage() {
+    const img =
+      selectedImageRef.current;
+
+    if (!img || disabled)
+      return;
+
+    img.remove();
+    selectImage(null);
     emit();
   }
 
@@ -304,6 +656,25 @@ export default function QuestionTextEditor({
         >
           1. List
         </button>
+
+        {selectedImage && (
+          <label
+            className="ratioTool"
+            title="Rasm nisbatini saqlash"
+          >
+            <input
+              type="checkbox"
+              checked={keepRatio}
+              onChange={(e) =>
+                setKeepRatio(
+                  e.target.checked
+                )
+              }
+              disabled={disabled}
+            />
+            Rasm nisbati
+          </label>
+        )}
       </div>
 
       <div
@@ -313,7 +684,89 @@ export default function QuestionTextEditor({
         suppressContentEditableWarning
         onInput={emit}
         onBlur={emit}
+        onClick={(event) => {
+          const target =
+            event.target as HTMLElement;
+
+          if (
+            target.tagName ===
+            "IMG"
+          ) {
+            selectImage(
+              target as HTMLImageElement
+            );
+            return;
+          }
+
+          selectImage(null);
+        }}
       />
+
+      {selectedImage &&
+        selectionBox && (
+          <div
+            className="imageSelection"
+            style={{
+              left:
+                selectionBox.left,
+              top:
+                selectionBox.top,
+              width:
+                selectionBox.width,
+              height:
+                selectionBox.height,
+            }}
+            aria-hidden="true"
+          >
+            {(
+              [
+                "nw",
+                "n",
+                "ne",
+                "e",
+                "se",
+                "s",
+                "sw",
+                "w",
+              ] as Handle[]
+            ).map(
+              (handle) => (
+                <button
+                  key={handle}
+                  type="button"
+                  className={`resizeHandle h-${handle}`}
+                  onPointerDown={(
+                    event
+                  ) =>
+                    startResize(
+                      event,
+                      handle
+                    )
+                  }
+                  tabIndex={-1}
+                />
+              )
+            )}
+
+            <button
+              type="button"
+              className="imageDelete"
+              onPointerDown={(
+                event
+              ) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={
+                deleteImage
+              }
+              tabIndex={-1}
+              title="Rasmni o‘chirish"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
       <style jsx>{`
         .questionTextEditor {
@@ -371,6 +824,15 @@ export default function QuestionTextEditor({
           background: transparent;
         }
 
+        .ratioTool {
+          user-select: none;
+        }
+
+        .ratioTool input {
+          width: 16px;
+          height: 16px;
+        }
+
         .editor {
           min-height: 160px;
           padding: 16px 18px;
@@ -395,8 +857,123 @@ export default function QuestionTextEditor({
             0 0 0 3px
             rgba(0, 151, 222, .17);
         }
+
+        .editor :global(img) {
+          display: inline-block;
+          max-width: 100%;
+          height: auto;
+          cursor: pointer;
+          user-select: none;
+          vertical-align: middle;
+        }
+
+        .imageSelection {
+          position: fixed;
+          z-index: 100000;
+          pointer-events: none;
+          border: 2px dashed #0797dc;
+          box-sizing: border-box;
+        }
+
+        .resizeHandle {
+          position: absolute;
+          width: 12px;
+          height: 12px;
+          min-height: 0;
+          padding: 0;
+          border: 2px solid #087db4;
+          border-radius: 2px;
+          background: #eaf9ff;
+          box-shadow:
+            0 1px 2px
+            rgba(0, 0, 0, .25);
+          pointer-events: auto;
+          z-index: 3;
+        }
+
+        .h-nw {
+          left: -7px;
+          top: -7px;
+          cursor: nwse-resize;
+        }
+
+        .h-n {
+          left: 50%;
+          top: -7px;
+          transform: translateX(-50%);
+          cursor: ns-resize;
+        }
+
+        .h-ne {
+          right: -7px;
+          top: -7px;
+          cursor: nesw-resize;
+        }
+
+        .h-e {
+          right: -7px;
+          top: 50%;
+          transform: translateY(-50%);
+          cursor: ew-resize;
+        }
+
+        .h-se {
+          right: -7px;
+          bottom: -7px;
+          cursor: nwse-resize;
+        }
+
+        .h-s {
+          left: 50%;
+          bottom: -7px;
+          transform: translateX(-50%);
+          cursor: ns-resize;
+        }
+
+        .h-sw {
+          left: -7px;
+          bottom: -7px;
+          cursor: nesw-resize;
+        }
+
+        .h-w {
+          left: -7px;
+          top: 50%;
+          transform: translateY(-50%);
+          cursor: ew-resize;
+        }
+
+        .imageDelete {
+          position: absolute;
+          right: -18px;
+          top: -19px;
+          width: 28px;
+          height: 28px;
+          min-height: 0;
+          padding: 0;
+          display: grid;
+          place-items: center;
+          border: 2px solid #a80808;
+          border-radius: 50%;
+          background: linear-gradient(
+            180deg,
+            #ff5b5b,
+            #d90909
+          );
+          color: #fff;
+          font-size: 21px;
+          font-weight: 900;
+          line-height: 1;
+          box-shadow:
+            inset 0 2px 2px
+            rgba(255,255,255,.55),
+            0 3px 5px
+            rgba(0,0,0,.3);
+          pointer-events: auto;
+          cursor: pointer;
+          z-index: 4;
+        }
       `}</style>
     </div>
   );
 }
-
