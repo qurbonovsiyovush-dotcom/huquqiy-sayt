@@ -131,6 +131,8 @@ export default function QuestionDesigner({
     top: number;
     width: number;
     height: number;
+    ratio: number;
+    lockRatio: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -254,15 +256,109 @@ export default function QuestionDesigner({
             data.top + dy;
         }
 
-        width = Math.max(
-          40,
-          width
-        );
+        /*
+          Venn diagrammalarida proporsiyani QAT'IY saqlaymiz.
+          Shunda parent kichrayganda ichidagi matn va doiralar
+          alohida-alohida siqilib, ustma-ust tushmaydi.
+        */
+        if (data.lockRatio) {
+          const ratio =
+            data.ratio || 1;
 
-        height = Math.max(
-          30,
-          height
-        );
+          const horizontalHandle =
+            data.handle === "e" ||
+            data.handle === "w";
+
+          const verticalHandle =
+            data.handle === "n" ||
+            data.handle === "s";
+
+          if (horizontalHandle) {
+            width = Math.max(
+              180,
+              width
+            );
+
+            height =
+              width / ratio;
+          } else if (verticalHandle) {
+            height = Math.max(
+              110,
+              height
+            );
+
+            width =
+              height * ratio;
+          } else {
+            const widthScale =
+              Math.abs(
+                width /
+                  Math.max(
+                    data.width,
+                    1
+                  )
+              );
+
+            const heightScale =
+              Math.abs(
+                height /
+                  Math.max(
+                    data.height,
+                    1
+                  )
+              );
+
+            const scale =
+              Math.max(
+                widthScale,
+                heightScale
+              );
+
+            width = Math.max(
+              180,
+              data.width * scale
+            );
+
+            height =
+              width / ratio;
+          }
+
+          /*
+            G'arb / shimol tutqichlarida qarama-qarshi chet
+            joyida qolishi uchun left/top ni qayta hisoblaymiz.
+          */
+          if (
+            data.handle.includes(
+              "w"
+            )
+          ) {
+            left =
+              data.left +
+              data.width -
+              width;
+          }
+
+          if (
+            data.handle.includes(
+              "n"
+            )
+          ) {
+            top =
+              data.top +
+              data.height -
+              height;
+          }
+        } else {
+          width = Math.max(
+            40,
+            width
+          );
+
+          height = Math.max(
+            30,
+            height
+          );
+        }
 
         node.style.left = `${Math.max(
           0,
@@ -628,49 +724,65 @@ export default function QuestionDesigner({
     const id = uid();
     const clipId = `clip-${id}`;
 
+    /*
+      MUHIM:
+      Venn ichidagi HAMMA narsa bitta SVG ichida.
+      Shuning uchun obyektni kichraytirganda aylana va yozuvlar
+      bir xil nisbatda kichrayadi, bir-biriga yopishib ketmaydi.
+    */
     insertHtml(
-      `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" contenteditable="false" style="position:relative;width:760px;max-width:96%;height:420px;margin:22px auto;border:0;background:#fff;overflow:visible;">
-        <div contenteditable="true" style="position:absolute;left:25px;top:8px;width:315px;text-align:center;font-weight:800;font-size:18px;z-index:3;">I — Unitar davlatga xos</div>
-        <div contenteditable="true" style="position:absolute;right:25px;top:8px;width:315px;text-align:center;font-weight:800;font-size:18px;z-index:3;">II — Federativ davlatga xos</div>
-
-        <svg viewBox="0 0 760 330" width="100%" height="330" style="position:absolute;left:0;top:55px;overflow:visible;">
+      `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" data-lock-ratio="true" contenteditable="false"
+        style="position:relative;width:760px;max-width:96%;height:420px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
+        <svg viewBox="0 0 760 420" width="100%" height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          style="display:block;width:100%;height:100%;overflow:visible;">
           <defs>
             <clipPath id="${clipId}">
-              <ellipse cx="300" cy="155" rx="205" ry="125"></ellipse>
+              <ellipse cx="300" cy="220" rx="205" ry="125"></ellipse>
             </clipPath>
           </defs>
 
-          <ellipse cx="460" cy="155" rx="205" ry="125"
+          <text x="180" y="35" text-anchor="middle"
+            font-family="Georgia,Times New Roman,serif"
+            font-size="18" font-weight="800">I — Unitar davlatga xos</text>
+
+          <text x="580" y="35" text-anchor="middle"
+            font-family="Georgia,Times New Roman,serif"
+            font-size="18" font-weight="800">II — Federativ davlatga xos</text>
+
+          <ellipse cx="460" cy="220" rx="205" ry="125"
             fill="#bca7e8"
             fill-opacity="0.72"
             clip-path="url(#${clipId})"></ellipse>
 
-          <ellipse cx="300" cy="155" rx="205" ry="125"
+          <ellipse cx="300" cy="220" rx="205" ry="125"
             fill="white"
             fill-opacity="0.01"
             stroke="#263b46"
             stroke-width="3"></ellipse>
 
-          <ellipse cx="460" cy="155" rx="205" ry="125"
+          <ellipse cx="460" cy="220" rx="205" ry="125"
             fill="white"
             fill-opacity="0.01"
             stroke="#263b46"
             stroke-width="3"></ellipse>
 
-          <text x="225" y="165" text-anchor="middle"
+          <text x="225" y="229" text-anchor="middle"
             font-family="Georgia,Times New Roman,serif"
             font-size="25" font-weight="800">I</text>
 
-          <text x="535" y="165" text-anchor="middle"
+          <text x="535" y="229" text-anchor="middle"
             font-family="Georgia,Times New Roman,serif"
             font-size="25" font-weight="800">II</text>
 
-          <text x="380" y="165" text-anchor="middle"
+          <text x="380" y="229" text-anchor="middle"
             font-family="Georgia,Times New Roman,serif"
             font-size="25" font-weight="900">III</text>
-        </svg>
 
-        <div contenteditable="true" style="position:absolute;left:50%;transform:translateX(-50%);bottom:3px;width:390px;text-align:center;font-weight:800;font-size:18px;">III — har ikkalasiga xos</div>
+          <text x="380" y="400" text-anchor="middle"
+            font-family="Georgia,Times New Roman,serif"
+            font-size="18" font-weight="800">III — har ikkalasiga xos</text>
+        </svg>
       </div><p><br></p>`
     );
   }
@@ -678,21 +790,44 @@ export default function QuestionDesigner({
   function insertVenn3() {
     const id = uid();
 
+    /*
+      3 doirali Venn ham to'liq SVG.
+      Resize paytida barcha doira va yozuvlar proporsional o'zgaradi.
+    */
     insertHtml(
-      `<div class="nc-venn nc-object" data-object-id="${id}" data-kind="venn3" contenteditable="true" style="position:relative;width:720px;max-width:96%;height:470px;margin:22px auto;border:0;background:#fff;">
-        <div style="position:absolute;left:65px;top:75px;width:330px;height:245px;border:3px solid #263b46;border-radius:50%;background:rgba(77,176,225,.12);"></div>
-        <div style="position:absolute;right:65px;top:75px;width:330px;height:245px;border:3px solid #263b46;border-radius:50%;background:rgba(85,204,155,.12);"></div>
-        <div style="position:absolute;left:195px;top:185px;width:330px;height:245px;border:3px solid #263b46;border-radius:50%;background:rgba(241,187,74,.12);"></div>
-        <div style="position:absolute;left:90px;top:28px;font-weight:800;">A to‘plam</div>
-        <div style="position:absolute;right:90px;top:28px;font-weight:800;">B to‘plam</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:2px;font-weight:800;">C to‘plam</div>
-        <div style="position:absolute;left:150px;top:170px;font-weight:800;">I</div>
-        <div style="position:absolute;right:150px;top:170px;font-weight:800;">II</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:345px;font-weight:800;">III</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:145px;font-weight:800;">IV</div>
-        <div style="position:absolute;left:255px;top:270px;font-weight:800;">V</div>
-        <div style="position:absolute;right:255px;top:270px;font-weight:800;">VI</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:235px;font-weight:900;">VII</div>
+      `<div class="nc-object nc-venn3" data-object-id="${id}" data-kind="venn3" data-lock-ratio="true" contenteditable="false"
+        style="position:relative;width:720px;max-width:96%;height:470px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
+        <svg viewBox="0 0 720 470" width="100%" height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          style="display:block;width:100%;height:100%;overflow:visible;">
+
+          <ellipse cx="285" cy="195" rx="170" ry="125"
+            fill="rgba(77,176,225,.12)"
+            stroke="#263b46" stroke-width="3"></ellipse>
+
+          <ellipse cx="435" cy="195" rx="170" ry="125"
+            fill="rgba(85,204,155,.12)"
+            stroke="#263b46" stroke-width="3"></ellipse>
+
+          <ellipse cx="360" cy="310" rx="170" ry="125"
+            fill="rgba(241,187,74,.12)"
+            stroke="#263b46" stroke-width="3"></ellipse>
+
+          <g font-family="Georgia,Times New Roman,serif"
+             font-size="18" font-weight="800" text-anchor="middle">
+            <text x="170" y="38">A to‘plam</text>
+            <text x="550" y="38">B to‘plam</text>
+            <text x="360" y="458">C to‘plam</text>
+
+            <text x="205" y="185">I</text>
+            <text x="515" y="185">II</text>
+            <text x="360" y="390">III</text>
+            <text x="360" y="155">IV</text>
+            <text x="280" y="285">V</text>
+            <text x="440" y="285">VI</text>
+            <text x="360" y="245" font-weight="900">VII</text>
+          </g>
+        </svg>
       </div><p><br></p>`
     );
   }
@@ -1599,6 +1734,16 @@ export default function QuestionDesigner({
         node.offsetWidth,
       height:
         node.offsetHeight,
+      ratio:
+        node.offsetWidth /
+        Math.max(
+          node.offsetHeight,
+          1
+        ),
+      lockRatio:
+        node.getAttribute(
+          "data-lock-ratio"
+        ) === "true",
     };
 
     event.preventDefault();
