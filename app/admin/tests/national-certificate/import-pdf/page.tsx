@@ -75,18 +75,127 @@ function htmlToPlainText(html: string) {
     .trim();
 }
 
+
+function buildPdfLikeQuestionHtml(
+  questionText: string,
+  existingHtml?: string
+) {
+  const text = String(
+    questionText || ""
+  ).trim();
+
+  if (!text) {
+    return String(
+      existingHtml || ""
+    );
+  }
+
+  /*
+    BMBA huquq PDFlarida asosiy savol jumlasi qalin,
+    1., 2., 3., 4. hukmlar esa alohida satrlarda turadi.
+
+    PDF.js font metadata ayrim PDFlarda "Bold"ni aniq bermaydi.
+    Shu sabab editorga yuklash paytida savol stemini ishonchli
+    ravishda qalin qilib qayta quramiz.
+  */
+  const rawLines = text
+    .split(/\n+/)
+    .map((line) =>
+      line.trim()
+    )
+    .filter(Boolean);
+
+  const firstNumbered =
+    rawLines.findIndex(
+      (line) =>
+        /^\d{1,2}[.)]\s+/.test(
+          line
+        )
+    );
+
+  const stemLines =
+    firstNumbered === -1
+      ? rawLines.slice(0, 1)
+      : rawLines.slice(
+          0,
+          firstNumbered
+        );
+
+  const bodyLines =
+    firstNumbered === -1
+      ? rawLines.slice(1)
+      : rawLines.slice(
+          firstNumbered
+        );
+
+  const stemHtml =
+    stemLines.length > 0
+      ? `<div data-pdf-stem="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;font-weight:800;line-height:1.35;margin:0 0 22px 0;color:#000;">${stemLines
+          .map(escapeHtml)
+          .join("<br>")}</div>`
+      : "";
+
+  const bodyHtml =
+    bodyLines.length > 0
+      ? `<div data-pdf-body="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;font-weight:400;line-height:1.55;color:#000;">${bodyLines
+          .map(
+            (line) =>
+              `<div style="margin:0 0 2px 0;">${escapeHtml(
+                line
+              )}</div>`
+          )
+          .join("")}</div>`
+      : "";
+
+  return `${stemHtml}${bodyHtml}`;
+}
+
 function initialUnifiedHtml(question: ImportedQuestion) {
-  if (question.questionHtml?.trim()) {
-    return question.questionHtml;
-  }
+  /*
+    Import qilingan savol matnining asosiy savol qismini
+    editorning o‘zida PDFdagidek qalin ko‘rsatamiz.
 
-  if (question.questionTextHtml?.trim()) {
-    return question.questionTextHtml;
-  }
+    Agar questionHtml ichida rasm/Venn/shakl bo‘lsa,
+    ularni yo‘qotmaslik uchun mavjud visual HTMLni ham saqlaymiz.
+  */
+  const existing =
+    String(
+      question.questionHtml || ""
+    );
 
-  return `<div>${escapeHtml(
-    question.questionText || ""
-  ).replace(/\n/g, "<br>")}</div>`;
+  const visualOnly =
+    typeof document !== "undefined"
+      ? (() => {
+          const box =
+            document.createElement(
+              "div"
+            );
+
+          box.innerHTML =
+            existing;
+
+          const visuals =
+            Array.from(
+              box.querySelectorAll(
+                "[data-object-id]"
+              )
+            )
+              .map(
+                (node) =>
+                  (
+                    node as HTMLElement
+                  ).outerHTML
+              )
+              .join("");
+
+          return visuals;
+        })()
+      : "";
+
+  return `${buildPdfLikeQuestionHtml(
+    question.questionText || "",
+    existing
+  )}${visualOnly}`;
 }
 
 export default function NationalCertificatePdfImportPage() {
@@ -256,9 +365,14 @@ export default function NationalCertificatePdfImportPage() {
                   ? question.questionTextHtml
                   : "",
               questionHtml:
-                typeof question.questionHtml === "string"
-                  ? question.questionHtml
-                  : "",
+                buildPdfLikeQuestionHtml(
+                  typeof question.questionText === "string"
+                    ? question.questionText
+                    : "",
+                  typeof question.questionHtml === "string"
+                    ? question.questionHtml
+                    : ""
+                ),
             }))
             .sort((a, b) => a.number - b.number)
         : [];
