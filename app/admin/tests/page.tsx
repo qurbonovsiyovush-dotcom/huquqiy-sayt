@@ -1584,6 +1584,16 @@ margin: 10px auto 12px;
 
                   setCreateMenuOpen(false);
 
+                  if (
+                    createCategory ===
+                    "national-certificate"
+                  ) {
+                    router.push(
+                      "/admin/tests/national-certificate/new"
+                    );
+                    return;
+                  }
+
                   router.push(
                     `/test/editor?${params.toString()}`
                   );
@@ -1633,6 +1643,16 @@ margin: 10px auto 12px;
                   }
 
                   setCreateMenuOpen(false);
+
+                  if (
+                    createCategory ===
+                    "national-certificate"
+                  ) {
+                    router.push(
+                      "/admin/tests/national-certificate/import-pdf"
+                    );
+                    return;
+                  }
 
                   router.push(
                     `/test/import-pdf?${params.toString()}`
@@ -1704,6 +1724,16 @@ margin: 10px auto 12px;
                       : "categoryCard"
                   }
                   onClick={() => {
+                    if (
+                      category.key ===
+                      "national-certificate"
+                    ) {
+                      router.push(
+                        "/admin/tests/national-certificate/new"
+                      );
+                      return;
+                    }
+
                     setSelectedCategory(
                       category.key
                     );
