@@ -1081,6 +1081,188 @@ async function finalizeChunkedTest(
 
 
 /* =========================================================
+   BIR YO‘LA KO‘P TESTNI E’LON QILISH
+
+   Bitta request.
+   tests.json bir marta o‘qiladi va bir marta yoziladi.
+========================================================= */
+
+async function bulkPublishTests(
+  body: any
+) {
+  const cookieStore =
+    await cookies();
+
+  const isAdmin =
+    Boolean(
+      cookieStore.get(
+        "qurbonov_session"
+      )?.value
+    ) &&
+    cookieStore.get(
+      "qurbonov_role"
+    )?.value === "admin";
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bu amal faqat administrator uchun.",
+      },
+      {
+        status: 403,
+      }
+    );
+  }
+
+  const rawIds =
+    Array.isArray(
+      body?.testIds
+    )
+      ? body.testIds
+      : [];
+
+  const requestedIds =
+    Array.from(
+      new Set(
+        rawIds
+          .map(
+            (value: unknown) =>
+              String(value)
+                .trim()
+          )
+          .filter(Boolean)
+      )
+    );
+
+  if (
+    requestedIds.length ===
+    0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "E’lon qilinadigan testlar tanlanmagan.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  if (
+    requestedIds.length >
+    500
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bir so‘rovda ko‘pi bilan 500 ta test e’lon qilinadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const tests =
+    await readTests();
+
+  const requestedSet =
+    new Set(
+      requestedIds
+    );
+
+  const publishedIds:
+    string[] = [];
+
+  const nextTests =
+    tests.map(
+      (test) => {
+        if (
+          !requestedSet.has(
+            test.id
+          )
+        ) {
+          return test;
+        }
+
+        if (
+          !Array.isArray(
+            test.questions
+          ) ||
+          test.questions.length ===
+            0
+        ) {
+          return test;
+        }
+
+        publishedIds.push(
+          test.id
+        );
+
+        return {
+          ...test,
+          status:
+            "published" as const,
+          updatedAt:
+            new Date().toISOString(),
+        };
+      }
+    );
+
+  if (
+    publishedIds.length ===
+    0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "E’lon qilish uchun savollari mavjud qoralama test topilmadi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  /*
+    Eng muhim joy:
+    31 ta test uchun 31 marta overwrite YO‘Q.
+    Faqat bitta writeTests().
+  */
+  await writeTests(
+    nextTests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+      message:
+        `${publishedIds.length} ta test bir yo‘la e’lon qilindi.`,
+      publishedCount:
+        publishedIds.length,
+      publishedIds,
+      skippedCount:
+        requestedIds.length -
+        publishedIds.length,
+    },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
+}
+
+
+/* =========================================================
    BIR YO‘LA KO‘P TESTNI O‘CHIRISH
 
    Brauzer bitta so‘rov yuboradi.
@@ -2297,6 +2479,15 @@ export async function POST(
       "finalize-chunked-test"
     ) {
       return await finalizeChunkedTest(
+        body
+      );
+    }
+
+    if (
+      action ===
+      "bulk-publish-tests"
+    ) {
+      return await bulkPublishTests(
         body
       );
     }
