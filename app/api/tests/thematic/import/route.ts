@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* =========================================================
-   MAVZULASHTIRILGAN TEST — NEON BATCH IMPORT V2
+   MAVZULASHTIRILGAN TEST — NEON BATCH IMPORT V3 + SHAPES
 
    Asosiy farq:
    OLD:
@@ -76,6 +76,7 @@ type QuestionRow = {
   question_number: number;
   question_text: string;
   question_html: string | null;
+  shapes_json: unknown[];
   points: number;
 };
 
@@ -743,6 +744,19 @@ export async function POST(
             questionHtml ||
             null,
 
+          /*
+            Eski editor/importerdagi shape ma'lumotlarini
+            aynan JSON ko'rinishida saqlaymiz.
+            Rectangle, circle, ellipse, Venn, text, image
+            va boshqa shape turlari shu yerda yo'qolmaydi.
+          */
+          shapes_json:
+            Array.isArray(
+              question.shapes
+            )
+              ? question.shapes
+              : [],
+
           points:
             normalizePoints(
               question.points
@@ -792,6 +806,7 @@ export async function POST(
               question_number integer,
               question_text text,
               question_html text,
+              shapes_json jsonb,
               points numeric
             )
           )
@@ -801,6 +816,7 @@ export async function POST(
             question_number,
             question_text,
             question_html,
+            shapes_json,
             points,
             created_at,
             updated_at
@@ -811,6 +827,10 @@ export async function POST(
             question_number,
             question_text,
             question_html,
+            COALESCE(
+              shapes_json,
+              '[]'::jsonb
+            ),
             points,
             NOW(),
             NOW()
