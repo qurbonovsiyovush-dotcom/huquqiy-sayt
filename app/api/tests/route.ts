@@ -210,7 +210,14 @@ async function readTests(): Promise<TestData[]> {
       undefined;
 
     do {
-      const finals =
+      const finals: {
+        blobs: Array<{
+          pathname: string;
+          uploadedAt?: Date | string;
+        }>;
+        hasMore: boolean;
+        cursor?: string;
+      } =
         await list({
           prefix:
             `${IMPORT_ROOT}/`,
@@ -377,7 +384,14 @@ async function readTests(): Promise<TestData[]> {
       undefined;
 
     do {
-      const statusList =
+      const statusList: {
+        blobs: Array<{
+          pathname: string;
+          uploadedAt?: Date | string;
+        }>;
+        hasMore: boolean;
+        cursor?: string;
+      } =
         await list({
           prefix:
             `${TEST_STATUS_ROOT}/`,
@@ -1343,8 +1357,8 @@ async function bulkPublishTests(
       ? body.testIds
       : [];
 
-  const requestedIds =
-    Array.from(
+  const requestedIds: string[] =
+    Array.from<string>(
       new Set(
         rawIds
           .map(
@@ -1400,7 +1414,7 @@ async function bulkPublishTests(
     await readTests();
 
   const existingIds =
-    new Set(
+    new Set<string>(
       tests.map(
         (test) =>
           test.id
@@ -1416,7 +1430,7 @@ async function bulkPublishTests(
 
     Admin yuborgan va bazada mavjud bo‘lgan ID lar publish qilinadi.
   */
-  const publishIds =
+  const publishIds: string[] =
     requestedIds.filter(
       (id) =>
         existingIds.has(
