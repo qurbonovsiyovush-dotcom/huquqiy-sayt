@@ -1064,6 +1064,265 @@ async function finalizeChunkedTest(
 
 
 /* =========================================================
+   BIR YO‘LA KO‘P TESTNI O‘CHIRISH
+
+   Brauzer bitta so‘rov yuboradi.
+   tests.json bir marta o‘qiladi va bir marta yoziladi.
+========================================================= */
+
+async function bulkDeleteTests(
+  body: any
+) {
+  const cookieStore =
+    await cookies();
+
+  const isAdmin =
+    Boolean(
+      cookieStore.get(
+        "qurbonov_session"
+      )?.value
+    ) &&
+    cookieStore.get(
+      "qurbonov_role"
+    )?.value === "admin";
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bu amal faqat administrator uchun.",
+      },
+      {
+        status: 403,
+      }
+    );
+  }
+
+  const rawIds =
+    Array.isArray(
+      body?.testIds
+    )
+      ? body.testIds
+      : [];
+
+  const requestedIds =
+    Array.from(
+      new Set(
+        rawIds
+          .map(
+            (value: unknown) =>
+              String(value)
+                .trim()
+          )
+          .filter(Boolean)
+      )
+    );
+
+  if (
+    requestedIds.length ===
+    0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "O‘chiriladigan testlar tanlanmagan.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  /*
+    Juda katta yoki tasodifiy requestdan himoya.
+    Admin paneldagi real ish uchun 500 yetarli.
+  */
+  if (
+    requestedIds.length >
+    500
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Bir so‘rovda ko‘pi bilan 500 ta test o‘chiriladi.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  const onlyDrafts =
+    body?.onlyDrafts !==
+    false;
+
+  const tests =
+    await readTests();
+
+  const requestedSet =
+    new Set(
+      requestedIds
+    );
+
+  const deletableIds =
+    new Set<string>();
+
+  for (
+    const test of tests
+  ) {
+    if (
+      !requestedSet.has(
+        test.id
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      onlyDrafts &&
+      test.status ===
+        "published"
+    ) {
+      continue;
+    }
+
+    deletableIds.add(
+      test.id
+    );
+  }
+
+  if (
+    deletableIds.size ===
+    0
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "O‘chirish uchun mos qoralama test topilmadi.",
+      },
+      {
+        status: 404,
+      }
+    );
+  }
+
+  /*
+    readTests() final.json snapshotlarni ham qayta qo‘shadi.
+    Shuning uchun tests.json ni yozishdan OLDIN o‘chiriladigan
+    testlarning barcha import snapshot/temp bloblarini tozalaymiz.
+  */
+  const blobPathsToDelete:
+    string[] = [];
+
+  for (
+    const testId of
+    deletableIds
+  ) {
+    try {
+      const listed =
+        await list({
+          prefix:
+            `${IMPORT_ROOT}/${testId}/`,
+          limit: 1000,
+        });
+
+      for (
+        const blob of
+        listed.blobs
+      ) {
+        blobPathsToDelete.push(
+          blob.pathname
+        );
+      }
+    } catch (
+      listError
+    ) {
+      console.warn(
+        "BULK DELETE BLOB LIST ERROR:",
+        testId,
+        listError
+      );
+    }
+  }
+
+  if (
+    blobPathsToDelete.length >
+    0
+  ) {
+    /*
+      Vercel Blob del() ko‘p path qabul qiladi.
+      Juda katta massiv bo‘lmasligi uchun paketlab yuboramiz.
+    */
+    const deleteBatchSize =
+      250;
+
+    for (
+      let index = 0;
+      index <
+      blobPathsToDelete.length;
+      index +=
+        deleteBatchSize
+    ) {
+      const batch =
+        blobPathsToDelete.slice(
+          index,
+          index +
+            deleteBatchSize
+        );
+
+      await del(
+        batch
+      );
+    }
+  }
+
+  const nextTests =
+    tests.filter(
+      (test) =>
+        !deletableIds.has(
+          test.id
+        )
+    );
+
+  /*
+    Barcha testlar bitta filter bilan olib tashlanadi
+    va tests.json faqat BIR MARTA overwrite qilinadi.
+  */
+  await writeTests(
+    nextTests
+  );
+
+  return NextResponse.json(
+    {
+      success: true,
+      message:
+        `${deletableIds.size} ta test bir yo‘la o‘chirildi.`,
+      deletedCount:
+        deletableIds.size,
+      deletedIds:
+        Array.from(
+          deletableIds
+        ),
+      skippedCount:
+        requestedIds.length -
+        deletableIds.size,
+    },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+      },
+    }
+  );
+}
+
+
+/* =========================================================
    TEST STATUSINI O‘ZGARTIRISH
 
    Katta testlarda (780/840 ta savol) butun testni qayta PUT qilmaymiz.
@@ -2021,6 +2280,15 @@ export async function POST(
       "finalize-chunked-test"
     ) {
       return await finalizeChunkedTest(
+        body
+      );
+    }
+
+    if (
+      action ===
+      "bulk-delete-tests"
+    ) {
+      return await bulkDeleteTests(
         body
       );
     }
