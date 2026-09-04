@@ -1141,7 +1141,7 @@ export default function ImportPdfTestPage() {
         testType === "thematic" &&
         Array.isArray(data?.topics) &&
         data.topics.length > 0
-          ? `PDFdan ${imported.length} ta savol, ${data.topics.length} ta dars va ${
+          ? `PDFdan ${imported.length} ta savol, ${data.topics.length} ta haqiqiy mavzu va ${
               Array.isArray(data?.specialSections)
                 ? data.specialSections.length
                 : 0
@@ -3202,9 +3202,14 @@ export default function ImportPdfTestPage() {
       setSaving(true);
 
       /*
-        MAVZULASHTIRILGAN TEST:
-        bitta 1609 savollik test emas.
-        33 ta dars + Nazorat + Lug‘at alohida test bo‘lib saqlanadi.
+        MAVZULASHTIRILGAN TEST — KITOB → HAQIQIY MAVZULAR.
+
+        MUHIM:
+        - PDFdagi 1–2-DARS bitta bo‘lim bo‘lsa, BIRTA test bo‘lib saqlanadi.
+        - 3–4-DARS ham BIRTA test.
+        - 8/9/10/11-sinfda nechta haqiqiy mavzu bo‘lsa — shuncha test.
+        - Savollar sun’iy ko‘paytirilmaydi.
+        - Nazorat/Lug‘at bo‘limlari bo‘lsa alohida saqlanadi.
       */
       if (
         testType === "thematic" &&
@@ -3212,15 +3217,21 @@ export default function ImportPdfTestPage() {
       ) {
         const baseTitle =
           title.trim() ||
-          "Davlat va huquq asoslari 10-sinf";
+          subject.trim() ||
+          "Mavzulashtirilgan test";
 
-        const allSections = [
+        /*
+          V7 parser allaqachon haqiqiy source sectionlarni qaytaradi.
+          Lekin eski parser response kelib qolsa ham sourceSectionTitle
+          bo‘yicha dublikatni shu yerning o‘zida olib tashlaymiz.
+        */
+        const rawSections = [
           ...importedTopics.map(
             (topic) => ({
               ...topic,
               kind:
                 topic.kind ||
-                "lesson" as const,
+                ("lesson" as const),
             })
           ),
           ...specialSections,
@@ -3229,9 +3240,44 @@ export default function ImportPdfTestPage() {
             Array.isArray(
               section.questions
             ) &&
-            section.questions.length >
-              0
+            section.questions.length > 0
         );
+
+        const uniqueSections =
+          new Map<
+            string,
+            ImportedTopic
+          >();
+
+        for (
+          const section of
+          rawSections
+        ) {
+          const key =
+            String(
+              section.sourceSectionTitle ||
+                section.title ||
+                section.id
+            )
+              .replace(/[–—]/g, "-")
+              .replace(/\s+/g, " ")
+              .trim()
+              .toLowerCase();
+
+          if (
+            !uniqueSections.has(key)
+          ) {
+            uniqueSections.set(
+              key,
+              section
+            );
+          }
+        }
+
+        const allSections =
+          Array.from(
+            uniqueSections.values()
+          );
 
         if (
           allSections.length === 0
@@ -3239,6 +3285,27 @@ export default function ImportPdfTestPage() {
           throw new Error(
             "Mavzular bo‘yicha saqlash uchun savollar topilmadi."
           );
+        }
+
+        /*
+          Bitta savol bir nechta lesson cardga takror tushib qolmasligi
+          uchun umumiy unique savollar sonini ham tekshiramiz.
+        */
+        const uniqueQuestionIds =
+          new Set<string>();
+
+        for (
+          const section of
+          allSections
+        ) {
+          for (
+            const question of
+            section.questions
+          ) {
+            uniqueQuestionIds.add(
+              question.id
+            );
+          }
         }
 
         let savedTests = 0;
@@ -3255,8 +3322,27 @@ export default function ImportPdfTestPage() {
               sectionIndex
             ];
 
+          const usedInSection =
+            new Set<string>();
+
           const sectionPrepared =
             section.questions
+              .filter(
+                (question) => {
+                  if (
+                    usedInSection.has(
+                      question.id
+                    )
+                  ) {
+                    return false;
+                  }
+
+                  usedInSection.add(
+                    question.id
+                  );
+                  return true;
+                }
+              )
               .map(
                 (question) =>
                   preparedById.get(
@@ -3278,22 +3364,21 @@ export default function ImportPdfTestPage() {
           }
 
           const sectionTitle =
-            section.title.trim();
+            String(
+              section.sourceSectionTitle ||
+                section.title
+            )
+              .replace(/\s+/g, " ")
+              .trim();
 
           const testTitle =
             `${baseTitle} — ${sectionTitle}`;
 
-          const sharedNote =
-            section.sharedSource
-              ? ` PDF manbasida bu dars qo‘shni dars bilan bitta umumiy test blokida berilgan.`
-              : "";
-
           const testDescription =
             [
               description.trim(),
-              `Mavzulashtirilgan to‘plam: ${baseTitle}.`,
-              `Bo‘lim: ${sectionTitle}.`,
-              sharedNote.trim(),
+              `Mavzulashtirilgan kitob: ${baseTitle}.`,
+              `Mavzu: ${sectionTitle}.`,
             ]
               .filter(Boolean)
               .join(" ");
@@ -3317,11 +3402,15 @@ export default function ImportPdfTestPage() {
         }
 
         setMessage(
-          `${savedTests} ta alohida test muvaffaqiyatli saqlandi.`
+          `${savedTests} ta haqiqiy mavzu alohida test sifatida saqlandi.`
         );
 
         window.alert(
-          `Mavzulashtirilgan to‘plam saqlandi.\n\nAlohida testlar: ${savedTests} ta\nSaqlangan savollar: ${savedQuestions} ta`
+          `Mavzulashtirilgan kitob saqlandi.\n\n` +
+            `Kitob: ${baseTitle}\n` +
+            `Mavzular/bo‘limlar: ${savedTests} ta\n` +
+            `Saqlangan savollar: ${savedQuestions} ta\n` +
+            `PDFdagi noyob savollar: ${uniqueQuestionIds.size} ta`
         );
 
         router.push(
