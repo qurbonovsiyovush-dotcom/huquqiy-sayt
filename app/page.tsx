@@ -1447,22 +1447,30 @@ export default function Home() {
         =========================== */
 
         .emblemHolder {
+          width: 100%;
           min-height: 390px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          display: grid;
+          place-items: center;
 
           padding: 25px;
+
+          box-sizing: border-box;
         }
 
         .emblemRecess {
           width: 390px;
           height: 390px;
+          aspect-ratio: 1 / 1;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          margin:
+            0
+            auto;
+
+          display: grid;
+          place-items: center;
+
+          flex: 0 0 auto;
 
           border:
             5px solid #22292d;
@@ -1471,7 +1479,7 @@ export default function Home() {
 
           background:
             radial-gradient(
-              circle at 50% 42%,
+              circle at 50% 50%,
               #50575b 0%,
               #363c40 55%,
               #1f2528 100%
@@ -1488,21 +1496,28 @@ export default function Home() {
 
             0 14px 22px
               rgba(0,0,0,.34);
+
+          overflow: hidden;
         }
 
         .emblemImage {
-          width: 88%;
-          height: 88%;
+          width: 86%;
+          height: 86%;
+
+          margin: 0;
 
           object-fit: contain;
+          object-position: 50% 50%;
 
           display: block;
+
+          transform: none;
 
           user-select: none;
 
           filter:
             drop-shadow(
-              0 8px 5px
+              0 7px 5px
               rgba(0,0,0,.28)
             );
         }
@@ -1638,18 +1653,29 @@ export default function Home() {
           width:
             min(1200px, 95%);
 
+          min-height: 112px;
+
           margin:
             80px
             auto
             20px;
 
-          padding: 30px;
+          padding:
+            24px
+            35px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          box-sizing: border-box;
 
           text-align: center;
 
           color: #073b68;
 
           font-size: 23px;
+          line-height: 1.25;
 
           font-weight: 700;
 
