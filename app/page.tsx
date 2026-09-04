@@ -191,15 +191,11 @@ export default function Home() {
       <main className="loginPage">
         <section className="loginCard">
           <div className="loginTab">
-            Maxsus kirish
+            Qurbonov Siyovush Jamaliddinzoda
           </div>
 
           <div className="loginContent">
             <div className="loginLeft">
-              <div className="ownerName">
-                Qurbonov Siyovush Jamaliddinzoda
-              </div>
-
               <form
                 onSubmit={handleLogin}
                 className="loginForm"
@@ -303,9 +299,9 @@ export default function Home() {
             background:
               linear-gradient(
                 180deg,
-                #eeeeee 0%,
-                #d8d8d8 18%,
-                #c8c8c8 100%
+                #e5e7e8 0%,
+                #d3d7d9 38%,
+                #c4c9cc 100%
               );
 
             box-shadow:
@@ -347,39 +343,39 @@ export default function Home() {
 
             transform: translateX(-50%);
 
-            min-width: 360px;
+            min-width: 520px;
+            max-width: 72%;
 
             padding:
-              16px
-              34px
+              15px
+              32px
               14px;
 
             border:
-              3px solid #24516b;
+              3px solid #4f626d;
 
-            border-radius: 16px;
+            border-radius: 15px;
 
             background:
               linear-gradient(
                 180deg,
-                #d8f6ff 0%,
-                #8dd8f7 28%,
-                #55b6e5 62%,
-                #1597d1 100%
+                #f4f6f7 0%,
+                #d9e0e3 46%,
+                #b9c5ca 100%
               );
 
             box-shadow:
               inset 0 3px 0
-                rgba(255,255,255,.95),
+                rgba(255,255,255,.96),
               inset 0 -3px 0
-                rgba(14,104,145,.22),
-              0 8px 0 #17658b,
-              0 12px 20px
-                rgba(0,0,0,.16);
+                rgba(68,87,97,.16),
+              0 7px 0 #596c75,
+              0 11px 18px
+                rgba(0,0,0,.14);
 
-            color: #0a2f45;
+            color: #172a34;
 
-            font-size: 34px;
+            font-size: 29px;
             font-weight: 900;
             text-align: center;
 
@@ -404,7 +400,8 @@ export default function Home() {
           .loginLeft {
             display: flex;
             flex-direction: column;
-            gap: 28px;
+            justify-content: center;
+            gap: 24px;
           }
 
           .ownerName {
@@ -457,16 +454,16 @@ export default function Home() {
               20px;
 
             border:
-              3px solid #235f82;
+              3px solid #4d6877;
 
             border-radius: 13px;
 
             background:
               linear-gradient(
                 180deg,
-                #ffffff 0%,
-                #f0f0f0 62%,
-                #e2e2e2 100%
+                #fbfbfb 0%,
+                #eeeeee 62%,
+                #dedede 100%
               );
 
             box-shadow:
@@ -539,17 +536,17 @@ export default function Home() {
             min-height: 76px;
 
             border:
-              3px solid #235f82;
+              3px solid #4d6877;
 
             border-radius: 13px;
 
             background:
               linear-gradient(
                 180deg,
-                #dff8ff 0%,
-                #9ce1fb 18%,
-                #64bce9 56%,
-                #3a9fd6 100%
+                #eef5f8 0%,
+                #c9dce5 32%,
+                #91b7ca 68%,
+                #6f9eb5 100%
               );
 
             box-shadow:
@@ -557,11 +554,11 @@ export default function Home() {
                 rgba(255,255,255,.96),
               inset 0 -3px 0
                 rgba(20,101,143,.16),
-              0 8px 0 #176a96,
+              0 8px 0 #536f7e,
               0 12px 17px
                 rgba(0,0,0,.17);
 
-            color: #0b2d43;
+            color: #203640;
 
             font-family:
               "Bell MT",
@@ -704,16 +701,18 @@ export default function Home() {
             .loginTab {
               top: -35px;
 
-              min-width: 230px;
+              min-width: 0;
+              width: calc(100% - 44px);
+              max-width: 330px;
 
               padding:
                 12px
-                24px
+                18px
                 11px;
 
               border-radius: 14px;
 
-              font-size: 25px;
+              font-size: 20px;
             }
 
             .loginContent {
