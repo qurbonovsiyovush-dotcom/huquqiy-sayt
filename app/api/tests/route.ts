@@ -29,6 +29,29 @@ function importFinalPath(testId: string) {
 
 const IMPORT_FINAL_SUFFIX = "/final.json";
 
+/*
+  DURABLE STATUS REGISTRY
+
+  tests.json katta umumiy fayl.
+  Uning overwrite/read kechikishi statusni orqaga qaytarishi mumkin.
+
+  Shu sabab status alohida kichik registryda saqlanadi:
+  huquqiy-sayt/test-status/<testId>/published.json
+  huquqiy-sayt/test-status/<testId>/draft.json
+
+  readTests() eng yangi markerga qaraydi.
+*/
+const TEST_STATUS_ROOT =
+  "huquqiy-sayt/test-status";
+
+function testStatusMarkerPath(
+  testId: string,
+  status: TestStatus
+) {
+  return `${TEST_STATUS_ROOT}/${testId}/${status}.json`;
+}
+
+
 type TestStatus = "draft" | "published";
 
 type TestData = {
@@ -135,7 +158,8 @@ async function readTests(): Promise<TestData[]> {
 
   if (
     !result ||
-    result.statusCode !== 200 ||
+    result.statusCode !==
+      200 ||
     !result.stream
   ) {
     throw new Error(
@@ -151,58 +175,64 @@ async function readTests(): Promise<TestData[]> {
       result.stream
     ).text();
 
-  if (!text.trim()) {
+  if (
+    !text.trim()
+  ) {
     throw new Error(
       "tests.json bo‘sh."
     );
   }
 
-  const parsed =
-    JSON.parse(text);
-
   const baseTests =
-    normalizeTests(parsed);
+    normalizeTests(
+      JSON.parse(
+        text
+      )
+    );
+
+  const byId =
+    new Map(
+      baseTests.map(
+        (test) => [
+          test.id,
+          test,
+        ]
+      )
+    );
 
   /*
-    MUHIM:
-    Bir vaqtning o‘zida ko‘p mavzulashtirilgan test saqlanganda
-    tests.json ketma-ket overwrite qilinadi. Vercel Blob ayrim GET
-    so‘rovlarida oldingi nusxani qaytarishi mumkin. Shu sabab har bir
-    yakunlangan chunked testning UNIQUE final.json snapshoti saqlanadi.
-
-    Bu yerda tests.json dagi 0-savolli placeholderlar final snapshot
-    bilan tiklanadi. Natijada 35 ta testdan ayrimlari "Savollar: 0"
-    bo‘lib qolmaydi.
+    1) final.json faqat SAVOLLARNI tiklaydi.
+       U statusni tests.json ustidan bosmaydi.
   */
   try {
-    const finals =
-      await list({
-        prefix:
-          `${IMPORT_ROOT}/`,
-        limit: 1000,
-      });
+    let cursor:
+      string | undefined =
+      undefined;
 
-    const finalBlobs =
-      finals.blobs.filter(
-        (blob) =>
-          blob.pathname.endsWith(
-            IMPORT_FINAL_SUFFIX
-          )
-      );
+    do {
+      const finals =
+        await list({
+          prefix:
+            `${IMPORT_ROOT}/`,
+          limit: 1000,
+          ...(cursor
+            ? {
+                cursor,
+              }
+            : {}),
+        });
 
-    if (finalBlobs.length > 0) {
-      const byId =
-        new Map(
-          baseTests.map(
-            (test) => [
-              test.id,
-              test,
-            ]
-          )
+      const finalBlobs =
+        finals.blobs.filter(
+          (blob) =>
+            blob.pathname.endsWith(
+              IMPORT_FINAL_SUFFIX
+            )
         );
 
       for (
-        const blob of finalBlobs
+        const blob of
+        finalBlobs
       ) {
         try {
           const finalResult =
@@ -262,20 +292,11 @@ async function readTests(): Promise<TestData[]> {
             Array.isArray(
               current?.questions
             )
-              ? current!
-                  .questions!
+              ? current
+                  .questions
                   .length
               : 0;
 
-          /*
-            final.json faqat to‘liq savollarni tiklash uchun ishlatiladi.
-            tests.json dagi eng yangi metadata/status esa saqlanib qoladi.
-
-            Natija:
-            - published status yana draftga qaytmaydi;
-            - keyingi title/subject/description/duration tahrirlari yo‘qolmaydi;
-            - tests.json ichida questions 0 bo‘lib qolsa, final.json savollarni tiklaydi.
-          */
           if (!current) {
             byId.set(
               finalTest.id,
@@ -286,13 +307,18 @@ async function readTests(): Promise<TestData[]> {
 
           if (
             finalCount >
-              currentCount
+            currentCount
           ) {
             byId.set(
               finalTest.id,
               {
                 ...finalTest,
                 ...current,
+
+                /*
+                  Savollar va import holati final snapshotdan.
+                  Status/title va boshqa keyingi metadata currentdan.
+                */
                 questions:
                   finalTest.questions,
                 importState:
@@ -311,24 +337,184 @@ async function readTests(): Promise<TestData[]> {
         }
       }
 
-      return [
-        ...byId.values(),
-      ];
-    }
+      cursor =
+        finals.hasMore
+          ? finals.cursor
+          : undefined;
+    } while (cursor);
   } catch (
     finalListError
   ) {
-    /*
-      Final snapshotlarni o‘qishdagi vaqtinchalik xato eski test
-      tizimini butunlay yiqitmasin.
-    */
     console.warn(
       "FINAL SNAPSHOT LIST ERROR:",
       finalListError
     );
   }
 
-  return baseTests;
+  /*
+    2) DURABLE STATUS markerlari.
+
+       Ular TEST_STATUS_ROOT ostida alohida saqlanadi.
+       published.json va draft.json ikkalasi mavjud bo‘lsa,
+       uploadedAt bo‘yicha ENG YANGISI yutadi.
+
+       Shu qatlam tests.json va final.json statusidan ustun.
+  */
+  try {
+    const newestStatus =
+      new Map<
+        string,
+        {
+          status:
+            TestStatus;
+          time:
+            number;
+        }
+      >();
+
+    let cursor:
+      string | undefined =
+      undefined;
+
+    do {
+      const statusList =
+        await list({
+          prefix:
+            `${TEST_STATUS_ROOT}/`,
+          limit: 1000,
+          ...(cursor
+            ? {
+                cursor,
+              }
+            : {}),
+        });
+
+      for (
+        const blob of
+        statusList.blobs
+      ) {
+        const prefix =
+          `${TEST_STATUS_ROOT}/`;
+
+        if (
+          !blob.pathname.startsWith(
+            prefix
+          )
+        ) {
+          continue;
+        }
+
+        let status:
+          TestStatus | null =
+          null;
+
+        let suffix =
+          "";
+
+        if (
+          blob.pathname.endsWith(
+            "/published.json"
+          )
+        ) {
+          status =
+            "published";
+          suffix =
+            "/published.json";
+        } else if (
+          blob.pathname.endsWith(
+            "/draft.json"
+          )
+        ) {
+          status =
+            "draft";
+          suffix =
+            "/draft.json";
+        }
+
+        if (!status) {
+          continue;
+        }
+
+        const testId =
+          blob.pathname.slice(
+            prefix.length,
+            -suffix.length
+          );
+
+        if (!testId) {
+          continue;
+        }
+
+        const uploadedAt =
+          blob.uploadedAt
+            ? new Date(
+                blob.uploadedAt
+              ).getTime()
+            : 0;
+
+        const previous =
+          newestStatus.get(
+            testId
+          );
+
+        if (
+          !previous ||
+          uploadedAt >=
+            previous.time
+        ) {
+          newestStatus.set(
+            testId,
+            {
+              status,
+              time:
+                uploadedAt,
+            }
+          );
+        }
+      }
+
+      cursor =
+        statusList.hasMore
+          ? statusList.cursor
+          : undefined;
+    } while (cursor);
+
+    for (
+      const [
+        testId,
+        marker,
+      ] of newestStatus
+    ) {
+      const current =
+        byId.get(
+          testId
+        );
+
+      if (!current) {
+        continue;
+      }
+
+      byId.set(
+        testId,
+        {
+          ...current,
+          status:
+            marker.status,
+        }
+      );
+    }
+  } catch (
+    statusListError
+  ) {
+    console.warn(
+      "STATUS REGISTRY LIST ERROR:",
+      statusListError
+    );
+  }
+
+  return [
+    ...byId.values(),
+  ];
 }
 
 /* =========================================================
@@ -1013,6 +1199,38 @@ async function finalizeChunkedTest(
   );
 
   /*
+    Yangi import qilingan testning boshlang‘ich durable holati — draft.
+  */
+  await put(
+    testStatusMarkerPath(
+      testId,
+      finalStatus
+    ),
+    JSON.stringify(
+      {
+        id:
+          testId,
+        status:
+          finalStatus,
+        updatedAt:
+          now,
+      }
+    ),
+    {
+      access:
+        "private",
+      addRandomSuffix:
+        false,
+      allowOverwrite:
+        true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge:
+        0,
+    }
+  );
+
+  /*
     tests.json'da placeholder topilsa update qilamiz;
     stale read sabab topilmasa ham testni yo‘qotmaymiz — qo‘shamiz.
   */
@@ -1101,12 +1319,14 @@ async function bulkPublishTests(
     ) &&
     cookieStore.get(
       "qurbonov_role"
-    )?.value === "admin";
+    )?.value ===
+      "admin";
 
   if (!isAdmin) {
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
         message:
           "Bu amal faqat administrator uchun.",
       },
@@ -1128,11 +1348,17 @@ async function bulkPublishTests(
       new Set(
         rawIds
           .map(
-            (value: unknown) =>
-              String(value)
-                .trim()
+            (
+              value:
+                unknown
+            ) =>
+              String(
+                value
+              ).trim()
           )
-          .filter(Boolean)
+          .filter(
+            Boolean
+          )
       )
     );
 
@@ -1142,7 +1368,8 @@ async function bulkPublishTests(
   ) {
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
         message:
           "E’lon qilinadigan testlar tanlanmagan.",
       },
@@ -1158,7 +1385,8 @@ async function bulkPublishTests(
   ) {
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
         message:
           "Bir so‘rovda ko‘pi bilan 500 ta test e’lon qilinadi.",
       },
@@ -1171,48 +1399,132 @@ async function bulkPublishTests(
   const tests =
     await readTests();
 
-  const requestedSet =
+  const existingIds =
     new Set(
-      requestedIds
+      tests.map(
+        (test) =>
+          test.id
+      )
     );
 
-  const publishedIds:
-    string[] = [];
+  /*
+    MUHIM:
+    Endi questions.length === 0 sharti bilan testni tashlab yubormaymiz.
 
-  const nextTests =
-    tests.map(
-      (test) => {
-        if (
-          !requestedSet.has(
-            test.id
-          )
-        ) {
-          return test;
-        }
+    Chunki stale tests.json ayrim testni vaqtincha 0-savolli placeholder
+    qilib ko‘rsatishi mumkin, final.json esa haqiqiy savollarni saqlaydi.
 
-        if (
-          !Array.isArray(
-            test.questions
-          ) ||
-          test.questions.length ===
-            0
-        ) {
-          return test;
-        }
+    Admin yuborgan va bazada mavjud bo‘lgan ID lar publish qilinadi.
+  */
+  const publishIds =
+    requestedIds.filter(
+      (id) =>
+        existingIds.has(
+          id
+        )
+    );
 
-        publishedIds.push(
-          test.id
-        );
-
-        return {
-          ...test,
-          status:
-            "published" as const,
-          updatedAt:
-            new Date().toISOString(),
-        };
+  if (
+    publishIds.length ===
+    0
+  ) {
+    return NextResponse.json(
+      {
+        success:
+          false,
+        message:
+          "E’lon qilinadigan testlar bazadan topilmadi.",
+      },
+      {
+        status: 404,
       }
     );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  /*
+    Har bir test uchun UNIQUE marker.
+    Bu operatsiyalar bir-birini overwrite qilmaydi.
+  */
+  const markerResults =
+    await Promise.allSettled(
+      publishIds.map(
+        async (
+          testId
+        ) => {
+          await put(
+            testStatusMarkerPath(
+              testId,
+              "published"
+            ),
+            JSON.stringify(
+              {
+                id:
+                  testId,
+                status:
+                  "published",
+                updatedAt:
+                  now,
+              }
+            ),
+            {
+              access:
+                "private",
+              addRandomSuffix:
+                false,
+              allowOverwrite:
+                true,
+              contentType:
+                "application/json; charset=utf-8",
+              cacheControlMaxAge:
+                0,
+            }
+          );
+
+          return testId;
+        }
+      )
+    );
+
+  const publishedIds =
+    markerResults
+      .filter(
+        (
+          result
+        ): result is PromiseFulfilledResult<string> =>
+          result.status ===
+          "fulfilled"
+      )
+      .map(
+        (result) =>
+          result.value
+      );
+
+  const failedIds =
+    markerResults
+      .map(
+        (
+          result,
+          index
+        ) => ({
+          result,
+          id:
+            publishIds[
+              index
+            ],
+        })
+      )
+      .filter(
+        (item) =>
+          item.result.status ===
+          "rejected"
+      )
+      .map(
+        (item) =>
+          item.id
+      );
 
   if (
     publishedIds.length ===
@@ -1220,39 +1532,77 @@ async function bulkPublishTests(
   ) {
     return NextResponse.json(
       {
-        success: false,
+        success:
+          false,
         message:
-          "E’lon qilish uchun savollari mavjud qoralama test topilmadi.",
+          "Published markerlarini saqlab bo‘lmadi.",
+        failedIds,
       },
       {
-        status: 400,
+        status: 500,
       }
     );
   }
 
+  const publishedSet =
+    new Set(
+      publishedIds
+    );
+
   /*
-    Eng muhim joy:
-    31 ta test uchun 31 marta overwrite YO‘Q.
-    Faqat bitta writeTests().
+    Umumiy tests.json ham bir marta yangilanadi.
+    Lekin endi statusning yagona manbai emas.
   */
+  const nextTests =
+    tests.map(
+      (test) =>
+        publishedSet.has(
+          test.id
+        )
+          ? {
+              ...test,
+              status:
+                "published" as const,
+              updatedAt:
+                now,
+            }
+          : test
+    );
+
   await writeTests(
     nextTests
   );
 
   return NextResponse.json(
     {
-      success: true,
+      success:
+        failedIds.length ===
+        0,
+
       message:
-        `${publishedIds.length} ta test bir yo‘la e’lon qilindi.`,
+        failedIds.length ===
+        0
+          ? `${publishedIds.length} ta testning statusi mustahkam e’lon qilindi.`
+          : `${publishedIds.length} ta test e’lon qilindi, ${failedIds.length} tasida marker yozilmadi.`,
+
       publishedCount:
         publishedIds.length,
       publishedIds,
-      skippedCount:
+
+      failedCount:
+        failedIds.length,
+      failedIds,
+
+      missingCount:
         requestedIds.length -
-        publishedIds.length,
+        publishIds.length,
     },
     {
-      status: 200,
+      status:
+        failedIds.length ===
+        0
+          ? 200
+          : 207,
       headers: {
         "Cache-Control":
           "no-store, no-cache, must-revalidate",
@@ -1260,7 +1610,6 @@ async function bulkPublishTests(
     }
   );
 }
-
 
 /* =========================================================
    BIR YO‘LA KO‘P TESTNI O‘CHIRISH
@@ -1444,6 +1793,32 @@ async function bulkDeleteTests(
         "BULK DELETE BLOB LIST ERROR:",
         testId,
         listError
+      );
+    }
+
+    try {
+      const statusListed =
+        await list({
+          prefix:
+            `${TEST_STATUS_ROOT}/${testId}/`,
+          limit: 20,
+        });
+
+      for (
+        const blob of
+        statusListed.blobs
+      ) {
+        blobPathsToDelete.push(
+          blob.pathname
+        );
+      }
+    } catch (
+      statusListError
+    ) {
+      console.warn(
+        "BULK DELETE STATUS LIST ERROR:",
+        testId,
+        statusListError
       );
     }
   }
@@ -1641,6 +2016,34 @@ async function setTestStatus(
 
   tests[index] =
     updatedTest;
+
+  await put(
+    testStatusMarkerPath(
+      testId,
+      status
+    ),
+    JSON.stringify(
+      {
+        id:
+          testId,
+        status,
+        updatedAt:
+          updatedTest.updatedAt,
+      }
+    ),
+    {
+      access:
+        "private",
+      addRandomSuffix:
+        false,
+      allowOverwrite:
+        true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge:
+        0,
+    }
+  );
 
   await writeTests(
     tests
