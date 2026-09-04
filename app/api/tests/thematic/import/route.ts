@@ -5,16 +5,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /* =========================================================
-   MAVZULASHTIRILGAN TESTLARNI NEON'GA IMPORT QILISH
+   MAVZULASHTIRILGAN TEST — NEON BATCH IMPORT V2
 
-   Tuzilishi:
-   thematic_books
-      ↓
-   thematic_tests
-      ↓
-   thematic_questions
-      ↓
-   thematic_options
+   Asosiy farq:
+   OLD:
+     1609 savol -> 1609 INSERT
+     ~6436 variant -> ~6436 INSERT
+
+   V2:
+     mavzular -> 1 batch INSERT
+     savollar -> bir necha batch INSERT
+     variantlar -> bir necha batch INSERT
+
+   Natija: SQL so‘rovlari soni keskin kamayadi.
 ========================================================= */
 
 type IncomingOption = {
@@ -28,46 +31,60 @@ type IncomingOption = {
 type IncomingQuestion = {
   id?: string;
   number?: number;
-
   questionText?: string;
   questionHtml?: string;
-
   options?: IncomingOption[];
-
-  // Hozirgi editor yuborishi mumkin.
-  // Hozircha DB sxemasida shapes uchun alohida ustun yo'q.
   shapes?: unknown[];
-
   points?: number;
 };
 
 type IncomingSection = {
   title?: string;
-
   sectionType?:
     | "lesson"
     | "control"
     | "glossary"
     | "other";
-
   description?: string;
-
   questions?: IncomingQuestion[];
 };
 
 type ImportBody = {
   grade?: number;
-
   bookTitle?: string;
   subject?: string;
   edition?: string;
-
   description?: string;
-
   durationMinutes?: number;
   attemptLimit?: number | null;
-
   sections?: IncomingSection[];
+};
+
+type TestRow = {
+  section_order: number;
+  section_type: string;
+  title: string;
+  description: string | null;
+  duration_minutes: number;
+  attempt_limit: number | null;
+  question_count: number;
+};
+
+type QuestionRow = {
+  test_id: string;
+  section_order: number;
+  question_number: number;
+  question_text: string;
+  question_html: string | null;
+  points: number;
+};
+
+type OptionRow = {
+  question_id: string;
+  option_key: string;
+  option_text: string;
+  option_html: string | null;
+  is_correct: boolean;
 };
 
 /* =========================================================
@@ -111,13 +128,13 @@ function normalizeSectionType(
 }
 
 function normalizeDuration(value: unknown) {
-  const duration = Number(value);
+  const parsed = Number(value);
 
   if (
-    Number.isFinite(duration) &&
-    duration > 0
+    Number.isFinite(parsed) &&
+    parsed > 0
   ) {
-    return Math.round(duration);
+    return Math.round(parsed);
   }
 
   return 60;
@@ -162,10 +179,6 @@ function normalizePoints(value: unknown) {
   return parsed;
 }
 
-/* =========================================================
-   HTML'DAN ODDIY MATN FALLBACK
-========================================================= */
-
 function htmlToPlainText(value: string) {
   return String(value || "")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -182,6 +195,28 @@ function htmlToPlainText(value: string) {
     .trim();
 }
 
+function chunkArray<T>(
+  items: T[],
+  size: number
+): T[][] {
+  const result: T[][] = [];
+
+  for (
+    let index = 0;
+    index < items.length;
+    index += size
+  ) {
+    result.push(
+      items.slice(
+        index,
+        index + size
+      )
+    );
+  }
+
+  return result;
+}
+
 /* =========================================================
    POST
 ========================================================= */
@@ -189,13 +224,17 @@ function htmlToPlainText(value: string) {
 export async function POST(
   request: NextRequest
 ) {
+  let createdBookId:
+    | string
+    | null = null;
+
   try {
     const body =
       (await request.json()) as ImportBody;
 
-    /* -----------------------------------------------------
-       1. ASOSIY MA'LUMOTLARNI TEKSHIRISH
-    ----------------------------------------------------- */
+    /* =====================================================
+       1. ASOSIY TEKSHIRUV
+    ===================================================== */
 
     const grade =
       normalizeGrade(body.grade);
@@ -207,7 +246,9 @@ export async function POST(
           message:
             "Sinf noto‘g‘ri. Faqat 8, 9, 10 yoki 11-sinf mumkin.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -221,7 +262,9 @@ export async function POST(
           message:
             "Kitob nomi kiritilmagan.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -247,36 +290,46 @@ export async function POST(
         ? body.sections
         : [];
 
-    if (sections.length === 0) {
+    if (
+      sections.length === 0
+    ) {
       return NextResponse.json(
         {
           success: false,
           message:
             "Saqlash uchun mavzular topilmadi.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       2. SAVOLLARNI OLDINDAN TEKSHIRAMIZ
+    /* =====================================================
+       2. HAMMASINI DBGA YOZISHDAN OLDIN TEKSHIRAMIZ
+    ===================================================== */
 
-       DBga yozishni boshlashdan oldin xato bo'lsa shu yerda
-       to'xtaydi.
-    ----------------------------------------------------- */
+    let incomingQuestionCount =
+      0;
 
-    let incomingQuestionCount = 0;
+    let incomingOptionCount =
+      0;
 
     for (
       let sectionIndex = 0;
-      sectionIndex < sections.length;
+      sectionIndex <
+      sections.length;
       sectionIndex++
     ) {
       const section =
-        sections[sectionIndex];
+        sections[
+          sectionIndex
+        ];
 
       const sectionTitle =
-        cleanText(section.title);
+        cleanText(
+          section.title
+        );
 
       if (!sectionTitle) {
         return NextResponse.json(
@@ -285,7 +338,9 @@ export async function POST(
             message:
               `${sectionIndex + 1}-mavzuning nomi mavjud emas.`,
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
@@ -296,14 +351,18 @@ export async function POST(
           ? section.questions
           : [];
 
-      if (questions.length === 0) {
+      if (
+        questions.length === 0
+      ) {
         return NextResponse.json(
           {
             success: false,
             message:
               `"${sectionTitle}" mavzusida savollar mavjud emas.`,
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
@@ -314,7 +373,9 @@ export async function POST(
         questionIndex++
       ) {
         const question =
-          questions[questionIndex];
+          questions[
+            questionIndex
+          ];
 
         const questionHtml =
           cleanText(
@@ -342,7 +403,9 @@ export async function POST(
                   questionIndex + 1
                 }-savolida savol matni yo‘q.`,
             },
-            { status: 400 }
+            {
+              status: 400,
+            }
           );
         }
 
@@ -353,7 +416,9 @@ export async function POST(
             ? question.options
             : [];
 
-        if (options.length === 0) {
+        if (
+          options.length === 0
+        ) {
           return NextResponse.json(
             {
               success: false,
@@ -362,17 +427,22 @@ export async function POST(
                   questionIndex + 1
                 }-savolida javob variantlari yo‘q.`,
             },
-            { status: 400 }
+            {
+              status: 400,
+            }
           );
         }
 
         const correctCount =
           options.filter(
             (option) =>
-              option.isCorrect === true
+              option.isCorrect ===
+              true
           ).length;
 
-        if (correctCount !== 1) {
+        if (
+          correctCount !== 1
+        ) {
           return NextResponse.json(
             {
               success: false,
@@ -381,21 +451,42 @@ export async function POST(
                   questionIndex + 1
                 }-savolida aynan bitta to‘g‘ri javob bo‘lishi kerak.`,
             },
-            { status: 400 }
+            {
+              status: 400,
+            }
           );
         }
 
         incomingQuestionCount++;
+        incomingOptionCount +=
+          options.length;
       }
     }
 
-    /* -----------------------------------------------------
-       3. KITOBNI YARATAMIZ
+    /* =====================================================
+       3. OLDINGI YARIM QOLGAN DRAFT IMPORTNI TOZALASH
 
-       Hozirgi importda har bir PDF alohida kitob bo'ladi.
-    ----------------------------------------------------- */
+       Bir xil:
+       grade + title + draft
 
-    const createdBooks =
+       bo‘lsa eski yarim import o‘chiriladi.
+
+       Published kitobga TEGMAYDI.
+    ===================================================== */
+
+    await sql`
+      DELETE FROM thematic_books
+      WHERE
+        grade = ${grade}
+        AND title = ${bookTitle}
+        AND status = 'draft'
+    `;
+
+    /* =====================================================
+       4. KITOBNI YARATAMIZ
+    ===================================================== */
+
+    const bookResult =
       await sql`
         INSERT INTO thematic_books (
           grade,
@@ -416,7 +507,7 @@ export async function POST(
           NOW()
         )
         RETURNING
-          id,
+          id::text AS id,
           grade,
           title,
           subject,
@@ -425,7 +516,7 @@ export async function POST(
       `;
 
     const book =
-      createdBooks[0];
+      bookResult[0];
 
     if (!book?.id) {
       throw new Error(
@@ -433,334 +524,654 @@ export async function POST(
       );
     }
 
-    const bookId =
-      Number(book.id);
+    createdBookId =
+      String(book.id);
 
-    let savedSections = 0;
-    let savedQuestions = 0;
-    let savedOptions = 0;
+    /* =====================================================
+       5. 31 TA MAVZUNI BITTA BATCHDA YOZAMIZ
+    ===================================================== */
 
-    /* -----------------------------------------------------
-       4. MAVZULARNI SAQLAYMIZ
-    ----------------------------------------------------- */
-
-    try {
-      for (
-        let sectionIndex = 0;
-        sectionIndex <
-        sections.length;
-        sectionIndex++
-      ) {
-        const section =
-          sections[sectionIndex];
-
-        const sectionTitle =
-          cleanText(
-            section.title
-          );
-
-        const sectionType =
-          normalizeSectionType(
-            section.sectionType
-          );
-
-        const sectionDescription =
-          cleanText(
-            section.description
-          );
-
-        const questions =
-          Array.isArray(
-            section.questions
-          )
-            ? section.questions
-            : [];
-
-        const createdTests =
-          await sql`
-            INSERT INTO thematic_tests (
-              book_id,
-              section_order,
-              section_type,
-              title,
-              description,
-              duration_minutes,
-              attempt_limit,
-              status,
-              question_count,
-              created_at,
-              updated_at
-            )
-            VALUES (
-              ${bookId},
-              ${sectionIndex + 1},
-              ${sectionType},
-              ${sectionTitle},
-              ${
-                sectionDescription ||
-                null
-              },
-              ${durationMinutes},
-              ${attemptLimit},
-              'draft',
-              ${questions.length},
-              NOW(),
-              NOW()
-            )
-            RETURNING id
-          `;
-
-        const testId =
-          Number(
-            createdTests[0]?.id
-          );
-
-        if (!testId) {
-          throw new Error(
-            `"${sectionTitle}" mavzusi uchun test ID yaratilmadi.`
-          );
-        }
-
-        savedSections++;
-
-        /* -------------------------------------------------
-           5. SAVOLLARNI SAQLAYMIZ
-        ------------------------------------------------- */
-
-        for (
-          let questionIndex = 0;
-          questionIndex <
-          questions.length;
-          questionIndex++
-        ) {
-          const question =
-            questions[
-              questionIndex
-            ];
-
-          const questionHtml =
-            cleanText(
-              question.questionHtml ||
-                question.questionText
-            );
-
-          const questionText =
-            cleanText(
-              question.questionText
-            ) ||
-            htmlToPlainText(
-              questionHtml
-            );
-
-          const points =
-            normalizePoints(
-              question.points
-            );
-
-          const createdQuestions =
-            await sql`
-              INSERT INTO thematic_questions (
-                test_id,
-                question_number,
-                question_text,
-                question_html,
-                points,
-                created_at,
-                updated_at
-              )
-              VALUES (
-                ${testId},
-                ${questionIndex + 1},
-                ${questionText},
-                ${questionHtml || null},
-                ${points},
-                NOW(),
-                NOW()
-              )
-              RETURNING id
-            `;
-
-          const questionId =
-            Number(
-              createdQuestions[0]?.id
-            );
-
-          if (!questionId) {
-            throw new Error(
-              `"${sectionTitle}" mavzusining ${
-                questionIndex + 1
-              }-savoli uchun ID yaratilmadi.`
-            );
-          }
-
-          savedQuestions++;
-
-          /* -----------------------------------------------
-             6. A/B/C/D VARIANTLARNI SAQLAYMIZ
-          ----------------------------------------------- */
-
-          const options =
+    const testRows:
+      TestRow[] =
+      sections.map(
+        (
+          section,
+          sectionIndex
+        ) => {
+          const questions =
             Array.isArray(
-              question.options
+              section.questions
             )
-              ? question.options
+              ? section.questions
               : [];
 
-          for (
-            let optionIndex = 0;
-            optionIndex <
-            options.length;
-            optionIndex++
-          ) {
-            const option =
-              options[optionIndex];
+          return {
+            section_order:
+              sectionIndex + 1,
 
-            const optionKey =
+            section_type:
+              normalizeSectionType(
+                section.sectionType
+              ),
+
+            title:
               cleanText(
-                option.label
-              ) ||
-              String.fromCharCode(
-                65 + optionIndex
-              );
+                section.title
+              ),
 
-            const optionHtml =
+            description:
               cleanText(
-                option.html ||
-                  option.text
-              );
+                section.description
+              ) || null,
 
-            const optionText =
-              cleanText(
-                option.text
-              ) ||
-              htmlToPlainText(
-                optionHtml
-              );
+            duration_minutes:
+              durationMinutes,
 
-            await sql`
-              INSERT INTO thematic_options (
-                question_id,
-                option_key,
-                option_text,
-                option_html,
-                is_correct,
-                created_at
-              )
-              VALUES (
-                ${questionId},
-                ${optionKey},
-                ${optionText},
-                ${optionHtml || null},
-                ${
-                  option.isCorrect ===
-                  true
-                },
-                NOW()
-              )
-            `;
+            attempt_limit:
+              attemptLimit,
 
-            savedOptions++;
-          }
+            question_count:
+              questions.length,
+          };
         }
-      }
+      );
 
-      /* ---------------------------------------------------
-         7. KITOB QUESTION COUNTINI TEKSHIRAMIZ
-      --------------------------------------------------- */
+    const testRowsJson =
+      JSON.stringify(
+        testRows
+      );
 
-      const actualCount =
-        await sql`
-          SELECT
-            COUNT(q.id)::int AS count
-          FROM thematic_questions q
-          INNER JOIN thematic_tests t
-            ON t.id = q.test_id
-          WHERE t.book_id = ${bookId}
-        `;
-
-      const databaseQuestionCount =
-        Number(
-          actualCount[0]?.count ??
-            0
-        );
-
-      if (
-        databaseQuestionCount !==
-        incomingQuestionCount
-      ) {
-        throw new Error(
-          `Savollar soni mos kelmadi. Kutilgan: ${incomingQuestionCount}, bazada: ${databaseQuestionCount}.`
-        );
-      }
-
-      /* ---------------------------------------------------
-         8. MUVAFFAQIYATLI NATIJA
-      --------------------------------------------------- */
-
-      return NextResponse.json({
-        success: true,
-
-        message:
-          "Mavzulashtirilgan kitob Neon bazasiga muvaffaqiyatli saqlandi.",
-
-        book: {
-          id: String(
-            book.id
-          ),
-          grade:
-            Number(book.grade),
-          title:
-            String(book.title),
-          subject:
-            String(book.subject),
-          edition:
-            book.edition
-              ? String(
-                  book.edition
-                )
-              : null,
-          status:
-            String(book.status),
-        },
-
-        saved: {
-          sections:
-            savedSections,
-
-          questions:
-            savedQuestions,
-
-          options:
-            savedOptions,
-
-          verifiedQuestions:
-            databaseQuestionCount,
-        },
-      });
-    } catch (saveError) {
-      /*
-        Import o'rtasida xato chiqsa yarimta kitob qolib ketmasin.
-
-        thematic_books o'chirilganda:
-        thematic_tests
-        thematic_questions
-        thematic_options
-
-        ON DELETE CASCADE orqali avtomatik o'chadi.
-      */
-
+    const insertedTests =
       await sql`
-        DELETE FROM thematic_books
-        WHERE id = ${bookId}
+        WITH incoming AS (
+          SELECT *
+          FROM jsonb_to_recordset(
+            ${testRowsJson}::jsonb
+          ) AS x(
+            section_order integer,
+            section_type text,
+            title text,
+            description text,
+            duration_minutes integer,
+            attempt_limit integer,
+            question_count integer
+          )
+        )
+
+        INSERT INTO thematic_tests (
+          book_id,
+          section_order,
+          section_type,
+          title,
+          description,
+          duration_minutes,
+          attempt_limit,
+          status,
+          question_count,
+          created_at,
+          updated_at
+        )
+
+        SELECT
+          ${createdBookId}::bigint,
+          section_order,
+          section_type,
+          title,
+          description,
+          duration_minutes,
+          attempt_limit,
+          'draft',
+          question_count,
+          NOW(),
+          NOW()
+
+        FROM incoming
+
+        ORDER BY
+          section_order
+
+        RETURNING
+          id::text AS id,
+          section_order
       `;
 
-      throw saveError;
+    if (
+      insertedTests.length !==
+      sections.length
+    ) {
+      throw new Error(
+        `Mavzular soni mos kelmadi. Kutilgan: ${sections.length}, saqlangan: ${insertedTests.length}.`
+      );
     }
+
+    const testIdBySection =
+      new Map<
+        number,
+        string
+      >();
+
+    for (
+      const row of
+      insertedTests
+    ) {
+      testIdBySection.set(
+        Number(
+          row.section_order
+        ),
+        String(row.id)
+      );
+    }
+
+    /* =====================================================
+       6. BARCHA SAVOLLARNI TAYYORLAYMIZ
+    ===================================================== */
+
+    const questionRows:
+      QuestionRow[] = [];
+
+    for (
+      let sectionIndex = 0;
+      sectionIndex <
+      sections.length;
+      sectionIndex++
+    ) {
+      const sectionOrder =
+        sectionIndex + 1;
+
+      const testId =
+        testIdBySection.get(
+          sectionOrder
+        );
+
+      if (!testId) {
+        throw new Error(
+          `${sectionOrder}-mavzu test ID topilmadi.`
+        );
+      }
+
+      const section =
+        sections[
+          sectionIndex
+        ];
+
+      const questions =
+        Array.isArray(
+          section.questions
+        )
+          ? section.questions
+          : [];
+
+      for (
+        let questionIndex = 0;
+        questionIndex <
+        questions.length;
+        questionIndex++
+      ) {
+        const question =
+          questions[
+            questionIndex
+          ];
+
+        const questionHtml =
+          cleanText(
+            question.questionHtml ||
+              question.questionText
+          );
+
+        const questionText =
+          cleanText(
+            question.questionText
+          ) ||
+          htmlToPlainText(
+            questionHtml
+          );
+
+        questionRows.push({
+          test_id:
+            testId,
+
+          section_order:
+            sectionOrder,
+
+          question_number:
+            questionIndex + 1,
+
+          question_text:
+            questionText,
+
+          question_html:
+            questionHtml ||
+            null,
+
+          points:
+            normalizePoints(
+              question.points
+            ),
+        });
+      }
+    }
+
+    /* =====================================================
+       7. SAVOLLARNI 250 TADAN BATCH QILIB YOZAMIZ
+
+       1609 savol ≈ 7 ta SQL
+    ===================================================== */
+
+    const questionChunks =
+      chunkArray(
+        questionRows,
+        250
+      );
+
+    const questionIdMap =
+      new Map<
+        string,
+        string
+      >();
+
+    let savedQuestions = 0;
+
+    for (
+      const chunk of
+      questionChunks
+    ) {
+      const chunkJson =
+        JSON.stringify(
+          chunk
+        );
+
+      const insertedQuestions =
+        await sql`
+          WITH incoming AS (
+            SELECT *
+            FROM jsonb_to_recordset(
+              ${chunkJson}::jsonb
+            ) AS x(
+              test_id text,
+              section_order integer,
+              question_number integer,
+              question_text text,
+              question_html text,
+              points numeric
+            )
+          )
+
+          INSERT INTO thematic_questions (
+            test_id,
+            question_number,
+            question_text,
+            question_html,
+            points,
+            created_at,
+            updated_at
+          )
+
+          SELECT
+            test_id::bigint,
+            question_number,
+            question_text,
+            question_html,
+            points,
+            NOW(),
+            NOW()
+
+          FROM incoming
+
+          RETURNING
+            id::text AS id,
+            test_id::text AS test_id,
+            question_number
+        `;
+
+      savedQuestions +=
+        insertedQuestions.length;
+
+      for (
+        const row of
+        insertedQuestions
+      ) {
+        const mapKey =
+          `${String(
+            row.test_id
+          )}:${Number(
+            row.question_number
+          )}`;
+
+        questionIdMap.set(
+          mapKey,
+          String(row.id)
+        );
+      }
+    }
+
+    if (
+      savedQuestions !==
+      incomingQuestionCount
+    ) {
+      throw new Error(
+        `Savollar soni mos kelmadi. Kutilgan: ${incomingQuestionCount}, saqlangan: ${savedQuestions}.`
+      );
+    }
+
+    /* =====================================================
+       8. BARCHA A/B/C/D VARIANTLARNI TAYYORLAYMIZ
+    ===================================================== */
+
+    const optionRows:
+      OptionRow[] = [];
+
+    for (
+      let sectionIndex = 0;
+      sectionIndex <
+      sections.length;
+      sectionIndex++
+    ) {
+      const sectionOrder =
+        sectionIndex + 1;
+
+      const testId =
+        testIdBySection.get(
+          sectionOrder
+        );
+
+      if (!testId) {
+        throw new Error(
+          `${sectionOrder}-mavzu test ID topilmadi.`
+        );
+      }
+
+      const section =
+        sections[
+          sectionIndex
+        ];
+
+      const questions =
+        Array.isArray(
+          section.questions
+        )
+          ? section.questions
+          : [];
+
+      for (
+        let questionIndex = 0;
+        questionIndex <
+        questions.length;
+        questionIndex++
+      ) {
+        const questionNumber =
+          questionIndex + 1;
+
+        const questionMapKey =
+          `${testId}:${questionNumber}`;
+
+        const questionId =
+          questionIdMap.get(
+            questionMapKey
+          );
+
+        if (!questionId) {
+          throw new Error(
+            `${sectionOrder}-mavzuning ${questionNumber}-savol IDsi topilmadi.`
+          );
+        }
+
+        const question =
+          questions[
+            questionIndex
+          ];
+
+        const options =
+          Array.isArray(
+            question.options
+          )
+            ? question.options
+            : [];
+
+        for (
+          let optionIndex = 0;
+          optionIndex <
+          options.length;
+          optionIndex++
+        ) {
+          const option =
+            options[
+              optionIndex
+            ];
+
+          const optionKey =
+            cleanText(
+              option.label
+            ) ||
+            String.fromCharCode(
+              65 +
+                optionIndex
+            );
+
+          const optionHtml =
+            cleanText(
+              option.html ||
+                option.text
+            );
+
+          const optionText =
+            cleanText(
+              option.text
+            ) ||
+            htmlToPlainText(
+              optionHtml
+            );
+
+          optionRows.push({
+            question_id:
+              questionId,
+
+            option_key:
+              optionKey,
+
+            option_text:
+              optionText,
+
+            option_html:
+              optionHtml ||
+              null,
+
+            is_correct:
+              option.isCorrect ===
+              true,
+          });
+        }
+      }
+    }
+
+    /* =====================================================
+       9. VARIANTLARNI 1000 TADAN BATCH QILIB YOZAMIZ
+
+       ~6436 variant ≈ 7 ta SQL
+    ===================================================== */
+
+    const optionChunks =
+      chunkArray(
+        optionRows,
+        1000
+      );
+
+    let savedOptions = 0;
+
+    for (
+      const chunk of
+      optionChunks
+    ) {
+      const chunkJson =
+        JSON.stringify(
+          chunk
+        );
+
+      const insertedOptions =
+        await sql`
+          WITH incoming AS (
+            SELECT *
+            FROM jsonb_to_recordset(
+              ${chunkJson}::jsonb
+            ) AS x(
+              question_id text,
+              option_key text,
+              option_text text,
+              option_html text,
+              is_correct boolean
+            )
+          )
+
+          INSERT INTO thematic_options (
+            question_id,
+            option_key,
+            option_text,
+            option_html,
+            is_correct,
+            created_at
+          )
+
+          SELECT
+            question_id::bigint,
+            option_key,
+            option_text,
+            option_html,
+            is_correct,
+            NOW()
+
+          FROM incoming
+
+          RETURNING id
+        `;
+
+      savedOptions +=
+        insertedOptions.length;
+    }
+
+    if (
+      savedOptions !==
+      incomingOptionCount
+    ) {
+      throw new Error(
+        `Variantlar soni mos kelmadi. Kutilgan: ${incomingOptionCount}, saqlangan: ${savedOptions}.`
+      );
+    }
+
+    /* =====================================================
+       10. BAZADAGI SAVOLLARNI TEKSHIRAMIZ
+    ===================================================== */
+
+    const verification =
+      await sql`
+        SELECT
+          COUNT(q.id)::int
+            AS question_count
+
+        FROM thematic_questions q
+
+        INNER JOIN thematic_tests t
+          ON t.id =
+            q.test_id
+
+        WHERE
+          t.book_id =
+            ${createdBookId}::bigint
+      `;
+
+    const verifiedQuestions =
+      Number(
+        verification[0]
+          ?.question_count ??
+          0
+      );
+
+    if (
+      verifiedQuestions !==
+      incomingQuestionCount
+    ) {
+      throw new Error(
+        `Yakuniy tekshiruvda savollar soni mos kelmadi. Kutilgan: ${incomingQuestionCount}, bazada: ${verifiedQuestions}.`
+      );
+    }
+
+    /* =====================================================
+       11. NATIJA
+    ===================================================== */
+
+    return NextResponse.json({
+      success: true,
+
+      message:
+        "Mavzulashtirilgan kitob Neon bazasiga batch usulida muvaffaqiyatli saqlandi.",
+
+      book: {
+        id:
+          createdBookId,
+
+        grade,
+
+        title:
+          bookTitle,
+
+        subject,
+
+        edition:
+          edition ||
+          null,
+
+        status:
+          "draft",
+      },
+
+      saved: {
+        sections:
+          sections.length,
+
+        questions:
+          savedQuestions,
+
+        options:
+          savedOptions,
+
+        verifiedQuestions,
+      },
+
+      performance: {
+        questionBatches:
+          questionChunks.length,
+
+        optionBatches:
+          optionChunks.length,
+      },
+    });
   } catch (error) {
     console.error(
-      "THEMATIC NEON IMPORT ERROR:",
+      "THEMATIC NEON BATCH IMPORT ERROR:",
       error
     );
+
+    /* =====================================================
+       XATO BO‘LSA YANGI YARIM IMPORTNI TOZALAYMIZ
+    ===================================================== */
+
+    if (
+      createdBookId
+    ) {
+      try {
+        await sql`
+          DELETE FROM thematic_books
+          WHERE
+            id =
+              ${createdBookId}::bigint
+        `;
+      } catch (
+        cleanupError
+      ) {
+        console.error(
+          "THEMATIC IMPORT CLEANUP ERROR:",
+          cleanupError
+        );
+      }
+    }
 
     return NextResponse.json(
       {
