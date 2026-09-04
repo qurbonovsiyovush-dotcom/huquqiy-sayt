@@ -250,7 +250,7 @@ function normalizeQuestionText(parts: string[]) {
       hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
     */
     const startsInnerListItem =
-      /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
+      /^(?:\d{1,3}|[IVXLCDM]{1,8}|[a-zA-Z])[\)\.]\s+\S/i.test(line);
 
     if (startsInnerListItem) {
       flushCurrent();
@@ -341,7 +341,7 @@ function optionLabelFromStart(
       A) + ...
   */
   const match = value.match(
-    /^\s*\+?\s*([ABCD])[\)\.\-:]\s*\+?\s*/
+    /^\s*\+?\s*([ABCD])\)\s*\+?\s*/
   );
 
   return match
@@ -352,7 +352,7 @@ function optionLabelFromStart(
 function stripOptionPrefix(value: string) {
   return value
     .replace(
-      /^\s*\+?\s*[ABCD][\)\.\-:]\s*\+?\s*/,
+      /^\s*\+?\s*[ABCD]\)\s*\+?\s*/,
       ""
     )
     .trim();
@@ -360,8 +360,8 @@ function stripOptionPrefix(value: string) {
 
 function optionMarkerHasLeadingOrTrailingPlus(value: string) {
   return (
-    /^\s*\+\s*[ABCD][\)\.\-:]/.test(value) ||
-    /^\s*[ABCD][\)\.\-:]\s*\+/.test(value)
+    /^\s*\+\s*[ABCD]\)/.test(value) ||
+    /^\s*[ABCD]\)\s*\+/.test(value)
   );
 }
 
@@ -2161,7 +2161,7 @@ function splitInlineOptions(
       A) + ... B) ...
   */
   const regex =
-    /(^|\s)(\+?\s*)([ABCD])[\)\.\-:]\s*(\+?\s*)/g;
+    /(^|\s)(\+?\s*)([ABCD])\)\s*(\+?\s*)/g;
 
   const matches: {
     label: OptionLabel;
