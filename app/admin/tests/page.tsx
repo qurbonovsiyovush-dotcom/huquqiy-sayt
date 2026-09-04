@@ -57,6 +57,17 @@ type TestData = {
   testType?: TestCategory;
   customTestTypeName?: string;
 
+  /*
+    Neon'dagi mavzulashtirilgan testlarni eski Blob testlaridan
+    ajratish uchun admin-only metadata.
+  */
+  storage?: "legacy" | "thematic";
+  thematicId?: string;
+  bookId?: string;
+  bookTitle?: string;
+  grade?: number;
+  questionCount?: number;
+
   createdAt?: string;
   updatedAt?: string;
 };
@@ -149,6 +160,14 @@ function testTypeLabel(test: TestData) {
   );
 }
 
+function isNeonThematicTest(test: TestData | undefined | null) {
+  return test?.storage === "thematic";
+}
+
+function thematicRawId(test: TestData) {
+  return String(test.thematicId || test.id.replace(/^thematic:/, ""));
+}
+
 export default function AdminTestsPage() {
   const router = useRouter();
 
@@ -197,36 +216,147 @@ export default function AdminTestsPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/tests", {
-        method: "GET",
-        cache: "no-store",
-      });
+      /*
+        MUHIM:
+        - Eski kategoriyalar hali /api/tests (Blob) dan keladi.
+        - Mavzulashtirilgan testlar /api/tests/thematic (Neon) dan keladi.
+        - Blob vaqtincha 403 bersa ham Neon thematic testlar admin panelda
+          ko‘rinishda davom etadi.
+      */
+      const [legacyResult, thematicResult] = await Promise.allSettled([
+        fetch("/api/tests", {
+          method: "GET",
+          cache: "no-store",
+        }),
+        fetch("/api/tests/thematic", {
+          method: "GET",
+          cache: "no-store",
+        }),
+      ]);
 
-      const data = await readJson(response);
+      let legacyTests: TestData[] = [];
+      let thematicTests: TestData[] = [];
+      const warnings: string[] = [];
 
-      if (!response.ok || !data.success) {
-        setTests([]);
+      if (legacyResult.status === "fulfilled") {
+        const response = legacyResult.value;
+        const data = await readJson(response);
 
-        setError(
-          data.message ||
-            "Testlarni serverdan yuklab bo‘lmadi."
+        if (response.ok && data.success) {
+          legacyTests = Array.isArray(data.tests)
+            ? (data.tests as TestData[]).map((test) => ({
+                ...test,
+                storage: "legacy" as const,
+              }))
+            : [];
+        } else {
+          warnings.push(
+            data.message ||
+              "Eski Blob testlarini serverdan yuklab bo‘lmadi."
+          );
+        }
+      } else {
+        console.error(legacyResult.reason);
+        warnings.push(
+          "Eski Blob testlari bilan bog‘lanishda xatolik yuz berdi."
         );
-
-        return;
       }
 
-      const loadedTests: TestData[] = Array.isArray(data.tests)
-        ? data.tests
-        : [];
+      if (thematicResult.status === "fulfilled") {
+        const response = thematicResult.value;
+        const data = await readJson(response);
 
-      setTests(loadedTests);
+        if (response.ok && data.success) {
+          const books = Array.isArray(data.books)
+            ? data.books
+            : [];
+
+          thematicTests = books.flatMap((book: any) => {
+            const bookTests = Array.isArray(book?.tests)
+              ? book.tests
+              : [];
+
+            return bookTests.map((test: any): TestData => {
+              const rawId = String(test?.id ?? "");
+
+              return {
+                id: `thematic:${rawId}`,
+                thematicId: rawId,
+                storage: "thematic",
+                bookId: String(test?.book_id ?? book?.id ?? ""),
+                bookTitle: String(book?.title || ""),
+                grade: Number(book?.grade) || undefined,
+                title: [
+                  String(book?.title || "").trim(),
+                  String(test?.title || "").trim(),
+                ]
+                  .filter(Boolean)
+                  .join(" — "),
+                subject:
+                  String(book?.subject || "").trim() ||
+                  "Davlat va huquq asoslari",
+                duration:
+                  Number(test?.duration_minutes) || 60,
+                description:
+                  String(test?.description || "").trim() ||
+                  undefined,
+                questions: [],
+                questionCount:
+                  Number(test?.question_count) || 0,
+                status:
+                  test?.status === "published"
+                    ? "published"
+                    : "draft",
+                testType: "thematic",
+                createdAt:
+                  test?.created_at
+                    ? String(test.created_at)
+                    : undefined,
+                updatedAt:
+                  test?.updated_at
+                    ? String(test.updated_at)
+                    : undefined,
+              };
+            });
+          });
+        } else {
+          warnings.push(
+            data.message ||
+              "Neon mavzulashtirilgan testlarini yuklab bo‘lmadi."
+          );
+        }
+      } else {
+        console.error(thematicResult.reason);
+        warnings.push(
+          "Neon mavzulashtirilgan testlari bilan bog‘lanishda xatolik yuz berdi."
+        );
+      }
+
+      /*
+        Eski Blob'dagi thematic testlar dublikat ko‘rinmasligi uchun
+        admin ro‘yxatidan chiqaramiz. Endi thematic uchun yagona manba Neon.
+      */
+      const legacyWithoutThematic =
+        legacyTests.filter(
+          (test) =>
+            normalizeTestType(test) !== "thematic"
+        );
+
+      setTests([
+        ...legacyWithoutThematic,
+        ...thematicTests,
+      ]);
+
+      if (warnings.length > 0) {
+        setError(warnings.join(" "));
+      }
     } catch (error) {
       console.error(error);
 
       setTests([]);
 
       setError(
-        "Server bilan bog‘lanishda xatolik yuz berdi."
+        "Testlarni yuklashda server bilan bog‘lanish xatosi yuz berdi."
       );
     } finally {
       setLoading(false);
@@ -380,25 +510,50 @@ export default function AdminTestsPage() {
     id: string,
     newStatus: TestStatus
   ) {
+    const selectedTest =
+      tests.find((test) => test.id === id);
+
+    if (!selectedTest) {
+      window.alert("Test topilmadi.");
+      return;
+    }
+
     setWorkingId(id);
 
     try {
-      const fullTest = await getFullTest(id);
-
-      if (!fullTest) {
-        return;
-      }
-
+      /*
+        Neon thematic testda savollar admin ro‘yxatiga to‘liq yuklanmaydi.
+        question_count yetarli — 1609 ta savolni admin sahifaga tortmaymiz.
+      */
       if (
+        isNeonThematicTest(selectedTest) &&
         newStatus === "published" &&
-        (!Array.isArray(fullTest.questions) ||
-          fullTest.questions.length === 0)
+        Number(selectedTest.questionCount || 0) <= 0
       ) {
         window.alert(
           "Savolsiz testni e’lon qilib bo‘lmaydi."
         );
-
         return;
+      }
+
+      if (!isNeonThematicTest(selectedTest)) {
+        const fullTest =
+          await getFullTest(id);
+
+        if (!fullTest) {
+          return;
+        }
+
+        if (
+          newStatus === "published" &&
+          (!Array.isArray(fullTest.questions) ||
+            fullTest.questions.length === 0)
+        ) {
+          window.alert(
+            "Savolsiz testni e’lon qilib bo‘lmaydi."
+          );
+          return;
+        }
       }
 
       const confirmed = window.confirm(
@@ -411,28 +566,34 @@ export default function AdminTestsPage() {
         return;
       }
 
-      /*
-        MUHIM:
-        780/840 ta savolning HAMMASINI qayta PUT qilmaymiz.
-        Aks holda Vercel request hajmi limitiga uriladi.
-
-        Serverdagi /api/tests/[id]/route.ts mavjud testni o‘qib,
-        faqat status maydonini almashtiradi; savollar o‘z joyida qoladi.
-      */
-      const response = await fetch(
-        `/api/tests/${encodeURIComponent(id)}`,
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            status: newStatus,
-          }),
-        }
-      );
+      const response =
+        isNeonThematicTest(selectedTest)
+          ? await fetch(
+              "/api/tests/thematic",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  action: "set-status",
+                  testId: thematicRawId(selectedTest),
+                  status: newStatus,
+                }),
+              }
+            )
+          : await fetch(
+              `/api/tests/${encodeURIComponent(id)}`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  status: newStatus,
+                }),
+              }
+            );
 
       const data = await readJson(response);
 
@@ -441,7 +602,6 @@ export default function AdminTestsPage() {
           data.message ||
             "Test holatini o‘zgartirib bo‘lmadi."
         );
-
         return;
       }
 
@@ -450,8 +610,8 @@ export default function AdminTestsPage() {
           test.id === id
             ? {
                 ...test,
-                ...(data.test || {}),
                 status: newStatus,
+                updatedAt: new Date().toISOString(),
               }
             : test
         )
@@ -511,7 +671,7 @@ export default function AdminTestsPage() {
     const confirmed =
       window.confirm(
         `${drafts.length} ta qoralama e’lon qilinadi.\n\n` +
-          `Hozirgi filtrdagi jami ${allVisibleTests.length} ta testning statusi serverda bir marta mustahkamlanadi.\n\n` +
+          `Hozirgi filtrdagi jami ${allVisibleTests.length} ta test bir yo‘la yangilanadi.\n\n` +
           "Davom etasizmi?"
       );
 
@@ -523,15 +683,14 @@ export default function AdminTestsPage() {
     setError("");
 
     try {
-      /*
-        Faqat draft ID larni emas, HOZIRGI FILTRDAGI HAMMA test ID sini
-        yuboramiz. Bu oldin e’lon qilingan testlarga ham durable
-        "published" marker yozib, ularning yana draftga qaytishini
-        butunlay to‘xtatadi.
-      */
+      const thematicMode =
+        selectedCategory === "thematic";
+
       const response =
         await fetch(
-          "/api/tests",
+          thematicMode
+            ? "/api/tests/thematic"
+            : "/api/tests",
           {
             method: "POST",
             headers: {
@@ -545,7 +704,9 @@ export default function AdminTestsPage() {
                 testIds:
                   allVisibleTests.map(
                     (test) =>
-                      test.id
+                      thematicMode
+                        ? thematicRawId(test)
+                        : test.id
                   ),
               }),
           }
@@ -567,19 +728,14 @@ export default function AdminTestsPage() {
         return;
       }
 
-      const publishedIds =
+      const rawPublishedIds =
         new Set<string>(
           Array.isArray(
             data.publishedIds
           )
             ? data.publishedIds.map(
-                (
-                  value:
-                    unknown
-                ) =>
-                  String(
-                    value
-                  )
+                (value: unknown) =>
+                  String(value)
               )
             : []
         );
@@ -587,21 +743,32 @@ export default function AdminTestsPage() {
       setTests(
         (current) =>
           current.map(
-            (test) =>
-              publishedIds.has(
-                test.id
-              )
+            (test) => {
+              const matches =
+                thematicMode
+                  ? isNeonThematicTest(test) &&
+                    rawPublishedIds.has(
+                      thematicRawId(test)
+                    )
+                  : rawPublishedIds.has(
+                      test.id
+                    );
+
+              return matches
                 ? {
                     ...test,
                     status:
                       "published",
+                    updatedAt:
+                      new Date().toISOString(),
                   }
-                : test
+                : test;
+            }
           )
       );
 
       window.alert(
-        `${publishedIds.size} ta testning E’LON QILINGAN holati mustahkam saqlandi.`
+        `${rawPublishedIds.size} ta test muvaffaqiyatli e’lon qilindi.`
       );
 
       await loadTests();
@@ -641,13 +808,24 @@ export default function AdminTestsPage() {
     setWorkingId(test.id);
 
     try {
-      const response = await fetch(
-        `/api/tests/${encodeURIComponent(test.id)}`,
-        {
-          method: "DELETE",
-          cache: "no-store",
-        }
-      );
+      const response =
+        isNeonThematicTest(test)
+          ? await fetch(
+              `/api/tests/thematic?id=${encodeURIComponent(
+                thematicRawId(test)
+              )}`,
+              {
+                method: "DELETE",
+                cache: "no-store",
+              }
+            )
+          : await fetch(
+              `/api/tests/${encodeURIComponent(test.id)}`,
+              {
+                method: "DELETE",
+                cache: "no-store",
+              }
+            );
 
       const data = await readJson(response);
 
@@ -655,7 +833,6 @@ export default function AdminTestsPage() {
         window.alert(
           data.message || "Testni o‘chirib bo‘lmadi."
         );
-
         return;
       }
 
@@ -715,14 +892,13 @@ export default function AdminTestsPage() {
     setError("");
 
     try {
-      /*
-        MUHIM:
-        Endi brauzer 35 ta DELETE so‘rovi yubormaydi.
-        Barcha ID lar BIRTA POST so‘rov bilan serverga yuboriladi.
-        Server tests.json ni bir marta o‘qib, bir marta yozadi.
-      */
+      const thematicMode =
+        selectedCategory === "thematic";
+
       const response = await fetch(
-        "/api/tests",
+        thematicMode
+          ? "/api/tests/thematic"
+          : "/api/tests",
         {
           method: "POST",
           headers: {
@@ -735,7 +911,9 @@ export default function AdminTestsPage() {
             testIds:
               drafts.map(
                 (test) =>
-                  test.id
+                  thematicMode
+                    ? thematicRawId(test)
+                    : test.id
               ),
             onlyDrafts: true,
           }),
@@ -758,7 +936,7 @@ export default function AdminTestsPage() {
         return;
       }
 
-      const deletedIds =
+      const rawDeletedIds =
         new Set<string>(
           Array.isArray(
             data.deletedIds
@@ -774,14 +952,21 @@ export default function AdminTestsPage() {
         (current) =>
           current.filter(
             (test) =>
-              !deletedIds.has(
-                test.id
-              )
+              thematicMode
+                ? !(
+                    isNeonThematicTest(test) &&
+                    rawDeletedIds.has(
+                      thematicRawId(test)
+                    )
+                  )
+                : !rawDeletedIds.has(
+                    test.id
+                  )
           )
       );
 
       window.alert(
-        `${Number(data.deletedCount) || deletedIds.size} ta qoralama test bir yo‘la o‘chirildi.`
+        `${Number(data.deletedCount) || rawDeletedIds.size} ta qoralama test bir yo‘la o‘chirildi.`
       );
 
       await loadTests();
@@ -2211,11 +2396,12 @@ margin: 10px auto 12px;
           ) : (
             <div className="testList">
               {filteredTests.map((test) => {
-                const questionCount = Array.isArray(
-                  test.questions
-                )
-                  ? test.questions.length
-                  : 0;
+                const questionCount =
+                  isNeonThematicTest(test)
+                    ? Number(test.questionCount) || 0
+                    : Array.isArray(test.questions)
+                    ? test.questions.length
+                    : 0;
 
                 const busy = workingId === test.id;
 
@@ -2312,13 +2498,20 @@ margin: 10px auto 12px;
                         type="button"
                         className="editButton"
                         disabled={busy}
-                        onClick={() =>
+                        onClick={() => {
+                          if (isNeonThematicTest(test)) {
+                            window.alert(
+                              "Neon mavzulashtirilgan testini tahrirlash oynasi keyingi bosqichda ulanadi. Hozir e’lon qilish, qoralamaga qaytarish va o‘chirish ishlaydi."
+                            );
+                            return;
+                          }
+
                           router.push(
                             `/test/editor?id=${encodeURIComponent(
                               test.id
                             )}`
-                          )
-                        }
+                          );
+                        }}
                       >
                         <span className="actionMain">Tahrirlash</span>
                       </button>
@@ -2345,13 +2538,20 @@ margin: 10px auto 12px;
                             type="button"
                             className="viewButton"
                             disabled={busy}
-                            onClick={() =>
+                            onClick={() => {
+                              if (isNeonThematicTest(test)) {
+                                window.alert(
+                                  "Neon mavzulashtirilgan testining foydalanuvchi yechish sahifasi keyingi bosqichda ulanadi."
+                                );
+                                return;
+                              }
+
                               router.push(
                                 `/test/${encodeURIComponent(
                                   test.id
                                 )}`
-                              )
-                            }
+                              );
+                            }}
                           >
                             <span className="actionMain">Testni ko‘rish</span>
                           </button>
@@ -2376,7 +2576,16 @@ margin: 10px auto 12px;
                         type="button"
                         className="saveButton"
                         disabled={busy}
-                        onClick={() => setExportTest(test)}
+                        onClick={() => {
+                          if (isNeonThematicTest(test)) {
+                            window.alert(
+                              "Neon mavzulashtirilgan testining PDF/Word eksporti keyingi bosqichda ulanadi."
+                            );
+                            return;
+                          }
+
+                          setExportTest(test);
+                        }}
                       >
                         <span className="actionMain">Kompyuterga saqlash</span>
                       </button>
