@@ -2724,26 +2724,123 @@ export default function ImportPdfTestPage() {
       return;
     }
 
-    const invalid = questions.filter((question) => {
-      const correctCount = question.options.filter(
-        (option) => option.isCorrect
-      ).length;
+    const invalid = questions
+      .map((question) => {
+        const correctCount =
+          question.options.filter(
+            (option) =>
+              option.isCorrect
+          ).length;
 
-      return (
-        !richTextHasContent(
-          questionDrafts[question.id] ?? question.questionText
-        ) ||
-        question.options.some(
-          (option) => !richTextHasContent(option.text)
-        ) ||
-        correctCount !== 1
-      );
-    });
+        const emptyQuestion =
+          !richTextHasContent(
+            questionDrafts[
+              question.id
+            ] ??
+              question.questionText
+          );
+
+        const emptyOptions =
+          question.options
+            .filter(
+              (option) =>
+                !richTextHasContent(
+                  option.text
+                )
+            )
+            .map(
+              (option) =>
+                option.label
+            );
+
+        if (
+          !emptyQuestion &&
+          emptyOptions.length === 0 &&
+          correctCount === 1
+        ) {
+          return null;
+        }
+
+        return {
+          question,
+          emptyQuestion,
+          emptyOptions,
+          correctCount,
+        };
+      })
+      .filter(Boolean) as Array<{
+        question: ImportedQuestion;
+        emptyQuestion: boolean;
+        emptyOptions: Array<string>;
+        correctCount: number;
+      }>;
 
     if (invalid.length > 0) {
+      const first =
+        invalid[0];
+
+      const firstProblems = [
+        first.emptyQuestion
+          ? "savol matni bo‘sh"
+          : "",
+        first.emptyOptions.length > 0
+          ? `${first.emptyOptions.join(
+              ", "
+            )} variant bo‘sh`
+          : "",
+        first.correctCount !== 1
+          ? `to‘g‘ri javoblar soni ${first.correctCount} ta`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      const preview =
+        invalid
+          .slice(0, 12)
+          .map(
+            (item) =>
+              item.question.number
+          )
+          .join(", ");
+
+      const more =
+        invalid.length > 12
+          ? " ..."
+          : "";
+
+      const errorMessage =
+        `${invalid.length} ta savolda saqlashga to‘sqinlik qilayotgan xato bor.\n\n` +
+        `Birinchi xato: ${first.question.number}-savol — ${firstProblems}.\n\n` +
+        `Xatoli savollar: ${preview}${more}`;
+
       setMessage(
-        `${invalid.length} ta savolda xato bor. Har bir savolda 4 ta variant va 1 ta to‘g‘ri javob bo‘lishi kerak.`
+        errorMessage.replace(
+          /\n/g,
+          " "
+        )
       );
+
+      window.alert(
+        errorMessage
+      );
+
+      window.setTimeout(
+        () => {
+          document
+            .getElementById(
+              `question-card-${first.question.id}`
+            )
+            ?.scrollIntoView({
+              behavior:
+                "smooth",
+              block:
+                "center",
+            });
+        },
+        50
+      );
+
       return;
     }
 
@@ -3799,12 +3896,19 @@ export default function ImportPdfTestPage() {
             </div>
           </div>
 
+          {message && (
+            <div className="saveMessageBox">
+              {message}
+            </div>
+          )}
+
           <div className="questionsList">
             {questions.map(
               (
                 question
               ) => (
                 <article
+                  id={`question-card-${question.id}`}
                   className={
                     question.warning
                       ? "questionCard warningCard"
@@ -4414,6 +4518,17 @@ export default function ImportPdfTestPage() {
           display: flex;
           flex-direction: column;
           gap: 4px;
+        }
+
+        .saveMessageBox {
+          margin: 12px 0 16px;
+          padding: 11px 14px;
+          border: 2px solid #6b7479;
+          border-radius: 10px;
+          background: #ffffff;
+          box-shadow: inset 0 2px 3px rgba(255,255,255,.9), 0 3px 0 rgba(70,80,86,.28);
+          font-weight: 700;
+          white-space: pre-wrap;
         }
 
         .previewActions {
