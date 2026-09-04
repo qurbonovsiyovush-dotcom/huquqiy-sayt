@@ -996,9 +996,18 @@ export default function ImportPdfTestPage() {
         pdfFile
       );
 
+      /*
+        Mavzulashtirilgan testlar uchun alohida parser ishlatiladi.
+        Qolgan test turlari eski universal PDF importerda qoladi.
+      */
+      const importEndpoint =
+        testType === "thematic"
+          ? "/api/tests/import-pdf-thematic"
+          : "/api/tests/import-pdf";
+
       const response =
         await fetch(
-          "/api/tests/import-pdf",
+          importEndpoint,
           {
             method: "POST",
             credentials:
