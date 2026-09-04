@@ -414,133 +414,133 @@ export default function TestSolvePage() {
     let html = String(raw);
 
     /*
-      &nbsp; larni oddiy bo‘shliqqa aylantiramiz.
+      PDF/importdan kelgan bo‘shliqlarni normallashtiramiz.
     */
-    html = html.replace(/&nbsp;/gi, " ");
+    html = html
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]{2,}/g, " ");
 
     /*
-      Ketma-ket ortiqcha oddiy bo‘shliqlarni kamaytiramiz.
-      HTML teglariga tegmaydi.
+      Band oldidan yangi qator qo‘shish yordamchisi.
+
+      Muhim:
+      - matn boshida turgan 1. yoki I. oldidan ortiqcha <br> yo‘q;
+      - gapdan keyin kelgan BIRINCHI 1. ham yangi qatordan boshlanadi;
+      - 2., 3., 4. va II., III., IV. ham yangi qatordan boshlanadi;
+      - mavjud <br>, <p>, <div>, <li> dan keyin yana ortiqcha <br> qo‘shilmaydi.
     */
-    html = html.replace(/[ \t]{2,}/g, " ");
+    function addBreakBeforeLists(
+      source: string,
+      pattern: RegExp
+    ) {
+      return source.replace(
+        pattern,
+        (
+          match: string,
+          prefix: string,
+          marker: string,
+          offset: number,
+          whole: string
+        ) => {
+          const cleanPrefix = String(prefix || "");
+          const cleanMarker = String(marker || "").trim();
+
+          /*
+            Marker matnning eng boshida bo‘lsa:
+            "1. ..." yoki "I. ..."
+          */
+          if (offset === 0 && !cleanPrefix) {
+            return `${cleanMarker} `;
+          }
+
+          /*
+            Marker oldidan HTML tegi tugagan bo‘lishi mumkin.
+            Undan oldingi real matnni tekshiramiz.
+          */
+          const before = whole.slice(
+            0,
+            offset + cleanPrefix.length
+          );
+
+          const alreadyNewLine =
+            /(?:<br\s*\/?>|<\/p>|<\/div>|<\/li>|<p[^>]*>|<div[^>]*>|<li[^>]*>)\s*$/i.test(
+              before
+            );
+
+          if (alreadyNewLine) {
+            return `${cleanPrefix}${cleanMarker} `;
+          }
+
+          return `${cleanPrefix}<br class="autoListBreak">${cleanMarker} `;
+        }
+      );
+    }
 
     /*
-      Rim raqamli bandlar:
-
-      I.
-      II.
-      III.
-      IV.
-      V.
-      VI.
-      VII.
-      VIII.
-      IX.
-      X.
-      ...
-
-      Birinchi band oldidan <br> qo‘ymaymiz.
-      Keyingi bandlar oldidan yangi qator qo‘yamiz.
+      ENG MUHIM FIX:
+      gap tugagandan keyin kelgan birinchi 1. ni majburan
+      yangi qatordan boshlaymiz. Bu PDFdan kelgan HTMLda 1.
+      boshqa format/tag bilan kelgan holatlarda ham ishlaydi.
     */
-
-    const romanPattern =
-      /(^|[\s>])((?:M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3}))\.)\s+/g;
-
-    let romanSeen = false;
-
     html = html.replace(
-      romanPattern,
-      (match, prefix, marker) => {
-        const normalizedMarker =
-          String(marker || "").trim();
-
-        if (!normalizedMarker) {
-          return match;
-        }
-
-        if (!romanSeen) {
-          romanSeen = true;
-
-          return `${prefix}${normalizedMarker} `;
-        }
-
-        /*
-          Agar oldinda allaqachon <br> bo‘lsa,
-          yana qo‘shmaymiz.
-        */
-        if (
-          String(prefix).includes(">") &&
-          /<br\s*\/?>\s*$/i.test(
-            html.slice(
-              0,
-              Math.max(
-                0,
-                html.indexOf(match)
-              )
-            )
-          )
-        ) {
-          return `${prefix}${normalizedMarker} `;
-        }
-
-        return `${prefix}<br class="autoListBreak">${normalizedMarker} `;
-      }
+      /([.!?;:])(?:\s|&nbsp;|\u00a0)*(?=(?:<[^>]+>\s*)*1\.\s)/gi,
+      '$1<br class="autoListBreak">'
     );
 
     /*
-      Rim regex juda keng bo‘lgani uchun ayrim holatda
-      oddiy I. II. III. ketma-ketlikni qo‘shimcha
-      tekshiruv bilan ham ushlaymiz.
-    */
+      RIM RAQAMLI ICHKI RO‘YXATLAR
 
-    html = html.replace(
-      /(\s)(II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.\s+/g,
-      `$1<br class="autoListBreak">$2. `
+      I. II. III. IV. ... XX.
+    */
+    html = addBreakBeforeLists(
+      html,
+      /(^|[\s>])((?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.)\s+/g
     );
 
     /*
-      Oddiy raqamli bandlar:
+      ODDIY RAQAMLI ICHKI RO‘YXATLAR
 
-      1.
-      2.
-      3.
+      1. 2. 3. 4. ...
 
-      Lekin 1-modda, 2-modda kabi yozuvlarga tegmaydi,
-      chunki nuqtadan keyin bo‘shliq talab qilinadi.
+      Endi BIRINCHI "1." ham:
+      "... aniqlang. 1. ko‘plab ..."
+      ko‘rinishida yopishib qolmaydi.
+
+      Natija:
+      "... aniqlang."
+      "1. ko‘plab ..."
     */
-
-    let numericSeen = false;
-
-    html = html.replace(
-      /(^|[\s>])(\d{1,3}\.)\s+/g,
-      (match, prefix, marker) => {
-        if (!numericSeen) {
-          numericSeen = true;
-
-          return `${prefix}${marker} `;
-        }
-
-        return `${prefix}<br class="autoListBreak">${marker} `;
-      }
+    html = addBreakBeforeLists(
+      html,
+      /(^|[\s>])(\d{1,3}\.)\s+/g
     );
 
     /*
-      Bir joyda tasodifan ikki yoki undan ortiq
-      autoListBreak paydo bo‘lsa bittaga tushiramiz.
+      Bir necha avtomatik <br> ketma-ket paydo bo‘lsa,
+      bittaga tushiramiz.
     */
-
     html = html.replace(
       /(?:<br class="autoListBreak">\s*){2,}/gi,
       '<br class="autoListBreak">'
     );
 
     /*
-      Mavjud <br> bilan yangi <br> ustma-ust kelsa.
+      Oldindan mavjud <br> bilan avtomatik <br>
+      ustma-ust kelmasin.
     */
-
     html = html.replace(
       /<br\s*\/?>\s*<br class="autoListBreak">/gi,
       '<br class="autoListBreak">'
+    );
+
+    /*
+      Blok tegidan keyin ham ortiqcha avtomatik <br>
+      kerak emas.
+    */
+    html = html.replace(
+      /(<\/(?:p|div|li)>)\s*<br class="autoListBreak">/gi,
+      "$1"
     );
 
     return html;
