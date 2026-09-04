@@ -173,65 +173,52 @@ export default function ThematicGradePage() {
       setError("");
 
       try {
-        const response =
-          await fetch(
-            "/api/tests/public-list",
-            {
-              method: "GET",
-              cache: "no-store",
-            }
-          );
+        if (!supportedGrade) {
+          if (!cancelled) setTests([]);
+          return;
+        }
 
-        const data =
-          await response.json();
+        const response = await fetch(
+          `/api/tests/thematic?grade=${supportedGrade}&status=published`,
+          { method: "GET", cache: "no-store" }
+        );
 
-        if (
-          !response.ok ||
-          !data?.success
-        ) {
+        const data = await response.json();
+
+        if (!response.ok || !data?.success) {
           throw new Error(
-            data?.message ||
-              "Testlarni yuklab bo‘lmadi."
+            data?.message || "Testlarni yuklab bo‘lmadi."
           );
         }
 
-        const all =
-          Array.isArray(data.tests)
-            ? data.tests
-            : [];
+        const books = Array.isArray(data.books) ? data.books : [];
+        const thematic: PublicTest[] = [];
 
-        const thematic =
-          all.filter(
-            (test: PublicTest) => {
-              if (
-                test?.testType !==
-                "thematic"
-              ) {
-                return false;
-              }
+        for (const book of books) {
+          const bookTests = Array.isArray(book?.tests) ? book.tests : [];
 
-              if (!supportedGrade) {
-                return false;
-              }
+          for (const test of bookTests) {
+            if (String(test?.status || "") !== "published") continue;
 
-              const haystack =
-                `${test.title || ""} ${test.subject || ""}`
-                  .toLowerCase();
-
-              return (
-                haystack.includes(
-                  `${supportedGrade}-sinf`
-                ) ||
-                haystack.includes(
-                  `${supportedGrade} sinf`
-                )
-              );
-            }
-          );
-
-        if (!cancelled) {
-          setTests(thematic);
+            thematic.push({
+              id: String(test.id),
+              title: String(test.title || ""),
+              subject: String(book?.subject || ""),
+              description: String(test.description || ""),
+              duration: Number(test.duration_minutes) || 60,
+              testType: "thematic",
+              questionCount: Number(test.question_count) || 0,
+              attemptLimit:
+                test.attempt_limit === null ||
+                test.attempt_limit === undefined
+                  ? null
+                  : Number(test.attempt_limit),
+              status: "published",
+            });
+          }
         }
+
+        if (!cancelled) setTests(thematic);
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -241,9 +228,7 @@ export default function ThematicGradePage() {
           );
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
@@ -329,7 +314,7 @@ export default function ThematicGradePage() {
     }
 
     router.push(
-      `/test/${encodeURIComponent(
+      `/test/thematic/solve/${encodeURIComponent(
         test.id
       )}`
     );
