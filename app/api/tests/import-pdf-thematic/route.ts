@@ -1121,34 +1121,180 @@ function topicSlug(
   }`;
 }
 
-function buildTopics(
-  lines: TextLine[],
+type AnswerKeyTopic = {
+  id: string;
+  title: string;
+  answerCount: number;
+  answers: OptionLabel[];
+};
+
+/*
+  MUHIM:
+  Mavzular savollar sahifalaridagi takroriy headerlardan olinmaydi.
+  Faqat PDF oxiridagi "Javoblar:" bo‘limidan olinadi.
+
+  Shu PDFda javoblar bo‘limi mavzularning haqiqiy katalogi:
+  1–2-DARS, 3–4-DARS, 5-DARS ... 33-DARS.
+*/
+function extractAnswerKeyTopics(
+  lines: TextLine[]
+): AnswerKeyTopic[] {
+  let inAnswerSection = false;
+
+  const topics: AnswerKeyTopic[] = [];
+  let current:
+    AnswerKeyTopic | null = null;
+
+  let pendingNumbers: number[] = [];
+  let pendingTitleContinuation = false;
+
+  function flushCurrent() {
+    if (
+      current &&
+      current.answers.length > 0
+    ) {
+      current.answerCount =
+        current.answers.length;
+
+      topics.push(current);
+    }
+
+    current = null;
+    pendingNumbers = [];
+    pendingTitleContinuation = false;
+  }
+
+  for (const line of lines) {
+    const text =
+      normalizeOneLine(line.text);
+
+    if (!inAnswerSection) {
+      if (
+        /^javoblar\s*:?\s*$/i.test(text) ||
+        /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+      ) {
+        inAnswerSection = true;
+      }
+
+      continue;
+    }
+
+    const topicTitle =
+      topicTitleFromLine(text);
+
+    if (topicTitle) {
+      flushCurrent();
+
+      current = {
+        id: "",
+        title: topicTitle,
+        answerCount: 0,
+        answers: [],
+      };
+
+      /*
+        Sarlavha keyingi qatorda davom etishi mumkin:
+        "13-DARS. ... huquqiy"
+        "maqomi"
+      */
+      pendingTitleContinuation = true;
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    /*
+      Mavzu nomining ikkinchi qatori.
+      Savol/Javob jadvali boshlanmaguncha faqat sarlavha
+      davomiga o‘xshagan qisqa matnni qo‘shamiz.
+    */
+    if (
+      pendingTitleContinuation &&
+      text &&
+      !text.startsWith("№") &&
+      !/^savol\b/i.test(text) &&
+      !/^javob\b/i.test(text) &&
+      !/^javoblar\b/i.test(text) &&
+      !/^\d+$/.test(text) &&
+      !/Davlat va huquq asoslari/i.test(text)
+    ) {
+      current.title =
+        `${current.title} ${text}`
+          .replace(/\s+/g, " ")
+          .trim();
+
+      pendingTitleContinuation = false;
+      continue;
+    }
+
+    if (
+      text.startsWith("№") ||
+      /^savol\b/i.test(text)
+    ) {
+      pendingTitleContinuation = false;
+
+      pendingNumbers =
+        (text.match(/\b\d{1,4}\b/g) || [])
+          .map(Number)
+          .filter(Number.isFinite);
+
+      continue;
+    }
+
+    if (/^javob\b/i.test(text)) {
+      pendingTitleContinuation = false;
+
+      const rowAnswers =
+        (text.match(/\b[ABCD]\b/gi) || [])
+          .map(
+            (value) =>
+              value.toUpperCase() as OptionLabel
+          );
+
+      const count =
+        pendingNumbers.length > 0
+          ? Math.min(
+              pendingNumbers.length,
+              rowAnswers.length
+            )
+          : rowAnswers.length;
+
+      for (
+        let index = 0;
+        index < count;
+        index++
+      ) {
+        current.answers.push(
+          rowAnswers[index]
+        );
+      }
+
+      pendingNumbers = [];
+    }
+  }
+
+  flushCurrent();
+
+  return topics.map(
+    (topic, index) => ({
+      ...topic,
+      id: topicSlug(
+        topic.title,
+        index
+      ),
+      answerCount:
+        topic.answers.length,
+    })
+  );
+}
+
+function buildTopicsFromAnswerKey(
+  answerTopics: AnswerKeyTopic[],
   questions: ImportedQuestion[]
 ): TopicGroup[] {
-  const topicHeaders: Array<{
-    title: string;
-    lineIndex: number;
-  }> = [];
-
-  lines.forEach((line, lineIndex) => {
-    const title =
-      topicTitleFromLine(line.text);
-
-    if (!title) return;
-
-    const previous =
-      topicHeaders[topicHeaders.length - 1];
-
-    // Bir xil page-header qayta chiqsa yangi mavzu ochmaymiz.
-    if (!previous || previous.title !== title) {
-      topicHeaders.push({
-        title,
-        lineIndex,
-      });
-    }
-  });
-
-  if (topicHeaders.length === 0) {
+  if (answerTopics.length === 0) {
     return [{
       id: "01-mavzulashtirilgan-test",
       title: "Mavzulashtirilgan test",
@@ -1158,64 +1304,81 @@ function buildTopics(
     }];
   }
 
-  /*
-    Har parsed savolni PDFdagi navbatdagi haqiqiy savol-start line bilan
-    bog‘laymiz. Savol ichidagi 1./2./3. bandlar emas, A/B/C/D bilan
-    tugagan bloklardan keyingi startlar parser tartibiga mos keladi.
-  */
-  const sourceIndexes: number[] = [];
-  let cursor = 0;
+  const topics: TopicGroup[] = [];
+  let offset = 0;
 
-  for (let qIndex = 0; qIndex < questions.length; qIndex++) {
-    let found = -1;
+  for (const answerTopic of answerTopics) {
+    const count =
+      answerTopic.answerCount;
 
-    for (let i = cursor; i < lines.length; i++) {
-      const n =
-        questionNumberFromLine(lines[i].text);
+    const topicQuestions =
+      questions.slice(
+        offset,
+        offset + count
+      );
 
-      if (n !== null) {
-        found = i;
-        cursor = i + 1;
-        break;
-      }
-    }
+    /*
+      Har mavzu alohida test bo‘lishi uchun savollarni
+      mavzu ichida 1..N qilib qayta raqamlaymiz.
+      Original global questions[] esa o‘zgarmaydi.
+    */
+    const localQuestions =
+      topicQuestions.map(
+        (question, index) => ({
+          ...question,
+          number: index + 1,
+        })
+      );
 
-    sourceIndexes.push(found);
+    topics.push({
+      id: answerTopic.id,
+      title: answerTopic.title,
+      questionNumbers:
+        topicQuestions.map(
+          (question) =>
+            question.number
+        ),
+      questions:
+        localQuestions,
+    });
+
+    offset += count;
   }
 
-  const topics =
-    topicHeaders.map((header, index) => {
-      const nextHeaderIndex =
-        topicHeaders[index + 1]?.lineIndex ??
-        Number.POSITIVE_INFINITY;
+  /*
+    Answer-key jami soni savollardan kam chiqsa savol yo‘qolmaydi.
+    Oxirgi mavzuga qolgan savollarni qo‘shamiz.
+  */
+  if (
+    offset < questions.length &&
+    topics.length > 0
+  ) {
+    const last =
+      topics[topics.length - 1];
 
-      const topicQuestions =
-        questions.filter(
-          (_q, qIndex) => {
-            const lineIndex =
-              sourceIndexes[qIndex];
+    const remainder =
+      questions.slice(offset);
 
-            return (
-              lineIndex > header.lineIndex &&
-              lineIndex < nextHeaderIndex
-            );
-          }
-        );
+    last.questionNumbers.push(
+      ...remainder.map(
+        (question) =>
+          question.number
+      )
+    );
 
-      return {
-        id: topicSlug(
-          header.title,
-          index
-        ),
-        title: header.title,
-        questionNumbers:
-          topicQuestions.map(
-            (q) => q.number
-          ),
-        questions:
-          topicQuestions,
-      };
-    });
+    const localStart =
+      last.questions.length;
+
+    last.questions.push(
+      ...remainder.map(
+        (question, index) => ({
+          ...question,
+          number:
+            localStart + index + 1,
+        })
+      )
+    );
+  }
 
   return topics.filter(
     (topic) =>
@@ -2599,9 +2762,18 @@ export async function POST(
       Global raqamlar parser tomonidan 1..N tarzida beriladi.
       Qattiq 840 ta degan cheklov endi yo'q.
     */
+    /*
+      MAVZULAR FAQAT "Javoblar:" bo‘limidan olinadi.
+      Savollar sahifasidagi DARS headerlari hisobga olinmaydi.
+    */
+    const answerKeyTopics =
+      extractAnswerKeyTopics(
+        allLines
+      );
+
     const topics =
-      buildTopics(
-        allLines,
+      buildTopicsFromAnswerKey(
+        answerKeyTopics,
         finalQuestions
       );
 
@@ -2677,6 +2849,12 @@ export async function POST(
             topic.questions.length,
         })
       ),
+      topicAnswerKeyTotal:
+        answerKeyTopics.reduce(
+          (sum, topic) =>
+            sum + topic.answerCount,
+          0
+        ),
 
       answerKeyApplied,
       answerKeyCount:
