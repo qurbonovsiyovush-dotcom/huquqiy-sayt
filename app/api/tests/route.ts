@@ -23,6 +23,12 @@ function importChunkPrefix(testId: string) {
   return `${IMPORT_ROOT}/${testId}/chunks/`;
 }
 
+function importFinalPath(testId: string) {
+  return `${IMPORT_ROOT}/${testId}/final.json`;
+}
+
+const IMPORT_FINAL_SUFFIX = "/final.json";
+
 type TestStatus = "draft" | "published";
 
 type TestData = {
@@ -154,9 +160,158 @@ async function readTests(): Promise<TestData[]> {
   const parsed =
     JSON.parse(text);
 
-  return normalizeTests(
-    parsed
-  );
+  const baseTests =
+    normalizeTests(parsed);
+
+  /*
+    MUHIM:
+    Bir vaqtning o‘zida ko‘p mavzulashtirilgan test saqlanganda
+    tests.json ketma-ket overwrite qilinadi. Vercel Blob ayrim GET
+    so‘rovlarida oldingi nusxani qaytarishi mumkin. Shu sabab har bir
+    yakunlangan chunked testning UNIQUE final.json snapshoti saqlanadi.
+
+    Bu yerda tests.json dagi 0-savolli placeholderlar final snapshot
+    bilan tiklanadi. Natijada 35 ta testdan ayrimlari "Savollar: 0"
+    bo‘lib qolmaydi.
+  */
+  try {
+    const finals =
+      await list({
+        prefix:
+          `${IMPORT_ROOT}/`,
+        limit: 1000,
+      });
+
+    const finalBlobs =
+      finals.blobs.filter(
+        (blob) =>
+          blob.pathname.endsWith(
+            IMPORT_FINAL_SUFFIX
+          )
+      );
+
+    if (finalBlobs.length > 0) {
+      const byId =
+        new Map(
+          baseTests.map(
+            (test) => [
+              test.id,
+              test,
+            ]
+          )
+        );
+
+      for (
+        const blob of finalBlobs
+      ) {
+        try {
+          const finalResult =
+            await get(
+              blob.pathname,
+              {
+                access:
+                  "private",
+              }
+            );
+
+          if (
+            !finalResult ||
+            finalResult.statusCode !==
+              200 ||
+            !finalResult.stream
+          ) {
+            continue;
+          }
+
+          const finalText =
+            await new Response(
+              finalResult.stream
+            ).text();
+
+          if (
+            !finalText.trim()
+          ) {
+            continue;
+          }
+
+          const finalTest =
+            JSON.parse(
+              finalText
+            ) as TestData;
+
+          if (
+            !finalTest?.id
+          ) {
+            continue;
+          }
+
+          const current =
+            byId.get(
+              finalTest.id
+            );
+
+          const finalCount =
+            Array.isArray(
+              finalTest.questions
+            )
+              ? finalTest
+                  .questions.length
+              : 0;
+
+          const currentCount =
+            Array.isArray(
+              current?.questions
+            )
+              ? current!
+                  .questions!
+                  .length
+              : 0;
+
+          /*
+            Final snapshot savollarga ega bo‘lsa, 0-savolli yoki eski
+            placeholderdan ustun turadi.
+          */
+          if (
+            !current ||
+            finalCount >
+              currentCount ||
+            finalTest.importState
+              ?.completed === true
+          ) {
+            byId.set(
+              finalTest.id,
+              finalTest
+            );
+          }
+        } catch (
+          finalReadError
+        ) {
+          console.warn(
+            "FINAL SNAPSHOT READ ERROR:",
+            blob.pathname,
+            finalReadError
+          );
+        }
+      }
+
+      return [
+        ...byId.values(),
+      ];
+    }
+  } catch (
+    finalListError
+  ) {
+    /*
+      Final snapshotlarni o‘qishdagi vaqtinchalik xato eski test
+      tizimini butunlay yiqitmasin.
+    */
+    console.warn(
+      "FINAL SNAPSHOT LIST ERROR:",
+      finalListError
+    );
+  }
+
+  return baseTests;
 }
 
 /* =========================================================
@@ -820,6 +975,27 @@ async function finalizeChunkedTest(
   };
 
   /*
+    ENG MUHIM QISM:
+    To‘liq testni avval testId ga tegishli UNIQUE final.json ga yozamiz.
+    tests.json keyingi test saqlanishida stale-read sabab orqaga qaytsa
+    ham bu snapshot yo‘qolmaydi.
+  */
+  await put(
+    importFinalPath(testId),
+    JSON.stringify(
+      completedTest
+    ),
+    {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType:
+        "application/json; charset=utf-8",
+      cacheControlMaxAge: 0,
+    }
+  );
+
+  /*
     tests.json'da placeholder topilsa update qilamiz;
     stale read sabab topilmasa ham testni yo‘qotmaymiz — qo‘shamiz.
   */
@@ -844,7 +1020,9 @@ async function finalizeChunkedTest(
   await writeTests(tests);
 
   /*
-    Vaqtinchalik chunklarni tozalash.
+    Vaqtinchalik meta va chunklarni tozalash.
+    final.json O‘CHIRILMAYDI — u yakunlangan testning ishonchli
+    snapshoti bo‘lib qoladi.
     Cleanup xato qilsa test saqlanishiga ta'sir qilmaydi.
   */
   try {
