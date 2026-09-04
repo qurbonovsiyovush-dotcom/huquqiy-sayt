@@ -477,6 +477,16 @@ export default function TestPage() {
                       : "category"
                   }
                   onClick={() => {
+                    if (
+                      category.key ===
+                      "thematic"
+                    ) {
+                      router.push(
+                        "/test/thematic"
+                      );
+                      return;
+                    }
+
                     setSelectedCategory(
                       category.key
                     );
