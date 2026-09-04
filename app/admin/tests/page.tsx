@@ -651,65 +651,101 @@ export default function AdminTestsPage() {
         "Davom etasizmi?"
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     const secondConfirmed = window.confirm(
-      `DIQQAT!\n\n${drafts.length} ta qoralamani o‘chirishni tasdiqlaysizmi?`
+      `DIQQAT!\n\n${drafts.length} ta qoralamani BIR YO‘LA o‘chirishni tasdiqlaysizmi?`
     );
 
-    if (!secondConfirmed) return;
+    if (!secondConfirmed) {
+      return;
+    }
 
     setBulkDeleting(true);
-    const deletedIds: string[] = [];
-    const failed: string[] = [];
+    setError("");
 
     try {
-      // Ketma-ket o‘chiramiz: umumiy test omboriga parallel yozuv yubormaymiz.
-      for (const test of drafts) {
-        try {
-          setWorkingId(test.id);
-
-          const response = await fetch(
-            `/api/tests/${encodeURIComponent(test.id)}`,
-            {
-              method: "DELETE",
-              cache: "no-store",
-            }
-          );
-
-          const data = await readJson(response);
-
-          if (!response.ok || !data.success) {
-            failed.push(test.title || test.id);
-            continue;
-          }
-
-          deletedIds.push(test.id);
-
-          setTests((current) =>
-            current.filter((item) => item.id !== test.id)
-          );
-        } catch (error) {
-          console.error(error);
-          failed.push(test.title || test.id);
+      /*
+        MUHIM:
+        Endi brauzer 35 ta DELETE so‘rovi yubormaydi.
+        Barcha ID lar BIRTA POST so‘rov bilan serverga yuboriladi.
+        Server tests.json ni bir marta o‘qib, bir marta yozadi.
+      */
+      const response = await fetch(
+        "/api/tests",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            action:
+              "bulk-delete-tests",
+            testIds:
+              drafts.map(
+                (test) =>
+                  test.id
+              ),
+            onlyDrafts: true,
+          }),
         }
+      );
+
+      const data =
+        await readJson(
+          response
+        );
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        window.alert(
+          data.message ||
+            "Qoralamalarni bir yo‘la o‘chirib bo‘lmadi."
+        );
+        return;
       }
 
-      if (failed.length === 0) {
-        window.alert(
-          `${deletedIds.length} ta qoralama test muvaffaqiyatli o‘chirildi.`
+      const deletedIds =
+        new Set<string>(
+          Array.isArray(
+            data.deletedIds
+          )
+            ? data.deletedIds.map(
+                (value: unknown) =>
+                  String(value)
+              )
+            : []
         );
-      } else {
-        window.alert(
-          `${deletedIds.length} ta qoralama o‘chirildi.\n` +
-            `${failed.length} ta testni o‘chirishda xatolik yuz berdi.`
-        );
-      }
+
+      setTests(
+        (current) =>
+          current.filter(
+            (test) =>
+              !deletedIds.has(
+                test.id
+              )
+          )
+      );
+
+      window.alert(
+        `${Number(data.deletedCount) || deletedIds.size} ta qoralama test bir yo‘la o‘chirildi.`
+      );
 
       await loadTests();
+    } catch (error) {
+      console.error(error);
+
+      window.alert(
+        "Qoralamalarni bir yo‘la o‘chirishda server xatosi."
+      );
     } finally {
-      setWorkingId(null);
       setBulkDeleting(false);
+      setWorkingId(null);
     }
   }
 
@@ -2027,7 +2063,7 @@ margin: 10px auto 12px;
           {selectedCategory === "thematic" && (
             <button
               type="button"
-              className="blueButton"
+              className="thematicPublishButton"
               onClick={publishVisibleDrafts}
               disabled={
                 loading ||
@@ -2048,7 +2084,7 @@ margin: 10px auto 12px;
           {selectedCategory === "thematic" && (
             <button
               type="button"
-              className="deleteButton"
+              className="thematicDeleteButton"
               onClick={deleteVisibleDrafts}
               disabled={
                 loading ||
@@ -4253,6 +4289,114 @@ margin: 10px auto 12px;
 
           box-shadow:
             0 4px 0 #266c42;
+        }
+
+        .thematicPublishButton,
+        .thematicDeleteButton {
+          min-height: 54px;
+          min-width: 176px;
+
+          padding: 10px 18px;
+
+          border-radius: 11px;
+
+          color: #111111 !important;
+
+          font-family:
+            "Times New Roman",
+            Georgia,
+            serif;
+
+          font-size: 16px;
+          font-weight: 800;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.12s ease,
+            box-shadow 0.12s ease,
+            filter 0.12s ease;
+
+          text-shadow:
+            0 1px 0
+            rgba(255,255,255,.55);
+        }
+
+        .thematicPublishButton {
+          border:
+            2px solid #174461;
+
+          background:
+            linear-gradient(
+              180deg,
+              #c8f2ff 0%,
+              #79c6e9 48%,
+              #4ca1d0 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px
+              rgba(255,255,255,.92),
+            inset 0 -3px 3px
+              rgba(23,68,97,.20),
+            0 5px 0 #17415c,
+            0 8px 12px
+              rgba(0,0,0,.20);
+        }
+
+        .thematicDeleteButton {
+          border:
+            2px solid #8e1515;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffc0c0 0%,
+              #ef8585 48%,
+              #cf5656 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px
+              rgba(255,255,255,.90),
+            inset 0 -3px 3px
+              rgba(119,18,18,.20),
+            0 5px 0 #831515,
+            0 8px 12px
+              rgba(0,0,0,.20);
+        }
+
+        .thematicPublishButton:hover:not(:disabled),
+        .thematicDeleteButton:hover:not(:disabled) {
+          filter: brightness(1.04);
+          transform:
+            translateY(-1px);
+        }
+
+        .thematicPublishButton:active:not(:disabled),
+        .thematicDeleteButton:active:not(:disabled) {
+          transform:
+            translateY(4px);
+
+          box-shadow:
+            inset 0 2px 3px
+              rgba(0,0,0,.10),
+            0 1px 0
+              rgba(0,0,0,.45);
+        }
+
+        .thematicPublishButton:disabled,
+        .thematicDeleteButton:disabled {
+          cursor:
+            not-allowed;
+
+          opacity: .58;
+
+          color:
+            #111111 !important;
+
+          filter:
+            grayscale(.08);
         }
 
         .deleteButton {
