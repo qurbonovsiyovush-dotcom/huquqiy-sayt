@@ -1678,8 +1678,8 @@ export default function Home() {
         =========================== */
 
         .footer {
-          width: 95%;
-          max-width: 95%;
+          width: 91%;
+          max-width: 91%;
 
           min-height: 112px;
 
@@ -1814,8 +1814,8 @@ export default function Home() {
         @media (min-width: 651px) and (max-width: 900px) {
           .clockSection,
           .sectionBox {
-            width: 93%;
-            max-width: 93%;
+            width: 90%;
+            max-width: 90%;
           }
 
           .emblemRecess {
