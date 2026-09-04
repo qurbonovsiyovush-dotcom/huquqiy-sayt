@@ -150,7 +150,10 @@ async function readTests(): Promise<TestData[]> {
 
   const result =
     await get(
-      TESTS_BLOB_PATH
+      TESTS_BLOB_PATH,
+      {
+        access: "private",
+      }
     );
 
   if (
@@ -241,7 +244,10 @@ async function readTests(): Promise<TestData[]> {
         try {
           const finalResult =
             await get(
-      blob.pathname
+      blob.pathname,
+      {
+        access: "private",
+      }
     );
 
           if (
@@ -835,7 +841,10 @@ async function appendQuestionsChunk(
   */
   const metaResult =
     await get(
-      importMetaPath(testId)
+      importMetaPath(testId),
+      {
+        access: "private",
+      }
     );
 
   if (
@@ -973,7 +982,10 @@ async function finalizeChunkedTest(
 
   const metaResult =
     await get(
-      importMetaPath(testId)
+      importMetaPath(testId),
+      {
+        access: "private",
+      }
     );
 
   if (
@@ -1051,7 +1063,10 @@ async function finalizeChunkedTest(
   for (const blob of chunkBlobs) {
     const chunkResult =
       await get(
-      blob.pathname
+      blob.pathname,
+      {
+        access: "private",
+      }
     );
 
     if (
