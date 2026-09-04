@@ -1511,7 +1511,8 @@ export default function Home() {
 
           display: block;
 
-          transform: none;
+          /* PNG ichidagi optik qiyshiqlikni tuzatish */
+          transform: translate(8px, -4px);
 
           user-select: none;
 
