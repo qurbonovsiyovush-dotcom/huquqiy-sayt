@@ -1501,8 +1501,12 @@ export default function Home() {
         }
 
         .emblemImage {
-          width: 86%;
-          height: 86%;
+          /*
+            Gerb qora dumaloq taglikdan faqat ozgina kichik.
+            Qora halqa ko‘rinib turadi, lekin gerb kichkina bo‘lib qolmaydi.
+          */
+          width: 96%;
+          height: 96%;
 
           margin: 0;
 
