@@ -189,108 +189,94 @@ export default function Home() {
   if (!authenticated) {
     return (
       <main className="loginPage">
-
         <section className="loginCard">
-
-          <div className="loginFloatingTitle">
+          <div className="loginTab">
             Maxsus kirish
           </div>
 
-          <div className="loginMetalOuter">
+          <div className="loginContent">
+            <div className="loginLeft">
+              <div className="ownerName">
+                Qurbonov Siyovush Jamaliddinzoda
+              </div>
 
-            <div className="loginMetalInner">
-              Qurbonov Siyovush
-              Jamaliddinzoda
-            </div>
+              <form
+                onSubmit={handleLogin}
+                className="loginForm"
+              >
+                <div className="inputShell">
+                  <span
+                    className="lockIcon"
+                    aria-hidden="true"
+                  >
+                    🔒
+                  </span>
 
-          </div>
+                  <input
+                    className="loginInput"
+                    type="text"
+                    value={code}
+                    disabled={loginLoading}
+                    autoComplete="off"
+                    placeholder="Kirish kodini kiriting"
+                    onChange={(e) => {
+                      setCode(
+                        e.target.value.toUpperCase()
+                      );
+                      setLoginError("");
+                    }}
+                  />
+                </div>
 
-          <form
-            onSubmit={handleLogin}
-            className="loginForm"
-          >
+                {loginError && (
+                  <div
+                    className="loginError"
+                    role="alert"
+                  >
+                    {loginError}
+                  </div>
+                )}
 
-            <div className="loginField">
-
-              <label>
-                Maxsus kirish kodi
-              </label>
-
-              <div className="loginInputWrapper">
-
-                <span className="loginIcon">
-                  🔐
-                </span>
-
-                <input
-                  className="loginInput"
-                  type="text"
-                  value={code}
+                <button
+                  type="submit"
+                  className="loginButton"
                   disabled={loginLoading}
-                  autoComplete="off"
-                  placeholder="Kirish kodini kiriting"
-                  onChange={(e) => {
-                    setCode(
-                      e.target.value
-                        .toUpperCase()
-                    );
-
-                    setLoginError("");
-                  }}
-                />
-
-              </div>
-
+                >
+                  {loginLoading
+                    ? "Tekshirilmoqda..."
+                    : "Kirish"}
+                </button>
+              </form>
             </div>
 
-            {loginError && (
-              <div className="loginError">
-                {loginError}
+            <div className="loginRight">
+              <div className="emblemCircle">
+                <img
+                  src="/gerb.png"
+                  alt="O‘zbekiston Respublikasi Davlat gerbi"
+                  className="loginEmblem"
+                />
               </div>
-            )}
-
-            <button
-              type="submit"
-              className="loginButton"
-              disabled={loginLoading}
-            >
-              {loginLoading
-                ? "Tekshirilmoqda..."
-                : "Kirish"}
-            </button>
-
-          </form>
-
-          <div className="loginInfo">
-            Platformaga faqat
-            administrator tomonidan
-            berilgan maxsus kod orqali
-            kirish mumkin.
+            </div>
           </div>
-
         </section>
 
-
         <style jsx>{`
-
           * {
             box-sizing: border-box;
           }
 
           .loginPage {
-            width: 100%;
             min-height: 100vh;
+            width: 100%;
 
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
 
-            padding:
-              70px
-              20px
-              50px;
+            padding: 42px 24px;
 
-            background: #ffffff;
+            background: #f7f7f5;
 
             font-family:
               "Bell MT",
@@ -299,248 +285,209 @@ export default function Home() {
           }
 
           .loginCard {
-            width: 100%;
-            max-width: 610px;
-
             position: relative;
 
+            width: min(92vw, 1120px);
+            min-height: 470px;
+
             padding:
-              72px
-              30px
-              34px;
+              78px
+              54px
+              46px;
 
             border:
-              2px solid #252b2f;
+              3px solid #244c66;
 
-            border-radius: 25px;
+            border-radius: 44px;
 
             background:
               linear-gradient(
                 180deg,
-                #6c7174 0%,
-                #555b5e 44%,
-                #42484b 100%
+                #eeeeee 0%,
+                #d8d8d8 18%,
+                #c8c8c8 100%
               );
 
             box-shadow:
-              inset 0 4px 3px
-                rgba(255,255,255,.34),
-
-              inset 0 -5px 8px
-                rgba(0,0,0,.24),
-
-              0 9px 0 #242a2d,
-
+              inset 0 5px 0
+                rgba(255,255,255,.95),
+              inset 0 0 0 12px
+                rgba(255,255,255,.30),
+              inset 0 -8px 0
+                rgba(73,84,90,.18),
+              0 10px 0 #7a858a,
               0 16px 28px
-                rgba(0,0,0,.28);
+                rgba(0,0,0,.18);
           }
 
           .loginCard::before {
             content: "";
 
             position: absolute;
-            inset: 10px;
-
-            border:
-              1px solid
-              rgba(255,255,255,.30);
-
-            border-radius: 18px;
+            inset: 14px;
 
             pointer-events: none;
-          }
-
-          .loginFloatingTitle {
-            position: absolute;
-
-            top: -31px;
-            left: 50%;
-
-            transform:
-              translateX(-50%);
-
-            min-width: 270px;
-
-            padding:
-              13px
-              28px;
-
-            text-align: center;
-
-            color: #0b3654;
-
-            font-size: 24px;
-            font-weight: 900;
-
-            letter-spacing: .2px;
 
             border:
-              2px solid #1b566f;
+              2px solid
+              rgba(255,255,255,.80);
 
-            border-radius: 12px;
-
-            background:
-              linear-gradient(
-                180deg,
-                #aee7ff 0%,
-                #66c8f1 42%,
-                #2da7df 72%,
-                #1684bb 100%
-              );
+            border-radius: 34px;
 
             box-shadow:
-              inset 0 4px 3px
-                rgba(255,255,255,.72),
-
-              0 6px 0 #245a72,
-
-              0 9px 15px
-                rgba(0,0,0,.24);
-
-            z-index: 5;
+              inset 0 0 0 2px
+              rgba(112,124,130,.22);
           }
 
-          .loginMetalOuter {
-            position: relative;
-            z-index: 1;
+          .loginTab {
+            position: absolute;
 
-            padding: 5px;
+            top: -50px;
+            left: 50%;
 
-            margin-bottom: 28px;
+            transform: translateX(-50%);
+
+            min-width: 360px;
+
+            padding:
+              16px
+              34px
+              14px;
+
+            border:
+              3px solid #24516b;
 
             border-radius: 16px;
 
             background:
               linear-gradient(
                 180deg,
-                #f7f7f7 0%,
-                #c9c9c9 38%,
-                #8d8d8d 75%,
-                #4d4d4d 100%
+                #d8f6ff 0%,
+                #8dd8f7 28%,
+                #55b6e5 62%,
+                #1597d1 100%
               );
 
-            border:
-              1px solid #202020;
-
             box-shadow:
-              0 6px 0 #2e3437,
-              0 10px 16px
-                rgba(0,0,0,.30);
-          }
+              inset 0 3px 0
+                rgba(255,255,255,.95),
+              inset 0 -3px 0
+                rgba(14,104,145,.22),
+              0 8px 0 #17658b,
+              0 12px 20px
+                rgba(0,0,0,.16);
 
-          .loginMetalInner {
-            min-height: 90px;
+            color: #0a2f45;
 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-
-            padding:
-              14px
-              20px;
-
+            font-size: 34px;
+            font-weight: 900;
             text-align: center;
 
-            border-radius: 12px;
+            z-index: 3;
+          }
+
+          .loginContent {
+            position: relative;
+            z-index: 2;
+
+            min-height: 330px;
+
+            display: grid;
+            grid-template-columns:
+              minmax(420px, 1.15fr)
+              minmax(300px, .85fr);
+
+            align-items: center;
+            gap: 64px;
+          }
+
+          .loginLeft {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+          }
+
+          .ownerName {
+            width: 100%;
+
+            padding:
+              17px
+              20px;
+
+            border:
+              3px solid #525b60;
+
+            border-radius: 14px;
 
             background:
               linear-gradient(
                 180deg,
                 #ffffff 0%,
-                #eeeeee 38%,
-                #d0d0d0 100%
+                #ececec 56%,
+                #d4d4d4 100%
               );
 
-            border:
-              1px solid #757575;
-
             box-shadow:
-              inset 0 3px 3px
-                rgba(255,255,255,.90),
-
-              inset 0 -2px 3px
-                rgba(0,0,0,.12);
+              inset 0 3px 0 #ffffff,
+              0 7px 0 #454c50,
+              0 10px 15px
+                rgba(0,0,0,.16);
 
             color: #111;
 
-            font-size: 25px;
-            line-height: 1.05;
-            font-weight: 900;
-
-            text-shadow:
-              0 1px 0 #ffffff;
+            font-size: 26px;
+            font-weight: 800;
+            text-align: center;
           }
 
           .loginForm {
-            position: relative;
-            z-index: 1;
-
             display: flex;
             flex-direction: column;
-
-            gap: 14px;
+            gap: 28px;
           }
 
-          .loginField {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-          }
-
-          .loginField label {
-            text-align: center;
-
-            color: #111;
-
-            font-size: 19px;
-            font-weight: 900;
-
-            text-shadow:
-              0 1px 0
-              rgba(255,255,255,.70);
-          }
-
-          .loginInputWrapper {
-            height: 56px;
+          .inputShell {
+            min-height: 76px;
 
             display: flex;
             align-items: center;
 
             padding:
               0
-              14px;
+              20px;
 
             border:
-              2px solid #28607a;
+              3px solid #235f82;
 
-            border-radius: 11px;
+            border-radius: 13px;
 
             background:
               linear-gradient(
                 180deg,
                 #ffffff 0%,
-                #f4f4f4 55%,
-                #d8d8d8 100%
+                #f0f0f0 62%,
+                #e2e2e2 100%
               );
 
             box-shadow:
-              inset 0 3px 3px
-                rgba(255,255,255,.95),
-
-              0 4px 0 #5b676d,
-
-              0 7px 12px
-                rgba(0,0,0,.20);
+              inset 0 3px 0 #ffffff,
+              inset 0 -3px 0
+                rgba(102,113,120,.12),
+              0 7px 0 #3d5969,
+              0 11px 16px
+                rgba(0,0,0,.16);
           }
 
-          .loginIcon {
-            margin-right: 10px;
+          .lockIcon {
+            flex: 0 0 auto;
 
-            font-size: 19px;
+            margin-right: 13px;
+
+            font-size: 20px;
           }
 
           .loginInput {
-            flex: 1;
+            width: 100%;
             min-width: 0;
 
             border: 0;
@@ -555,86 +502,95 @@ export default function Home() {
               "Times New Roman",
               serif;
 
-            font-size: 18px;
+            font-size: 21px;
             font-weight: 700;
           }
 
           .loginInput::placeholder {
-            color: #727272;
+            color: #858585;
             opacity: 1;
           }
 
           .loginError {
+            margin:
+              -12px
+              0
+              -8px;
+
             padding:
-              10px
-              12px;
+              11px
+              14px;
 
             border:
-              1px solid #9f2525;
+              1px solid #bf6565;
 
-            border-radius: 8px;
+            border-radius: 9px;
 
-            background: #ffeaea;
+            background: #fff0f0;
 
-            color: #8a1717;
+            color: #9a1f1f;
 
-            text-align: center;
+            font-size: 14px;
             font-weight: 800;
+            text-align: center;
           }
 
           .loginButton {
-            min-height: 58px;
-
-            margin-top: 3px;
+            min-height: 76px;
 
             border:
-              2px solid #1b5670;
+              3px solid #235f82;
 
-            border-radius: 11px;
+            border-radius: 13px;
 
             background:
               linear-gradient(
                 180deg,
-                #aee8ff 0%,
-                #61c9f3 40%,
-                #1ba7e2 74%,
-                #0f83b9 100%
+                #dff8ff 0%,
+                #9ce1fb 18%,
+                #64bce9 56%,
+                #3a9fd6 100%
               );
 
             box-shadow:
-              inset 0 4px 3px
-                rgba(255,255,255,.72),
+              inset 0 3px 0
+                rgba(255,255,255,.96),
+              inset 0 -3px 0
+                rgba(20,101,143,.16),
+              0 8px 0 #176a96,
+              0 12px 17px
+                rgba(0,0,0,.17);
 
-              0 6px 0 #1d566f,
-
-              0 9px 14px
-                rgba(0,0,0,.24);
-
-            color: #11384f;
+            color: #0b2d43;
 
             font-family:
               "Bell MT",
               "Times New Roman",
               serif;
 
-            font-size: 24px;
+            font-size: 31px;
             font-weight: 900;
 
             cursor: pointer;
+
+            transition:
+              transform .12s ease,
+              box-shadow .12s ease;
+          }
+
+          .loginButton:hover {
+            transform: translateY(-1px);
           }
 
           .loginButton:active {
-            transform:
-              translateY(3px);
+            transform: translateY(4px);
 
             box-shadow:
-              inset 0 3px 3px
-                rgba(255,255,255,.55),
-
-              0 3px 0 #1d566f,
-
-              0 5px 9px
-                rgba(0,0,0,.22);
+              inset 0 3px 0
+                rgba(255,255,255,.80),
+              0 4px 0 #176a96,
+              0 8px 12px
+                rgba(0,0,0,.14);
           }
 
           .loginButton:disabled {
@@ -642,113 +598,159 @@ export default function Home() {
             cursor: wait;
           }
 
-          .loginInfo {
-            position: relative;
-            z-index: 1;
+          .loginRight {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
 
-            margin-top: 28px;
-
-            min-height: 58px;
+          .emblemCircle {
+            width: min(28vw, 320px);
+            aspect-ratio: 1 / 1;
 
             display: flex;
             align-items: center;
             justify-content: center;
 
-            padding:
-              10px
-              16px;
-
-            border:
-              1px solid #8a8a8a;
-
-            border-radius: 10px;
+            border-radius: 50%;
 
             background:
-              linear-gradient(
-                180deg,
-                #ffffff 0%,
-                #f1f1f1 55%,
-                #d6d6d6 100%
+              radial-gradient(
+                circle,
+                #444b4f 0%,
+                #30373b 72%,
+                #1f2528 100%
               );
 
+            border:
+              3px solid #30383c;
+
             box-shadow:
-              inset 0 3px 3px
-                rgba(255,255,255,.92),
+              inset 0 0 0 8px
+                rgba(255,255,255,.05),
+              inset 0 0 0 14px
+                rgba(0,0,0,.12),
+              0 10px 0 #272d30,
+              0 16px 22px
+                rgba(0,0,0,.16);
 
-              0 5px 0 #626b70,
-
-              0 8px 12px
-                rgba(0,0,0,.18);
-
-            color: #474747;
-
-            text-align: center;
-
-            font-size: 13px;
-            line-height: 1.25;
-            font-weight: 700;
+            overflow: hidden;
           }
 
-          @media (max-width: 650px) {
+          .loginEmblem {
+            width: 90%;
+            height: 90%;
+
+            display: block;
+
+            object-fit: contain;
+            object-position: center;
+
+            user-select: none;
+          }
+
+          @media (max-width: 900px) {
+            .loginCard {
+              width: min(94vw, 760px);
+
+              padding:
+                76px
+                34px
+                40px;
+            }
+
+            .loginContent {
+              grid-template-columns: 1fr;
+              gap: 36px;
+            }
+
+            .loginRight {
+              order: -1;
+            }
+
+            .emblemCircle {
+              width: min(46vw, 260px);
+            }
+
+            .ownerName {
+              font-size: 23px;
+            }
+          }
+
+          @media (max-width: 560px) {
             .loginPage {
               padding:
-                60px
-                12px
-                30px;
+                38px
+                12px;
             }
 
             .loginCard {
-              max-width: 390px;
+              width: 92vw;
+              min-height: auto;
 
               padding:
-                62px
-                16px
-                25px;
+                66px
+                18px
+                28px;
 
-              border-radius: 22px;
+              border-radius: 28px;
             }
 
-            .loginFloatingTitle {
+            .loginCard::before {
+              inset: 9px;
+              border-radius: 21px;
+            }
+
+            .loginTab {
+              top: -35px;
+
               min-width: 230px;
 
               padding:
-                11px
-                20px;
+                12px
+                24px
+                11px;
+
+              border-radius: 14px;
+
+              font-size: 25px;
+            }
+
+            .loginContent {
+              gap: 27px;
+            }
+
+            .emblemCircle {
+              width: min(58vw, 220px);
+            }
+
+            .ownerName {
+              padding:
+                14px
+                12px;
 
               font-size: 20px;
+              line-height: 1.18;
             }
 
-            .loginMetalInner {
-              min-height: 78px;
-
-              font-size: 21px;
+            .loginForm {
+              gap: 20px;
             }
 
-            .loginField label {
-              font-size: 17px;
-            }
-
-            .loginInputWrapper {
-              height: 52px;
+            .inputShell,
+            .loginButton {
+              min-height: 60px;
             }
 
             .loginInput {
-              font-size: 16px;
+              font-size: 17px;
             }
 
             .loginButton {
-              min-height: 54px;
-              font-size: 21px;
-            }
-
-            .loginInfo {
-              margin-top: 24px;
-              font-size: 12px;
+              font-size: 25px;
             }
           }
-
         `}</style>
-
       </main>
     );
   }
