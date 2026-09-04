@@ -23,7 +23,8 @@ type PublicTest = {
 };
 
 type LessonRow = {
-  lessonNumber: number;
+  lessonStart: number;
+  lessonEnd: number;
   title: string;
   test: PublicTest | null;
 };
@@ -37,64 +38,86 @@ function normalizeTitle(
     .trim();
 }
 
-function lessonNumberFromTitle(
+function lessonRangeFromTitle(
   title: string
 ) {
   const normalized =
     normalizeTitle(title);
 
   /*
-    Saqlangan title misoli:
-    Davlat va huquq asoslari 10-sinf — 1-DARS. ...
+    Qo‘llab-quvvatlaydi:
+    1-DARS.
+    1-2-DARS.
+    11-12-DARS.
   */
   const match =
     normalized.match(
-      /(?:^|\s|[-])(\d{1,2})-DARS\./i
+      /(?:^|\s|—|-)(\d{1,3})\s*(?:-\s*(\d{1,3}))?\s*-\s*DARS\./i
     );
 
   if (!match) {
     return null;
   }
 
-  const value =
+  const start =
     Number(match[1]);
 
+  const end =
+    match[2]
+      ? Number(match[2])
+      : start;
+
   if (
-    !Number.isInteger(value) ||
-    value < 1 ||
-    value > 200
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 1 ||
+    end < start ||
+    end > 300
   ) {
     return null;
   }
 
-  return value;
+  return {
+    start,
+    end,
+  };
 }
 
 function lessonLabelFromTitle(
   title: string,
-  lessonNumber: number
+  lessonStart: number,
+  lessonEnd: number
 ) {
   const normalized =
     String(title || "")
       .replace(/\s+/g, " ")
       .trim();
 
+  const range =
+    lessonEnd > lessonStart
+      ? `${lessonStart}\\s*[-–—]\\s*${lessonEnd}`
+      : `${lessonStart}`;
+
   const marker =
     new RegExp(
-      `${lessonNumber}\\s*-\\s*DARS\\.`,
+      `${range}\\s*-\\s*DARS\\.`,
       "i"
     );
 
   const match =
     normalized.match(marker);
 
-  if (!match || match.index == null) {
-    return `${lessonNumber}-DARS`;
+  if (
+    !match ||
+    match.index == null
+  ) {
+    return lessonEnd > lessonStart
+      ? `${lessonStart}–${lessonEnd}-DARS`
+      : `${lessonStart}-DARS`;
   }
 
   return normalized
     .slice(match.index)
-    .replace(/[–—]/g, "-")
     .trim();
 }
 
@@ -233,46 +256,51 @@ export default function ThematicGradePage() {
 
   const lessonRows =
     useMemo<LessonRow[]>(() => {
-      const byLesson =
-        new Map<
-          number,
-          PublicTest
-        >();
+      const rows: LessonRow[] = [];
+      const seen =
+        new Set<string>();
 
       for (const test of tests) {
-        const number =
-          lessonNumberFromTitle(
+        const range =
+          lessonRangeFromTitle(
             test.title
           );
 
-        if (
-          number !== null &&
-          !byLesson.has(number)
-        ) {
-          byLesson.set(
-            number,
-            test
-          );
+        if (!range) {
+          continue;
         }
+
+        const key =
+          `${range.start}-${range.end}`;
+
+        if (seen.has(key)) {
+          continue;
+        }
+
+        seen.add(key);
+
+        rows.push({
+          lessonStart:
+            range.start,
+          lessonEnd:
+            range.end,
+          title:
+            lessonLabelFromTitle(
+              test.title,
+              range.start,
+              range.end
+            ),
+          test,
+        });
       }
 
-      return Array.from(
-        byLesson.entries()
-      )
-        .sort(
-          ([a], [b]) => a - b
-        )
-        .map(
-          ([lessonNumber, test]) => ({
-            lessonNumber,
-            title:
-              lessonLabelFromTitle(
-                test.title,
-                lessonNumber
-              ),
-            test,
-          })
-        );
+      return rows.sort(
+        (a, b) =>
+          a.lessonStart -
+            b.lessonStart ||
+          a.lessonEnd -
+            b.lessonEnd
+      );
     }, [tests]);
 
   const controlTest =
@@ -376,7 +404,7 @@ export default function ThematicGradePage() {
                     return (
                       <button
                         key={
-                          row.lessonNumber
+                          row.lessonStart
                         }
                         type="button"
                         className={`lessonButton ${
@@ -395,7 +423,7 @@ export default function ThematicGradePage() {
                       >
                         <span className="lessonNo">
                           {
-                            row.lessonNumber
+                            row.lessonStart
                           }
                         </span>
 
