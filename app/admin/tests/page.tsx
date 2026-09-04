@@ -155,6 +155,7 @@ export default function AdminTestsPage() {
   const [tests, setTests] = useState<TestData[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -468,6 +469,108 @@ export default function AdminTestsPage() {
       );
     } finally {
       setWorkingId(null);
+    }
+  }
+
+  /* =========================================================
+     KO'RINIB TURGAN QORALAMALARNI BIR YO'LA E'LON QILISH
+  ========================================================= */
+
+  async function publishVisibleDrafts() {
+    const drafts = filteredTests.filter(
+      (test) => test.status === "draft"
+    );
+
+    if (drafts.length === 0) {
+      window.alert(
+        "Hozirgi filtrda e’lon qilinadigan qoralama test yo‘q."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${drafts.length} ta qoralama test bir yo‘la e’lon qilinadi.\n\n` +
+        "Faqat hozir tanlangan bo‘lim va qidiruv/holat filtriga mos testlar e’lon qilinadi.\n\n" +
+        "Davom etasizmi?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBulkPublishing(true);
+
+    const publishedIds: string[] = [];
+    const failed: string[] = [];
+
+    try {
+      /*
+        Har bir test uchun faqat status maydonini PUT qilamiz.
+        Savollar qayta yuborilmaydi, shuning uchun katta testlarda
+        request hajmi oshib ketmaydi.
+
+        So‘rovlarni ketma-ket yuboramiz: Blob faylga bir vaqtning
+        o‘zida ko‘p yozish natijasida ma’lumot yo‘qolib qolmasin.
+      */
+      for (const test of drafts) {
+        try {
+          setWorkingId(test.id);
+
+          const response = await fetch(
+            `/api/tests/${encodeURIComponent(test.id)}`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                status: "published",
+              }),
+            }
+          );
+
+          const data = await readJson(response);
+
+          if (!response.ok || !data.success) {
+            failed.push(test.title || test.id);
+            continue;
+          }
+
+          publishedIds.push(test.id);
+
+          setTests((current) =>
+            current.map((item) =>
+              item.id === test.id
+                ? {
+                    ...item,
+                    ...(data.test || {}),
+                    status: "published",
+                  }
+                : item
+            )
+          );
+        } catch (error) {
+          console.error(error);
+          failed.push(test.title || test.id);
+        }
+      }
+
+      if (failed.length === 0) {
+        window.alert(
+          `${publishedIds.length} ta test muvaffaqiyatli e’lon qilindi.`
+        );
+      } else {
+        window.alert(
+          `${publishedIds.length} ta test e’lon qilindi.\n` +
+            `${failed.length} ta testda xatolik yuz berdi.\n\n` +
+            "Xatolik bo‘lgan testlarni ro‘yxatdan tekshiring."
+        );
+      }
+
+      await loadTests();
+    } finally {
+      setWorkingId(null);
+      setBulkPublishing(false);
     }
   }
 
@@ -1834,11 +1937,32 @@ margin: 10px auto 12px;
             )}
           </div>
 
+          {selectedCategory === "thematic" && (
+            <button
+              type="button"
+              className="blueButton"
+              onClick={publishVisibleDrafts}
+              disabled={
+                loading ||
+                bulkPublishing ||
+                filteredTests.every(
+                  (test) =>
+                    test.status !== "draft"
+                )
+              }
+              title="Hozir ko‘rinib turgan qoralama testlarni bir yo‘la e’lon qilish"
+            >
+              {bulkPublishing
+                ? "E’lon qilinmoqda..."
+                : "Barchasini e’lon qilish"}
+            </button>
+          )}
+
           <button
             type="button"
             className="refreshButton"
             onClick={loadTests}
-            disabled={loading}
+            disabled={loading || bulkPublishing}
           >
             ↻ Yangilash
           </button>
