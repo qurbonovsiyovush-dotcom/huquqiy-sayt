@@ -1352,8 +1352,12 @@ export default function Home() {
         .sectionBox {
           position: relative;
 
-          width:
-            min(1200px, 95%);
+          /*
+            Tepada .topPanel width:100%.
+            Pastdagi barcha katta bo‘limlar ham aynan shu kenglikda.
+          */
+          width: 100%;
+          max-width: none;
 
           margin:
             90px
@@ -1364,6 +1368,8 @@ export default function Home() {
             75px
             38px
             45px;
+
+          box-sizing: border-box;
 
           border:
             3px solid #303538;
@@ -1502,22 +1508,23 @@ export default function Home() {
 
         .emblemImage {
           /*
-            Gerb qora dumaloq taglikdan faqat ozgina kichik.
-            Qora halqa ko‘rinib turadi, lekin gerb kichkina bo‘lib qolmaydi.
+            Gerb cho‘zilmaydi:
+            balandlik yoki kenglik majburan bir xil qiymatga tortilmaydi.
+            PNG o‘zining tabiiy proporsiyasini saqlaydi.
           */
-          width: 96%;
-          height: 96%;
+          width: 94%;
+          height: auto;
+          max-width: 94%;
+          max-height: 94%;
 
-          margin: 0;
+          margin: 0 auto;
 
           object-fit: contain;
-          object-position: center center;
+          object-position: center;
 
           display: block;
 
-          position: relative;
-          left: 0;
-          top: 0;
+          position: static;
 
           transform: none;
 
@@ -1536,21 +1543,29 @@ export default function Home() {
         =========================== */
 
         .cards {
+          width: 100%;
+
           display: grid;
 
           grid-template-columns:
             repeat(
               3,
-              1fr
+              minmax(0, 1fr)
             );
 
           gap: 30px;
+
+          align-items: stretch;
         }
 
         .card {
+          width: 100%;
+          min-width: 0;
           min-height: 235px;
 
           padding: 30px;
+
+          box-sizing: border-box;
 
           display: flex;
 
@@ -1658,8 +1673,8 @@ export default function Home() {
         =========================== */
 
         .footer {
-          width:
-            min(1200px, 95%);
+          width: 100%;
+          max-width: none;
 
           min-height: 112px;
 
