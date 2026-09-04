@@ -3306,6 +3306,18 @@ export default function ImportPdfTestPage() {
                   questionDrafts[question.id] ?? question.questionText
                 ),
                 questionHtml: prepared.questionHtml,
+
+                /*
+                  MUHIM:
+                  PDF/editor ichidagi barcha vizual elementlar
+                  Neon import API'ga ham yuboriladi.
+                  prepareQuestion() ularni allaqachon tozalab,
+                  normalizatsiya qilib prepared.shapes ga joylagan.
+                */
+                shapes: Array.isArray(prepared.shapes)
+                  ? prepared.shapes
+                  : [],
+
                 points: prepared.points,
                 options: prepared.options.map((option, optionIndex) => ({
                   id: option.id,
