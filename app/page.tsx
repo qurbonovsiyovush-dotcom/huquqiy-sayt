@@ -33,13 +33,6 @@ export default function Home() {
   const [loginLoading, setLoginLoading] =
     useState(false);
 
-  /* =====================================================
-     SOAT VA SANA
-  ===================================================== */
-
-  const [now, setNow] =
-    useState(new Date());
-
   useEffect(() => {
     /*
       Faqat shu brauzer oynasida
@@ -62,14 +55,6 @@ export default function Home() {
     }
 
     setChecking(false);
-
-    const timer =
-      setInterval(() => {
-        setNow(new Date());
-      }, 1000);
-
-    return () =>
-      clearInterval(timer);
   }, []);
 
   /* =====================================================
@@ -180,48 +165,6 @@ export default function Home() {
     setCode("");
     setLoginError("");
   }
-
-  /* =====================================================
-     SANA
-  ===================================================== */
-
-  const days = [
-    "Yakshanba",
-    "Dushanba",
-    "Seshanba",
-    "Chorshanba",
-    "Payshanba",
-    "Juma",
-    "Shanba",
-  ];
-
-  const months = [
-    "yanvar",
-    "fevral",
-    "mart",
-    "aprel",
-    "may",
-    "iyun",
-    "iyul",
-    "avgust",
-    "sentabr",
-    "oktabr",
-    "noyabr",
-    "dekabr",
-  ];
-
-  const timeText =
-    now.toLocaleTimeString(
-      "uz-UZ",
-      {
-        hour12: false,
-      }
-    );
-
-  const dateText =
-    `${days[now.getDay()]}, ` +
-    `${now.getDate()}-${months[now.getMonth()]} ` +
-    `${now.getFullYear()}`;
 
   /* =====================================================
      TEKSHIRILAYOTGAN PAYT
@@ -846,12 +789,17 @@ export default function Home() {
             Savol-javob
           </a>
 
-          <a
-            href="#qollanmalar"
+          <button
+            type="button"
             className="menuButton"
+            onClick={() =>
+              router.push(
+                "/qollanmalar"
+              )
+            }
           >
             Qo‘llanmalar
-          </a>
+          </button>
 
           {isAdmin && (
             <button
@@ -879,7 +827,7 @@ export default function Home() {
 
 
       {/* =================================================
-          SOAT VA SANA
+          O‘ZBEKISTON RESPUBLIKASI DAVLAT GERBI
       ================================================= */}
 
       <section className="clockSection">
@@ -888,12 +836,15 @@ export default function Home() {
           Huquqiy ta’lim platformasi
         </div>
 
-        <div className="clockBox">
-          {timeText}
-        </div>
-
-        <div className="dateBox">
-          {dateText}
+        <div className="emblemHolder">
+          <div className="emblemRecess">
+            <img
+              src="/gerb.png"
+              alt="O‘zbekiston Respublikasi Davlat gerbi"
+              className="emblemImage"
+              draggable={false}
+            />
+          </div>
         </div>
 
       </section>
@@ -1082,7 +1033,15 @@ export default function Home() {
           <article className="card">
             <h2>Kodekslar</h2>
 
-            <button className="openButton">
+            <button
+              type="button"
+              className="openButton"
+              onClick={() =>
+                router.push(
+                  "/qollanmalar/kodekslar"
+                )
+              }
+            >
               Ochish
             </button>
           </article>
@@ -1093,7 +1052,15 @@ export default function Home() {
               hujjatlari
             </h2>
 
-            <button className="openButton">
+            <button
+              type="button"
+              className="openButton"
+              onClick={() =>
+                router.push(
+                  "/qollanmalar/qonunlar"
+                )
+              }
+            >
               Ochish
             </button>
           </article>
@@ -1101,7 +1068,60 @@ export default function Home() {
           <article className="card">
             <h2>Darsliklar</h2>
 
-            <button className="openButton">
+            <button
+              type="button"
+              className="openButton"
+              onClick={() =>
+                router.push(
+                  "/qollanmalar/darsliklar"
+                )
+              }
+            >
+              Ochish
+            </button>
+          </article>
+
+          <article className="card">
+            <h2>
+              English Vocabulary
+            </h2>
+
+            <div className="vocabularySubtitle">
+              4000 Essential English Words
+            </div>
+
+            <button
+              type="button"
+              className="openButton testButton"
+              onClick={() =>
+                router.push(
+                  "/qollanmalar/english-vocabulary"
+                )
+              }
+            >
+              Ochish
+            </button>
+          </article>
+
+          <article className="card">
+            <h2>
+              Inglizcha lug‘atlar
+            </h2>
+
+            <div className="vocabularySubtitle">
+              English–Uzbek, Phrasal Verbs,
+              Irregular Verbs va boshqalar
+            </div>
+
+            <button
+              type="button"
+              className="openButton testButton"
+              onClick={() =>
+                router.push(
+                  "/dictionaries"
+                )
+              }
+            >
               Ochish
             </button>
           </article>
@@ -1109,7 +1129,6 @@ export default function Home() {
         </div>
 
       </section>
-
 
       {/* =================================================
           FOOTER
@@ -1424,89 +1443,68 @@ export default function Home() {
 
 
         /* ===========================
-           SOAT
+           GERB
         =========================== */
 
-        .clockBox {
-          min-height: 170px;
+        .emblemHolder {
+          min-height: 390px;
 
           display: flex;
-
           align-items: center;
-
           justify-content: center;
 
-          margin-bottom: 30px;
-
-          border:
-            2px solid #444b4f;
-
-          border-radius: 20px;
-
-          background:
-            linear-gradient(
-              #f0f0f0,
-              #c3c3c3
-            );
-
-          box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.9),
-
-            0 7px 0 #4a5054;
-
-          font-size:
-            clamp(
-              55px,
-              9vw,
-              95px
-            );
-
-          font-weight: 700;
-
-          letter-spacing: 4px;
+          padding: 25px;
         }
 
-        .dateBox {
-          min-height: 105px;
+        .emblemRecess {
+          width: 390px;
+          height: 390px;
 
           display: flex;
-
           align-items: center;
-
           justify-content: center;
 
-          padding: 20px;
-
-          text-align: center;
-
-          color: #073b68;
-
           border:
-            3px solid #174461;
+            5px solid #22292d;
 
-          border-radius: 16px;
+          border-radius: 50%;
 
           background:
-            linear-gradient(
-              #9bd9ff,
-              #59a9d8
+            radial-gradient(
+              circle at 50% 42%,
+              #50575b 0%,
+              #363c40 55%,
+              #1f2528 100%
             );
 
           box-shadow:
-            inset 0 6px 5px
-              rgba(255,255,255,.75),
+            inset 0 7px 8px
+              rgba(255,255,255,.18),
 
-            0 6px 0 #17415c;
+            inset 0 -10px 14px
+              rgba(0,0,0,.42),
 
-          font-size:
-            clamp(
-              24px,
-              4vw,
-              37px
+            0 7px 0 #1f2528,
+
+            0 14px 22px
+              rgba(0,0,0,.34);
+        }
+
+        .emblemImage {
+          width: 88%;
+          height: 88%;
+
+          object-fit: contain;
+
+          display: block;
+
+          user-select: none;
+
+          filter:
+            drop-shadow(
+              0 8px 5px
+              rgba(0,0,0,.28)
             );
-
-          font-weight: 700;
         }
 
 
@@ -1561,6 +1559,27 @@ export default function Home() {
 
             0 11px 16px
               rgba(0,0,0,.25);
+        }
+
+        .vocabularySubtitle {
+          min-height: 42px;
+
+          margin:
+            -12px
+            0
+            18px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          text-align: center;
+
+          color: #314753;
+
+          font-size: 15px;
+          line-height: 1.25;
+          font-weight: 700;
         }
 
         .card h2 {
