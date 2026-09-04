@@ -4986,7 +4986,6 @@ export default function ImportPdfTestPage() {
             grid-column: 3;
           }
         }
-      `}
         .topicsBox {
           position: relative;
           width: min(100%, 1180px);
@@ -5126,6 +5125,7 @@ export default function ImportPdfTestPage() {
           }
         }
 
+      `}
 </style>
     </main>
   );
