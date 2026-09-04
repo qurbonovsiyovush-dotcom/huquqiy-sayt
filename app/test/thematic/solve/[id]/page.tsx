@@ -3839,7 +3839,7 @@ const pageStyles = `
       "Times New Roman",
       serif;
 
-    font-size: 17px;
+    font-size: 19px;
 
     line-height: 1.5;
 
@@ -4831,7 +4831,7 @@ const pageStyles = `
     }
 
     .optionText {
-      font-size: 15px;
+      font-size: 17px;
 
       line-height: 1.4;
     }
