@@ -685,6 +685,74 @@ export default function Home() {
           }
 
           @media (max-width: 650px) {
+
+          .clockSection,
+          .sectionBox {
+            width: 92%;
+            max-width: 92%;
+
+            margin:
+              72px
+              auto
+              55px;
+
+            padding:
+              66px
+              16px
+              30px;
+          }
+
+          .emblemHolder {
+            min-height: auto;
+            padding: 18px 0;
+          }
+
+          .emblemRecess {
+            width: min(78vw, 315px);
+            height: auto;
+            aspect-ratio: 1 / 1;
+
+            margin: 0 auto;
+
+            flex: 0 0 auto;
+          }
+
+          .emblemImage {
+            width: 91%;
+            height: auto;
+            max-width: 91%;
+            max-height: 91%;
+
+            object-fit: contain;
+            object-position: center;
+          }
+
+          .cards {
+            grid-template-columns: 1fr;
+            gap: 18px;
+          }
+
+          .card {
+            min-height: 190px;
+            padding: 24px 20px;
+          }
+
+          .sectionTitle {
+            max-width: calc(100% - 38px);
+            padding-left: 24px;
+            padding-right: 24px;
+          }
+
+          .loginCard {
+            width: 92%;
+            max-width: 390px;
+
+            padding:
+              62px
+              16px
+              25px;
+          }
+
             .loginPage {
               padding:
                 60px
@@ -1467,8 +1535,8 @@ export default function Home() {
         }
 
         .emblemRecess {
-          width: 390px;
-          height: 390px;
+          width: clamp(300px, 28vw, 390px);
+          height: auto;
           aspect-ratio: 1 / 1;
 
           margin: 0 auto;
@@ -1477,7 +1545,7 @@ export default function Home() {
           align-items: center;
           justify-content: center;
 
-          flex: 0 0 390px;
+          flex: 0 0 auto;
 
           border:
             5px solid #22292d;
@@ -1509,14 +1577,13 @@ export default function Home() {
 
         .emblemImage {
           /*
-            Gerb cho‘zilmaydi:
-            balandlik yoki kenglik majburan bir xil qiymatga tortilmaydi.
-            PNG o‘zining tabiiy proporsiyasini saqlaydi.
+            Gerb qora dumaloq taglik ichida markazda turadi.
+            Cho‘zilmaydi va qora halqadan ozgina kichik bo‘ladi.
           */
-          width: 94%;
+          width: 91%;
           height: auto;
-          max-width: 94%;
-          max-height: 94%;
+          max-width: 91%;
+          max-height: 91%;
 
           margin: 0 auto;
 
@@ -1526,7 +1593,6 @@ export default function Home() {
           display: block;
 
           position: static;
-
           transform: none;
 
           user-select: none;
@@ -1803,6 +1869,21 @@ export default function Home() {
             max-width: 92%;
 
             font-size: 22px;
+          }
+        }
+
+
+        @media (min-width: 651px) and (max-width: 900px) {
+          .clockSection,
+          .sectionBox {
+            width: 93%;
+            max-width: 93%;
+          }
+
+          .emblemRecess {
+            width: min(46vw, 350px);
+            height: auto;
+            aspect-ratio: 1 / 1;
           }
         }
 
