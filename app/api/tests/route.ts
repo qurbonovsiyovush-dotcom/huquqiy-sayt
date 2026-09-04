@@ -268,19 +268,36 @@ async function readTests(): Promise<TestData[]> {
               : 0;
 
           /*
-            Final snapshot savollarga ega bo‘lsa, 0-savolli yoki eski
-            placeholderdan ustun turadi.
+            final.json faqat to‘liq savollarni tiklash uchun ishlatiladi.
+            tests.json dagi eng yangi metadata/status esa saqlanib qoladi.
+
+            Natija:
+            - published status yana draftga qaytmaydi;
+            - keyingi title/subject/description/duration tahrirlari yo‘qolmaydi;
+            - tests.json ichida questions 0 bo‘lib qolsa, final.json savollarni tiklaydi.
           */
-          if (
-            !current ||
-            finalCount >
-              currentCount ||
-            finalTest.importState
-              ?.completed === true
-          ) {
+          if (!current) {
             byId.set(
               finalTest.id,
               finalTest
+            );
+            continue;
+          }
+
+          if (
+            finalCount >
+              currentCount
+          ) {
+            byId.set(
+              finalTest.id,
+              {
+                ...finalTest,
+                ...current,
+                questions:
+                  finalTest.questions,
+                importState:
+                  finalTest.importState,
+              }
             );
           }
         } catch (
