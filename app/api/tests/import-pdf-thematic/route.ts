@@ -72,13 +72,6 @@ type ImportedQuestion = {
   options: ImportedOption[];
   pdfCrop?: PdfCrop;
   warning?: string;
-
-  // Thematic importer ichki metadata.
-  sectionKey?: string;
-  sectionTitle?: string;
-  sectionKind?: "lesson" | "control" | "glossary" | "unknown";
-  lessonStart?: number;
-  lessonEnd?: number;
 };
 
 type PdfTextItem = {
@@ -131,11 +124,6 @@ type PageInfo = {
 type QuestionBlock = {
   number: number;
   lines: TextLine[];
-  sectionKey: string;
-  sectionTitle: string;
-  sectionKind: "lesson" | "control" | "glossary" | "unknown";
-  lessonStart?: number;
-  lessonEnd?: number;
 };
 type TopicGroup = {
   id: string;
@@ -895,105 +883,6 @@ function blockHasAllOptions(lines: TextLine[]) {
   aylanib ketmaydi va boshqa sahifadagi savol oldingi savolning
   o'rnini bosmaydi.
 */
-
-type DetectedSection = {
-  key: string;
-  title: string;
-  kind: "lesson" | "control" | "glossary" | "unknown";
-  lessonStart?: number;
-  lessonEnd?: number;
-};
-
-function cleanSectionTitle(value: string) {
-  return normalizeOneLine(value)
-    .replace(
-      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
-      ""
-    )
-    .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
-    .replace(/\s+\d+\s*$/, "")
-    .trim();
-}
-
-function detectSectionHeading(
-  value: string
-): DetectedSection | null {
-  const text = cleanSectionTitle(value);
-
-  const lesson = text.match(
-    /(\d+)\s*(?:[–—-]\s*(\d+))?\s*-\s*DARS\.\s*(.*)$/i
-  );
-
-  if (lesson) {
-    const start = Number(lesson[1]);
-    const end =
-      lesson[2]
-        ? Number(lesson[2])
-        : start;
-
-    const name =
-      lesson[3]?.trim() || "";
-
-    return {
-      key: `lesson-${start}-${end}`,
-      title:
-        `${start}${
-          end !== start ? `–${end}` : ""
-        }-DARS.${name ? ` ${name}` : ""}`,
-      kind: "lesson",
-      lessonStart: start,
-      lessonEnd: end,
-    };
-  }
-
-  if (
-    /NAZORAT\s+ISHI\s+BO['‘’ʻʼ`´]?YICHA/i.test(text) ||
-    /^NAZORAT\s+ISHI$/i.test(text)
-  ) {
-    return {
-      key: "control",
-      title: "Nazorat savollari",
-      kind: "control",
-    };
-  }
-
-  if (
-    /AYRIM\s+YURIDIK\s+ATAMALARNING\s+IZOHLI\s+LUG['‘’ʻʼ`´]?ATI/i.test(
-      text
-    )
-  ) {
-    return {
-      key: "glossary",
-      title:
-        "Ayrim yuridik atamalarning izohli lug‘ati",
-      kind: "glossary",
-    };
-  }
-
-  return null;
-}
-
-function isLikelySectionTitleContinuation(
-  value: string
-) {
-  const text = cleanSectionTitle(value);
-
-  if (!text) return false;
-
-  if (
-    questionNumberFromLine(text) !== null ||
-    /^[+ ]?[ABCD][).:\-]/i.test(text) ||
-    /^savol\b/i.test(text) ||
-    /^javob\b/i.test(text) ||
-    /^№/.test(text) ||
-    /^javoblar\b/i.test(text)
-  ) {
-    return false;
-  }
-
-  return text.length <= 110;
-}
-
 function buildQuestionBlocks(
   lines: TextLine[]
 ): QuestionBlock[] {
@@ -1018,14 +907,6 @@ function buildQuestionBlocks(
   */
   let nextGlobalNumber = 1;
 
-  let currentSection: DetectedSection = {
-    key: "unknown",
-    title: "Mavzu aniqlanmadi",
-    kind: "unknown",
-  };
-
-  let pendingSectionContinuation = false;
-
   function flushCurrent() {
     if (
       currentGlobalNumber !== null &&
@@ -1034,16 +915,6 @@ function buildQuestionBlocks(
       blocks.push({
         number: currentGlobalNumber,
         lines: currentLines,
-        sectionKey:
-          currentSection.key,
-        sectionTitle:
-          currentSection.title,
-        sectionKind:
-          currentSection.kind,
-        lessonStart:
-          currentSection.lessonStart,
-        lessonEnd:
-          currentSection.lessonEnd,
       });
     }
 
@@ -1056,7 +927,6 @@ function buildQuestionBlocks(
     localNumber: number,
     line: TextLine
   ) {
-    pendingSectionContinuation = false;
     currentLocalNumber = localNumber;
     currentGlobalNumber = nextGlobalNumber++;
     currentLines = [line];
@@ -1105,58 +975,6 @@ function buildQuestionBlocks(
     if (isAnswerKeyHeading(line.text)) {
       flushCurrent();
       break;
-    }
-
-    const detectedSection =
-      detectSectionHeading(line.text);
-
-    if (detectedSection) {
-      /*
-        Yangi bo‘lim boshlansa oldingi savolni yopamiz.
-        Header sahifa o‘rtasida kelishi mumkin, shu sabab bu juda muhim.
-      */
-      if (
-        currentGlobalNumber !== null &&
-        canCloseCurrentQuestion()
-      ) {
-        flushCurrent();
-      }
-
-      currentSection =
-        detectedSection;
-
-      pendingSectionContinuation =
-        detectedSection.kind === "lesson";
-
-      continue;
-    }
-
-    if (
-      pendingSectionContinuation &&
-      currentSection.kind === "lesson" &&
-      currentGlobalNumber === null &&
-      isLikelySectionTitleContinuation(line.text)
-    ) {
-      const continuation =
-        cleanSectionTitle(line.text);
-
-      if (
-        continuation &&
-        !/MAVZULASHTIRILGAN TESTLAR/i.test(
-          continuation
-        )
-      ) {
-        currentSection = {
-          ...currentSection,
-          title:
-            `${currentSection.title} ${continuation}`
-              .replace(/\s+/g, " ")
-              .trim(),
-        };
-      }
-
-      pendingSectionContinuation = false;
-      continue;
     }
 
     /*
@@ -1571,6 +1389,610 @@ function buildTopicsFromAnswerKey(
     (topic) =>
       topic.questions.length > 0
   );
+}
+
+
+/* =========================================================
+   V4 — POST-PARSE MAVZU AJRATISH
+
+   MUHIM:
+   Savollarni ajratadigan parserga umuman tegmaymiz.
+   Avval 1609 ta savol to‘liq parse bo‘ladi.
+   Keyin allLines bo‘yicha DARS / NAZORAT / LUG‘AT chegaralarini
+   aniqlab, savollarni ketma-ket sectionlarga biriktiramiz.
+========================================================= */
+
+type PostSection = {
+  key: string;
+  title: string;
+  kind: "lesson" | "control" | "glossary";
+  lessonStart?: number;
+  lessonEnd?: number;
+  lineIndex: number;
+};
+
+function cleanPostSectionTitle(value: string) {
+  return normalizeOneLine(value)
+    .replace(
+      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
+      ""
+    )
+    .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
+    .replace(/\s+\d+\s*$/, "")
+    .trim();
+}
+
+function detectPostSection(
+  value: string
+): Omit<PostSection, "lineIndex"> | null {
+  const text =
+    cleanPostSectionTitle(value);
+
+  const lesson = text.match(
+    /(\d+)\s*(?:[–—-]\s*(\d+))?\s*-\s*DARS\.\s*(.*)$/i
+  );
+
+  if (lesson) {
+    const start =
+      Number(lesson[1]);
+
+    const end =
+      lesson[2]
+        ? Number(lesson[2])
+        : start;
+
+    const name =
+      lesson[3]?.trim() || "";
+
+    return {
+      key:
+        `lesson-${start}-${end}`,
+      title:
+        `${start}${
+          end !== start
+            ? `–${end}`
+            : ""
+        }-DARS.${
+          name ? ` ${name}` : ""
+        }`,
+      kind: "lesson",
+      lessonStart: start,
+      lessonEnd: end,
+    };
+  }
+
+  if (
+    /NAZORAT\s+ISHI\s+BO['‘’ʻʼ`´]?YICHA/i.test(text) ||
+    /NAZORAT\s+SAVOLLARI/i.test(text)
+  ) {
+    return {
+      key: "control",
+      title: "Nazorat savollari",
+      kind: "control",
+    };
+  }
+
+  if (
+    /AYRIM\s+YURIDIK\s+ATAMALARNING\s+IZOHLI\s+LUG['‘’ʻʼ`´]?ATI/i.test(
+      text
+    )
+  ) {
+    return {
+      key: "glossary",
+      title:
+        "Ayrim yuridik atamalarning izohli lug‘ati",
+      kind: "glossary",
+    };
+  }
+
+  return null;
+}
+
+function looksLikePostTitleContinuation(
+  value: string
+) {
+  const text =
+    cleanPostSectionTitle(value);
+
+  if (!text) {
+    return false;
+  }
+
+  if (
+    questionNumberFromLine(text) !== null ||
+    /^[+ ]?[ABCD][).:\-]/i.test(text) ||
+    /^savol\b/i.test(text) ||
+    /^javob\b/i.test(text) ||
+    /^№/.test(text) ||
+    /^javoblar\b/i.test(text) ||
+    /^\d+$/.test(text)
+  ) {
+    return false;
+  }
+
+  return text.length <= 120;
+}
+
+function collectPostSections(
+  lines: TextLine[]
+): PostSection[] {
+  const sections: PostSection[] = [];
+
+  for (
+    let index = 0;
+    index < lines.length;
+    index++
+  ) {
+    const detected =
+      detectPostSection(
+        lines[index].text
+      );
+
+    if (!detected) {
+      continue;
+    }
+
+    let title =
+      detected.title;
+
+    /*
+      13-DARS, 15-DARS, 18–19-DARS kabi sarlavhalar
+      keyingi qatorga davom etishi mumkin.
+    */
+    if (
+      detected.kind === "lesson" &&
+      index + 1 < lines.length &&
+      looksLikePostTitleContinuation(
+        lines[index + 1].text
+      )
+    ) {
+      const continuation =
+        cleanPostSectionTitle(
+          lines[index + 1].text
+        );
+
+      if (
+        continuation &&
+        !detectPostSection(
+          continuation
+        )
+      ) {
+        title =
+          `${title} ${continuation}`
+            .replace(/\s+/g, " ")
+            .trim();
+      }
+    }
+
+    const previous =
+      sections[
+        sections.length - 1
+      ];
+
+    /*
+      Bir xil dars headeri sahifalarda qayta chiqadi.
+      Faqat ketma-ket bir xil sectionni dublikat qilmaymiz.
+    */
+    if (
+      previous &&
+      previous.key === detected.key
+    ) {
+      continue;
+    }
+
+    sections.push({
+      ...detected,
+      title,
+      lineIndex: index,
+    });
+  }
+
+  /*
+    Savollar qismidagi haqiqiy ketma-ketlikni olamiz.
+    Javoblar bo‘limiga o‘tgandan keyingi DARS sarlavhalari
+    takroriy katalog bo‘lgani uchun ikkinchi marta kelishi mumkin.
+    Birinchi "Javoblar:" dan keyingi sectionlarni kesib tashlaymiz.
+  */
+  let answerKeyStart = -1;
+
+  for (
+    let index = 0;
+    index < lines.length;
+    index++
+  ) {
+    const text =
+      normalizeOneLine(
+        lines[index].text
+      );
+
+    if (
+      /^javoblar\s*:?\s*$/i.test(text) ||
+      /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+    ) {
+      answerKeyStart = index;
+      break;
+    }
+  }
+
+  const sourceSections =
+    answerKeyStart >= 0
+      ? sections.filter(
+          (section) =>
+            section.lineIndex <
+            answerKeyStart
+        )
+      : sections;
+
+  return sourceSections;
+}
+
+function findQuestionStartLineIndexes(
+  lines: TextLine[],
+  questionCount: number
+) {
+  const indexes: number[] = [];
+  let cursor = 0;
+
+  while (
+    cursor < lines.length &&
+    indexes.length <
+      questionCount
+  ) {
+    const n =
+      questionNumberFromLine(
+        lines[cursor].text
+      );
+
+    if (n !== null) {
+      /*
+        Savol ichidagi 1./2./3. bandlarni ushlamaslik uchun
+        shu startdan keyin A/B/C/D mavjudligini tekshiramiz.
+      */
+      let optionLabels =
+        new Set<string>();
+
+      for (
+        let j = cursor + 1;
+        j <
+          Math.min(
+            cursor + 35,
+            lines.length
+          );
+        j++
+      ) {
+        const lineText =
+          normalizeOneLine(
+            lines[j].text
+          );
+
+        if (
+          questionNumberFromLine(
+            lineText
+          ) !== null &&
+          optionLabels.size < 4
+        ) {
+          break;
+        }
+
+        const inline =
+          splitInlineOptions(
+            lineText
+          );
+
+        for (
+          const option of inline
+        ) {
+          optionLabels.add(
+            option.label
+          );
+        }
+
+        const direct =
+          lineText.match(
+            /^[+ ]?([ABCD])[\)\.\-:]/
+          );
+
+        if (direct) {
+          optionLabels.add(
+            direct[1]
+          );
+        }
+
+        if (
+          optionLabels.size >= 4
+        ) {
+          break;
+        }
+      }
+
+      if (
+        optionLabels.size >= 4
+      ) {
+        indexes.push(cursor);
+      }
+    }
+
+    cursor++;
+  }
+
+  return indexes;
+}
+
+function build33LessonTopicsPostParse(
+  lines: TextLine[],
+  questions: ImportedQuestion[]
+) {
+  const sections =
+    collectPostSections(lines);
+
+  const questionLineIndexes =
+    findQuestionStartLineIndexes(
+      lines,
+      questions.length
+    );
+
+  /*
+    Agar source-index aniqlash savollar soniga to‘liq mos kelmasa,
+    xavfsiz fallback: savollarni yo‘qotmaymiz.
+  */
+  const canMapByLine =
+    questionLineIndexes.length ===
+    questions.length;
+
+  const sectionQuestions =
+    new Map<
+      string,
+      ImportedQuestion[]
+    >();
+
+  for (const section of sections) {
+    sectionQuestions.set(
+      section.key,
+      []
+    );
+  }
+
+  if (canMapByLine) {
+    for (
+      let qIndex = 0;
+      qIndex <
+      questions.length;
+      qIndex++
+    ) {
+      const qLine =
+        questionLineIndexes[
+          qIndex
+        ];
+
+      let selected:
+        PostSection | null = null;
+
+      for (
+        let sIndex = 0;
+        sIndex <
+        sections.length;
+        sIndex++
+      ) {
+        const current =
+          sections[sIndex];
+
+        const next =
+          sections[sIndex + 1];
+
+        if (
+          qLine >
+            current.lineIndex &&
+          (!next ||
+            qLine <
+              next.lineIndex)
+        ) {
+          selected =
+            current;
+          break;
+        }
+      }
+
+      if (selected) {
+        sectionQuestions
+          .get(selected.key)!
+          .push(
+            questions[qIndex]
+          );
+      }
+    }
+  }
+
+  const sourceByLesson =
+    new Map<
+      number,
+      PostSection
+    >();
+
+  for (const section of sections) {
+    if (
+      section.kind !==
+        "lesson" ||
+      !section.lessonStart
+    ) {
+      continue;
+    }
+
+    const end =
+      section.lessonEnd ||
+      section.lessonStart;
+
+    for (
+      let lesson =
+        section.lessonStart;
+      lesson <= end;
+      lesson++
+    ) {
+      if (
+        lesson >= 1 &&
+        lesson <= 33
+      ) {
+        sourceByLesson.set(
+          lesson,
+          section
+        );
+      }
+    }
+  }
+
+  const topics: TopicGroup[] = [];
+
+  for (
+    let lesson = 1;
+    lesson <= 33;
+    lesson++
+  ) {
+    const section =
+      sourceByLesson.get(
+        lesson
+      );
+
+    if (!section) {
+      topics.push({
+        id:
+          `lesson-${lesson}`,
+        title:
+          `${lesson}-DARS. Mavzu aniqlanmadi`,
+        lessonNumber:
+          lesson,
+        sourceSectionKey:
+          "missing",
+        sourceSectionTitle:
+          "Mavzu aniqlanmadi",
+        sharedSource: false,
+        kind: "lesson",
+        questionNumbers: [],
+        questions: [],
+      });
+
+      continue;
+    }
+
+    const sourceQuestions =
+      sectionQuestions.get(
+        section.key
+      ) || [];
+
+    const sourceStart =
+      section.lessonStart ||
+      lesson;
+
+    const sourceEnd =
+      section.lessonEnd ||
+      sourceStart;
+
+    const sharedSource =
+      sourceEnd >
+      sourceStart;
+
+    const sourceName =
+      section.title
+        .replace(
+          /^\d+\s*(?:[–—-]\s*\d+)?\s*-\s*DARS\.\s*/i,
+          ""
+        )
+        .trim();
+
+    topics.push({
+      id:
+        `lesson-${lesson}`,
+      title:
+        `${lesson}-DARS.${
+          sourceName
+            ? ` ${sourceName}`
+            : ""
+        }`,
+      lessonNumber:
+        lesson,
+      sourceSectionKey:
+        section.key,
+      sourceSectionTitle:
+        section.title,
+      sharedSource,
+      kind: "lesson",
+      questionNumbers:
+        sourceQuestions.map(
+          (question) =>
+            question.number
+        ),
+      questions:
+        sourceQuestions.map(
+          (question, index) => ({
+            ...question,
+            number:
+              index + 1,
+          })
+        ),
+    });
+  }
+
+  const specialSections: TopicGroup[] =
+    sections
+      .filter(
+        (section) =>
+          section.kind ===
+            "control" ||
+          section.kind ===
+            "glossary"
+      )
+      .map(
+        (section) => {
+          const sourceQuestions =
+            sectionQuestions.get(
+              section.key
+            ) || [];
+
+          return {
+            id:
+              section.kind ===
+                "control"
+                ? "control-questions"
+                : "legal-glossary",
+            title:
+              section.kind ===
+                "control"
+                ? "Nazorat savollari"
+                : "Ayrim yuridik atamalarning izohli lug‘ati",
+            sourceSectionKey:
+              section.key,
+            sourceSectionTitle:
+              section.title,
+            sharedSource: false,
+            kind:
+              section.kind,
+            questionNumbers:
+              sourceQuestions.map(
+                (question) =>
+                  question.number
+              ),
+            questions:
+              sourceQuestions.map(
+                (question, index) => ({
+                  ...question,
+                  number:
+                    index + 1,
+                })
+              ),
+          } as TopicGroup;
+        }
+      );
+
+  return {
+    topics,
+    specialSections,
+    sectionCount:
+      sections.length,
+    mappedQuestionCount:
+      canMapByLine
+        ? questionLineIndexes.length
+        : 0,
+    mappingComplete:
+      canMapByLine,
+  };
 }
 
 /* =========================================================
@@ -2870,17 +3292,6 @@ export async function POST(
         pdfCrop,
         warning:
           parsed.warning,
-
-        sectionKey:
-          block.sectionKey,
-        sectionTitle:
-          block.sectionTitle,
-        sectionKind:
-          block.sectionKind,
-        lessonStart:
-          block.lessonStart,
-        lessonEnd:
-          block.lessonEnd,
       });
     }
 
@@ -2961,250 +3372,21 @@ export async function POST(
       Qattiq 840 ta degan cheklov endi yo'q.
     */
     /*
-      33 TA DARS + NAZORAT + LUG‘AT
-
-      Savollar buildQuestionBlocks() vaqtida PDFning o‘zidagi
-      DARS / NAZORAT / LUG‘AT sarlavhasiga bog‘landi.
-
-      PDFda ayrim darslar bitta umumiy blok:
-        1–2-DARS
-        3–4-DARS
-        11–12-DARS
-        18–19-DARS
-
-      Manbada ularning savollari ichkaridan alohida ajratilmagan.
-      Shuning uchun ma’lumotni buzmaslik uchun shu juft darslar
-      bitta source-question-setni bo‘lishadi. Biz savollarni
-      sun’iy ravishda yarmiga bo‘lmaymiz.
+      V4:
+      1609 savol parse bo‘lib bo‘lgandan KEYIN
+      mavzular alohida biriktiriladi.
     */
-
-    const sourceMap =
-      new Map<
-        string,
-        {
-          key: string;
-          title: string;
-          kind:
-            | "lesson"
-            | "control"
-            | "glossary"
-            | "unknown";
-          lessonStart?: number;
-          lessonEnd?: number;
-          questions: ImportedQuestion[];
-        }
-      >();
-
-    for (const question of finalQuestions) {
-      const key =
-        question.sectionKey ||
-        "unknown";
-
-      if (!sourceMap.has(key)) {
-        sourceMap.set(key, {
-          key,
-          title:
-            question.sectionTitle ||
-            "Mavzu aniqlanmadi",
-          kind:
-            question.sectionKind ||
-            "unknown",
-          lessonStart:
-            question.lessonStart,
-          lessonEnd:
-            question.lessonEnd,
-          questions: [],
-        });
-      }
-
-      sourceMap
-        .get(key)!
-        .questions.push(question);
-    }
-
-    const sourceSections =
-      Array.from(
-        sourceMap.values()
-      ).filter(
-        (section) =>
-          section.questions.length > 0
+    const thematicStructure =
+      build33LessonTopicsPostParse(
+        allLines,
+        finalQuestions
       );
 
-    const lessonSourceByNumber =
-      new Map<number, typeof sourceSections[number]>();
+    const topics =
+      thematicStructure.topics;
 
-    for (const section of sourceSections) {
-      if (
-        section.kind !== "lesson" ||
-        !section.lessonStart
-      ) {
-        continue;
-      }
-
-      const end =
-        section.lessonEnd ||
-        section.lessonStart;
-
-      for (
-        let lesson =
-          section.lessonStart;
-        lesson <= end;
-        lesson++
-      ) {
-        lessonSourceByNumber.set(
-          lesson,
-          section
-        );
-      }
-    }
-
-    const topics: TopicGroup[] = [];
-
-    for (
-      let lessonNumber = 1;
-      lessonNumber <= 33;
-      lessonNumber++
-    ) {
-      const source =
-        lessonSourceByNumber.get(
-          lessonNumber
-        );
-
-      if (!source) {
-        topics.push({
-          id:
-            `lesson-${lessonNumber}`,
-          title:
-            `${lessonNumber}-DARS. Mavzu aniqlanmadi`,
-          lessonNumber,
-          sourceSectionKey:
-            "missing",
-          sourceSectionTitle:
-            "Mavzu aniqlanmadi",
-          sharedSource: false,
-          kind: "lesson",
-          questionNumbers: [],
-          questions: [],
-        });
-
-        continue;
-      }
-
-      const sourceStart =
-        source.lessonStart ||
-        lessonNumber;
-
-      const sourceEnd =
-        source.lessonEnd ||
-        sourceStart;
-
-      const sourceName =
-        source.title
-          .replace(
-            /^\d+\s*(?:[–—-]\s*\d+)?\s*-\s*DARS\.\s*/i,
-            ""
-          )
-          .trim();
-
-      const sharedSource =
-        sourceEnd > sourceStart;
-
-      topics.push({
-        id:
-          `lesson-${lessonNumber}`,
-        title:
-          `${lessonNumber}-DARS.${
-            sourceName
-              ? ` ${sourceName}`
-              : ""
-          }`,
-        lessonNumber,
-        sourceSectionKey:
-          source.key,
-        sourceSectionTitle:
-          source.title,
-        sharedSource,
-        kind: "lesson",
-        questionNumbers:
-          source.questions.map(
-            (question) =>
-              question.number
-          ),
-        questions:
-          source.questions.map(
-            (question, index) => ({
-              ...question,
-              number:
-                index + 1,
-            })
-          ),
-      });
-    }
-
-    const specialSections: TopicGroup[] =
-      sourceSections
-        .filter(
-          (section) =>
-            section.kind ===
-              "control" ||
-            section.kind ===
-              "glossary"
-        )
-        .map(
-          (section) => ({
-            id:
-              section.kind === "control"
-                ? "control-questions"
-                : "legal-glossary",
-            title:
-              section.kind === "control"
-                ? "Nazorat savollari"
-                : "Ayrim yuridik atamalarning izohli lug‘ati",
-            sourceSectionKey:
-              section.key,
-            sourceSectionTitle:
-              section.title,
-            sharedSource: false,
-            kind:
-              section.kind as
-                | "control"
-                | "glossary",
-            questionNumbers:
-              section.questions.map(
-                (question) =>
-                  question.number
-              ),
-            questions:
-              section.questions.map(
-                (question, index) => ({
-                  ...question,
-                  number:
-                    index + 1,
-                })
-              ),
-          })
-        );
-
-    const uniqueLessonSourceTopics =
-      sourceSections
-        .filter(
-          (section) =>
-            section.kind === "lesson"
-        )
-        .map(
-          (section, index) => ({
-            id:
-              `source-${index + 1}`,
-            title:
-              section.title,
-            questionCount:
-              section.questions.length,
-            lessonStart:
-              section.lessonStart,
-            lessonEnd:
-              section.lessonEnd,
-          })
-        );
+    const specialSections =
+      thematicStructure.specialSections;
 
     console.log(
       "THEMATIC PDF TOPICS:",
@@ -3289,10 +3471,12 @@ export async function POST(
       specialSectionCount:
         specialSections.length,
 
-      sourceTopicCount:
-        uniqueLessonSourceTopics.length,
-      sourceTopics:
-        uniqueLessonSourceTopics,
+      sectionCount:
+        thematicStructure.sectionCount,
+      mappedQuestionCount:
+        thematicStructure.mappedQuestionCount,
+      mappingComplete:
+        thematicStructure.mappingComplete,
 
       answerKeyApplied,
       answerKeyCount:
