@@ -1605,6 +1605,18 @@ export default function ImportPdfTestPage() {
         setSpecialSections([]);
       }
 
+      const browserPdfShapeCount =
+        imported.filter((question) =>
+          Array.isArray(question.shapes) &&
+          question.shapes.some(
+            (shape) =>
+              shape.type === "image" &&
+              shape.id.startsWith(
+                "pdf-browser-img-"
+              )
+          )
+        ).length;
+
       setMessage(
         testType === "thematic" &&
         Array.isArray(data?.topics) &&
@@ -1613,7 +1625,11 @@ export default function ImportPdfTestPage() {
               Array.isArray(data?.specialSections)
                 ? data.specialSections.length
                 : 0
-            } ta qo‘shimcha bo‘lim ajratildi.`
+            } ta qo‘shimcha bo‘lim ajratildi. | Vizual: ${Number(
+              data?.visualQuestionCount ?? 0
+            )} ta | PDF crop: ${Number(
+              data?.pdfCropCount ?? 0
+            )} ta | Brauzer image-shape: ${browserPdfShapeCount} ta.`
           : `PDFdan ${imported.length} ta savol ajratildi.`
       );
     } catch (error) {
