@@ -125,6 +125,13 @@ type QuestionBlock = {
   number: number;
   lines: TextLine[];
 };
+type TopicGroup = {
+  id: string;
+  title: string;
+  questionNumbers: number[];
+  questions: ImportedQuestion[];
+};
+
 
 /* =========================================================
    ADMIN
@@ -1067,6 +1074,153 @@ function buildQuestionBlocks(
     PDF bo'yicha tabiiy tartibni saqlaymiz.
   */
   return blocks;
+}
+
+
+/* =========================================================
+   MAVZU (DARS) SARLAVHALARINI ANIQLASH
+========================================================= */
+
+function topicTitleFromLine(
+  value: string
+): string | null {
+  let text = normalizeOneLine(value);
+
+  const match = text.match(
+    /(\d+\s*(?:[–—-]\s*\d+\s*)?-\s*DARS\..*)/i
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  text = match[1]
+    .replace(
+      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
+      ""
+    )
+    .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
+    .replace(/\s+\d+\s*$/, "")
+    .trim();
+
+  return text || null;
+}
+
+function topicSlug(
+  title: string,
+  index: number
+) {
+  const slug = title
+    .toLocaleLowerCase("uz-UZ")
+    .replace(/[‘’ʻʼ`´]/g, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `${String(index + 1).padStart(2, "0")}-${
+    slug || `mavzu-${index + 1}`
+  }`;
+}
+
+function buildTopics(
+  lines: TextLine[],
+  questions: ImportedQuestion[]
+): TopicGroup[] {
+  const topicHeaders: Array<{
+    title: string;
+    lineIndex: number;
+  }> = [];
+
+  lines.forEach((line, lineIndex) => {
+    const title =
+      topicTitleFromLine(line.text);
+
+    if (!title) return;
+
+    const previous =
+      topicHeaders[topicHeaders.length - 1];
+
+    // Bir xil page-header qayta chiqsa yangi mavzu ochmaymiz.
+    if (!previous || previous.title !== title) {
+      topicHeaders.push({
+        title,
+        lineIndex,
+      });
+    }
+  });
+
+  if (topicHeaders.length === 0) {
+    return [{
+      id: "01-mavzulashtirilgan-test",
+      title: "Mavzulashtirilgan test",
+      questionNumbers:
+        questions.map((q) => q.number),
+      questions,
+    }];
+  }
+
+  /*
+    Har parsed savolni PDFdagi navbatdagi haqiqiy savol-start line bilan
+    bog‘laymiz. Savol ichidagi 1./2./3. bandlar emas, A/B/C/D bilan
+    tugagan bloklardan keyingi startlar parser tartibiga mos keladi.
+  */
+  const sourceIndexes: number[] = [];
+  let cursor = 0;
+
+  for (let qIndex = 0; qIndex < questions.length; qIndex++) {
+    let found = -1;
+
+    for (let i = cursor; i < lines.length; i++) {
+      const n =
+        questionNumberFromLine(lines[i].text);
+
+      if (n !== null) {
+        found = i;
+        cursor = i + 1;
+        break;
+      }
+    }
+
+    sourceIndexes.push(found);
+  }
+
+  const topics =
+    topicHeaders.map((header, index) => {
+      const nextHeaderIndex =
+        topicHeaders[index + 1]?.lineIndex ??
+        Number.POSITIVE_INFINITY;
+
+      const topicQuestions =
+        questions.filter(
+          (_q, qIndex) => {
+            const lineIndex =
+              sourceIndexes[qIndex];
+
+            return (
+              lineIndex > header.lineIndex &&
+              lineIndex < nextHeaderIndex
+            );
+          }
+        );
+
+      return {
+        id: topicSlug(
+          header.title,
+          index
+        ),
+        title: header.title,
+        questionNumbers:
+          topicQuestions.map(
+            (q) => q.number
+          ),
+        questions:
+          topicQuestions,
+      };
+    });
+
+  return topics.filter(
+    (topic) =>
+      topic.questions.length > 0
+  );
 }
 
 /* =========================================================
@@ -2445,6 +2599,21 @@ export async function POST(
       Global raqamlar parser tomonidan 1..N tarzida beriladi.
       Qattiq 840 ta degan cheklov endi yo'q.
     */
+    const topics =
+      buildTopics(
+        allLines,
+        finalQuestions
+      );
+
+    console.log(
+      "THEMATIC PDF TOPICS:",
+      topics.map((topic) => ({
+        title: topic.title,
+        questionCount:
+          topic.questions.length,
+      }))
+    );
+
     const sequenceBroken =
       finalQuestions.some(
         (question, index) =>
@@ -2493,10 +2662,27 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
+
+      // Eski frontend uchun umumiy ro‘yxat ham saqlanadi.
       questions: finalQuestions,
+
+      // Yangi mavzulashtirilgan tuzilma.
+      topics,
+      topicCount: topics.length,
+      topicSummary: topics.map(
+        (topic) => ({
+          id: topic.id,
+          title: topic.title,
+          questionCount:
+            topic.questions.length,
+        })
+      ),
+
       answerKeyApplied,
-      answerKeyCount: answerKey.length,
-      total: finalQuestions.length,
+      answerKeyCount:
+        answerKey.length,
+      total:
+        finalQuestions.length,
     });
   } catch (error) {
     console.error(
