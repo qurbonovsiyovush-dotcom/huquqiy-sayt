@@ -250,15 +250,18 @@ export default function AdminTestsPage() {
               }))
             : [];
         } else {
-          warnings.push(
-            data.message ||
-              "Eski Blob testlarini serverdan yuklab bo‘lmadi."
+          // Blob vaqtincha bloklangan bo‘lsa, Neon thematic bo‘limida
+          // qizil 403 xabarini ko‘rsatmaymiz. Eski testlar shunchaki
+          // vaqtincha ro‘yxatga qo‘shilmaydi.
+          console.warn(
+            "Legacy Blob tests unavailable:",
+            data.message || response.statusText
           );
         }
       } else {
-        console.error(legacyResult.reason);
-        warnings.push(
-          "Eski Blob testlari bilan bog‘lanishda xatolik yuz berdi."
+        console.warn(
+          "Legacy Blob tests request failed:",
+          legacyResult.reason
         );
       }
 
