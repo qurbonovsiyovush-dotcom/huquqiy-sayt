@@ -3220,203 +3220,182 @@ export default function ImportPdfTestPage() {
           subject.trim() ||
           "Mavzulashtirilgan test";
 
-        /*
-          V7 parser allaqachon haqiqiy source sectionlarni qaytaradi.
-          Lekin eski parser response kelib qolsa ham sourceSectionTitle
-          bo‘yicha dublikatni shu yerning o‘zida olib tashlaymiz.
-        */
         const rawSections = [
-          ...importedTopics.map(
-            (topic) => ({
-              ...topic,
-              kind:
-                topic.kind ||
-                ("lesson" as const),
-            })
-          ),
+          ...importedTopics.map((topic) => ({
+            ...topic,
+            kind: topic.kind || ("lesson" as const),
+          })),
           ...specialSections,
         ].filter(
           (section) =>
-            Array.isArray(
-              section.questions
-            ) &&
+            Array.isArray(section.questions) &&
             section.questions.length > 0
         );
 
-        const uniqueSections =
-          new Map<
-            string,
-            ImportedTopic
-          >();
+        const uniqueSections = new Map<string, ImportedTopic>();
 
-        for (
-          const section of
-          rawSections
-        ) {
-          const key =
-            String(
-              section.sourceSectionTitle ||
-                section.title ||
-                section.id
-            )
-              .replace(/[–—]/g, "-")
-              .replace(/\s+/g, " ")
-              .trim()
-              .toLowerCase();
+        for (const section of rawSections) {
+          const key = String(
+            section.sourceSectionTitle ||
+              section.title ||
+              section.id
+          )
+            .replace(/[–—]/g, "-")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
 
-          if (
-            !uniqueSections.has(key)
-          ) {
-            uniqueSections.set(
-              key,
-              section
-            );
+          if (!uniqueSections.has(key)) {
+            uniqueSections.set(key, section);
           }
         }
 
-        const allSections =
-          Array.from(
-            uniqueSections.values()
-          );
+        const allSections = Array.from(uniqueSections.values());
 
-        if (
-          allSections.length === 0
-        ) {
+        if (allSections.length === 0) {
           throw new Error(
             "Mavzular bo‘yicha saqlash uchun savollar topilmadi."
           );
         }
 
-        /*
-          Bitta savol bir nechta lesson cardga takror tushib qolmasligi
-          uchun umumiy unique savollar sonini ham tekshiramiz.
-        */
-        const uniqueQuestionIds =
-          new Set<string>();
+        const uniqueQuestionIds = new Set<string>();
 
-        for (
-          const section of
-          allSections
-        ) {
-          for (
-            const question of
-            section.questions
-          ) {
-            uniqueQuestionIds.add(
-              question.id
-            );
+        for (const section of allSections) {
+          for (const question of section.questions) {
+            uniqueQuestionIds.add(question.id);
           }
         }
 
-        let savedTests = 0;
-        let savedQuestions = 0;
+        /*
+          Sinfni kitob nomi/fan nomidan aniqlaymiz.
+          Masalan: "Davlat va huquq asoslari (10-sinf)" -> 10.
+        */
+        const gradeSource = `${baseTitle} ${subject}`;
+        const gradeMatch = gradeSource.match(/(?:^|\D)(8|9|10|11)\s*[-–—]?\s*sinf/i);
+        const grade = gradeMatch ? Number(gradeMatch[1]) : null;
 
-        for (
-          let sectionIndex = 0;
-          sectionIndex <
-          allSections.length;
-          sectionIndex++
-        ) {
-          const section =
-            allSections[
-              sectionIndex
-            ];
+        if (!grade) {
+          throw new Error(
+            "Kitob nomidan sinfni aniqlab bo‘lmadi. Test nomida 8-sinf, 9-sinf, 10-sinf yoki 11-sinf yozuvi bo‘lishi kerak."
+          );
+        }
 
-          const usedInSection =
-            new Set<string>();
+        const neonSections = allSections.map((section) => {
+          const usedInSection = new Set<string>();
 
-          const sectionPrepared =
-            section.questions
-              .filter(
-                (question) => {
-                  if (
-                    usedInSection.has(
-                      question.id
-                    )
-                  ) {
-                    return false;
-                  }
+          const sectionQuestions = section.questions
+            .filter((question) => {
+              if (usedInSection.has(question.id)) {
+                return false;
+              }
 
-                  usedInSection.add(
-                    question.id
-                  );
-                  return true;
-                }
-              )
-              .map(
-                (question) =>
-                  preparedById.get(
-                    question.id
-                  )
-              )
-              .filter(
-                (
-                  question
-                ): question is PreparedQuestion =>
-                  Boolean(question)
-              );
+              usedInSection.add(question.id);
+              return true;
+            })
+            .map((question) => {
+              const prepared = preparedById.get(question.id);
 
-          if (
-            sectionPrepared.length ===
-            0
-          ) {
-            continue;
-          }
+              if (!prepared) {
+                return null;
+              }
 
-          const sectionTitle =
-            String(
-              section.sourceSectionTitle ||
-                section.title
-            )
-              .replace(/\s+/g, " ")
-              .trim();
+              return {
+                id: prepared.id,
+                number: question.number,
+                questionText: sanitizeRichHtml(
+                  questionDrafts[question.id] ?? question.questionText
+                ),
+                questionHtml: prepared.questionHtml,
+                points: prepared.points,
+                options: prepared.options.map((option, optionIndex) => ({
+                  id: option.id,
+                  label:
+                    question.options[optionIndex]?.label ||
+                    String.fromCharCode(65 + optionIndex),
+                  text: option.text,
+                  html: option.text,
+                  isCorrect: option.isCorrect,
+                })),
+              };
+            })
+            .filter(Boolean);
 
-          const testTitle =
-            `${baseTitle} — ${sectionTitle}`;
+          const sectionTitle = String(
+            section.sourceSectionTitle || section.title
+          )
+            .replace(/\s+/g, " ")
+            .trim();
 
-          const testDescription =
-            [
+          const sectionType =
+            section.kind === "control"
+              ? "control"
+              : section.kind === "glossary"
+              ? "glossary"
+              : "lesson";
+
+          return {
+            title: sectionTitle,
+            sectionType,
+            description: [
               description.trim(),
               `Mavzulashtirilgan kitob: ${baseTitle}.`,
               `Mavzu: ${sectionTitle}.`,
             ]
               .filter(Boolean)
-              .join(" ");
-
-          setMessage(
-            `${sectionIndex + 1}/${allSections.length}: ${sectionTitle} saqlanmoqda...`
-          );
-
-          await saveOneTest({
-            testTitle,
-            testDescription,
-            preparedQuestions:
-              sectionPrepared,
-            progressPrefix:
-              `${sectionIndex + 1}/${allSections.length} — `,
-          });
-
-          savedTests++;
-          savedQuestions +=
-            sectionPrepared.length;
-        }
+              .join(" "),
+            questions: sectionQuestions,
+          };
+        });
 
         setMessage(
-          `${savedTests} ta haqiqiy mavzu alohida test sifatida saqlandi.`
+          `${allSections.length} ta mavzu va ${uniqueQuestionIds.size} ta savol Neon bazasiga saqlanmoqda...`
+        );
+
+        const neonResponse = await fetch(
+          "/api/tests/thematic/import",
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              grade,
+              bookTitle: baseTitle,
+              subject: subject.trim() || "Davlat va huquq asoslari",
+              edition: "",
+              description: description.trim(),
+              durationMinutes: Number(duration) || 60,
+              attemptLimit: attemptLimitEnabled
+                ? Math.max(1, Number(attemptLimit) || 1)
+                : null,
+              sections: neonSections,
+            }),
+          }
+        );
+
+        const neonData = await readApiResponse(neonResponse);
+
+        const savedTests = Number(neonData?.saved?.sections) || 0;
+        const savedQuestions = Number(neonData?.saved?.questions) || 0;
+        const verifiedQuestions =
+          Number(neonData?.saved?.verifiedQuestions) || 0;
+
+        setMessage(
+          `${savedTests} ta mavzu va ${savedQuestions} ta savol Neon bazasiga saqlandi.`
         );
 
         window.alert(
-          `Mavzulashtirilgan kitob saqlandi.\n\n` +
+          `Mavzulashtirilgan kitob Neon bazasiga saqlandi.\n\n` +
             `Kitob: ${baseTitle}\n` +
+            `Sinf: ${grade}-sinf\n` +
             `Mavzular/bo‘limlar: ${savedTests} ta\n` +
             `Saqlangan savollar: ${savedQuestions} ta\n` +
+            `Bazadagi tekshirilgan savollar: ${verifiedQuestions} ta\n` +
             `PDFdagi noyob savollar: ${uniqueQuestionIds.size} ta`
         );
 
-        router.push(
-          "/admin/tests"
-        );
-
+        router.push("/admin/tests");
         return;
       }
 
