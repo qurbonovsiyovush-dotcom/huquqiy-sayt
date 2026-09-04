@@ -1,74 +1,68 @@
-"use client";
+/*
+  MAVZULASHTIRILGAN TESTLAR UCHUN MAXSUS PDF IMPORTER
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+  Joylashuvi:
+  app/api/tests/import-pdf-thematic/route.ts
 
-type TestCategory =
-  | "legislation"
-  | "thematic"
-  | "block"
-  | "national-certificate"
-  | "thirty"
-  | "custom";
+  Xususiyatlari:
+  - katta PDF (1600+ test) bilan ishlash;
+  - yangi mavzuda savollar 1 dan qayta boshlanishini taniydi;
+  - sahifa oxirida bo'linib qolgan savolni keyingi sahifadan davom ettiradi;
+  - savol ichidagi 1., 2., 3. bandlarni yangi savol deb olmaydi;
+  - +A / +B / +C / +D orqali to'g'ri javobni taniydi;
+  - "Javoblar:" bo'limini savollarga qo'shib yubormaydi.
+*/
 
-const TEST_CATEGORY_LABELS: Record<TestCategory, string> = {
-  legislation: "Qonunchilik hujjatlaridan test",
-  thematic: "Mavzulashtirilgan test",
-  block: "Blok test",
-  "national-certificate": "Milliy sertifikat testi",
-  thirty: "30 talik test",
-  custom: "Boshqa test",
-};
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+import { DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
 
-function normalizeTestCategory(value: unknown): TestCategory {
-  return value === "legislation" ||
-    value === "thematic" ||
-    value === "block" ||
-    value === "national-certificate" ||
-    value === "thirty" ||
-    value === "custom"
-    ? value
-    : "legislation";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+/*
+  PDF.js Node/Vercel polyfill.
+
+  Biz serverda PDFni rasmga render qilmaymiz.
+  Lekin pdfjs-dist PDFni ochish/getTextContent qilish paytida ham
+  DOMMatrix / ImageData / Path2D global obyektlarini kutishi mumkin.
+
+  Oldingi @napi-rs/canvas importi olib tashlanganda:
+    "DOMMatrix is not defined"
+  xatosi shundan paydo bo'ldi.
+*/
+if (typeof (globalThis as any).DOMMatrix === "undefined") {
+  (globalThis as any).DOMMatrix = DOMMatrix as any;
 }
+
+if (typeof (globalThis as any).ImageData === "undefined") {
+  (globalThis as any).ImageData = ImageData as any;
+}
+
+if (typeof (globalThis as any).Path2D === "undefined") {
+  (globalThis as any).Path2D = Path2D as any;
+}
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type OptionLabel = "A" | "B" | "C" | "D";
 
 type ImportedOption = {
   id: string;
-  label: "A" | "B" | "C" | "D";
+  label: OptionLabel;
   text: string;
   isCorrect: boolean;
 };
 
-type ShapeType =
-  | "rectangle"
-  | "roundedRectangle"
-  | "circle"
-  | "ellipse"
-  | "text"
-  | "image"
-  | "matchingItem";
-
-type EditorShape = {
-  id: string;
-  type: ShapeType;
+type PdfCrop = {
+  pageNumber: number;
   x: number;
   y: number;
   width: number;
   height: number;
-  text?: string;
-  imageSrc?: string;
-  backgroundColor?: string;
-  borderColor?: string;
-  textColor?: string;
-  fontSize?: number;
-  borderWidth?: number;
-  borderRadius?: number;
-  opacity?: number;
-  objectFit?: "contain" | "cover" | "fill";
-  zIndex?: number;
-
-  // Moslashtirish elementi uchun
-  matchingSide?: "left" | "right";
-  matchingKey?: string;
 };
 
 type ImportedQuestion = {
@@ -76,878 +70,3069 @@ type ImportedQuestion = {
   number: number;
   questionText: string;
   options: ImportedOption[];
-  imageSrc?: string;
-  shapes?: EditorShape[];
+  pdfCrop?: PdfCrop;
   warning?: string;
 };
-type ImportedTopic = {
+
+type PdfTextItem = {
+  str: string;
+  transform: number[];
+  width?: number;
+  height?: number;
+};
+
+type PositionedText = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageNumber: number;
+};
+
+type TextLine = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageNumber: number;
+  column: "left" | "right" | "full";
+};
+
+type HighlightRect = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+type PageInfo = {
+  page: any;
+  width: number;
+  height: number;
+  highlights: HighlightRect[];
+
+  /*
+    PDF.js + @napi-rs/canvas Vercel'da ba'zi PDF shriftlarini
+    rasterga chizmay qolishi mumkin. Shuning uchun sahifadagi
+    text layer satrlarini ham saqlaymiz va crop ustiga qayta chizamiz.
+  */
+  lines?: TextLine[];
+};
+
+type QuestionBlock = {
+  number: number;
+  lines: TextLine[];
+};
+type TopicGroup = {
   id: string;
   title: string;
-  questionCount?: number;
+  questionNumbers: number[];
   questions: ImportedQuestion[];
   lessonNumber?: number;
-  sharedSource?: boolean;
+  sourceSectionKey?: string;
   sourceSectionTitle?: string;
+  sharedSource?: boolean;
   kind?: "lesson" | "control" | "glossary";
 };
 
 
+/* =========================================================
+   ADMIN
+========================================================= */
 
-type RichTextEditorProps = {
-  editorId: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  minHeight?: number;
-  compact?: boolean;
-};
+async function isAdmin() {
+  const cookieStore = await cookies();
 
-function editorValueToHtml(value: string) {
-  const source = String(value || "");
-
-  if (/<[a-z][\s\S]*>/i.test(source)) {
-    return source;
-  }
-
-  return source
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\n/g, "<br>");
+  return (
+    cookieStore.get("qurbonov_role")?.value === "admin"
+  );
 }
 
-function richTextHasContent(value: string) {
-  if (typeof window === "undefined") {
-    return String(value || "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .trim().length > 0;
-  }
+/* =========================================================
+   BASIC HELPERS
+========================================================= */
 
-  const element = document.createElement("div");
-  element.innerHTML = String(value || "");
+function makeId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
 
-  return (element.textContent || "")
+function normalizeText(value: string) {
+  return value
     .replace(/\u00a0/g, " ")
-    .trim().length > 0;
+    .replace(/[ \t]+/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
-function sanitizeRichHtml(value: string) {
-  if (typeof window === "undefined") {
-    return value;
+/*
+  PDF MATNINI AVTOMATIK TOZALASH
+
+  PDF sahifasidagi vizual qatorlar savol matnida majburiy
+  yangi qator bo‘lib qolmasligi kerak.
+
+  Masalan PDF:
+    Quyidagi qaysi moddalar 1-
+    bo‘lim II bob tarkibiga mos tushadi?
+
+  Natija:
+    Quyidagi qaysi moddalar 1-bo‘lim II bob tarkibiga mos tushadi?
+
+  Lekin savol ichidagi sanalgan bandlar:
+    1) Tashqi siyosat
+    2) Fuqarolik
+    3) ...
+  alohida qatorda saqlanadi.
+*/
+function normalizeQuestionText(parts: string[]) {
+  const rawLines = parts
+    .flatMap((part) => String(part || "").split(/\r?\n/))
+    .map((line) =>
+      line
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .trim()
+    )
+    .filter(Boolean);
+
+  const paragraphs: string[] = [];
+  let current = "";
+
+  function appendLine(line: string) {
+    if (!current) {
+      current = line;
+      return;
+    }
+
+    /*
+      PDF satr oxirida '-' bilan bo‘lingan bo‘lsa:
+        1- + bo‘lim        => 1-bo‘lim
+        jinoyat- + huquq   => jinoyat-huquq
+    */
+    if (/-$/.test(current)) {
+      current += line;
+    } else {
+      current += ` ${line}`;
+    }
   }
 
-  const parser = new DOMParser();
-  const documentValue = parser.parseFromString(
-    `<div>${value}</div>`,
-    "text/html"
+  function flushCurrent() {
+    const cleaned = current
+      .replace(/\s+([,.;:!])/g, "$1")
+      .replace(/\s*\?/g, " ?")
+      .replace(/\(\s+/g, "(")
+      .replace(/\s+\)/g, ")")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    if (cleaned) {
+      paragraphs.push(cleaned);
+    }
+
+    current = "";
+  }
+
+  for (const line of rawLines) {
+    /*
+      Yangi ichki band boshlanishi:
+        1) ...
+        2) ...
+        a) ...
+        b) ...
+
+      MUHIM:
+      Bandning keyingi vizual PDF qatorlari shu bandning DAVOMI
+      hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
+    */
+    const startsInnerListItem =
+      /^(?:\d{1,3}|[IVXLCDM]{1,8}|[a-zA-Z])[\)\.]\s+\S/i.test(line);
+
+    if (startsInnerListItem) {
+      flushCurrent();
+      current = line;
+      continue;
+    }
+
+    /*
+      Oddiy qator — hozirgi gap/bandning davomi.
+      Shuning uchun yangi \n qo‘ymaymiz, shu qatorga ulaymiz.
+    */
+    appendLine(line);
+  }
+
+  flushCurrent();
+
+  return paragraphs
+    .join("\n")
+    .replace(/\s+([,.;:!])/g, "$1")
+    .replace(/\s*\?/g, " ?")
+    .trim();
+}
+
+function normalizeOneLine(value: string) {
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanPlus(value: string) {
+  return value
+    .replace(/\(\s*\+\s*\)/g, "")
+    .replace(/\s*\+\s*$/g, "")
+    .replace(/^\s*\+\s*/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function hasPlus(value: string) {
+  return (
+    /\+\s*$/.test(value) ||
+    /\(\s*\+\s*\)/.test(value) ||
+    /^\s*\+\s*/.test(value)
+  );
+}
+
+function questionNumberFromLine(value: string) {
+  /*
+    MUHIM:
+    Test savollari faqat "1.", "2.", "3." ... formatida.
+    "1)", "2)" esa savol ichidagi bandlar, savol deb olinmaydi.
+  */
+  const match = value.match(/^\s*(\d{1,4})\.(?:\s+\S.*)?\s*$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const number = Number(match[1]);
+
+  if (
+    !Number.isFinite(number) ||
+    number < 1 ||
+    number > 5000
+  ) {
+    return null;
+  }
+
+  return number;
+}
+
+function stripQuestionNumber(value: string) {
+  return value
+    .replace(/^\s*\d{1,4}\.\s+/, "")
+    .trim();
+}
+
+function optionLabelFromStart(
+  value: string
+): OptionLabel | null {
+  /*
+    Qabul qilinadi:
+      A) ...
+      +A) ...
+      + A) ...
+      A)+ ...
+      A) + ...
+  */
+  const match = value.match(
+    /^\s*\+?\s*([ABCD])\)\s*\+?\s*/
   );
 
-  documentValue
-    .querySelectorAll(
-      "script,style,iframe,object,embed,form,input,button,textarea,select,link,meta"
+  return match
+    ? (match[1] as OptionLabel)
+    : null;
+}
+
+function stripOptionPrefix(value: string) {
+  return value
+    .replace(
+      /^\s*\+?\s*[ABCD]\)\s*\+?\s*/,
+      ""
     )
-    .forEach((node) => node.remove());
+    .trim();
+}
 
-  documentValue.querySelectorAll("*").forEach((node) => {
-    [...node.attributes].forEach((attribute) => {
-      const name = attribute.name.toLowerCase();
-      const value = attribute.value.trim().toLowerCase();
+function optionMarkerHasLeadingOrTrailingPlus(value: string) {
+  return (
+    /^\s*\+\s*[ABCD]\)/.test(value) ||
+    /^\s*[ABCD]\)\s*\+/.test(value)
+  );
+}
 
-      if (name.startsWith("on")) {
-        node.removeAttribute(attribute.name);
+/* =========================================================
+   HIGHLIGHT
+========================================================= */
+
+function rectIntersects(
+  a: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  },
+  b: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  }
+) {
+  return !(
+    a.x2 < b.x1 ||
+    a.x1 > b.x2 ||
+    a.y2 < b.y1 ||
+    a.y1 > b.y2
+  );
+}
+
+function lineIsHighlighted(
+  line: TextLine,
+  highlights: HighlightRect[]
+) {
+  const lineRect = {
+    x1: line.x - 3,
+    y1: line.y - line.height * 0.45,
+    x2: line.x + line.width + 3,
+    y2: line.y + line.height * 1.05,
+  };
+
+  return highlights.some((highlight) =>
+    rectIntersects(lineRect, highlight)
+  );
+}
+
+async function pageHighlights(
+  page: any
+): Promise<HighlightRect[]> {
+  try {
+    const annotations =
+      await page.getAnnotations({
+        intent: "display",
+      });
+
+    const result: HighlightRect[] = [];
+
+    for (const annotation of annotations) {
+      if (
+        annotation?.subtype !== "Highlight" &&
+        annotation?.annotationType !== 9
+      ) {
+        continue;
+      }
+
+      const quadPoints =
+        Array.isArray(annotation?.quadPoints)
+          ? annotation.quadPoints
+          : null;
+
+      if (
+        quadPoints &&
+        quadPoints.length >= 8
+      ) {
+        for (
+          let index = 0;
+          index + 7 < quadPoints.length;
+          index += 8
+        ) {
+          const xs = [
+            quadPoints[index],
+            quadPoints[index + 2],
+            quadPoints[index + 4],
+            quadPoints[index + 6],
+          ];
+
+          const ys = [
+            quadPoints[index + 1],
+            quadPoints[index + 3],
+            quadPoints[index + 5],
+            quadPoints[index + 7],
+          ];
+
+          result.push({
+            x1: Math.min(...xs),
+            y1: Math.min(...ys),
+            x2: Math.max(...xs),
+            y2: Math.max(...ys),
+          });
+        }
+
+        continue;
       }
 
       if (
-        (name === "href" || name === "src") &&
-        value.startsWith("javascript:")
+        Array.isArray(annotation?.rect) &&
+        annotation.rect.length >= 4
       ) {
-        node.removeAttribute(attribute.name);
-      }
-    });
-  });
+        const [x1, y1, x2, y2] =
+          annotation.rect;
 
-  return documentValue.body.firstElementChild?.innerHTML || "";
+        result.push({
+          x1: Math.min(x1, x2),
+          y1: Math.min(y1, y2),
+          x2: Math.max(x1, x2),
+          y2: Math.max(y1, y2),
+        });
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error(
+      "HIGHLIGHT READ ERROR:",
+      error
+    );
+
+    return [];
+  }
 }
 
-const richTextDraftCache = new Map<string, string>();
+/* =========================================================
+   TEXT ITEMS -> LINES
+========================================================= */
 
-function RichTextEditor({
-  editorId,
-  value,
-  onChange,
-  placeholder = "Matn kiriting...",
-  minHeight = 160,
-  compact = false,
-}: RichTextEditorProps) {
-  const editorRef = useRef<HTMLDivElement | null>(null);
-  const savedRangeRef = useRef<Range | null>(null);
+function buildPositionedItems(
+  textItems: PdfTextItem[],
+  pageNumber: number
+): PositionedText[] {
+  return textItems
+    .filter(
+      (item) =>
+        typeof item.str === "string" &&
+        item.str.trim()
+    )
+    .map((item) => {
+      const transform =
+        item.transform ?? [
+          1, 0, 0, 1, 0, 0,
+        ];
 
-  const storageKey = `pdf-rich-editor:${editorId}`;
+      return {
+        text: item.str.trim(),
+        x:
+          Number(transform[4]) || 0,
+        y:
+          Number(transform[5]) || 0,
+        width:
+          Math.max(
+            1,
+            Number(item.width) || 1
+          ),
+        height:
+          Math.max(
+            8,
+            Math.abs(
+              Number(transform[3]) || 0
+            )
+          ),
+        pageNumber,
+      };
+    });
+}
 
-  function readSavedDraft() {
-    try {
-      return window.sessionStorage.getItem(storageKey);
-    } catch {
-      return null;
+function groupItemsIntoLines(
+  items: PositionedText[],
+  column: "left" | "right" | "full"
+): TextLine[] {
+  const sorted =
+    [...items].sort((a, b) => {
+      const dy = b.y - a.y;
+
+      if (Math.abs(dy) > 3.5) {
+        return dy;
+      }
+
+      return a.x - b.x;
+    });
+
+  const groups: PositionedText[][] = [];
+
+  for (const item of sorted) {
+    let bestGroup:
+      PositionedText[] | null = null;
+
+    let bestDistance =
+      Number.POSITIVE_INFINITY;
+
+    for (const group of groups) {
+      const avgY =
+        group.reduce(
+          (sum, part) =>
+            sum + part.y,
+          0
+        ) / group.length;
+
+      const distance =
+        Math.abs(
+          avgY - item.y
+        );
+
+      const tolerance =
+        Math.max(
+          3.5,
+          item.height * 0.45
+        );
+
+      if (
+        distance <= tolerance &&
+        distance < bestDistance
+      ) {
+        bestDistance =
+          distance;
+
+        bestGroup =
+          group;
+      }
+    }
+
+    if (bestGroup) {
+      bestGroup.push(item);
+    } else {
+      groups.push([item]);
     }
   }
 
-  function saveDraftHtml(html: string) {
-    try {
-      window.sessionStorage.setItem(storageKey, html);
-    } catch {
-      // sessionStorage ishlamasa ham editor ishlashda davom etadi
-    }
+  return groups
+    .map((group) => {
+      group.sort(
+        (a, b) =>
+          a.x - b.x
+      );
+
+      let text = "";
+      let previousRight:
+        number | null = null;
+
+      for (const item of group) {
+        if (
+          previousRight !== null
+        ) {
+          const gap =
+            item.x -
+            previousRight;
+
+          if (
+            gap >
+            Math.max(
+              2.5,
+              item.height * 0.18
+            )
+          ) {
+            text += " ";
+          }
+        }
+
+        text +=
+          item.text;
+
+        previousRight =
+          item.x +
+          item.width;
+      }
+
+      const x =
+        Math.min(
+          ...group.map(
+            (item) => item.x
+          )
+        );
+
+      const y =
+        group.reduce(
+          (sum, item) =>
+            sum + item.y,
+          0
+        ) / group.length;
+
+      const right =
+        Math.max(
+          ...group.map(
+            (item) =>
+              item.x +
+              item.width
+          )
+        );
+
+      const height =
+        Math.max(
+          ...group.map(
+            (item) =>
+              item.height
+          )
+        );
+
+      return {
+        text:
+          normalizeOneLine(text),
+        x,
+        y,
+        width:
+          right - x,
+        height,
+        pageNumber:
+          group[0].pageNumber,
+        column,
+      };
+    })
+    .filter(
+      (line) =>
+        line.text.length > 0
+    )
+    .sort((a, b) => {
+      const dy =
+        b.y - a.y;
+
+      if (
+        Math.abs(dy) > 3
+      ) {
+        return dy;
+      }
+
+      return a.x - b.x;
+    });
+}
+
+/* =========================================================
+   PAGE READING ORDER
+   Two-column pages:
+   LEFT TOP->BOTTOM, then RIGHT TOP->BOTTOM.
+   No item is discarded in the middle.
+========================================================= */
+
+
+/*
+  =========================================================
+  SAHIFA ICHKI RAMKASI
+  =========================================================
+
+  Kitobda har sahifaning asosiy test qismi qora ramka ichida.
+  Ramkadan tashqaridagi:
+    - "Davlat va huquq asoslari (10-sinf)"
+    - "Qurbonov S.J."
+    - boshqa kolontitullar
+  savol yoki variantga qo‘shilmasligi kerak.
+
+  PDF.js koordinatalari pastdan yuqoriga o‘sadi. Shu sabab
+  yuqoridagi tashqi sarlavhani ham, juda pastdagi tashqi
+  elementlarni ham nisbiy chegara bilan chiqarib tashlaymiz.
+*/
+function keepItemInsideBookFrame(
+  item: PositionedText,
+  pageWidth: number,
+  pageHeight: number
+) {
+  const centerX =
+    item.x + item.width / 2;
+
+  const minX =
+    pageWidth * 0.045;
+
+  const maxX =
+    pageWidth * 0.955;
+
+  const minY =
+    pageHeight * 0.035;
+
+  const maxY =
+    pageHeight * 0.965;
+
+  return (
+    centerX >= minX &&
+    centerX <= maxX &&
+    item.y >= minY &&
+    item.y <= maxY
+  );
+}
+
+function pageLines(
+  items: PositionedText[],
+  pageWidth: number,
+  pageHeight: number
+) {
+  const framedItems =
+    items.filter((item) =>
+      keepItemInsideBookFrame(
+        item,
+        pageWidth,
+        pageHeight
+      )
+    );
+
+  if (framedItems.length === 0) {
+    return [] as TextLine[];
+  }
+
+  const middle =
+    pageWidth / 2;
+
+  /*
+    We detect whether there is meaningful text on BOTH sides.
+  */
+  const leftCount =
+    framedItems.filter(
+      (item) =>
+        item.x <
+        middle - 10
+    ).length;
+
+  const rightCount =
+    framedItems.filter(
+      (item) =>
+        item.x >
+        middle + 10
+    ).length;
+
+  const twoColumn =
+    leftCount >= 8 &&
+    rightCount >= 8;
+
+  if (!twoColumn) {
+    return groupItemsIntoLines(
+      framedItems,
+      "full"
+    );
   }
 
   /*
-    MUHIM:
-    contentEditable endi HAQIQIY uncontrolled editor.
-    Parentdagi `value` har bir renderda DOMga qayta yozilmaydi.
-    Shu sabab matnni bir qatordan ikkinchi qatorga ko‘chirsangiz,
-    `1-bo‘lim` qilib birlashtirsangiz yoki so‘zlarni joyidan sursangiz,
-    ular eski joyiga qaytmaydi.
+    IMPORTANT:
+    assign EVERY item to exactly one column.
+    No dead zone, no dropped tokens.
   */
-  const mountedOnceRef = useRef(false);
-
-  useEffect(() => {
-    const editor = editorRef.current;
-
-    if (!editor) {
-      return;
-    }
-
-    /*
-      HAR BIR EDITOR UCHUN ALOHIDA DRAFT.
-      Scroll, parent re-render yoki component qayta mount bo‘lsa ham
-      sessionStorage'dagi oxirgi foydalanuvchi HTML'i ustun turadi.
-    */
-    const saved = readSavedDraft();
-    const initialHtml =
-      saved !== null
-        ? saved
-        : editorValueToHtml(value);
-
-    editor.innerHTML = initialHtml;
-    saveDraftHtml(initialHtml);
-
-    /*
-      Browser DOMdagi HAR QANDAY o‘zgarishni darhol saqlaymiz.
-      Drag/drop, so‘zni tepaga olib chiqish, Enter/Backspace/Delete,
-      Ctrl+X/Ctrl+V — hammasi shu yerda ushlanadi.
-    */
-    const observer = new MutationObserver(() => {
-      const html = editor.innerHTML;
-      saveDraftHtml(html);
-      onChange(html);
-    });
-
-    observer.observe(editor, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      attributes: true,
-    });
-
-    return () => {
-      const html = editor.innerHTML;
-      saveDraftHtml(html);
-      onChange(html);
-      observer.disconnect();
-    };
-
-    // editorId o‘zgarmaydi; value ataylab dependency emas.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editorId]);
-
-  function rememberLocalHtml() {
-    const editor = editorRef.current;
-
-    if (!editor) {
-      return;
-    }
-
-    saveDraftHtml(editor.innerHTML);
-  }
-
-  function commitChange() {
-    const editor = editorRef.current;
-
-    if (!editor) {
-      return;
-    }
-
-    const html = editor.innerHTML;
-    saveDraftHtml(html);
-    onChange(html);
-  }
-
-  function saveSelection() {
-    const editor = editorRef.current;
-    const selection = window.getSelection();
-
-    if (
-      !editor ||
-      !selection ||
-      selection.rangeCount === 0
-    ) {
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-
-    if (editor.contains(range.commonAncestorContainer)) {
-      savedRangeRef.current = range.cloneRange();
-    }
-  }
-
-  function restoreSelection() {
-    const editor = editorRef.current;
-
-    if (!editor) {
-      return;
-    }
-
-    editor.focus();
-
-    const range = savedRangeRef.current;
-    const selection = window.getSelection();
-
-    if (!range || !selection) {
-      return;
-    }
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
-
-  function command(
-    name: string,
-    commandValue?: string
-  ) {
-    restoreSelection();
-    document.execCommand(
-      name,
-      false,
-      commandValue
+  const left =
+    framedItems.filter(
+      (item) =>
+        item.x +
+          item.width / 2 <=
+        middle
     );
-    saveSelection();
-    rememberLocalHtml();
 
-    // Toolbar bosilgandan keyin caret tanlangan joyda qoladi.
-    // Parent state faqat editor blur bo‘lganda yangilanadi.
-    window.requestAnimationFrame(() => {
-      restoreSelection();
-    });
+  const right =
+    framedItems.filter(
+      (item) =>
+        item.x +
+          item.width / 2 >
+        middle
+    );
+
+  const leftLines =
+    groupItemsIntoLines(
+      left,
+      "left"
+    );
+
+  const rightLines =
+    groupItemsIntoLines(
+      right,
+      "right"
+    );
+
+  return [
+    ...leftLines,
+    ...rightLines,
+  ];
+}
+
+/* =========================================================
+   QUESTION BLOCKS
+========================================================= */
+
+function isPdfDecorationLine(value: string) {
+  const text = normalizeOneLine(value);
+  const lower = text.toLowerCase();
+
+  if (!text) {
+    return true;
   }
 
-  function toolMouseDown(
-    event: React.MouseEvent<HTMLElement>
+  /* Har sahifada takrorlanadigan kolontitul / sahifa raqami */
+  if (
+    /^davlat\s+va\s+huquq\s+asoslari\s*\(\s*10-sinf\s*\)$/i.test(text) ||
+    /^davlat\s+va\s+huquq\s+asoslari\s*\(\s*\d{1,2}-sinf\s*\)$/i.test(text) ||
+    /^qurbonov\s+s\.j\.?$/i.test(text) ||
+    /^qurbonob\s+siyovush$/i.test(text) ||
+    /^\d{1,3}$/.test(text)
   ) {
-    event.preventDefault();
-    saveSelection();
+    return true;
+  }
+
+  /* Maxsus blok variant sarlavhalari — savolning qismi emas. */
+  if (/^[12]\s*[-–—]?\s*variant\s*\(\s*30\s*ta\s*\)$/i.test(text)) {
+    return true;
+  }
+
+  /* Javoblar bo'limi sarlavhalari */
+  if (
+    /^umumiy\s+javoblar$/i.test(text) ||
+    /^javoblar(?:\s+kaliti)?$/i.test(text)
+  ) {
+    return true;
+  }
+
+  /* Sahifadagi dekorativ bo'lim/bob sarlavhalari. */
+  if (
+    /^[IVXLCDM]+\s+bob\./i.test(text) ||
+    /^(birinchi|ikkinchi|uchinchi|to['’ʻʼ`]?rtinchi|beshinchi|oltinchi)\s+bo['’ʻʼ`]?lim\b/i.test(lower) ||
+    /\bmoddalar\s+bo['’ʻʼ`]?yicha\s+(?:test|\d+\s*ta)/i.test(lower) ||
+    /^o['’ʻʼ`]?zbekiston\s+respublikasi\s+konstitutsiyasi$/i.test(lower)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function blockHasAllOptions(lines: TextLine[]) {
+  const found = new Set<OptionLabel>();
+
+  for (const line of lines) {
+    const direct = optionLabelFromStart(line.text);
+
+    if (direct) {
+      found.add(direct);
+    }
+
+    const inline = splitInlineOptions(line.text);
+
+    for (const part of inline) {
+      found.add(part.label);
+    }
   }
 
   return (
-    <div className={compact ? "richEditor richEditorCompact" : "richEditor"}>
-      <div className="richToolbar">
-        <div className="toolbarGroup">
-          <button
-            type="button"
-            title="Bekor qilish (Undo)"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("undo")}
-          >
-            ↶
-          </button>
-
-          <button
-            type="button"
-            title="Qaytarish (Redo)"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("redo")}
-          >
-            ↷
-          </button>
-        </div>
-
-        <div className="toolbarGroup toolbarSelectGroup">
-          <select
-            title="Shrift"
-            defaultValue="Bell MT"
-            onMouseDown={saveSelection}
-            onChange={(event) =>
-              command(
-                "fontName",
-                event.target.value
-              )
-            }
-          >
-            <option value="Bell MT">Bell MT</option>
-            <option value="Times New Roman">Times New Roman</option>
-            <option value="Arial">Arial</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Verdana">Verdana</option>
-            <option value="Tahoma">Tahoma</option>
-          </select>
-
-          <select
-            title="Matn o‘lchami"
-            defaultValue="4"
-            onMouseDown={saveSelection}
-            onChange={(event) =>
-              command(
-                "fontSize",
-                event.target.value
-              )
-            }
-          >
-            <option value="2">13</option>
-            <option value="3">16</option>
-            <option value="4">18</option>
-            <option value="5">24</option>
-            <option value="6">32</option>
-            <option value="7">48</option>
-          </select>
-        </div>
-
-        <div className="toolbarGroup">
-          <button
-            type="button"
-            className="formatBold"
-            title="Qalin"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("bold")}
-          >
-            B
-          </button>
-
-          <button
-            type="button"
-            className="formatItalic"
-            title="Kursiv"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("italic")}
-          >
-            I
-          </button>
-
-          <button
-            type="button"
-            className="formatUnderline"
-            title="Tagiga chizish"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("underline")}
-          >
-            U
-          </button>
-
-          <button
-            type="button"
-            className="formatStrike"
-            title="Ustidan chizish"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("strikeThrough")}
-          >
-            abc
-          </button>
-        </div>
-
-        <div className="toolbarGroup colorTools">
-          <label title="Matn rangi">
-            <span>A</span>
-            <input
-              type="color"
-              defaultValue="#111111"
-              onMouseDown={saveSelection}
-              onChange={(event) =>
-                command(
-                  "foreColor",
-                  event.target.value
-                )
-              }
-            />
-          </label>
-
-          <label title="Marker / fon rangi">
-            <span>▰</span>
-            <input
-              type="color"
-              defaultValue="#fff176"
-              onMouseDown={saveSelection}
-              onChange={(event) =>
-                command(
-                  "hiliteColor",
-                  event.target.value
-                )
-              }
-            />
-          </label>
-        </div>
-
-        <div className="toolbarGroup">
-          <button
-            type="button"
-            title="Chapga tekislash"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("justifyLeft")}
-          >
-            ≡←
-          </button>
-
-          <button
-            type="button"
-            title="Markazga tekislash"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("justifyCenter")}
-          >
-            ≡
-          </button>
-
-          <button
-            type="button"
-            title="O‘ngga tekislash"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("justifyRight")}
-          >
-            →≡
-          </button>
-
-          <button
-            type="button"
-            title="Ikki chetidan tekislash"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("justifyFull")}
-          >
-            ☰
-          </button>
-        </div>
-
-        <div className="toolbarGroup">
-          <button
-            type="button"
-            title="Raqamli ro‘yxat"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("insertOrderedList")}
-          >
-            1.
-          </button>
-
-          <button
-            type="button"
-            title="Belgili ro‘yxat"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("insertUnorderedList")}
-          >
-            •
-          </button>
-
-          <button
-            type="button"
-            title="Chapga surish"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("outdent")}
-          >
-            ⇤
-          </button>
-
-          <button
-            type="button"
-            title="Ichkariga surish"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("indent")}
-          >
-            ⇥
-          </button>
-        </div>
-
-        <div className="toolbarGroup">
-          <button
-            type="button"
-            title="Formatlashni tozalash"
-            onMouseDown={toolMouseDown}
-            onClick={() => command("removeFormat")}
-          >
-            Tx
-          </button>
-        </div>
-      </div>
-
-      <div
-        ref={editorRef}
-        className="richEditorArea"
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder={placeholder}
-        style={{ minHeight }}
-        onInput={() => {
-          saveSelection();
-
-          window.requestAnimationFrame(() => {
-            rememberLocalHtml();
-            commitChange();
-          });
-        }}
-        onFocus={() => {
-          saveSelection();
-          rememberLocalHtml();
-        }}
-        onMouseUp={saveSelection}
-        onKeyUp={saveSelection}
-        onPaste={() => {
-          window.requestAnimationFrame(() => {
-            saveSelection();
-            rememberLocalHtml();
-            commitChange();
-          });
-        }}
-        onCut={() => {
-          window.requestAnimationFrame(() => {
-            saveSelection();
-            rememberLocalHtml();
-            commitChange();
-          });
-        }}
-        onDrop={() => {
-          /*
-            Tanlangan matnni sichqoncha bilan boshqa joyga tashlashda
-            brauzer DOMni drop eventidan KEYIN o‘zgartiradi.
-            Shu sabab requestAnimationFrame ichida yangi HTMLni olamiz.
-          */
-          window.requestAnimationFrame(() => {
-            saveSelection();
-            rememberLocalHtml();
-            commitChange();
-          });
-        }}
-        onBlur={() => {
-          saveSelection();
-          rememberLocalHtml();
-          commitChange();
-        }}
-      />
-
-      <style jsx>{`
-        .richEditor {
-          overflow: hidden;
-          border: 2px solid #66737a;
-          border-radius: 13px;
-          background: #fff;
-          box-shadow:
-            inset 0 2px 3px rgba(0,0,0,.07),
-            0 2px 0 rgba(50,60,66,.22);
-        }
-
-        .richToolbar {
-          padding: 8px;
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 7px;
-          border-bottom: 1px solid #9aa5ab;
-          background: linear-gradient(#f8f8f8,#dedede);
-        }
-
-        .toolbarGroup {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          padding-right: 7px;
-          border-right: 1px solid #aab1b5;
-        }
-
-        .toolbarGroup:last-child {
-          border-right: 0;
-        }
-
-        .richToolbar button,
-        .richToolbar select,
-        .colorTools label {
-          min-height: 36px;
-          border: 1px solid #7f898e;
-          border-radius: 6px;
-          background: linear-gradient(#fff,#dedede);
-          font-family: "Bell MT", "Times New Roman", serif;
-        }
-
-        .richToolbar button {
-          min-width: 36px;
-          padding: 4px 9px;
-          cursor: pointer;
-          font-size: 15px;
-          font-weight: 700;
-        }
-
-        .richToolbar button:hover {
-          border-color: #168fc9;
-          background: #e4f6ff;
-        }
-
-        .richToolbar select {
-          padding: 4px 8px;
-          cursor: pointer;
-        }
-
-        .toolbarSelectGroup select:first-child {
-          width: 150px;
-        }
-
-        .toolbarSelectGroup select:last-child {
-          width: 68px;
-        }
-
-        .formatBold {
-          font-weight: 900 !important;
-        }
-
-        .formatItalic {
-          font-style: italic;
-        }
-
-        .formatUnderline {
-          text-decoration: underline;
-        }
-
-        .formatStrike {
-          text-decoration: line-through;
-          font-size: 12px !important;
-        }
-
-        .colorTools label {
-          position: relative;
-          width: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-weight: 900;
-        }
-
-        .colorTools input {
-          position: absolute;
-          inset: auto 4px 2px;
-          width: 30px;
-          height: 5px;
-          padding: 0;
-          border: 0;
-          opacity: .85;
-          cursor: pointer;
-        }
-
-        .richEditorArea {
-          padding: 18px 20px;
-          outline: none;
-          overflow: auto;
-          color: #111;
-          background: #fff;
-          font-family: "Bell MT", "Times New Roman", serif;
-          font-size: 21px;
-          line-height: 1.65;
-          text-align: justify;
-          text-justify: inter-word;
-          white-space: normal;
-          overflow-wrap: anywhere;
-        }
-
-        .richEditorArea:empty::before {
-          content: attr(data-placeholder);
-          color: #8a9398;
-          pointer-events: none;
-        }
-
-        .richEditorArea :global(p) {
-          margin: 0 0 12px;
-        }
-
-        .richEditorArea :global(ol),
-        .richEditorArea :global(ul) {
-          margin: 8px 0;
-          padding-left: 30px;
-        }
-
-        .richEditorCompact .richToolbar {
-          padding: 6px;
-        }
-
-        .richEditorCompact .richEditorArea {
-          padding: 13px 15px;
-          font-size: 19px;
-          line-height: 1.5;
-        }
-
-        @media(max-width:700px) {
-          .richToolbar {
-            align-items: stretch;
-          }
-
-          .toolbarGroup {
-            padding-right: 4px;
-          }
-
-          .richToolbar button {
-            min-width: 33px;
-            min-height: 34px;
-            padding: 3px 7px;
-          }
-
-          .toolbarSelectGroup {
-            width: 100%;
-            border-right: 0;
-          }
-
-          .toolbarSelectGroup select:first-child {
-            flex: 1;
-            width: auto;
-          }
-
-          .richEditorArea,
-          .richEditorCompact .richEditorArea {
-            padding: 13px;
-            font-size: 17px;
-            line-height: 1.55;
-          }
-        }
-      `}</style>
-    </div>
+    found.has("A") &&
+    found.has("B") &&
+    found.has("C") &&
+    found.has("D")
   );
 }
 
-export default function ImportPdfTestPage() {
-  const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("");
-  const [duration, setDuration] = useState(60);
-  const [description, setDescription] = useState("");
+/*
+  =========================================================
+  SAVOLLARNI KETMA-KET AJRATISH
+  =========================================================
 
-  const [testType, setTestType] =
-    useState<TestCategory>("legislation");
+  Ushbu PDFning tuzilishi:
+    1..780   — asosiy testlar
+    1..30    — 1-variant blok test
+    1..30    — 2-variant blok test
 
-  const [customTestTypeName, setCustomTestTypeName] =
-    useState("");
+  Saytda esa ularni bitta ketma-ket ro'yxat qilamiz:
+    1..780
+    781..810
+    811..840
 
-  const [attemptLimitEnabled, setAttemptLimitEnabled] = useState(true);
-  const [attemptLimit, setAttemptLimit] = useState(1);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  MUHIM:
+  Savol ichidagi:
+    1. jinsi
+    2. irqi
+    3. millati
+  kabi bandlar yangi savol EMAS.
 
-  const [analyzing, setAnalyzing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  Yangi savol faqat:
+    - kutilayotgan navbatdagi raqam bo'lsa;
+    - oldingi savolda A/B/C/D variantlari to'liq topilgan bo'lsa
+  boshlanadi.
 
-  const [message, setMessage] = useState("");
-  const [questions, setQuestions] =
-    useState<ImportedQuestion[]>([]);
-  const [importedTopics, setImportedTopics] =
-    useState<ImportedTopic[]>([]);
-  const [specialSections, setSpecialSections] =
-    useState<ImportedTopic[]>([]);
+  Shu sababli 85-savol ichidagi 1..8 bandlar 1..8-savolga
+  aylanib ketmaydi va boshqa sahifadagi savol oldingi savolning
+  o'rnini bosmaydi.
+*/
+function buildQuestionBlocks(
+  lines: TextLine[]
+): QuestionBlock[] {
+  const blocks: QuestionBlock[] = [];
 
+  let expectedLocalNumber = 1;
+  let currentLocalNumber: number | null = null;
+  let currentGlobalNumber: number | null = null;
+  let currentLines: TextLine[] = [];
 
   /*
-    SAVOL MATNI UCHUN ALOHIDA SOURCE OF TRUTH.
-    Variantlar ishlayotgani uchun ularga tegmaymiz.
-    Savol matni esa endi questions[] ichidagi eski PDF qiymatiga
-    qaram bo‘lmaydi.
+    Global raqam endi PDFdagi lokal raqamga bog'liq emas.
+
+    Mavzulashtirilgan PDFlarda har bir yangi mavzuda savollar:
+      1, 2, 3 ... 52
+    keyingi mavzuda yana:
+      1, 2, 3 ...
+
+    Saytda esa ular:
+      1, 2, 3 ... N
+    ko'rinishida ketma-ket saqlanadi.
   */
-  const [questionDrafts, setQuestionDrafts] =
-    useState<Record<string, string>>({});
+  let nextGlobalNumber = 1;
 
-  const [selectedShape, setSelectedShape] = useState<{
-    questionId: string;
-    shapeId: string;
-  } | null>(null);
-
-  const [activeCanvasQuestionId, setActiveCanvasQuestionId] =
-    useState<string | null>(null);
-
-  const [openVisualEditors, setOpenVisualEditors] =
-    useState<Record<string, boolean>>({});
-
-  const copiedShapeRef = useRef<EditorShape | null>(null);
-
-  const pointerActionRef = useRef<{
-    mode: "move" | "resize";
-    questionId: string;
-    shapeId: string;
-    startClientX: number;
-    startClientY: number;
-    startX: number;
-    startY: number;
-    startWidth: number;
-    startHeight: number;
-    handle?: "nw" | "ne" | "sw" | "se";
-  } | null>(null);
-
-  useEffect(() => {
-    // URL parametrlarini faqat brauzerda o'qiymiz.
-    // Bu Next.js prerender vaqtida URL parametr muammosini oldini oladi.
-    if (typeof window === "undefined") {
-      return;
+  function flushCurrent() {
+    if (
+      currentGlobalNumber !== null &&
+      currentLines.length > 0
+    ) {
+      blocks.push({
+        number: currentGlobalNumber,
+        lines: currentLines,
+      });
     }
 
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
+    currentLocalNumber = null;
+    currentGlobalNumber = null;
+    currentLines = [];
+  }
 
-    const urlType =
-      params.get("testType");
+  function startQuestion(
+    localNumber: number,
+    line: TextLine
+  ) {
+    currentLocalNumber = localNumber;
+    currentGlobalNumber = nextGlobalNumber++;
+    currentLines = [line];
+    expectedLocalNumber = localNumber + 1;
+  }
 
-    if (urlType) {
-      setTestType(
-        normalizeTestCategory(
-          urlType
-        )
-      );
+  function isAnswerKeyHeading(value: string) {
+    const text = normalizeOneLine(value);
+
+    return (
+      /^javoblar\s*:?\s*$/i.test(text) ||
+      /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+    );
+  }
+
+  function isVariantTitle(value: string) {
+    const text = normalizeOneLine(value);
+
+    return /^[12]\s*[-–—]?\s*variant\s*\(\s*\d+\s*ta\s*\)$/i.test(
+      text
+    );
+  }
+
+  function canCloseCurrentQuestion() {
+    if (currentGlobalNumber === null) {
+      return false;
     }
 
-    const customName =
-      params.get(
-        "customTestTypeName"
-      );
+    /*
+      Mavzulashtirilgan testlarda ichki ro'yxatlar ko'p:
+        1. ...
+        2. ...
+        3. ...
 
-    if (customName) {
-      setCustomTestTypeName(
-        customName
-      );
+      Shuning uchun faqat A/B/C/D variantlari tugagandan keyingina
+      yangi raqamni haqiqiy yangi savol deb olamiz.
+    */
+    return blockHasAllOptions(currentLines);
+  }
+
+  for (const line of lines) {
+    /*
+      Javoblar bo'limiga kelganda savol o'qishni TO'XTATAMIZ.
+      Aks holda "Savol 1 2 3..." jadvallari oxirgi savolga qo'shilib ketadi.
+    */
+    if (isAnswerKeyHeading(line.text)) {
+      flushCurrent();
+      break;
     }
-  }, []);
 
-  useEffect(() => {
-    try {
-      Object.entries(questionDrafts).forEach(
-        ([id, html]) => {
-          window.sessionStorage.setItem(
-            `pdf-rich-editor:question:${id}`,
-            html
-          );
-        }
-      );
-    } catch {
-      // ignore
+    /*
+      Blok testdagi alohida variantlar ham qaytadan 1 dan boshlashi mumkin.
+    */
+    if (isVariantTitle(line.text)) {
+      if (currentGlobalNumber !== null) {
+        flushCurrent();
+      }
+
+      expectedLocalNumber = 1;
+      continue;
     }
-  }, [questionDrafts]);
 
-  const warningCount = useMemo(
-    () =>
-      questions.filter(
-        (item) =>
-          item.warning
-      ).length,
-    [questions]
+    if (isPdfDecorationLine(line.text)) {
+      continue;
+    }
+
+    const candidate =
+      questionNumberFromLine(line.text);
+
+    /*
+      Birinchi haqiqiy savol.
+    */
+    if (currentGlobalNumber === null) {
+      if (candidate === 1) {
+        startQuestion(candidate, line);
+      }
+
+      continue;
+    }
+
+    if (candidate !== null) {
+      /*
+        ODDIY DAVOM:
+          31 -> 32 -> 33 ...
+
+        MUHIM:
+        current savolda A/B/C/D hali tugamagan bo'lsa,
+        "2.", "3.", "4." kabi ichki bandlarni yangi savol deb olmaymiz.
+      */
+      if (
+        candidate === expectedLocalNumber &&
+        canCloseCurrentQuestion()
+      ) {
+        flushCurrent();
+        startQuestion(candidate, line);
+        continue;
+      }
+
+      /*
+        YANGI MAVZU / YANGI BO'LIM:
+          ... 52-savol tugadi
+          keyingi mavzu yana 1-savoldan boshlanadi.
+
+        Shu joy eski parserning asosiy muammosi edi.
+      */
+      if (
+        candidate === 1 &&
+        currentLocalNumber !== null &&
+        currentLocalNumber !== 1 &&
+        canCloseCurrentQuestion()
+      ) {
+        flushCurrent();
+        startQuestion(1, line);
+        continue;
+      }
+
+      /*
+        PDF text-layer ba'zan bitta savol raqamini yo'qotib yuboradi.
+        Masalan expected=37, keyingi aniq o'qilgan savol=38.
+
+        Parser butun PDF bo'ylab 36-savolda qotib qolmasligi uchun,
+        oldingi savol A/B/C/D bilan tugagan bo'lsa, 1-2 raqamlik kichik
+        sakrashdan tiklanamiz.
+      */
+      if (
+        candidate > expectedLocalNumber &&
+        candidate <= expectedLocalNumber + 2 &&
+        canCloseCurrentQuestion()
+      ) {
+        flushCurrent();
+        startQuestion(candidate, line);
+        continue;
+      }
+    }
+
+    /*
+      Haqiqiy yangi savol emas:
+      - savol matnining davomi;
+      - ichki 1./2./3. band;
+      - A/B/C/D variantlari;
+      - jadval/moslashtirish qismi.
+    */
+    currentLines.push(line);
+  }
+
+  flushCurrent();
+
+  /*
+    Global raqamlar startQuestion() da allaqachon 1..N qilib berilgan.
+    PDF bo'yicha tabiiy tartibni saqlaymiz.
+  */
+  return blocks;
+}
+
+
+/* =========================================================
+   MAVZU (DARS) SARLAVHALARINI ANIQLASH
+========================================================= */
+
+function topicTitleFromLine(
+  value: string
+): string | null {
+  let text = normalizeOneLine(value);
+
+  const match = text.match(
+    /(\d+\s*(?:[–—-]\s*\d+\s*)?-\s*DARS\..*)/i
   );
 
-  function handleFile(
-    file: File | null
-  ) {
-    setMessage("");
-    setQuestions([]);
-    setImportedTopics([]);
-    setSpecialSections([]);
-    setQuestionDrafts({});
+  if (!match) {
+    return null;
+  }
 
-    if (!file) {
-      setPdfFile(null);
-      return;
+  text = match[1]
+    .replace(
+      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
+      ""
+    )
+    .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
+    .replace(/\s+\d+\s*$/, "")
+    .trim();
+
+  return text || null;
+}
+
+function topicSlug(
+  title: string,
+  index: number
+) {
+  const slug = title
+    .toLocaleLowerCase("uz-UZ")
+    .replace(/[‘’ʻʼ`´]/g, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `${String(index + 1).padStart(2, "0")}-${
+    slug || `mavzu-${index + 1}`
+  }`;
+}
+
+type AnswerKeyTopic = {
+  id: string;
+  title: string;
+  answerCount: number;
+  answers: OptionLabel[];
+};
+
+/*
+  MUHIM:
+  Mavzular savollar sahifalaridagi takroriy headerlardan olinmaydi.
+  Faqat PDF oxiridagi "Javoblar:" bo‘limidan olinadi.
+
+  Shu PDFda javoblar bo‘limi mavzularning haqiqiy katalogi:
+  1–2-DARS, 3–4-DARS, 5-DARS ... 33-DARS.
+*/
+function extractAnswerKeyTopics(
+  lines: TextLine[]
+): AnswerKeyTopic[] {
+  let inAnswerSection = false;
+
+  const topics: AnswerKeyTopic[] = [];
+  let current:
+    AnswerKeyTopic | null = null;
+
+  let pendingNumbers: number[] = [];
+  let pendingTitleContinuation = false;
+
+  function flushCurrent() {
+    if (
+      current &&
+      current.answers.length > 0
+    ) {
+      current.answerCount =
+        current.answers.length;
+
+      topics.push(current);
+    }
+
+    current = null;
+    pendingNumbers = [];
+    pendingTitleContinuation = false;
+  }
+
+  for (const line of lines) {
+    const text =
+      normalizeOneLine(line.text);
+
+    if (!inAnswerSection) {
+      if (
+        /^javoblar\s*:?\s*$/i.test(text) ||
+        /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+      ) {
+        inAnswerSection = true;
+      }
+
+      continue;
+    }
+
+    const topicTitle =
+      topicTitleFromLine(text);
+
+    if (topicTitle) {
+      flushCurrent();
+
+      current = {
+        id: "",
+        title: topicTitle,
+        answerCount: 0,
+        answers: [],
+      };
+
+      /*
+        Sarlavha keyingi qatorda davom etishi mumkin:
+        "13-DARS. ... huquqiy"
+        "maqomi"
+      */
+      pendingTitleContinuation = true;
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    /*
+      Mavzu nomining ikkinchi qatori.
+      Savol/Javob jadvali boshlanmaguncha faqat sarlavha
+      davomiga o‘xshagan qisqa matnni qo‘shamiz.
+    */
+    if (
+      pendingTitleContinuation &&
+      text &&
+      !text.startsWith("№") &&
+      !/^savol\b/i.test(text) &&
+      !/^javob\b/i.test(text) &&
+      !/^javoblar\b/i.test(text) &&
+      !/^\d+$/.test(text) &&
+      !/Davlat va huquq asoslari/i.test(text)
+    ) {
+      current.title =
+        `${current.title} ${text}`
+          .replace(/\s+/g, " ")
+          .trim();
+
+      pendingTitleContinuation = false;
+      continue;
+    }
+
+    if (
+      text.startsWith("№") ||
+      /^savol\b/i.test(text)
+    ) {
+      pendingTitleContinuation = false;
+
+      pendingNumbers =
+        (text.match(/\b\d{1,4}\b/g) || [])
+          .map(Number)
+          .filter(Number.isFinite);
+
+      continue;
+    }
+
+    if (/^javob\b/i.test(text)) {
+      pendingTitleContinuation = false;
+
+      const rowAnswers =
+        (text.match(/\b[ABCD]\b/gi) || [])
+          .map(
+            (value) =>
+              value.toUpperCase() as OptionLabel
+          );
+
+      const count =
+        pendingNumbers.length > 0
+          ? Math.min(
+              pendingNumbers.length,
+              rowAnswers.length
+            )
+          : rowAnswers.length;
+
+      for (
+        let index = 0;
+        index < count;
+        index++
+      ) {
+        current.answers.push(
+          rowAnswers[index]
+        );
+      }
+
+      pendingNumbers = [];
+    }
+  }
+
+  flushCurrent();
+
+  return topics.map(
+    (topic, index) => ({
+      ...topic,
+      id: topicSlug(
+        topic.title,
+        index
+      ),
+      answerCount:
+        topic.answers.length,
+    })
+  );
+}
+
+function buildTopicsFromAnswerKey(
+  answerTopics: AnswerKeyTopic[],
+  questions: ImportedQuestion[]
+): TopicGroup[] {
+  if (answerTopics.length === 0) {
+    return [{
+      id: "01-mavzulashtirilgan-test",
+      title: "Mavzulashtirilgan test",
+      questionNumbers:
+        questions.map((q) => q.number),
+      questions,
+    }];
+  }
+
+  const topics: TopicGroup[] = [];
+  let offset = 0;
+
+  for (const answerTopic of answerTopics) {
+    const count =
+      answerTopic.answerCount;
+
+    const topicQuestions =
+      questions.slice(
+        offset,
+        offset + count
+      );
+
+    /*
+      Har mavzu alohida test bo‘lishi uchun savollarni
+      mavzu ichida 1..N qilib qayta raqamlaymiz.
+      Original global questions[] esa o‘zgarmaydi.
+    */
+    const localQuestions =
+      topicQuestions.map(
+        (question, index) => ({
+          ...question,
+          number: index + 1,
+        })
+      );
+
+    topics.push({
+      id: answerTopic.id,
+      title: answerTopic.title,
+      questionNumbers:
+        topicQuestions.map(
+          (question) =>
+            question.number
+        ),
+      questions:
+        localQuestions,
+    });
+
+    offset += count;
+  }
+
+  /*
+    Answer-key jami soni savollardan kam chiqsa savol yo‘qolmaydi.
+    Oxirgi mavzuga qolgan savollarni qo‘shamiz.
+  */
+  if (
+    offset < questions.length &&
+    topics.length > 0
+  ) {
+    const last =
+      topics[topics.length - 1];
+
+    const remainder =
+      questions.slice(offset);
+
+    last.questionNumbers.push(
+      ...remainder.map(
+        (question) =>
+          question.number
+      )
+    );
+
+    const localStart =
+      last.questions.length;
+
+    last.questions.push(
+      ...remainder.map(
+        (question, index) => ({
+          ...question,
+          number:
+            localStart + index + 1,
+        })
+      )
+    );
+  }
+
+  return topics.filter(
+    (topic) =>
+      topic.questions.length > 0
+  );
+}
+
+
+/* =========================================================
+   V4 — POST-PARSE MAVZU AJRATISH
+
+   MUHIM:
+   Savollarni ajratadigan parserga umuman tegmaymiz.
+   Avval 1609 ta savol to‘liq parse bo‘ladi.
+   Keyin allLines bo‘yicha DARS / NAZORAT / LUG‘AT chegaralarini
+   aniqlab, savollarni ketma-ket sectionlarga biriktiramiz.
+========================================================= */
+
+type PostSection = {
+  key: string;
+  title: string;
+  kind: "lesson" | "control" | "glossary";
+  lessonStart?: number;
+  lessonEnd?: number;
+  lineIndex: number;
+};
+
+function cleanPostSectionTitle(value: string) {
+  return normalizeOneLine(value)
+    .replace(
+      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
+      ""
+    )
+    .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
+    .replace(/\s+\d+\s*$/, "")
+    .trim();
+}
+
+function detectPostSection(
+  value: string
+): Omit<PostSection, "lineIndex"> | null {
+  const text =
+    cleanPostSectionTitle(value);
+
+  const lesson = text.match(
+    /(\d+)\s*(?:[–—-]\s*(\d+))?\s*-\s*DARS\.\s*(.*)$/i
+  );
+
+  if (lesson) {
+    const start =
+      Number(lesson[1]);
+
+    const end =
+      lesson[2]
+        ? Number(lesson[2])
+        : start;
+
+    const name =
+      lesson[3]?.trim() || "";
+
+    return {
+      key:
+        `lesson-${start}-${end}`,
+      title:
+        `${start}${
+          end !== start
+            ? `–${end}`
+            : ""
+        }-DARS.${
+          name ? ` ${name}` : ""
+        }`,
+      kind: "lesson",
+      lessonStart: start,
+      lessonEnd: end,
+    };
+  }
+
+  if (
+    /NAZORAT\s+ISHI\s+BO['‘’ʻʼ`´]?YICHA/i.test(text) ||
+    /NAZORAT\s+SAVOLLARI/i.test(text)
+  ) {
+    return {
+      key: "control",
+      title: "Nazorat savollari",
+      kind: "control",
+    };
+  }
+
+  if (
+    /AYRIM\s+YURIDIK\s+ATAMALARNING\s+IZOHLI\s+LUG['‘’ʻʼ`´]?ATI/i.test(
+      text
+    )
+  ) {
+    return {
+      key: "glossary",
+      title:
+        "Ayrim yuridik atamalarning izohli lug‘ati",
+      kind: "glossary",
+    };
+  }
+
+  return null;
+}
+
+function looksLikePostTitleContinuation(
+  value: string
+) {
+  const text =
+    cleanPostSectionTitle(value);
+
+  if (!text) {
+    return false;
+  }
+
+  if (
+    questionNumberFromLine(text) !== null ||
+    /^[+ ]?[ABCD][).:\-]/i.test(text) ||
+    /^savol\b/i.test(text) ||
+    /^javob\b/i.test(text) ||
+    /^№/.test(text) ||
+    /^javoblar\b/i.test(text) ||
+    /^\d+$/.test(text)
+  ) {
+    return false;
+  }
+
+  return text.length <= 120;
+}
+
+function collectPostSections(
+  lines: TextLine[]
+): PostSection[] {
+  const sections: PostSection[] = [];
+
+  for (
+    let index = 0;
+    index < lines.length;
+    index++
+  ) {
+    const detected =
+      detectPostSection(
+        lines[index].text
+      );
+
+    if (!detected) {
+      continue;
+    }
+
+    let title =
+      detected.title;
+
+    /*
+      13-DARS, 15-DARS, 18–19-DARS kabi sarlavhalar
+      keyingi qatorga davom etishi mumkin.
+    */
+    if (
+      detected.kind === "lesson" &&
+      index + 1 < lines.length &&
+      looksLikePostTitleContinuation(
+        lines[index + 1].text
+      )
+    ) {
+      const continuation =
+        cleanPostSectionTitle(
+          lines[index + 1].text
+        );
+
+      if (
+        continuation &&
+        !detectPostSection(
+          continuation
+        )
+      ) {
+        title =
+          `${title} ${continuation}`
+            .replace(/\s+/g, " ")
+            .trim();
+      }
+    }
+
+    const previous =
+      sections[
+        sections.length - 1
+      ];
+
+    /*
+      Bir xil dars headeri sahifalarda qayta chiqadi.
+      Faqat ketma-ket bir xil sectionni dublikat qilmaymiz.
+    */
+    if (
+      previous &&
+      previous.key === detected.key
+    ) {
+      continue;
+    }
+
+    sections.push({
+      ...detected,
+      title,
+      lineIndex: index,
+    });
+  }
+
+  /*
+    Savollar qismidagi haqiqiy ketma-ketlikni olamiz.
+    Javoblar bo‘limiga o‘tgandan keyingi DARS sarlavhalari
+    takroriy katalog bo‘lgani uchun ikkinchi marta kelishi mumkin.
+    Birinchi "Javoblar:" dan keyingi sectionlarni kesib tashlaymiz.
+  */
+  let answerKeyStart = -1;
+
+  for (
+    let index = 0;
+    index < lines.length;
+    index++
+  ) {
+    const text =
+      normalizeOneLine(
+        lines[index].text
+      );
+
+    if (
+      /^javoblar\s*:?\s*$/i.test(text) ||
+      /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+    ) {
+      answerKeyStart = index;
+      break;
+    }
+  }
+
+  const sourceSections =
+    answerKeyStart >= 0
+      ? sections.filter(
+          (section) =>
+            section.lineIndex <
+            answerKeyStart
+        )
+      : sections;
+
+  return sourceSections;
+}
+
+function findQuestionStartLineIndexes(
+  lines: TextLine[],
+  questionCount: number
+) {
+  const indexes: number[] = [];
+  let cursor = 0;
+
+  while (
+    cursor < lines.length &&
+    indexes.length <
+      questionCount
+  ) {
+    const n =
+      questionNumberFromLine(
+        lines[cursor].text
+      );
+
+    if (n !== null) {
+      /*
+        Savol ichidagi 1./2./3. bandlarni ushlamaslik uchun
+        shu startdan keyin A/B/C/D mavjudligini tekshiramiz.
+      */
+      let optionLabels =
+        new Set<string>();
+
+      for (
+        let j = cursor + 1;
+        j <
+          Math.min(
+            cursor + 35,
+            lines.length
+          );
+        j++
+      ) {
+        const lineText =
+          normalizeOneLine(
+            lines[j].text
+          );
+
+        if (
+          questionNumberFromLine(
+            lineText
+          ) !== null &&
+          optionLabels.size < 4
+        ) {
+          break;
+        }
+
+        const inline =
+          splitInlineOptions(
+            lineText
+          );
+
+        for (
+          const option of inline
+        ) {
+          optionLabels.add(
+            option.label
+          );
+        }
+
+        const direct =
+          lineText.match(
+            /^[+ ]?([ABCD])[\)\.\-:]/
+          );
+
+        if (direct) {
+          optionLabels.add(
+            direct[1]
+          );
+        }
+
+        if (
+          optionLabels.size >= 4
+        ) {
+          break;
+        }
+      }
+
+      if (
+        optionLabels.size >= 4
+      ) {
+        indexes.push(cursor);
+      }
+    }
+
+    cursor++;
+  }
+
+  return indexes;
+}
+
+function build33LessonTopicsPostParse(
+  lines: TextLine[],
+  questions: ImportedQuestion[]
+) {
+  const sections =
+    collectPostSections(lines);
+
+  const questionLineIndexes =
+    findQuestionStartLineIndexes(
+      lines,
+      questions.length
+    );
+
+  /*
+    Agar source-index aniqlash savollar soniga to‘liq mos kelmasa,
+    xavfsiz fallback: savollarni yo‘qotmaymiz.
+  */
+  const canMapByLine =
+    questionLineIndexes.length ===
+    questions.length;
+
+  const sectionQuestions =
+    new Map<
+      string,
+      ImportedQuestion[]
+    >();
+
+  for (const section of sections) {
+    sectionQuestions.set(
+      section.key,
+      []
+    );
+  }
+
+  if (canMapByLine) {
+    for (
+      let qIndex = 0;
+      qIndex <
+      questions.length;
+      qIndex++
+    ) {
+      const qLine =
+        questionLineIndexes[
+          qIndex
+        ];
+
+      let selected:
+        PostSection | null = null;
+
+      for (
+        let sIndex = 0;
+        sIndex <
+        sections.length;
+        sIndex++
+      ) {
+        const current =
+          sections[sIndex];
+
+        const next =
+          sections[sIndex + 1];
+
+        if (
+          qLine >
+            current.lineIndex &&
+          (!next ||
+            qLine <
+              next.lineIndex)
+        ) {
+          selected =
+            current;
+          break;
+        }
+      }
+
+      if (selected) {
+        sectionQuestions
+          .get(selected.key)!
+          .push(
+            questions[qIndex]
+          );
+      }
+    }
+  }
+
+  const sourceByLesson =
+    new Map<
+      number,
+      PostSection
+    >();
+
+  for (const section of sections) {
+    if (
+      section.kind !==
+        "lesson" ||
+      !section.lessonStart
+    ) {
+      continue;
+    }
+
+    const end =
+      section.lessonEnd ||
+      section.lessonStart;
+
+    for (
+      let lesson =
+        section.lessonStart;
+      lesson <= end;
+      lesson++
+    ) {
+      if (
+        lesson >= 1 &&
+        lesson <= 33
+      ) {
+        sourceByLesson.set(
+          lesson,
+          section
+        );
+      }
+    }
+  }
+
+  const topics: TopicGroup[] = [];
+
+  for (
+    let lesson = 1;
+    lesson <= 33;
+    lesson++
+  ) {
+    const section =
+      sourceByLesson.get(
+        lesson
+      );
+
+    if (!section) {
+      topics.push({
+        id:
+          `lesson-${lesson}`,
+        title:
+          `${lesson}-DARS. Mavzu aniqlanmadi`,
+        lessonNumber:
+          lesson,
+        sourceSectionKey:
+          "missing",
+        sourceSectionTitle:
+          "Mavzu aniqlanmadi",
+        sharedSource: false,
+        kind: "lesson",
+        questionNumbers: [],
+        questions: [],
+      });
+
+      continue;
+    }
+
+    const sourceQuestions =
+      sectionQuestions.get(
+        section.key
+      ) || [];
+
+    const sourceStart =
+      section.lessonStart ||
+      lesson;
+
+    const sourceEnd =
+      section.lessonEnd ||
+      sourceStart;
+
+    const sharedSource =
+      sourceEnd >
+      sourceStart;
+
+    const sourceName =
+      section.title
+        .replace(
+          /^\d+\s*(?:[–—-]\s*\d+)?\s*-\s*DARS\.\s*/i,
+          ""
+        )
+        .trim();
+
+    topics.push({
+      id:
+        `lesson-${lesson}`,
+      title:
+        `${lesson}-DARS.${
+          sourceName
+            ? ` ${sourceName}`
+            : ""
+        }`,
+      lessonNumber:
+        lesson,
+      sourceSectionKey:
+        section.key,
+      sourceSectionTitle:
+        section.title,
+      sharedSource,
+      kind: "lesson",
+      questionNumbers:
+        sourceQuestions.map(
+          (question) =>
+            question.number
+        ),
+      questions:
+        sourceQuestions.map(
+          (question, index) => ({
+            ...question,
+            number:
+              index + 1,
+          })
+        ),
+    });
+  }
+
+  const specialSections: TopicGroup[] =
+    sections
+      .filter(
+        (section) =>
+          section.kind ===
+            "control" ||
+          section.kind ===
+            "glossary"
+      )
+      .map(
+        (section) => {
+          const sourceQuestions =
+            sectionQuestions.get(
+              section.key
+            ) || [];
+
+          return {
+            id:
+              section.kind ===
+                "control"
+                ? "control-questions"
+                : "legal-glossary",
+            title:
+              section.kind ===
+                "control"
+                ? "Nazorat savollari"
+                : "Ayrim yuridik atamalarning izohli lug‘ati",
+            sourceSectionKey:
+              section.key,
+            sourceSectionTitle:
+              section.title,
+            sharedSource: false,
+            kind:
+              section.kind,
+            questionNumbers:
+              sourceQuestions.map(
+                (question) =>
+                  question.number
+              ),
+            questions:
+              sourceQuestions.map(
+                (question, index) => ({
+                  ...question,
+                  number:
+                    index + 1,
+                })
+              ),
+          } as TopicGroup;
+        }
+      );
+
+  return {
+    topics,
+    specialSections,
+    sectionCount:
+      sections.length,
+    mappedQuestionCount:
+      canMapByLine
+        ? questionLineIndexes.length
+        : 0,
+    mappingComplete:
+      canMapByLine,
+  };
+}
+
+/* =========================================================
+   ANSWER KEY READER
+
+   "Javoblar:" bo'limidagi:
+     Savol  11 12 13 ...
+     Javob  B  C  A  ...
+   jadvallarini ketma-ket o'qiydi.
+
+   Natija savollar bilan SONI TO'LIQ MOS tushsa, correct answerlar
+   avtomatik belgilanadi. Mos kelmasa xavfsizlik uchun qo'llanmaydi.
+========================================================= */
+
+function extractAnswerKey(
+  lines: TextLine[]
+): OptionLabel[] {
+  let inAnswerSection = false;
+
+  let pendingNumbers: number[] = [];
+  const answers: OptionLabel[] = [];
+
+  for (const line of lines) {
+    const text = normalizeOneLine(line.text);
+
+    if (!inAnswerSection) {
+      if (
+        /^javoblar\s*:?\s*$/i.test(text) ||
+        /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+      ) {
+        inAnswerSection = true;
+      }
+
+      continue;
+    }
+
+    /*
+      Birinchi qator ko'pincha:
+        № 1 2 3 ... 10
+      keyingilari:
+        Savol 11 12 ... 20
+    */
+    if (
+      text.startsWith("№") ||
+      /^savol\b/i.test(text)
+    ) {
+      pendingNumbers =
+        (text.match(/\b\d{1,4}\b/g) || [])
+          .map(Number)
+          .filter((value) =>
+            Number.isFinite(value)
+          );
+
+      continue;
+    }
+
+    if (/^javob\b/i.test(text)) {
+      const rowAnswers =
+        (text.match(/\b[ABCD]\b/gi) || [])
+          .map(
+            (value) =>
+              value.toUpperCase() as OptionLabel
+          );
+
+      if (
+        pendingNumbers.length > 0 &&
+        rowAnswers.length > 0
+      ) {
+        const count = Math.min(
+          pendingNumbers.length,
+          rowAnswers.length
+        );
+
+        for (
+          let index = 0;
+          index < count;
+          index++
+        ) {
+          answers.push(
+            rowAnswers[index]
+          );
+        }
+      }
+
+      pendingNumbers = [];
+    }
+  }
+
+  return answers;
+}
+
+/* =========================================================
+   INLINE OPTION SPLITTER
+   Example:
+      A) 1,4 B) 2,3
+      C) 1,3 D) 2,4
+========================================================= */
+
+function splitInlineOptions(
+  text: string
+) {
+  /*
+    Bir qatorda quyidagilarni ham taniydi:
+      A) ... B) ...
+      +A) ... B) ...
+      A)+ ... B) ...
+      A) + ... B) ...
+  */
+  const regex =
+    /(^|\s)(\+?\s*)([ABCD])\)\s*(\+?\s*)/g;
+
+  const matches: {
+    label: OptionLabel;
+    markerStart: number;
+    contentStart: number;
+    markerHasPlus: boolean;
+  }[] = [];
+
+  let match:
+    RegExpExecArray | null;
+
+  while (
+    (match =
+      regex.exec(text)) !==
+    null
+  ) {
+    const leadingLength =
+      match[1]?.length ?? 0;
+
+    matches.push({
+      label:
+        match[3] as OptionLabel,
+      markerStart:
+        match.index +
+        leadingLength,
+      contentStart:
+        regex.lastIndex,
+      markerHasPlus:
+        Boolean(match[2]?.includes("+")) ||
+        Boolean(match[4]?.includes("+")),
+    });
+  }
+
+  return matches.map(
+    (current, index) => {
+      const next =
+        matches[index + 1];
+
+      return {
+        label:
+          current.label,
+        text:
+          text
+            .slice(
+              current.contentStart,
+              next
+                ? next.markerStart
+                : text.length
+            )
+            .trim(),
+        markerHasPlus:
+          current.markerHasPlus,
+      };
+    }
+  );
+}
+
+/* =========================================================
+   VISUAL QUESTION DETECTION
+   Jadval / diagramma / belgi / atama-moslashtirish kabi savollarda
+   PDFdagi vizual qism savol matni bilan A/B/C/D orasida joylashadi.
+========================================================= */
+
+function looksLikeVisualQuestion(value: string) {
+  const text = normalizeOneLine(value).toLowerCase();
+
+  return (
+    /\bjadval(?:da|ni|dan)?\b/.test(text) ||
+    /\bdiagramma(?:si|ga|ni|dan)?\b/.test(text) ||
+    /\beyler[\s\-–—]*venn\b/.test(text) ||
+    /\bushbu\s+belgi\b/.test(text) ||
+    /\bbelgi\s+qanday\s+ma[’'`ʻʼ]?noni\b/.test(text) ||
+    /\byuridik\s+atamalar\b/.test(text) ||
+    /\batamalar\s+va\s+ularning\s+izohi\b/.test(text)
+  );
+}
+
+/*
+  Vizual savolda prompt tugagan joyni topamiz.
+  Masalan:
+    "8. Quyidagi jadvalda ..."
+    "berilgan qatorni aniqlang ?"
+  keyingi satrlar jadvalning o‘zi bo‘ladi.
+
+  Savol prompti odatda ?, ! yoki . bilan tugaydi.
+*/
+function visualPromptEndIndex(lines: TextLine[]) {
+  if (lines.length === 0) {
+    return -1;
+  }
+
+  let accumulated = "";
+
+  for (let index = 0; index < lines.length; index++) {
+    const current =
+      index === 0
+        ? stripQuestionNumber(lines[index].text)
+        : lines[index].text;
+
+    accumulated = normalizeOneLine(
+      accumulated
+        ? `${accumulated} ${current}`
+        : current
+    );
+
+    if (
+      looksLikeVisualQuestion(accumulated) &&
+      /[?!\.]\s*$/.test(accumulated)
+    ) {
+      return index;
+    }
+
+    // Vizual savol promptlari odatda 1-4 satr.
+    // Juda cho‘zilib ketsa, diagramma/jadval matnini promptga qo‘shmaymiz.
+    if (
+      index >= 3 &&
+      looksLikeVisualQuestion(accumulated)
+    ) {
+      return index;
+    }
+  }
+
+  return looksLikeVisualQuestion(accumulated)
+    ? Math.min(lines.length - 1, 1)
+    : -1;
+}
+
+/* =========================================================
+   PARSE:
+   QUESTION -> A -> B -> C -> D -> NEXT QUESTION
+========================================================= */
+
+function parseQuestion(
+  block: QuestionBlock,
+  pageInfos: Map<number, PageInfo>
+) {
+  const labels:
+    OptionLabel[] = [
+      "A",
+      "B",
+      "C",
+      "D",
+    ];
+
+  const questionParts:
+    string[] = [];
+
+  const questionLines:
+    TextLine[] = [];
+
+  const optionData =
+    new Map<
+      OptionLabel,
+      {
+        textParts: string[];
+        plus: boolean;
+        highlight: boolean;
+        firstLine: TextLine;
+      }
+    >();
+
+  let currentOption:
+    OptionLabel | null =
+    null;
+
+  let firstOptionLine:
+    TextLine | null =
+    null;
+
+  let lastQuestionLine:
+    TextLine | null =
+    null;
+
+  for (
+    let index = 0;
+    index <
+    block.lines.length;
+    index++
+  ) {
+    const line =
+      block.lines[index];
+
+    const lineText =
+      index === 0
+        ? stripQuestionNumber(
+            line.text
+          )
+        : line.text;
+
+    const inline =
+      splitInlineOptions(
+        lineText
+      );
+
+    if (
+      inline.length > 0
+    ) {
+      if (!firstOptionLine) {
+        firstOptionLine =
+          line;
+      }
+
+      const pageInfo =
+        pageInfos.get(
+          line.pageNumber
+        );
+
+      for (const part of inline) {
+        currentOption =
+          part.label;
+
+        const existing =
+          optionData.get(
+            part.label
+          );
+
+        const plus =
+          part.markerHasPlus ||
+          hasPlus(
+            part.text
+          );
+
+        const highlight =
+          pageInfo
+            ? lineIsHighlighted(
+                line,
+                pageInfo.highlights
+              )
+            : false;
+
+        if (existing) {
+          existing.textParts.push(
+            cleanPlus(
+              part.text
+            )
+          );
+
+          existing.plus =
+            existing.plus ||
+            plus;
+
+          existing.highlight =
+            existing.highlight ||
+            highlight;
+        } else {
+          optionData.set(
+            part.label,
+            {
+              textParts: [
+                cleanPlus(
+                  part.text
+                ),
+              ],
+              plus,
+              highlight,
+              firstLine:
+                line,
+            }
+          );
+        }
+      }
+
+      continue;
+    }
+
+    const directLabel =
+      optionLabelFromStart(
+        lineText
+      );
+
+    if (directLabel) {
+      currentOption =
+        directLabel;
+
+      if (!firstOptionLine) {
+        firstOptionLine =
+          line;
+      }
+
+      const raw =
+        stripOptionPrefix(
+          lineText
+        );
+
+      const pageInfo =
+        pageInfos.get(
+          line.pageNumber
+        );
+
+      optionData.set(
+        directLabel,
+        {
+          textParts: [
+            cleanPlus(raw),
+          ],
+          plus:
+            optionMarkerHasLeadingOrTrailingPlus(
+              lineText
+            ) ||
+            hasPlus(raw) ||
+            hasPlus(
+              lineText
+            ),
+          highlight:
+            pageInfo
+              ? lineIsHighlighted(
+                  line,
+                  pageInfo.highlights
+                )
+              : false,
+          firstLine:
+            line,
+        }
+      );
+
+      continue;
+    }
+
+    if (currentOption) {
+      const existing =
+        optionData.get(
+          currentOption
+        );
+
+      if (existing) {
+        existing.textParts.push(
+          cleanPlus(
+            lineText
+          )
+        );
+
+        if (
+          hasPlus(
+            lineText
+          )
+        ) {
+          existing.plus =
+            true;
+        }
+
+        const pageInfo =
+          pageInfos.get(
+            line.pageNumber
+          );
+
+        if (
+          pageInfo &&
+          lineIsHighlighted(
+            line,
+            pageInfo.highlights
+          )
+        ) {
+          existing.highlight =
+            true;
+        }
+      }
+
+      continue;
+    }
+
+    questionParts.push(
+      lineText
+    );
+
+    questionLines.push(
+      line
+    );
+
+    lastQuestionLine =
+      line;
+  }
+
+  const plusLabels =
+    labels.filter(
+      (label) =>
+        optionData.get(
+          label
+        )?.plus
+    );
+
+  const highlightLabels =
+    labels.filter(
+      (label) =>
+        optionData.get(
+          label
+        )?.highlight
+    );
+
+  let correctLabel:
+    OptionLabel | null =
+    null;
+
+  /*
+    PRIORITY:
+    1. +
+    2. yellow highlight
+    3. manual admin selection
+  */
+  if (
+    plusLabels.length === 1
+  ) {
+    correctLabel =
+      plusLabels[0];
+  } else if (
+    plusLabels.length === 0 &&
+    highlightLabels.length === 1
+  ) {
+    correctLabel =
+      highlightLabels[0];
+  }
+
+  const options:
+    ImportedOption[] =
+    labels.map(
+      (label) => {
+        const found =
+          optionData.get(
+            label
+          );
+
+        return {
+          id: makeId(
+            `q${block.number}-${label.toLowerCase()}`
+          ),
+          label,
+          text:
+            found
+              ? normalizeText(
+                  found.textParts.join(
+                    " "
+                  )
+                )
+              : "",
+          isCorrect:
+            correctLabel ===
+            label,
+        };
+      }
+    );
+
+  const foundCount =
+    labels.filter(
+      (label) =>
+        optionData.has(
+          label
+        )
+    ).length;
+
+  let warning:
+    string | undefined;
+
+  if (foundCount !== 4) {
+    warning =
+      `${foundCount} ta variant topildi. A, B, C, D to‘liq topilmadi.`;
+  } else if (
+    plusLabels.length > 1
+  ) {
+    warning =
+      "Bir nechta variantda + belgisi topildi. To‘g‘ri javobni tekshiring.";
+  } else if (
+    plusLabels.length === 0 &&
+    highlightLabels.length > 1
+  ) {
+    warning =
+      "Bir nechta sariq variant topildi. To‘g‘ri javobni tekshiring.";
+  } else if (!correctLabel) {
+    warning =
+      "To‘g‘ri javob topilmadi. To‘g‘ri variant oxiriga + belgisi qo‘ying yoki admin oynasida belgilang.";
+  }
+
+  const fullQuestionText =
+    normalizeQuestionText(
+      questionParts
+    );
+
+  const promptEndIndex =
+    visualPromptEndIndex(
+      questionLines
+    );
+
+  const shouldRenderImage =
+    promptEndIndex >= 0 &&
+    Boolean(firstOptionLine);
+
+  const promptParts =
+    shouldRenderImage
+      ? questionLines
+          .slice(
+            0,
+            promptEndIndex + 1
+          )
+          .map(
+            (line, index) =>
+              index === 0
+                ? stripQuestionNumber(
+                    line.text
+                  )
+                : line.text
+          )
+      : questionParts;
+
+  const promptEndLine =
+    shouldRenderImage
+      ? questionLines[
+          promptEndIndex
+        ] ?? null
+      : null;
+
+  return {
+    number:
+      block.number,
+    questionText:
+      normalizeQuestionText(
+        promptParts
+      ),
+    options,
+    warning,
+    firstOptionLine,
+    lastQuestionLine,
+    promptEndLine,
+    shouldRenderImage,
+    fullQuestionText,
+  };
+}
+
+/* =========================================================
+   IMAGE / DIAGRAM
+   Only if there is a REAL large gap between question text
+   and first A/B/C/D line on the SAME page/column.
+========================================================= */
+
+function getQuestionPdfCrop(
+  pageInfo: PageInfo,
+  firstOptionLine: TextLine | null,
+  promptEndLine: TextLine | null
+): PdfCrop | undefined {
+  if (!firstOptionLine || !promptEndLine) {
+    return undefined;
+  }
+
+  if (
+    firstOptionLine.pageNumber !==
+    promptEndLine.pageNumber
+  ) {
+    return undefined;
+  }
+
+  /*
+    =========================================================
+    COLUMN-AWARE DYNAMIC CROP
+    =========================================================
+
+    QOIDA:
+      1) Savol matni tugagan joydan KEYIN boshlanadi.
+      2) A/B/C/D variantlari boshlanishidan OLDIN tugaydi.
+      3) Faqat SAVOLNING O'Z USTUNI ichidagi kontent olinadi.
+      4) Chap/o'ng ustun orasidagi uzun vertikal chiziq cropga kirmaydi.
+      5) Crop razmeri fixed emas — real kontent chegarasidan hisoblanadi.
+  */
+
+  const targetColumn: "left" | "right" | "full" =
+    promptEndLine.column !== "full"
+      ? promptEndLine.column
+      : firstOptionLine.column !== "full"
+      ? firstOptionLine.column
+      : "full";
+
+  const middle =
+    pageInfo.width / 2;
+
+  /*
+    Savol prompti va variantlar orasidagi vertikal "koridor".
+    Juda katta fixed padding ishlatmaymiz.
+  */
+  const rawTopY =
+    promptEndLine.y -
+    Math.max(
+      5,
+      promptEndLine.height * 0.35
+    );
+
+  /*
+    Variant boshlanishidan ancha yuqorida to‘xtaymiz.
+    Oldingi 0.35 koeffitsiyent A) satrining yuqori qismini cropga
+    kiritib yuborayotgan edi.
+  */
+  /*
+    FINAL BOTTOM TUNE:
+    Pastki chegara ozgina pastga tushirildi.
+    Maqsad: Venn/jadvalning oxirgi qatori to‘liq ko‘rinsin,
+    lekin A/B/C/D variantlari rasmga kirmasin.
+  */
+  const rawBottomY =
+    firstOptionLine.y +
+    Math.max(
+      7,
+      firstOptionLine.height * 0.88
+    );
+
+  if (
+    rawTopY -
+      rawBottomY <
+    22
+  ) {
+    return undefined;
+  }
+
+  /*
+    Faqat shu savolning USTUNI va vertikal oralig'idagi textlarni olamiz.
+    Bu eng muhim fix: chapdagi 13/14/15 savollar o'ng Venn cropiga
+    endi tushmaydi va aksincha.
+  */
+  const insideLines =
+    (pageInfo.lines || [])
+      .filter((line) => {
+        if (
+          line.pageNumber !==
+          promptEndLine.pageNumber
+        ) {
+          return false;
+        }
+
+        if (
+          targetColumn !== "full" &&
+          line.column !== targetColumn
+        ) {
+          return false;
+        }
+
+        const lineTop =
+          line.y +
+          line.height * 0.8;
+
+        const lineBottom =
+          line.y -
+          line.height * 0.4;
+
+        return (
+          lineTop < rawTopY &&
+          lineBottom > rawBottomY
+        );
+      });
+
+  /*
+    USTUNNING xavfsiz gorizontal chegaralari.
+    Separator chiziq ko'rinmasligi uchun markazdan ancha ichkariga kiramiz.
+  */
+  const separatorGap =
+    Math.max(
+      10,
+      pageInfo.width * 0.018
+    );
+
+  /*
+    Sahifa tashqi chetida ozgina xavfsizlik qoldiramiz.
+    3.5% jadvalning birinchi ustunini (№ / 1 / 2 / 3...) kesib yuborayotgan
+    edi, shuning uchun 1.5% ga tushirdik.
+  */
+  let hardLeft =
+    pageInfo.width * 0.015;
+
+  let hardRight =
+    pageInfo.width * 0.985;
+
+  if (targetColumn === "left") {
+    hardRight =
+      middle - separatorGap;
+  } else if (
+    targetColumn === "right"
+  ) {
+    hardLeft =
+      middle + separatorGap;
+  }
+
+  /*
+    Agar text layer topilmasa ham ustundan tashqariga chiqmaymiz.
+  */
+  if (
+    insideLines.length === 0
+  ) {
+    const fallbackWidth =
+      hardRight - hardLeft;
+
+    if (
+      fallbackWidth < 80
+    ) {
+      return undefined;
+    }
+
+    return {
+      pageNumber:
+        firstOptionLine.pageNumber,
+      x:
+        hardLeft,
+      y:
+        Math.max(
+          0,
+          rawBottomY
+        ),
+      width:
+        fallbackWidth,
+      height:
+        Math.max(
+          30,
+          rawTopY -
+            rawBottomY
+        ),
+    };
+  }
+
+  /*
+    REAL CONTENT BOUNDING BOX.
+    Jadval / Venn / moslashtirish ichidagi matnlar qayerda bo'lsa,
+    crop gorizontal razmeri shunga qarab moslashadi.
+  */
+  const minTextX =
+    Math.min(
+      ...insideLines.map(
+        (line) => line.x
+      )
+    );
+
+  const maxTextX =
+    Math.max(
+      ...insideLines.map(
+        (line) =>
+          line.x +
+          line.width
+      )
+    );
+
+  const highestTextTop =
+    Math.max(
+      ...insideLines.map(
+        (line) =>
+          line.y +
+          line.height
+      )
+    );
+
+  const lowestTextBottom =
+    Math.min(
+      ...insideLines.map(
+        (line) =>
+          line.y -
+          line.height * 0.45
+      )
+    );
+
+  const averageHeight =
+    insideLines.reduce(
+      (sum, line) =>
+        sum + line.height,
+      0
+    ) /
+    Math.max(
+      1,
+      insideLines.length
+    );
+
+  /*
+    Shakl chiziqlari matndan biroz tashqarida bo'lishi mumkin.
+    Padding dinamik, ammo ustun chegarasidan oshmaydi.
+  */
+  /*
+    Jadvalning yashil borderlari textdan ancha tashqarida turishi mumkin.
+    Shuning uchun gorizontal paddingni biroz kengaytiramiz.
+    Bu baribir hardLeft/hardRight va separator chegarasidan oshmaydi.
+  */
+  const horizontalPadding =
+    Math.max(
+      24,
+      Math.min(
+        48,
+        averageHeight * 3.1
+      )
+    );
+
+  const verticalPadding =
+    Math.max(
+      5,
+      Math.min(
+        12,
+        averageHeight * 0.85
+      )
+    );
+
+  let x1 =
+    minTextX -
+    horizontalPadding;
+
+  let x2 =
+    maxTextX +
+    horizontalPadding;
+
+  /*
+    Ustun separatorini qat'iy kesib tashlaymiz.
+  */
+  x1 =
+    Math.max(
+      hardLeft,
+      x1
+    );
+
+  x2 =
+    Math.min(
+      hardRight,
+      x2
+    );
+
+  /*
+    Venn ichidagi I/II/III kabi text juda tor bo'lishi mumkin.
+    Shuning uchun faqat shu USTUN ichida minimal vizual kenglik.
+    Bu boshqa ustunga o'tmaydi.
+  */
+  const availableColumnWidth =
+    hardRight - hardLeft;
+
+  const minimumVisualWidth =
+    Math.min(
+      availableColumnWidth,
+      Math.max(
+        250,
+        availableColumnWidth * 0.72
+      )
+    );
+
+  if (
+    x2 - x1 <
+    minimumVisualWidth
+  ) {
+    const contentCenter =
+      (x1 + x2) / 2;
+
+    x1 =
+      contentCenter -
+      minimumVisualWidth / 2;
+
+    x2 =
+      contentCenter +
+      minimumVisualWidth / 2;
+
+    if (
+      x1 < hardLeft
+    ) {
+      const shift =
+        hardLeft - x1;
+
+      x1 += shift;
+      x2 += shift;
+    }
+
+    if (
+      x2 > hardRight
+    ) {
+      const shift =
+        x2 - hardRight;
+
+      x1 -= shift;
+      x2 -= shift;
+    }
+  }
+
+  /*
+    Vertikal crop ham real kontent bo'yicha, ammo:
+      - savol matniga chiqmaydi
+      - A/B/C/D variantiga tushmaydi
+  */
+  const top =
+    Math.min(
+      rawTopY,
+      highestTextTop +
+        verticalPadding
+    );
+
+  const bottom =
+    Math.max(
+      rawBottomY,
+      lowestTextBottom -
+        verticalPadding
+    );
+
+  const width =
+    x2 - x1;
+
+  const height =
+    top - bottom;
+
+  if (
+    width < 80 ||
+    height < 28
+  ) {
+    return undefined;
+  }
+
+  return {
+    pageNumber:
+      firstOptionLine.pageNumber,
+    x:
+      Math.max(
+        hardLeft,
+        x1
+      ),
+    y:
+      Math.max(
+        0,
+        bottom
+      ),
+    width:
+      Math.min(
+        width,
+        hardRight -
+          Math.max(
+            hardLeft,
+            x1
+          )
+      ),
+    height:
+      Math.min(
+        height,
+        pageInfo.height -
+          Math.max(
+            0,
+            bottom
+          )
+      ),
+  };
+}
+
+/* =========================================================
+   POST
+========================================================= */
+
+export async function POST(
+  request: NextRequest
+) {
+  try {
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "PDF import faqat administrator uchun.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    const formData =
+      await request.formData();
+
+    const file =
+      formData.get(
+        "file"
+      );
+
+    if (
+      !(file instanceof File)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "PDF fayl topilmadi.",
+        },
+        {
+          status: 400,
+        }
+      );
     }
 
     if (
@@ -957,4621 +3142,425 @@ export default function ImportPdfTestPage() {
         .toLowerCase()
         .endsWith(".pdf")
     ) {
-      setPdfFile(null);
-      setMessage(
-        "Faqat PDF fayl yuklash mumkin."
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Faqat PDF fayl yuklash mumkin.",
+        },
+        {
+          status: 400,
+        }
       );
-      return;
     }
 
     if (
       file.size >
       30 * 1024 * 1024
     ) {
-      setPdfFile(null);
-      setMessage(
-        "PDF hajmi 30 MB dan oshmasligi kerak."
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "PDF hajmi 30 MB dan oshmasligi kerak.",
+        },
+        {
+          status: 400,
+        }
       );
-      return;
     }
 
-    setPdfFile(file);
-  }
-
-  async function analyzePdf() {
-    if (!title.trim()) {
-      setMessage(
-        "Test nomini kiriting."
+    const bytes =
+      new Uint8Array(
+        await file.arrayBuffer()
       );
-      return;
-    }
 
-    if (!subject.trim()) {
-      setMessage(
-        "Fan nomini kiriting."
+    const pdfjs =
+      await import(
+        "pdfjs-dist/legacy/build/pdf.mjs"
       );
-      return;
-    }
 
-    if (!pdfFile) {
-      setMessage(
-        "Avval PDF faylni tanlang."
+    /*
+      VERCEL PDF.JS WORKER FIX
+      Keep this — it already worked on your deployment.
+    */
+    const {
+      pathToFileURL,
+    } = await import(
+      "node:url"
+    );
+
+    const path =
+      await import(
+        "node:path"
       );
-      return;
-    }
 
-    try {
-      setAnalyzing(true);
-      setMessage("");
-      setQuestions([]);
-      setImportedTopics([]);
-      setSpecialSections([]);
-      setQuestionDrafts({});
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      pathToFileURL(
+        path.join(
+          process.cwd(),
+          "node_modules",
+          "pdfjs-dist",
+          "legacy",
+          "build",
+          "pdf.worker.mjs"
+        )
+      ).href;
 
-      const formData =
-        new FormData();
+    const document =
+      await pdfjs
+        .getDocument({
+          data: bytes,
+          useSystemFonts:
+            true,
+          disableFontFace:
+            false,
+        })
+        .promise;
 
-      formData.append(
-        "file",
-        pdfFile
-      );
+    const allLines:
+      TextLine[] = [];
+
+    const pageInfos =
+      new Map<
+        number,
+        PageInfo
+      >();
+
+    /* ---------------------------------------------------------
+       PAGE BY PAGE
+    --------------------------------------------------------- */
+
+    for (
+      let pageNumber = 1;
+      pageNumber <=
+      document.numPages;
+      pageNumber++
+    ) {
+      const page =
+        await document.getPage(
+          pageNumber
+        );
+
+      const viewport =
+        page.getViewport({
+          scale: 1,
+        });
+
+      const textContent =
+        await page.getTextContent();
+
+      const rawItems =
+        textContent.items as
+          PdfTextItem[];
+
+      const items =
+        buildPositionedItems(
+          rawItems,
+          pageNumber
+        );
+
+      const highlights =
+        await pageHighlights(
+          page
+        );
 
       /*
-        Mavzulashtirilgan testlar uchun alohida parser ishlatiladi.
-        Qolgan test turlari eski universal PDF importerda qoladi.
+        PAGE READING ORDER:
+        left column first, then right column.
+        No center text is discarded.
       */
-      const importEndpoint =
-        testType === "thematic"
-          ? "/api/tests/import-pdf-thematic"
-          : "/api/tests/import-pdf";
-
-      const response =
-        await fetch(
-          importEndpoint,
-          {
-            method: "POST",
-            credentials:
-              "include",
-            body: formData,
-          }
+      const lines =
+        pageLines(
+          items,
+          viewport.width,
+          viewport.height
         );
 
-      const data =
-        await response.json();
+      pageInfos.set(
+        pageNumber,
+        {
+          page,
+          width:
+            viewport.width,
+          height:
+            viewport.height,
+          highlights,
+          lines,
+        }
+      );
+
+      allLines.push(
+        ...lines
+      );
+    }
+
+    /* ---------------------------------------------------------
+       QUESTION BLOCKS
+    --------------------------------------------------------- */
+
+    const blocks =
+      buildQuestionBlocks(
+        allLines
+      );
+
+    const imported:
+      ImportedQuestion[] = [];
+
+    for (const block of blocks) {
+      const parsed =
+        parseQuestion(
+          block,
+          pageInfos
+        );
+
+      let pdfCrop:
+        PdfCrop | undefined;
 
       if (
-        !response.ok ||
-        !data?.success
+        parsed.shouldRenderImage &&
+        parsed.firstOptionLine &&
+        parsed.promptEndLine &&
+        parsed.firstOptionLine.pageNumber ===
+          parsed.promptEndLine.pageNumber
       ) {
-        throw new Error(
-          data?.message ||
-            "PDFni tahlil qilib bo‘lmadi."
-        );
+        const pageInfo =
+          pageInfos.get(
+            parsed.firstOptionLine.pageNumber
+          );
+
+        if (pageInfo) {
+          pdfCrop =
+            getQuestionPdfCrop(
+              pageInfo,
+              parsed.firstOptionLine,
+              parsed.promptEndLine
+            );
+        }
       }
 
-      const imported:
-        ImportedQuestion[] =
-        Array.isArray(
-          data.questions
-        )
-          ? data.questions.map(
-              (question: ImportedQuestion) => {
-                const legacyImageShape: EditorShape[] =
-                  question.imageSrc
-                    ? [
-                        {
-                          id: `pdf-img-${question.id}`,
-                          type: "image",
-                          x: 110,
-                          y: 40,
-                          width: 620,
-                          height: 300,
-                          imageSrc: question.imageSrc,
-                          objectFit: "contain",
-                          borderWidth: 0,
-                          borderRadius: 6,
-                          zIndex: 1,
-                        },
-                      ]
-                    : [];
+      imported.push({
+        id: makeId(
+          `import-q${parsed.number}`
+        ),
+        number:
+          parsed.number,
+        questionText:
+          parsed.questionText,
+        options:
+          parsed.options,
+        pdfCrop,
+        warning:
+          parsed.warning,
+      });
+    }
 
-                return {
-                  ...question,
-                  imageSrc: undefined,
-                  shapes:
-                    Array.isArray(question.shapes) &&
-                    question.shapes.length > 0
-                      ? question.shapes
-                      : legacyImageShape,
-                };
-              }
+    /* ---------------------------------------------------------
+       FINAL ORDER
+
+       buildQuestionBlocks() savollarni allaqachon qat'iy ketma-ket
+       1..840 ko'rinishida global raqamlagan. Shu sababli eski
+       Map<number,...> deduplikatsiya QAT'IYAN ishlatilmaydi.
+
+       Eski kod bir xil raqamni ko'rsa "variantlari ko'proq" bo'lgan
+       blok bilan haqiqiy savolni almashtirib yuborardi. Natijada
+       1-savol o'rniga boshqa joydagi ichki "1." band kelib qolishi
+       mumkin edi.
+    --------------------------------------------------------- */
+
+    const finalQuestions = imported;
+
+    /*
+      JAVOBLAR KALITI
+
+      Mavzulashtirilgan PDFda to'g'ri javoblar testning o'zida "+"
+      bilan belgilanmagan bo'lishi mumkin. Ko'pincha PDF oxirida
+      alohida "Javoblar:" jadvali bor.
+
+      Savollar soni va javoblar soni aynan teng bo'lsagina avtomatik
+      qo'llaymiz. Bu noto'g'ri siljib ketgan javobni belgilashdan saqlaydi.
+    */
+    const answerKey =
+      extractAnswerKey(allLines);
+
+    const answerKeyApplied =
+      answerKey.length === finalQuestions.length &&
+      answerKey.length > 0;
+
+    if (answerKeyApplied) {
+      finalQuestions.forEach(
+        (question, questionIndex) => {
+          const correctLabel =
+            answerKey[questionIndex];
+
+          question.options =
+            question.options.map(
+              (option) => ({
+                ...option,
+                isCorrect:
+                  option.label === correctLabel,
+              })
+            );
+
+          /*
+            Endi answer key topilgan bo'lsa, "to'g'ri javob topilmadi"
+            warningini olib tashlaymiz. Variantlar yetishmasa warning qoladi.
+          */
+          if (
+            question.warning?.includes(
+              "To‘g‘ri javob topilmadi"
             )
-          : [];
-
-      try {
-        const keysToRemove: string[] = [];
-
-        for (let i = 0; i < window.sessionStorage.length; i++) {
-          const key = window.sessionStorage.key(i);
-
-          if (key?.startsWith("pdf-rich-editor:")) {
-            keysToRemove.push(key);
+          ) {
+            question.warning = undefined;
           }
         }
+      );
+    } else if (answerKey.length > 0) {
+      console.warn(
+        "PDF ANSWER KEY COUNT MISMATCH:",
+        {
+          questions:
+            finalQuestions.length,
+          answers:
+            answerKey.length,
+        }
+      );
+    }
 
-        keysToRemove.forEach((key) =>
-          window.sessionStorage.removeItem(key)
-        );
+    /*
+      Global raqamlar parser tomonidan 1..N tarzida beriladi.
+      Qattiq 840 ta degan cheklov endi yo'q.
+    */
+    /*
+      V4:
+      1609 savol parse bo‘lib bo‘lgandan KEYIN
+      mavzular alohida biriktiriladi.
+    */
+    const thematicStructure =
+      build33LessonTopicsPostParse(
+        allLines,
+        finalQuestions
+      );
+
+    const topics =
+      thematicStructure.topics;
+
+    const specialSections =
+      thematicStructure.specialSections;
+
+    console.log(
+      "THEMATIC PDF TOPICS:",
+      topics.map((topic) => ({
+        title: topic.title,
+        questionCount:
+          topic.questions.length,
+      }))
+    );
+
+    const sequenceBroken =
+      finalQuestions.some(
+        (question, index) =>
+          question.number !== index + 1
+      );
+
+    if (sequenceBroken) {
+      console.warn(
+        "PDF QUESTION SEQUENCE WARNING"
+      );
+    }
+
+    if (
+      finalQuestions.length ===
+      0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "PDFdan test savollari topilmadi. Test savollari '1.' '2.' '3.' ko‘rinishida bo‘lishi kerak.",
+        },
+        {
+          status: 422,
+        }
+      );
+    }
+
+    /* ---------------------------------------------------------
+       CLEANUP
+    --------------------------------------------------------- */
+
+    for (
+      const pageInfo of
+      pageInfos.values()
+    ) {
+      try {
+        pageInfo.page.cleanup();
       } catch {
         // ignore
       }
-
-      setQuestionDrafts(
-        Object.fromEntries(
-          imported.map((question) => [
-            question.id,
-            question.questionText,
-          ])
-        )
-      );
-
-      setQuestions(imported);
-
-      if (
-        testType === "thematic" &&
-        Array.isArray(data?.topics)
-      ) {
-        setImportedTopics(
-          data.topics as ImportedTopic[]
-        );
-
-        setSpecialSections(
-          Array.isArray(
-            data?.specialSections
-          )
-            ? (data.specialSections as ImportedTopic[])
-            : []
-        );
-      } else {
-        setImportedTopics([]);
-        setSpecialSections([]);
-      }
-
-      setMessage(
-        testType === "thematic" &&
-        Array.isArray(data?.topics) &&
-        data.topics.length > 0
-          ? `PDFdan ${imported.length} ta savol, ${data.topics.length} ta dars va ${
-              Array.isArray(data?.specialSections)
-                ? data.specialSections.length
-                : 0
-            } ta qo‘shimcha bo‘lim ajratildi.`
-          : `PDFdan ${imported.length} ta savol ajratildi.`
-      );
-    } catch (error) {
-      console.error(
-        "PDF IMPORT ERROR:",
-        error
-      );
-
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "PDFni tahlil qilishda xatolik."
-      );
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
-  function changeQuestionText(
-    id: string,
-    value: string
-  ) {
-    /*
-      Bu state faqat SAVOL MATNI uchun.
-      Har qanday ?, probel, drag/drop, qatorni birlashtirish va boshqa
-      tahrir darhol shu yerda qoladi.
-    */
-    setQuestionDrafts((current) => ({
-      ...current,
-      [id]: value,
-    }));
-
-    setQuestions((current) =>
-      current.map((question) =>
-        question.id === id
-          ? {
-              ...question,
-              questionText: value,
-            }
-          : question
-      )
-    );
-  }
-
-  function changeOptionText(
-    questionId: string,
-    optionId: string,
-    value: string
-  ) {
-    setQuestions((current) =>
-      current.map(
-        (question) =>
-          question.id ===
-          questionId
-            ? {
-                ...question,
-                options:
-                  question.options.map(
-                    (option) =>
-                      option.id ===
-                      optionId
-                        ? {
-                            ...option,
-                            text: value,
-                          }
-                        : option
-                  ),
-              }
-            : question
-      )
-    );
-  }
-
-  function setCorrectAnswer(
-    questionId: string,
-    optionId: string
-  ) {
-    setQuestions((current) =>
-      current.map(
-        (question) =>
-          question.id ===
-          questionId
-            ? {
-                ...question,
-                warning:
-                  undefined,
-                options:
-                  question.options.map(
-                    (option) => ({
-                      ...option,
-                      isCorrect:
-                        option.id ===
-                        optionId,
-                    })
-                  ),
-              }
-            : question
-      )
-    );
-  }
-
-  function removeQuestion(
-    id: string
-  ) {
-    if (
-      !window.confirm(
-        "Ushbu savolni olib tashlaysizmi?"
-      )
-    ) {
-      return;
     }
 
-    setQuestions((current) =>
-      renumberQuestions(
-        current.filter(
-          (question) =>
-            question.id !== id
-        )
-      )
-    );
+    document.cleanup();
+    document.destroy();
 
-    setQuestionDrafts((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
+    return NextResponse.json({
+      success: true,
+
+      // Eski frontend uchun umumiy ro‘yxat ham saqlanadi.
+      questions: finalQuestions,
+
+      // Yangi mavzulashtirilgan tuzilma.
+      topics,
+      topicCount: topics.length,
+      topicSummary: topics.map(
+        (topic) => ({
+          id: topic.id,
+          title: topic.title,
+          questionCount:
+            topic.questions.length,
+          lessonNumber:
+            topic.lessonNumber,
+          sharedSource:
+            topic.sharedSource,
+          sourceSectionTitle:
+            topic.sourceSectionTitle,
+        })
+      ),
+
+      specialSections,
+      specialSectionCount:
+        specialSections.length,
+
+      sectionCount:
+        thematicStructure.sectionCount,
+      mappedQuestionCount:
+        thematicStructure.mappedQuestionCount,
+      mappingComplete:
+        thematicStructure.mappingComplete,
+
+      answerKeyApplied,
+      answerKeyCount:
+        answerKey.length,
+      total:
+        finalQuestions.length,
     });
-  }
-
-
-  function renumberQuestions(items: ImportedQuestion[]) {
-    return items.map((question, index) => ({
-      ...question,
-      number: index + 1,
-    }));
-  }
-
-  function createEmptyQuestion(): ImportedQuestion {
-    const questionId =
-      `manual-q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    return {
-      id: questionId,
-      number: questions.length + 1,
-      questionText: "",
-      options: (["A", "B", "C", "D"] as const).map((label) => ({
-        id: `${questionId}-${label.toLowerCase()}-${Math.random()
-          .toString(36)
-          .slice(2, 6)}`,
-        label,
-        text: "",
-        isCorrect: label === "A",
-      })),
-      shapes: [],
-      warning: "Yangi savol. Matn va variantlarni to‘ldiring.",
-    };
-  }
-
-  function addQuestion() {
-    const created = createEmptyQuestion();
-
-    setQuestionDrafts((current) => ({
-      ...current,
-      [created.id]: created.questionText,
-    }));
-
-    setQuestions((current) =>
-      renumberQuestions([
-        ...current,
-        {
-          ...created,
-          number: current.length + 1,
-        },
-      ])
+  } catch (error) {
+    console.error(
+      "PDF TEST IMPORT ERROR:",
+      error
     );
 
-    window.setTimeout(() => {
-      window.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 50);
-  }
-
-  function duplicateQuestion(id: string) {
-    setQuestions((current) => {
-      const index = current.findIndex((item) => item.id === id);
-
-      if (index < 0) {
-        return current;
-      }
-
-      const source = current[index];
-      const cloneId =
-        `copy-q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-      const clone: ImportedQuestion = {
-        ...source,
-        id: cloneId,
-        options: source.options.map((option) => ({
-          ...option,
-          id: `${cloneId}-${option.label.toLowerCase()}-${Math.random()
-            .toString(36)
-            .slice(2, 6)}`,
-        })),
-        shapes: (source.shapes || []).map((shape) => ({
-          ...shape,
-          id: `shape-${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2, 8)}`,
-          x: shape.x + 18,
-          y: shape.y + 18,
-        })),
-        warning: source.warning,
-      };
-
-      setQuestionDrafts((drafts) => ({
-        ...drafts,
-        [clone.id]:
-          drafts[source.id] ??
-          source.questionText,
-      }));
-
-      const next = [...current];
-      next.splice(index + 1, 0, clone);
-
-      return renumberQuestions(next);
-    });
-  }
-
-  function moveQuestion(id: string, direction: -1 | 1) {
-    setQuestions((current) => {
-      const index = current.findIndex((item) => item.id === id);
-
-      if (index < 0) {
-        return current;
-      }
-
-      const target = index + direction;
-
-      if (target < 0 || target >= current.length) {
-        return current;
-      }
-
-      const next = [...current];
-      const [moved] = next.splice(index, 1);
-      next.splice(target, 0, moved);
-
-      return renumberQuestions(next);
-    });
-  }
-
-  function makeShapeId() {
-    return `shape-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 9)}`;
-  }
-
-  function updateQuestionShapes(
-    questionId: string,
-    updater: (shapes: EditorShape[]) => EditorShape[]
-  ) {
-    setQuestions((current) =>
-      current.map((question) =>
-        question.id === questionId
-          ? {
-              ...question,
-              shapes: updater(question.shapes || []),
-              imageSrc: undefined,
-            }
-          : question
-      )
-    );
-  }
-
-  function addShape(
-    questionId: string,
-    type: Exclude<ShapeType, "image">
-  ) {
-    const baseZ =
-      Math.max(
-        0,
-        ...(
-          questions.find((q) => q.id === questionId)?.shapes || []
-        ).map((shape) => Number(shape.zIndex) || 0)
-      ) + 1;
-
-    const shape: EditorShape = {
-      id: makeShapeId(),
-      type,
-      x: 120,
-      y: 70,
-      width:
-        type === "circle"
-          ? 170
-          : type === "text"
-          ? 260
-          : 240,
-      height:
-        type === "circle"
-          ? 170
-          : type === "text"
-          ? 80
-          : 150,
-      text:
-        type === "text"
-          ? "Matn"
-          : undefined,
-      backgroundColor:
-        type === "text"
-          ? "transparent"
-          : "#8fc9ef",
-      borderColor: "#2f5975",
-      textColor: "#111111",
-      fontSize: 22,
-      borderWidth:
-        type === "text"
-          ? 0
-          : 2,
-      borderRadius:
-        type === "roundedRectangle"
-          ? 22
-          : type === "circle" ||
-            type === "ellipse"
-          ? 999
-          : 4,
-      opacity: 1,
-      zIndex: baseZ,
-    };
-
-    updateQuestionShapes(questionId, (shapes) => [
-      ...shapes,
-      shape,
-    ]);
-
-    setSelectedShape({
-      questionId,
-      shapeId: shape.id,
-    });
-    setActiveCanvasQuestionId(questionId);
-  }
-
-  function addImageDataUrl(
-    questionId: string,
-    imageSrc: string
-  ) {
-    const image = new Image();
-
-    image.onload = () => {
-      const maxWidth = 680;
-      const maxHeight = 380;
-      const ratio = Math.min(
-        maxWidth / Math.max(1, image.naturalWidth),
-        maxHeight / Math.max(1, image.naturalHeight),
-        1
-      );
-
-      const width = Math.max(
-        120,
-        Math.round(image.naturalWidth * ratio)
-      );
-      const height = Math.max(
-        90,
-        Math.round(image.naturalHeight * ratio)
-      );
-
-      const shape: EditorShape = {
-        id: makeShapeId(),
-        type: "image",
-        x: Math.max(20, Math.round((900 - width) / 2)),
-        y: 55,
-        width,
-        height,
-        imageSrc,
-        objectFit: "contain",
-        borderWidth: 0,
-        borderRadius: 6,
-        opacity: 1,
-        zIndex: Date.now(),
-      };
-
-      updateQuestionShapes(questionId, (shapes) => [
-        ...shapes,
-        shape,
-      ]);
-
-      setSelectedShape({
-        questionId,
-        shapeId: shape.id,
-      });
-      setActiveCanvasQuestionId(questionId);
-    };
-
-    image.src = imageSrc;
-  }
-
-  function changeQuestionImage(
-    questionId: string,
-    file: File | null
-  ) {
-    if (!file) {
-      return;
-    }
-
-    if (!file.type.startsWith("image/")) {
-      setMessage("Faqat rasm fayli tanlang.");
-      return;
-    }
-
-    if (file.size > 8 * 1024 * 1024) {
-      setMessage("Rasm hajmi 8 MB dan oshmasligi kerak.");
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const imageSrc =
-        typeof reader.result === "string"
-          ? reader.result
-          : "";
-
-      if (imageSrc) {
-        addImageDataUrl(questionId, imageSrc);
-      }
-    };
-
-    reader.readAsDataURL(file);
-  }
-
-  function updateShape(
-    questionId: string,
-    shapeId: string,
-    patch: Partial<EditorShape>
-  ) {
-    updateQuestionShapes(questionId, (shapes) =>
-      shapes.map((shape) =>
-        shape.id === shapeId
-          ? {
-              ...shape,
-              ...patch,
-            }
-          : shape
-      )
-    );
-  }
-
-  function removeAllShapes(questionId: string) {
-    if (
-      !window.confirm(
-        "Ushbu savoldagi barcha rasm va shakllarni o‘chirasizmi?"
-      )
-    ) {
-      return;
-    }
-
-    updateQuestionShapes(
-      questionId,
-      () => []
-    );
-
-    setSelectedShape((current) =>
-      current?.questionId === questionId
-        ? null
-        : current
-    );
-  }
-
-  function removeShape(
-    questionId: string,
-    shapeId: string
-  ) {
-    updateQuestionShapes(questionId, (shapes) =>
-      shapes.filter((shape) => shape.id !== shapeId)
-    );
-
-    setSelectedShape((current) =>
-      current?.questionId === questionId &&
-      current?.shapeId === shapeId
-        ? null
-        : current
-    );
-  }
-
-  function duplicateShape(
-    questionId: string,
-    shapeId: string
-  ) {
-    const question =
-      questions.find((item) => item.id === questionId);
-
-    const source =
-      question?.shapes?.find((shape) => shape.id === shapeId);
-
-    if (!source) {
-      return;
-    }
-
-    const clone: EditorShape = {
-      ...source,
-      id: makeShapeId(),
-      x: source.x + 24,
-      y: source.y + 24,
-      zIndex: (Number(source.zIndex) || 0) + 1,
-    };
-
-    updateQuestionShapes(questionId, (shapes) => [
-      ...shapes,
-      clone,
-    ]);
-
-    setSelectedShape({
-      questionId,
-      shapeId: clone.id,
-    });
-  }
-
-  function changeShapeLayer(
-    questionId: string,
-    shapeId: string,
-    direction: "front" | "back"
-  ) {
-    const question =
-      questions.find((item) => item.id === questionId);
-
-    const shapes = question?.shapes || [];
-
-    if (shapes.length === 0) {
-      return;
-    }
-
-    const values =
-      shapes.map((shape) => Number(shape.zIndex) || 0);
-
-    updateShape(
-      questionId,
-      shapeId,
+    return NextResponse.json(
       {
-        zIndex:
-          direction === "front"
-            ? Math.max(...values) + 1
-            : Math.min(...values) - 1,
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "PDFni tahlil qilishda server xatosi yuz berdi.",
+      },
+      {
+        status: 500,
       }
     );
   }
-
-  function startShapePointer(
-    event: React.PointerEvent,
-    questionId: string,
-    shape: EditorShape,
-    mode: "move" | "resize",
-    handle?: "nw" | "ne" | "sw" | "se"
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setSelectedShape({
-      questionId,
-      shapeId: shape.id,
-    });
-    setActiveCanvasQuestionId(questionId);
-
-    pointerActionRef.current = {
-      mode,
-      questionId,
-      shapeId: shape.id,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: shape.x,
-      startY: shape.y,
-      startWidth: shape.width,
-      startHeight: shape.height,
-      handle,
-    };
-  }
-
-  useEffect(() => {
-    function onPointerMove(event: PointerEvent) {
-      const action = pointerActionRef.current;
-
-      if (!action) {
-        return;
-      }
-
-      const dx = event.clientX - action.startClientX;
-      const dy = event.clientY - action.startClientY;
-
-      if (action.mode === "move") {
-        updateShape(
-          action.questionId,
-          action.shapeId,
-          {
-            x: Math.max(0, action.startX + dx),
-            y: Math.max(0, action.startY + dy),
-          }
-        );
-        return;
-      }
-
-      const minSize = 40;
-      let x = action.startX;
-      let y = action.startY;
-      let width = action.startWidth;
-      let height = action.startHeight;
-
-      if (action.handle?.includes("e")) {
-        width = Math.max(minSize, action.startWidth + dx);
-      }
-
-      if (action.handle?.includes("s")) {
-        height = Math.max(minSize, action.startHeight + dy);
-      }
-
-      if (action.handle?.includes("w")) {
-        const nextWidth =
-          Math.max(minSize, action.startWidth - dx);
-
-        x =
-          action.startX +
-          (action.startWidth - nextWidth);
-
-        width = nextWidth;
-      }
-
-      if (action.handle?.includes("n")) {
-        const nextHeight =
-          Math.max(minSize, action.startHeight - dy);
-
-        y =
-          action.startY +
-          (action.startHeight - nextHeight);
-
-        height = nextHeight;
-      }
-
-      updateShape(
-        action.questionId,
-        action.shapeId,
-        {
-          x: Math.max(0, x),
-          y: Math.max(0, y),
-          width,
-          height,
-        }
-      );
-    }
-
-    function onPointerUp() {
-      pointerActionRef.current = null;
-    }
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [questions]);
-
-  useEffect(() => {
-    function isEditableTarget(target: EventTarget | null) {
-      const element = target as HTMLElement | null;
-
-      return Boolean(
-        element &&
-          (
-            element.tagName === "INPUT" ||
-            element.tagName === "TEXTAREA" ||
-            element.tagName === "SELECT" ||
-            element.isContentEditable
-          )
-      );
-    }
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      const ctrl =
-        event.ctrlKey ||
-        event.metaKey;
-
-      if (
-        ctrl &&
-        event.key.toLowerCase() === "c" &&
-        selectedShape
-      ) {
-        const question =
-          questions.find(
-            (item) => item.id === selectedShape.questionId
-          );
-
-        const shape =
-          question?.shapes?.find(
-            (item) => item.id === selectedShape.shapeId
-          );
-
-        if (shape) {
-          copiedShapeRef.current = {
-            ...shape,
-          };
-          event.preventDefault();
-        }
-
-        return;
-      }
-
-      if (
-        ctrl &&
-        event.key.toLowerCase() === "v" &&
-        copiedShapeRef.current &&
-        activeCanvasQuestionId
-      ) {
-        const source =
-          copiedShapeRef.current;
-
-        const clone: EditorShape = {
-          ...source,
-          id: makeShapeId(),
-          x: source.x + 28,
-          y: source.y + 28,
-          zIndex: (Number(source.zIndex) || 0) + 1,
-        };
-
-        updateQuestionShapes(
-          activeCanvasQuestionId,
-          (shapes) => [
-            ...shapes,
-            clone,
-          ]
-        );
-
-        setSelectedShape({
-          questionId: activeCanvasQuestionId,
-          shapeId: clone.id,
-        });
-
-        event.preventDefault();
-        return;
-      }
-
-      if (
-        (event.key === "Delete" ||
-          event.key === "Backspace") &&
-        selectedShape
-      ) {
-        removeShape(
-          selectedShape.questionId,
-          selectedShape.shapeId
-        );
-        event.preventDefault();
-      }
-    }
-
-    function onPaste(event: ClipboardEvent) {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      const questionId =
-        activeCanvasQuestionId ||
-        selectedShape?.questionId;
-
-      if (!questionId) {
-        return;
-      }
-
-      const imageItem =
-        Array.from(event.clipboardData?.items || [])
-          .find((item) =>
-            item.type.startsWith("image/")
-          );
-
-      const file =
-        imageItem?.getAsFile();
-
-      if (!file) {
-        return;
-      }
-
-      event.preventDefault();
-
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const imageSrc =
-          typeof reader.result === "string"
-            ? reader.result
-            : "";
-
-        if (imageSrc) {
-          addImageDataUrl(
-            questionId,
-            imageSrc
-          );
-        }
-      };
-
-      reader.readAsDataURL(file);
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("paste", onPaste);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("paste", onPaste);
-    };
-  }, [
-    questions,
-    selectedShape,
-    activeCanvasQuestionId,
-  ]);
-
-
-  function nextMatchingKey(
-    question: ImportedQuestion,
-    side: "left" | "right"
-  ) {
-    const existing =
-      (question.shapes || [])
-        .filter(
-          (shape) =>
-            shape.type === "matchingItem" &&
-            shape.matchingSide === side
-        )
-        .map((shape) => shape.matchingKey || "");
-
-    if (side === "left") {
-      const numbers =
-        existing
-          .map((value) => Number(value))
-          .filter((value) => Number.isFinite(value));
-
-      const next =
-        numbers.length > 0
-          ? Math.max(...numbers) + 1
-          : 1;
-
-      return String(next);
-    }
-
-    const letters = "abcdefghijklmnopqrstuvwxyz";
-
-    for (const letter of letters) {
-      if (!existing.includes(letter)) {
-        return letter;
-      }
-    }
-
-    return `a${existing.length + 1}`;
-  }
-
-  function addMatchingItem(
-    questionId: string,
-    side: "left" | "right"
-  ) {
-    const question =
-      questions.find((item) => item.id === questionId);
-
-    if (!question) {
-      return;
-    }
-
-    const key =
-      nextMatchingKey(question, side);
-
-    const sameSideCount =
-      (question.shapes || []).filter(
-        (shape) =>
-          shape.type === "matchingItem" &&
-          shape.matchingSide === side
-      ).length;
-
-    const shape: EditorShape = {
-      id: makeShapeId(),
-      type: "matchingItem",
-      matchingSide: side,
-      matchingKey: key,
-
-      // Chap va o'ng ustun alohida joylashadi
-      x:
-        side === "left"
-          ? 70
-          : 390,
-      y:
-        side === "left"
-          ? 75 + sameSideCount * 135
-          : 35 + sameSideCount * 90,
-
-      width:
-        side === "left"
-          ? 285
-          : 470,
-      height:
-        side === "left"
-          ? 96
-          : 72,
-
-      text:
-        side === "left"
-          ? `Atama ${key}`
-          : `Izoh ${key}`,
-
-      backgroundColor: "#ffffff",
-      borderColor: "#1f2a30",
-      textColor: "#111111",
-      fontSize: 20,
-      borderWidth: 2,
-      borderRadius: 8,
-      opacity: 1,
-      zIndex: Date.now(),
-    };
-
-    updateQuestionShapes(questionId, (shapes) => [
-      ...shapes,
-      shape,
-    ]);
-
-    setSelectedShape({
-      questionId,
-      shapeId: shape.id,
-    });
-
-    setActiveCanvasQuestionId(questionId);
-  }
-
-  function addMatchingTemplate(questionId: string) {
-    const question =
-      questions.find((item) => item.id === questionId);
-
-    if (!question) {
-      return;
-    }
-
-    const hasMatching =
-      (question.shapes || []).some(
-        (shape) =>
-          shape.type === "matchingItem"
-      );
-
-    if (hasMatching) {
-      setMessage(
-        "Moslashtirish shakli allaqachon bor. + Chap yoki + O‘ng orqali yangi qator qo‘shing."
-      );
-      return;
-    }
-
-    const leftTexts = [
-      "Immunitet",
-      "Inauguratsiya",
-      "Kvorum",
-    ];
-
-    const rightTexts = [
-      "Izoh a",
-      "Izoh b",
-      "Izoh c",
-      "Izoh d",
-      "Izoh e",
-    ];
-
-    const created: EditorShape[] = [];
-
-    leftTexts.forEach((item, index) => {
-      created.push({
-        id: makeShapeId(),
-        type: "matchingItem",
-        matchingSide: "left",
-        matchingKey: String(index + 1),
-        x: 70,
-        y: 75 + index * 135,
-        width: 285,
-        height: 96,
-        text: item,
-        backgroundColor: "#ffffff",
-        borderColor: "#1f2a30",
-        textColor: "#111111",
-        fontSize: 21,
-        borderWidth: 2,
-        borderRadius: 4,
-        opacity: 1,
-        zIndex: Date.now() + index,
-      });
-    });
-
-    rightTexts.forEach((item, index) => {
-      created.push({
-        id: makeShapeId(),
-        type: "matchingItem",
-        matchingSide: "right",
-        matchingKey: String.fromCharCode(97 + index),
-        x: 390,
-        y: 35 + index * 90,
-        width: 470,
-        height: 72,
-        text: item,
-        backgroundColor: "#ffffff",
-        borderColor: "#1f2a30",
-        textColor: "#111111",
-        fontSize: 18,
-        borderWidth: 2,
-        borderRadius: 4,
-        opacity: 1,
-        zIndex: Date.now() + 20 + index,
-      });
-    });
-
-    updateQuestionShapes(questionId, (shapes) => [
-      ...shapes,
-      ...created,
-    ]);
-
-    setActiveCanvasQuestionId(questionId);
-    setSelectedShape({
-      questionId,
-      shapeId: created[0].id,
-    });
-  }
-
-  function renderShapeEditor(question: ImportedQuestion) {
-    const shapes = question.shapes || [];
-
-    const selected =
-      selectedShape?.questionId === question.id
-        ? shapes.find(
-            (shape) =>
-              shape.id === selectedShape.shapeId
-          )
-        : undefined;
-
-    return (
-      <div className="visualEditor">
-        <div className="visualToolbar">
-          <strong>Rasm / shakl editori</strong>
-
-          <div className="visualToolbarButtons">
-            <label className="visualTool imageVisualTool">
-              Rasm
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  changeQuestionImage(
-                    question.id,
-                    event.target.files?.[0] ?? null
-                  );
-                  event.currentTarget.value = "";
-                }}
-              />
-            </label>
-
-            <button
-              type="button"
-              className="visualTool"
-              onClick={() =>
-                addShape(question.id, "text")
-              }
-            >
-              Matn
-            </button>
-
-            <button
-              type="button"
-              className="visualTool"
-              onClick={() =>
-                addShape(question.id, "rectangle")
-              }
-            >
-              To‘rtburchak
-            </button>
-
-            <button
-              type="button"
-              className="visualTool"
-              onClick={() =>
-                addShape(question.id, "roundedRectangle")
-              }
-            >
-              Yumaloq
-            </button>
-
-            <button
-              type="button"
-              className="visualTool"
-              onClick={() =>
-                addShape(question.id, "circle")
-              }
-            >
-              Doira
-            </button>
-
-            <button
-              type="button"
-              className="visualTool"
-              onClick={() =>
-                addShape(question.id, "ellipse")
-              }
-            >
-              Oval
-            </button>
-
-            <button
-              type="button"
-              className="visualTool matchingTool"
-              onClick={() =>
-                addMatchingTemplate(
-                  question.id
-                )
-              }
-            >
-              Moslashtirish
-            </button>
-
-            <button
-              type="button"
-              className="visualTool matchingAddTool"
-              onClick={() =>
-                addMatchingItem(
-                  question.id,
-                  "left"
-                )
-              }
-            >
-              + Chap
-            </button>
-
-            <button
-              type="button"
-              className="visualTool matchingAddTool"
-              onClick={() =>
-                addMatchingItem(
-                  question.id,
-                  "right"
-                )
-              }
-            >
-              + O‘ng
-            </button>
-
-            {(question.shapes || []).length > 0 && (
-              <button
-                type="button"
-                className="visualTool clearAllShapesTool"
-                onClick={() =>
-                  removeAllShapes(
-                    question.id
-                  )
-                }
-              >
-                Hammasini o‘chirish
-              </button>
-            )}
-          </div>
-
-          <span className="clipboardHint">
-            Rasmni tanlang: Ctrl+C / Ctrl+V · Clipboard rasmini Ctrl+V · Delete
-          </span>
-        </div>
-
-        <div
-          className="shapeCanvasScroll"
-          onPointerDown={() => {
-            setActiveCanvasQuestionId(question.id);
-            setSelectedShape(null);
-          }}
-        >
-          <div
-            className={
-              activeCanvasQuestionId === question.id
-                ? "shapeCanvas activeCanvas"
-                : "shapeCanvas"
-            }
-          >
-            {shapes.length === 0 && (
-              <div className="emptyCanvas">
-                PDFdagi rasm shu yerga tushadi yoki “Rasm” tugmasi / Ctrl+V orqali rasm qo‘shing.
-              </div>
-            )}
-
-            {shapes.map((shape) => {
-              const isSelected =
-                selectedShape?.questionId === question.id &&
-                selectedShape?.shapeId === shape.id;
-
-              const style: React.CSSProperties = {
-                left: shape.x,
-                top: shape.y,
-                width: shape.width,
-                height: shape.height,
-                zIndex: shape.zIndex ?? 1,
-                opacity: shape.opacity ?? 1,
-                borderWidth:
-                  shape.type === "image" ||
-                  shape.type === "matchingItem"
-                    ? 0
-                    : shape.borderWidth ?? 2,
-                borderColor:
-                  shape.borderColor ?? "#2f5975",
-                borderStyle:
-                  shape.type === "text"
-                    ? "dashed"
-                    : "solid",
-                borderRadius:
-                  shape.type === "matchingItem"
-                    ? "0"
-                    : shape.type === "circle" ||
-                      shape.type === "ellipse"
-                    ? "999px"
-                    : `${shape.borderRadius ?? 4}px`,
-                background:
-                  shape.type === "text" ||
-                  shape.type === "image" ||
-                  shape.type === "matchingItem"
-                    ? "transparent"
-                    : shape.backgroundColor ?? "#8fc9ef",
-                color: shape.textColor ?? "#111111",
-              };
-
-              return (
-                <div
-                  key={shape.id}
-                  className={
-                    isSelected
-                      ? "canvasShape selectedCanvasShape"
-                      : "canvasShape"
-                  }
-                  style={style}
-                  onPointerDown={(event) =>
-                    startShapePointer(
-                      event,
-                      question.id,
-                      shape,
-                      "move"
-                    )
-                  }
-                  onDoubleClick={(event) => {
-                    event.stopPropagation();
-
-                    if (
-                      shape.type === "text" ||
-                      shape.type === "matchingItem"
-                    ) {
-                      const next = window.prompt(
-                        shape.type === "matchingItem"
-                          ? "Atama / izoh matni:"
-                          : "Matn:",
-                        shape.text || ""
-                      );
-
-                      if (next !== null) {
-                        updateShape(
-                          question.id,
-                          shape.id,
-                          {
-                            text: next,
-                          }
-                        );
-                      }
-                    }
-                  }}
-                >
-                  {shape.type === "image" &&
-                  shape.imageSrc ? (
-                    <img
-                      src={shape.imageSrc}
-                      alt="Savol rasmi"
-                      draggable={false}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        display: "block",
-                        objectFit:
-                          shape.objectFit ?? "contain",
-                        borderRadius: "inherit",
-                        pointerEvents: "none",
-                      }}
-                    />
-                  ) : shape.type === "matchingItem" ? (
-                    <div
-                      className={
-                        shape.matchingSide === "left"
-                          ? "matchingItem matchingLeft"
-                          : "matchingItem matchingRight"
-                      }
-                    >
-                      <div
-                        className="matchingKeyCircle"
-                        style={{
-                          background:
-                            shape.backgroundColor ||
-                            "#ffffff",
-                          borderColor:
-                            shape.borderColor ||
-                            "#111111",
-                          color:
-                            shape.textColor ||
-                            "#111111",
-                        }}
-                      >
-                        {shape.matchingKey}
-                      </div>
-
-                      <div
-                        className="matchingTextBox"
-                        style={{
-                          background:
-                            shape.backgroundColor ||
-                            "#ffffff",
-                          borderColor:
-                            shape.borderColor ||
-                            "#111111",
-                          color:
-                            shape.textColor ||
-                            "#111111",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: `${shape.fontSize ?? 20}px`,
-                          }}
-                        >
-                          {shape.text || ""}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <span
-                      className="shapeText"
-                      style={{
-                        fontSize: `${shape.fontSize ?? 22}px`,
-                      }}
-                    >
-                      {shape.text || ""}
-                    </span>
-                  )}
-
-                  <button
-                    type="button"
-                    className="shapeDeleteX"
-                    title="O‘chirish"
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-
-                      removeShape(
-                        question.id,
-                        shape.id
-                      );
-                    }}
-                  >
-                    ×
-                  </button>
-
-                  {isSelected &&
-                    (
-                      ["nw", "ne", "sw", "se"] as const
-                    ).map((handle) => (
-                      <span
-                        key={handle}
-                        className={`resizeHandle handle-${handle}`}
-                        onPointerDown={(event) =>
-                          startShapePointer(
-                            event,
-                            question.id,
-                            shape,
-                            "resize",
-                            handle
-                          )
-                        }
-                      />
-                    ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {selected && (
-          <div className="selectedShapePanel">
-            <strong>
-              Tanlangan: {selected.type}
-            </strong>
-
-            {(selected.type === "text" ||
-              selected.type === "matchingItem") && (
-              <input
-                value={selected.text || ""}
-                onChange={(event) =>
-                  updateShape(
-                    question.id,
-                    selected.id,
-                    {
-                      text: event.target.value,
-                    }
-                  )
-                }
-                placeholder="Shakl matni"
-              />
-            )}
-
-            <label>
-              W
-              <input
-                type="number"
-                min={40}
-                value={Math.round(selected.width)}
-                onChange={(event) =>
-                  updateShape(
-                    question.id,
-                    selected.id,
-                    {
-                      width: Math.max(
-                        40,
-                        Number(event.target.value) || 40
-                      ),
-                    }
-                  )
-                }
-              />
-            </label>
-
-            <label>
-              H
-              <input
-                type="number"
-                min={40}
-                value={Math.round(selected.height)}
-                onChange={(event) =>
-                  updateShape(
-                    question.id,
-                    selected.id,
-                    {
-                      height: Math.max(
-                        40,
-                        Number(event.target.value) || 40
-                      ),
-                    }
-                  )
-                }
-              />
-            </label>
-
-            {selected.type !== "image" && (
-              <>
-                <label className="shapeColorControl">
-                  Fon
-                  <input
-                    type="color"
-                    value={
-                      selected.backgroundColor &&
-                      selected.backgroundColor !== "transparent"
-                        ? selected.backgroundColor
-                        : "#ffffff"
-                    }
-                    onChange={(event) =>
-                      updateShape(
-                        question.id,
-                        selected.id,
-                        {
-                          backgroundColor:
-                            event.target.value,
-                        }
-                      )
-                    }
-                  />
-                </label>
-
-                <label className="shapeColorControl">
-                  Chegara
-                  <input
-                    type="color"
-                    value={
-                      selected.borderColor ||
-                      "#1f2a30"
-                    }
-                    onChange={(event) =>
-                      updateShape(
-                        question.id,
-                        selected.id,
-                        {
-                          borderColor:
-                            event.target.value,
-                        }
-                      )
-                    }
-                  />
-                </label>
-
-                <label className="shapeColorControl">
-                  Matn
-                  <input
-                    type="color"
-                    value={
-                      selected.textColor ||
-                      "#111111"
-                    }
-                    onChange={(event) =>
-                      updateShape(
-                        question.id,
-                        selected.id,
-                        {
-                          textColor:
-                            event.target.value,
-                        }
-                      )
-                    }
-                  />
-                </label>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() =>
-                duplicateShape(
-                  question.id,
-                  selected.id
-                )
-              }
-            >
-              Nusxa
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                changeShapeLayer(
-                  question.id,
-                  selected.id,
-                  "front"
-                )
-              }
-            >
-              Oldinga
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                changeShapeLayer(
-                  question.id,
-                  selected.id,
-                  "back"
-                )
-              }
-            >
-              Orqaga
-            </button>
-
-
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  async function saveDraft() {
-    if (
-      testType === "custom" &&
-      !customTestTypeName.trim()
-    ) {
-      setMessage(
-        "Boshqa test turi uchun test turining nomini kiriting."
-      );
-      return;
-    }
-
-    if (questions.length === 0) {
-      setMessage("Saqlash uchun savollar yo‘q.");
-      return;
-    }
-
-    const invalid = questions
-      .map((question) => {
-        const correctCount =
-          question.options.filter(
-            (option) =>
-              option.isCorrect
-          ).length;
-
-        const emptyQuestion =
-          !richTextHasContent(
-            questionDrafts[
-              question.id
-            ] ??
-              question.questionText
-          );
-
-        const emptyOptions =
-          question.options
-            .filter(
-              (option) =>
-                !richTextHasContent(
-                  option.text
-                )
-            )
-            .map(
-              (option) =>
-                option.label
-            );
-
-        if (
-          !emptyQuestion &&
-          emptyOptions.length === 0 &&
-          correctCount === 1
-        ) {
-          return null;
-        }
-
-        return {
-          question,
-          emptyQuestion,
-          emptyOptions,
-          correctCount,
-        };
-      })
-      .filter(Boolean) as Array<{
-        question: ImportedQuestion;
-        emptyQuestion: boolean;
-        emptyOptions: Array<string>;
-        correctCount: number;
-      }>;
-
-    if (invalid.length > 0) {
-      const first =
-        invalid[0];
-
-      const firstProblems = [
-        first.emptyQuestion
-          ? "savol matni bo‘sh"
-          : "",
-        first.emptyOptions.length > 0
-          ? `${first.emptyOptions.join(
-              ", "
-            )} variant bo‘sh`
-          : "",
-        first.correctCount !== 1
-          ? `to‘g‘ri javoblar soni ${first.correctCount} ta`
-          : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-      const preview =
-        invalid
-          .slice(0, 12)
-          .map(
-            (item) =>
-              item.question.number
-          )
-          .join(", ");
-
-      const more =
-        invalid.length > 12
-          ? " ..."
-          : "";
-
-      const errorMessage =
-        `${invalid.length} ta savolda saqlashga to‘sqinlik qilayotgan xato bor.\n\n` +
-        `Birinchi xato: ${first.question.number}-savol — ${firstProblems}.\n\n` +
-        `Xatoli savollar: ${preview}${more}`;
-
-      setMessage(
-        errorMessage.replace(
-          /\n/g,
-          " "
-        )
-      );
-
-      window.alert(
-        errorMessage
-      );
-
-      window.setTimeout(
-        () => {
-          document
-            .getElementById(
-              `question-card-${first.question.id}`
-            )
-            ?.scrollIntoView({
-              behavior:
-                "smooth",
-              block:
-                "center",
-            });
-        },
-        50
-      );
-
-      return;
-    }
-
-    async function readApiResponse(response: Response) {
-      const text = await response.text();
-      let data: any = null;
-
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        if (response.status === 413) {
-          throw new Error(
-            "Yuborilayotgan ma’lumot hajmi server limitidan oshdi. Bitta rasm juda katta bo‘lsa uni kichraytirish kerak."
-          );
-        }
-
-        throw new Error(
-          text || `Server xatosi: ${response.status}`
-        );
-      }
-
-      if (!response.ok || !data?.success) {
-        throw new Error(
-          data?.message || `Server xatosi: ${response.status}`
-        );
-      }
-
-      return data;
-    }
-
-    function prepareQuestion(question: ImportedQuestion) {
-      return {
-        id: question.id,
-
-        questionHtml: sanitizeRichHtml(
-          questionDrafts[question.id] ?? question.questionText
-        ),
-
-        options: question.options.map((option) => ({
-          id: option.id,
-          text: sanitizeRichHtml(option.text),
-          isCorrect: option.isCorrect,
-        })),
-
-        shapes: Array.isArray(question.shapes)
-          ? question.shapes.flatMap<EditorShape>(
-              (shape): EditorShape[] => {
-                if (shape.type !== "matchingItem") {
-                  return [
-                    {
-                      id: shape.id,
-                      type: shape.type,
-                      x: Math.round(shape.x),
-                      y: Math.round(shape.y),
-                      width: Math.max(1, Math.round(shape.width)),
-                      height: Math.max(1, Math.round(shape.height)),
-                      text: shape.text,
-                      imageSrc: shape.imageSrc,
-                      backgroundColor: shape.backgroundColor,
-                      borderColor: shape.borderColor,
-                      textColor: shape.textColor,
-                      fontSize: shape.fontSize,
-                      borderWidth: shape.borderWidth,
-                      borderRadius: shape.borderRadius,
-                      opacity: shape.opacity,
-                      objectFit: shape.objectFit,
-                      zIndex: shape.zIndex,
-                    },
-                  ];
-                }
-
-                const keyWidth = 50;
-                const gap = 8;
-                const boxX = Math.round(shape.x) + keyWidth - 8;
-                const boxWidth = Math.max(
-                  70,
-                  Math.round(shape.width) - keyWidth + 8
-                );
-
-                return [
-                  {
-                    id: `${shape.id}-box`,
-                    type: "roundedRectangle",
-                    x: boxX,
-                    y: Math.round(shape.y),
-                    width: boxWidth,
-                    height: Math.max(1, Math.round(shape.height)),
-                    backgroundColor: "#ffffff",
-                    borderColor: shape.borderColor || "#1f2a30",
-                    borderWidth: 2,
-                    borderRadius: 8,
-                    zIndex: shape.zIndex,
-                  },
-                  {
-                    id: `${shape.id}-key-circle`,
-                    type: "circle",
-                    x: Math.round(shape.x),
-                    y:
-                      Math.round(shape.y) +
-                      Math.max(
-                        0,
-                        Math.round((shape.height - keyWidth) / 2)
-                      ),
-                    width: keyWidth,
-                    height: keyWidth,
-                    backgroundColor: "#ffffff",
-                    borderColor: shape.borderColor || "#1f2a30",
-                    borderWidth: 2,
-                    borderRadius: 999,
-                    zIndex: (shape.zIndex || 1) + 1,
-                  },
-                  {
-                    id: `${shape.id}-key`,
-                    type: "text",
-                    x: Math.round(shape.x),
-                    y:
-                      Math.round(shape.y) +
-                      Math.max(
-                        0,
-                        Math.round((shape.height - keyWidth) / 2)
-                      ),
-                    width: keyWidth,
-                    height: keyWidth,
-                    text: shape.matchingKey || "",
-                    textColor: shape.textColor || "#111111",
-                    fontSize: 19,
-                    borderWidth: 0,
-                    zIndex: (shape.zIndex || 1) + 2,
-                  },
-                  {
-                    id: `${shape.id}-text`,
-                    type: "text",
-                    x: boxX + gap,
-                    y: Math.round(shape.y) + 7,
-                    width: Math.max(40, boxWidth - gap * 2),
-                    height: Math.max(30, Math.round(shape.height) - 14),
-                    text: shape.text || "",
-                    textColor: shape.textColor || "#111111",
-                    fontSize: shape.fontSize || 18,
-                    borderWidth: 0,
-                    zIndex: (shape.zIndex || 1) + 2,
-                  },
-                ];
-              }
-            )
-          : [],
-
-        points: 1,
-      };
-    }
-
-    const preparedById =
-      new Map(
-        questions.map((question) => [
-          question.id,
-          prepareQuestion(question),
-        ])
-      );
-
-    type PreparedQuestion =
-      ReturnType<typeof prepareQuestion>;
-
-    async function saveOneTest(args: {
-      testTitle: string;
-      testDescription: string;
-      preparedQuestions: PreparedQuestion[];
-      progressPrefix?: string;
-    }) {
-      const preparedQuestions =
-        args.preparedQuestions;
-
-      if (preparedQuestions.length === 0) {
-        return null;
-      }
-
-      const createResponse = await fetch("/api/tests", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "create-chunked-test",
-          title: args.testTitle,
-          subject: subject.trim(),
-          duration: Number(duration) || 60,
-          description: args.testDescription,
-          testType,
-          customTestTypeName:
-            testType === "custom"
-              ? customTestTypeName.trim()
-              : "",
-          status: "draft",
-          attemptLimit: attemptLimitEnabled
-            ? Math.max(1, Number(attemptLimit) || 1)
-            : null,
-          expectedQuestions: preparedQuestions.length,
-        }),
-      });
-
-      const createData =
-        await readApiResponse(createResponse);
-
-      const testId =
-        String(createData?.testId || "");
-
-      if (!testId) {
-        throw new Error(
-          `"${args.testTitle}" uchun test ID olinmadi.`
-        );
-      }
-
-      const MAX_QUESTIONS_PER_CHUNK = 10;
-      const MAX_CHUNK_BYTES = 1_800_000;
-      const MAX_SINGLE_QUESTION_BYTES = 3_500_000;
-      const encoder = new TextEncoder();
-
-      const chunks: {
-        startIndex: number;
-        items: PreparedQuestion[];
-      }[] = [];
-
-      let currentChunk: PreparedQuestion[] = [];
-      let currentChunkBytes = 0;
-      let currentStartIndex = 0;
-
-      for (
-        let index = 0;
-        index < preparedQuestions.length;
-        index++
-      ) {
-        const question =
-          preparedQuestions[index];
-
-        const questionBytes =
-          encoder.encode(
-            JSON.stringify(question)
-          ).length;
-
-        if (
-          questionBytes >
-          MAX_SINGLE_QUESTION_BYTES
-        ) {
-          throw new Error(
-            `"${args.testTitle}" testining ${index + 1}-savolidagi rasm yoki shakl juda katta.`
-          );
-        }
-
-        const shouldFlush =
-          currentChunk.length > 0 &&
-          (
-            currentChunk.length >=
-              MAX_QUESTIONS_PER_CHUNK ||
-            currentChunkBytes +
-              questionBytes >
-              MAX_CHUNK_BYTES
-          );
-
-        if (shouldFlush) {
-          chunks.push({
-            startIndex:
-              currentStartIndex,
-            items:
-              currentChunk,
-          });
-
-          currentStartIndex =
-            index;
-          currentChunk = [];
-          currentChunkBytes = 0;
-        }
-
-        currentChunk.push(
-          question
-        );
-        currentChunkBytes +=
-          questionBytes;
-      }
-
-      if (
-        currentChunk.length > 0
-      ) {
-        chunks.push({
-          startIndex:
-            currentStartIndex,
-          items:
-            currentChunk,
-        });
-      }
-
-      let savedCount = 0;
-
-      for (
-        let chunkIndex = 0;
-        chunkIndex < chunks.length;
-        chunkIndex++
-      ) {
-        const chunk =
-          chunks[chunkIndex];
-
-        setMessage(
-          `${args.progressPrefix || ""}${savedCount}/${preparedQuestions.length} ta savol saqlanmoqda...`
-        );
-
-        const chunkResponse =
-          await fetch("/api/tests", {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              action:
-                "append-questions",
-              testId,
-              startIndex:
-                chunk.startIndex,
-              questions:
-                chunk.items,
-            }),
-          });
-
-        const chunkData =
-          await readApiResponse(
-            chunkResponse
-          );
-
-        savedCount =
-          Number(
-            chunkData?.receivedQuestions
-          ) || 0;
-      }
-
-      const finalizeResponse =
-        await fetch("/api/tests", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            action:
-              "finalize-chunked-test",
-            testId,
-            status: "draft",
-          }),
-        });
-
-      await readApiResponse(
-        finalizeResponse
-      );
-
-      return testId;
-    }
-
-    try {
-      setSaving(true);
-
-      /*
-        MAVZULASHTIRILGAN TEST:
-        bitta 1609 savollik test emas.
-        33 ta dars + Nazorat + Lug‘at alohida test bo‘lib saqlanadi.
-      */
-      if (
-        testType === "thematic" &&
-        importedTopics.length > 0
-      ) {
-        const baseTitle =
-          title.trim() ||
-          "Davlat va huquq asoslari 10-sinf";
-
-        const allSections = [
-          ...importedTopics.map(
-            (topic) => ({
-              ...topic,
-              kind:
-                topic.kind ||
-                "lesson" as const,
-            })
-          ),
-          ...specialSections,
-        ].filter(
-          (section) =>
-            Array.isArray(
-              section.questions
-            ) &&
-            section.questions.length >
-              0
-        );
-
-        if (
-          allSections.length === 0
-        ) {
-          throw new Error(
-            "Mavzular bo‘yicha saqlash uchun savollar topilmadi."
-          );
-        }
-
-        let savedTests = 0;
-        let savedQuestions = 0;
-
-        for (
-          let sectionIndex = 0;
-          sectionIndex <
-          allSections.length;
-          sectionIndex++
-        ) {
-          const section =
-            allSections[
-              sectionIndex
-            ];
-
-          const sectionPrepared =
-            section.questions
-              .map(
-                (question) =>
-                  preparedById.get(
-                    question.id
-                  )
-              )
-              .filter(
-                (
-                  question
-                ): question is PreparedQuestion =>
-                  Boolean(question)
-              );
-
-          if (
-            sectionPrepared.length ===
-            0
-          ) {
-            continue;
-          }
-
-          const sectionTitle =
-            section.title.trim();
-
-          const testTitle =
-            `${baseTitle} — ${sectionTitle}`;
-
-          const sharedNote =
-            section.sharedSource
-              ? ` PDF manbasida bu dars qo‘shni dars bilan bitta umumiy test blokida berilgan.`
-              : "";
-
-          const testDescription =
-            [
-              description.trim(),
-              `Mavzulashtirilgan to‘plam: ${baseTitle}.`,
-              `Bo‘lim: ${sectionTitle}.`,
-              sharedNote.trim(),
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-          setMessage(
-            `${sectionIndex + 1}/${allSections.length}: ${sectionTitle} saqlanmoqda...`
-          );
-
-          await saveOneTest({
-            testTitle,
-            testDescription,
-            preparedQuestions:
-              sectionPrepared,
-            progressPrefix:
-              `${sectionIndex + 1}/${allSections.length} — `,
-          });
-
-          savedTests++;
-          savedQuestions +=
-            sectionPrepared.length;
-        }
-
-        setMessage(
-          `${savedTests} ta alohida test muvaffaqiyatli saqlandi.`
-        );
-
-        window.alert(
-          `Mavzulashtirilgan to‘plam saqlandi.\n\nAlohida testlar: ${savedTests} ta\nSaqlangan savollar: ${savedQuestions} ta`
-        );
-
-        router.push(
-          "/admin/tests"
-        );
-
-        return;
-      }
-
-      /*
-        QOLGAN TEST TURLARI:
-        eski bir-test saqlash usuli o‘zgarishsiz qoladi.
-      */
-      const preparedQuestions =
-        questions.map(
-          (question) =>
-            prepareQuestion(
-              question
-            )
-        );
-
-      setMessage(
-        "Testni saqlash boshlandi..."
-      );
-
-      await saveOneTest({
-        testTitle:
-          title.trim(),
-        testDescription:
-          description.trim(),
-        preparedQuestions,
-      });
-
-      setMessage(
-        `${preparedQuestions.length} ta savol muvaffaqiyatli saqlandi.`
-      );
-
-      window.alert(
-        `Test muvaffaqiyatli saqlandi.\n\nJami: ${preparedQuestions.length} ta savol.`
-      );
-
-      router.push(
-        "/admin/tests"
-      );
-    } catch (error) {
-      console.error(
-        "SAVE IMPORTED TEST ERROR:",
-        error
-      );
-
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Testni saqlashda xatolik."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <main className="page">
-      <header className="header">
-        <div className="headerTitle">
-          <span>
-            ADMIN PANEL
-          </span>
-
-          <strong>
-            PDF dan test yaratish
-          </strong>
-        </div>
-
-        <div className="headerActions">
-          <button
-            type="button"
-            className="homeButton"
-            onClick={() =>
-              router.push("/")
-            }
-          >
-            Bosh sahifa
-          </button>
-
-          <button
-            type="button"
-            className="grayButton"
-            onClick={() =>
-              router.push(
-                "/admin/tests"
-              )
-            }
-          >
-            Testlarni boshqarish
-          </button>
-
-          <button
-            type="button"
-            className="blueButton"
-            onClick={() => {
-              const params =
-                new URLSearchParams({
-                  testType,
-                });
-
-              if (
-                testType === "custom" &&
-                customTestTypeName.trim()
-              ) {
-                params.set(
-                  "customTestTypeName",
-                  customTestTypeName.trim()
-                );
-              }
-
-              router.push(
-                `/test/editor?${params.toString()}`
-              );
-            }}
-          >
-            Oddiy test yaratish
-          </button>
-        </div>
-      </header>
-
-      <section className="mainBox">
-        <div className="floatingTitle">
-          PDF import
-        </div>
-
-        <div className="introBox">
-          <strong>
-            PDF → avtomatik test
-          </strong>
-
-          <p>
-            PDFdan savol matni, A/B/C/D variantlar va + belgisi bilan ko‘rsatilgan to‘g‘ri javob avtomatik ajratiladi. Jadval, diagramma yoki boshqa rasmlarni kerakli savolga “Rasm / shakl” orqali o‘zingiz joylaysiz. Tahlildan keyin savolni tahrirlash, rasm qo‘shish, savol qo‘shish, nusxalash va tartibini o‘zgartirish mumkin.
-          </p>
-        </div>
-
-        <div className="metaGrid">
-          <label className="categoryField">
-            <span>
-              Test turi
-            </span>
-
-            <select
-              value={testType}
-              onChange={(event) =>
-                setTestType(
-                  normalizeTestCategory(
-                    event.target.value
-                  )
-                )
-              }
-            >
-              <option value="legislation">
-                Qonunchilik hujjatlaridan test
-              </option>
-              <option value="thematic">
-                Mavzulashtirilgan test
-              </option>
-              <option value="block">
-                Blok test
-              </option>
-              <option value="national-certificate">
-                Milliy sertifikat testi
-              </option>
-              <option value="thirty">
-                30 talik test
-              </option>
-              <option value="custom">
-                Boshqa test
-              </option>
-            </select>
-          </label>
-
-          {testType === "custom" && (
-            <label className="customCategoryField">
-              <span>
-                Test turining nomi
-              </span>
-
-              <input
-                value={customTestTypeName}
-                onChange={(event) =>
-                  setCustomTestTypeName(
-                    event.target.value
-                  )
-                }
-                placeholder="Masalan: Final nazorat testi"
-              />
-            </label>
-          )}
-
-          <div className="selectedTypeBanner">
-            <span>
-              TANLANGAN BO‘LIM
-            </span>
-
-            <strong>
-              {testType === "custom"
-                ? customTestTypeName.trim() ||
-                  "Boshqa test"
-                : TEST_CATEGORY_LABELS[
-                    testType
-                  ]}
-            </strong>
-          </div>
-
-          <label>
-            <span>
-              Test nomi
-            </span>
-
-            <input
-              value={title}
-              onChange={(
-                event
-              ) =>
-                setTitle(
-                  event.target
-                    .value
-                )
-              }
-              placeholder="Masalan: Jinoyat huquqi — 1-test"
-            />
-          </label>
-
-          <label>
-            <span>
-              Fan nomi
-            </span>
-
-            <input
-              value={subject}
-              onChange={(
-                event
-              ) =>
-                setSubject(
-                  event.target
-                    .value
-                )
-              }
-              placeholder="Masalan: Jinoyat huquqi"
-            />
-          </label>
-
-          <label>
-            <span>Vaqt</span>
-
-            <div className="durationBox">
-              <input
-                type="number"
-                min={1}
-                max={600}
-                value={duration}
-                onChange={(
-                  event
-                ) =>
-                  setDuration(
-                    Math.max(
-                      1,
-                      Number(
-                        event
-                          .target
-                          .value
-                      ) || 1
-                    )
-                  )
-                }
-              />
-
-              <strong>
-                daqiqa
-              </strong>
-            </div>
-          </label>
-
-
-          <label className="attemptField">
-            <span>Urinishlar soni</span>
-
-            <div className="attemptBox">
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={attemptLimit}
-                disabled={!attemptLimitEnabled}
-                onChange={(event) =>
-                  setAttemptLimit(
-                    Math.max(
-                      1,
-                      Number(event.target.value) || 1
-                    )
-                  )
-                }
-              />
-
-              <button
-                type="button"
-                className={
-                  attemptLimitEnabled
-                    ? "attemptToggle active"
-                    : "attemptToggle"
-                }
-                onClick={() =>
-                  setAttemptLimitEnabled(
-                    (current) => !current
-                  )
-                }
-              >
-                {attemptLimitEnabled
-                  ? "Cheklangan"
-                  : "Cheksiz"}
-              </button>
-            </div>
-          </label>
-
-          <label className="descriptionField">
-            <span>Izoh</span>
-
-            <textarea
-              value={
-                description
-              }
-              onChange={(
-                event
-              ) =>
-                setDescription(
-                  event.target
-                    .value
-                )
-              }
-              placeholder="Ixtiyoriy..."
-            />
-          </label>
-        </div>
-
-        <div
-          className={
-            pdfFile
-              ? "uploadArea hasFile"
-              : "uploadArea"
-          }
-          onDragOver={(
-            event
-          ) =>
-            event.preventDefault()
-          }
-          onDrop={(
-            event
-          ) => {
-            event.preventDefault();
-
-            handleFile(
-              event
-                .dataTransfer
-                .files?.[0] ??
-                null
-            );
-          }}
-        >
-          <div className="pdfBadge">
-            PDF
-          </div>
-
-          <h2>
-            PDF faylni tanlang
-          </h2>
-
-          <p>
-            Eng ishonchli usul: to‘g‘ri variantga + belgisi qo‘ying.
-          </p>
-
-          <label className="fileButton">
-            PDF tanlash
-
-            <input
-              type="file"
-              accept=".pdf,application/pdf"
-              onChange={(
-                event
-              ) =>
-                handleFile(
-                  event.target
-                    .files?.[0] ??
-                    null
-                )
-              }
-            />
-          </label>
-
-          {pdfFile && (
-            <div className="selectedFile">
-              <strong>
-                {pdfFile.name}
-              </strong>
-
-              <span>
-                {(
-                  pdfFile.size /
-                  1024 /
-                  1024
-                ).toFixed(2)}{" "}
-                MB
-              </span>
-            </div>
-          )}
-        </div>
-
-        {message && (
-          <div className="messageBox">
-            {message}
-          </div>
-        )}
-
-        <div className="analyzeActions">
-          <button
-            type="button"
-            className="analyzeButton"
-            onClick={
-              analyzePdf
-            }
-            disabled={
-              analyzing ||
-              saving
-            }
-          >
-            {analyzing
-              ? "PDF tahlil qilinmoqda..."
-              : "PDFNI TAHLIL QILISH"}
-          </button>
-        </div>
-      </section>
-
-      {testType === "thematic" &&
-        importedTopics.length > 0 && (
-          <section className="topicsBox">
-            <div className="topicsFloatingTitle">
-              Mavzular
-            </div>
-
-            <div className="topicsHeader">
-              <strong>
-                33 ta dars aniqlandi
-              </strong>
-
-              <span>
-                Jami {questions.length} ta savol
-              </span>
-            </div>
-
-            <div className="topicsList">
-              {importedTopics.map(
-                (topic, index) => (
-                  <div
-                    key={topic.id}
-                    className="topicRow"
-                  >
-                    <div className="topicNumber">
-                      {topic.lessonNumber ??
-                        index + 1}
-                    </div>
-
-                    <div className="topicName">
-                      <div>
-                        {topic.title}
-                      </div>
-
-                      {topic.sharedSource && (
-                        <small className="sharedTopicNote">
-                          PDFda bu dars qo‘shni dars bilan
-                          bitta umumiy test blokida berilgan.
-                        </small>
-                      )}
-                    </div>
-
-                    <div className="topicTotal">
-                      {topic.questions?.length ??
-                        topic.questionCount ??
-                        0}{" "}
-                      ta savol
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-
-            {specialSections.length > 0 && (
-              <>
-                <div className="specialDivider">
-                  Qo‘shimcha bo‘limlar
-                </div>
-
-                <div className="topicsList">
-                  {specialSections.map(
-                    (section, index) => (
-                      <div
-                        key={section.id}
-                        className="topicRow specialTopicRow"
-                      >
-                        <div className="topicNumber specialTopicNumber">
-                          {section.kind ===
-                          "control"
-                            ? "N"
-                            : "L"}
-                        </div>
-
-                        <div className="topicName">
-                          {section.title}
-                        </div>
-
-                        <div className="topicTotal">
-                          {section.questions?.length ??
-                            section.questionCount ??
-                            0}{" "}
-                          ta savol
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
-              </>
-            )}
-          </section>
-        )}
-
-      {questions.length >
-        0 && (
-        <section className="previewBox">
-          <div className="floatingTitle">
-            Tekshirish
-          </div>
-
-          <div className="previewHeader">
-            <div>
-              <strong>
-                {
-                  questions.length
-                }{" "}
-                ta savol topildi
-              </strong>
-
-              <span>
-                {warningCount >
-                0
-                  ? `${warningCount} ta savol tekshirilishi kerak`
-                  : "Barcha savollar tayyor"}
-              </span>
-            </div>
-
-            <div className="previewActions">
-              <button
-                type="button"
-                className="addQuestionButton"
-                onClick={addQuestion}
-                disabled={saving}
-              >
-                + YANGI SAVOL
-              </button>
-
-              <button
-                type="button"
-                className="saveDraftButton"
-                onClick={saveDraft}
-                disabled={saving}
-              >
-                QORALAMA SIFATIDA SAQLASH
-              </button>
-            </div>
-          </div>
-
-          {message && (
-            <div className="saveMessageBox">
-              {message}
-            </div>
-          )}
-
-          <div className="questionsList">
-            {questions.map(
-              (
-                question
-              ) => (
-                <article
-                  id={`question-card-${question.id}`}
-                  className={
-                    question.warning
-                      ? "questionCard warningCard"
-                      : "questionCard"
-                  }
-                  key={
-                    question.id
-                  }
-                >
-                  <div className="questionTop">
-                    <div className="questionNumber">
-                      {
-                        question.number
-                      }
-                      -savol
-                    </div>
-
-                    <div className="questionTools">
-                      <button
-                        type="button"
-                        className="toolButton"
-                        onClick={() =>
-                          moveQuestion(
-                            question.id,
-                            -1
-                          )
-                        }
-                        disabled={
-                          question.number === 1
-                        }
-                        title="Yuqoriga ko‘chirish"
-                      >
-                        ↑
-                      </button>
-
-                      <button
-                        type="button"
-                        className="toolButton"
-                        onClick={() =>
-                          moveQuestion(
-                            question.id,
-                            1
-                          )
-                        }
-                        disabled={
-                          question.number === questions.length
-                        }
-                        title="Pastga ko‘chirish"
-                      >
-                        ↓
-                      </button>
-
-                      <button
-                        type="button"
-                        className="duplicateButton"
-                        onClick={() =>
-                          duplicateQuestion(
-                            question.id
-                          )
-                        }
-                      >
-                        Nusxalash
-                      </button>
-
-                      <button
-                        type="button"
-                        className={
-                          openVisualEditors[question.id]
-                            ? "imageButton imageButtonActive"
-                            : "imageButton"
-                        }
-                        onClick={() => {
-                          setOpenVisualEditors((current) => ({
-                            ...current,
-                            [question.id]:
-                              !current[question.id],
-                          }));
-
-                          setActiveCanvasQuestionId(
-                            question.id
-                          );
-                        }}
-                      >
-                        {openVisualEditors[question.id]
-                          ? "Rasm / shaklni yopish"
-                          : "Rasm / shakl"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="removeButton"
-                        onClick={() =>
-                          removeQuestion(
-                            question.id
-                          )
-                        }
-                      >
-                        O‘chirish
-                      </button>
-                    </div>
-                  </div>
-
-                  {question.warning && (
-                    <div className="warningBox">
-                      {
-                        question.warning
-                      }
-                    </div>
-                  )}
-
-                  <div className="questionTextField">
-                    <span>
-                      Savol matni
-                    </span>
-
-                    <RichTextEditor
-                      editorId={`question:${question.id}`}
-                      value={
-                        questionDrafts[question.id] ??
-                        question.questionText
-                      }
-                      onChange={(value) =>
-                        changeQuestionText(
-                          question.id,
-                          value
-                        )
-                      }
-                      placeholder="Savol matnini shu yerda tahrirlang..."
-                      minHeight={170}
-                    />
-                  </div>
-
-                  {openVisualEditors[question.id] &&
-                    renderShapeEditor(question)}
-
-                  <div className="optionsList">
-                    {question.options.map(
-                      (
-                        option
-                      ) => (
-                        <div
-                          className={
-                            option.isCorrect
-                              ? "optionRow correctOption"
-                              : "optionRow"
-                          }
-                          key={
-                            option.id
-                          }
-                        >
-                          <button
-                            type="button"
-                            className="correctSelector"
-                            onClick={() =>
-                              setCorrectAnswer(
-                                question.id,
-                                option.id
-                              )
-                            }
-                          >
-                            {option.isCorrect
-                              ? "✓"
-                              : ""}
-                          </button>
-
-                          <strong className="optionLetter">
-                            {
-                              option.label
-                            }
-                          </strong>
-
-                          <RichTextEditor
-                            editorId={`option:${question.id}:${option.id}`}
-                            value={option.text}
-                            onChange={(value) =>
-                              changeOptionText(
-                                question.id,
-                                option.id,
-                                value
-                              )
-                            }
-                            placeholder={`${option.label} variant matni...`}
-                            minHeight={80}
-                            compact
-                          />
-
-                          {option.isCorrect && (
-                            <span className="correctBadge">
-                              TO‘G‘RI
-                            </span>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                </article>
-              )
-            )}
-          </div>
-
-          <div className="bottomSave">
-            <button
-              type="button"
-              className="addQuestionButton"
-              onClick={addQuestion}
-              disabled={saving}
-            >
-              + YANGI SAVOL
-            </button>
-
-            <button
-              type="button"
-              className="saveDraftButton"
-              onClick={saveDraft}
-              disabled={saving}
-            >
-              QORALAMA SIFATIDA SAQLASH
-            </button>
-          </div>
-        </section>
-      )}
-
-      <style jsx global>{`
-        * {
-          box-sizing: border-box;
-        }
-
-        .page {
-          min-height: 100vh;
-          padding: 26px 0 80px;
-          color: #101820;
-          font-family: "Bell MT", "Times New Roman", serif;
-          background:
-            radial-gradient(circle at 50% 0%, rgba(115,191,232,.23), transparent 30%),
-            linear-gradient(180deg,#eef4f7 0%,#dde5e9 46%,#edf2f4 100%);
-        }
-
-        .header {
-          position: relative;
-          width: min(1480px, 96%);
-          margin: 0 auto;
-          padding: 19px 22px 23px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 22px;
-          border: 2px solid #28343b;
-          border-radius: 22px;
-          background:
-            linear-gradient(145deg,#747d82 0%,#586167 42%,#3d454a 100%);
-          box-shadow:
-            0 10px 0 #293238,
-            0 17px 30px rgba(23,34,40,.22),
-            inset 0 2px 0 rgba(255,255,255,.48),
-            inset 0 -4px 8px rgba(0,0,0,.22);
-        }
-
-        .header::after {
-          content: "";
-          position: absolute;
-          left: 24px;
-          right: 24px;
-          bottom: 8px;
-          height: 2px;
-          border-radius: 999px;
-          background: rgba(255,255,255,.13);
-          pointer-events: none;
-        }
-
-        .headerTitle {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          color: #fff;
-          text-shadow: 0 2px 2px rgba(0,0,0,.42);
-        }
-
-        .headerTitle span {
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 2.2px;
-          opacity: .92;
-        }
-
-        .headerTitle strong {
-          font-size: 29px;
-          letter-spacing: .2px;
-        }
-
-        .headerActions {
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          gap: 12px;
-        }
-
-        .homeButton,
-        .grayButton,
-        .blueButton {
-          position: relative;
-          min-height: 50px;
-          padding: 9px 18px;
-          border-radius: 11px;
-          cursor: pointer;
-          font-family: inherit;
-          font-weight: 800;
-          letter-spacing: .15px;
-          transition:
-            transform .12s ease,
-            box-shadow .12s ease,
-            filter .12s ease;
-        }
-
-        .homeButton:hover,
-        .grayButton:hover,
-        .blueButton:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
-        }
-
-        .homeButton:active,
-        .grayButton:active,
-        .blueButton:active {
-          transform: translateY(4px);
-          box-shadow: 0 1px 0 rgba(0,0,0,.55) !important;
-        }
-
-        .homeButton {
-          color: #17482f;
-          border: 2px solid #236743;
-          background: linear-gradient(180deg,#dcffe9 0%,#78d99d 56%,#53bd7a 100%);
-          box-shadow:
-            0 6px 0 #235d3e,
-            0 10px 16px rgba(0,0,0,.14),
-            inset 0 2px 0 rgba(255,255,255,.78);
-        }
-
-        .grayButton {
-          color: #253039;
-          border: 2px solid #626b70;
-          background: linear-gradient(180deg,#ffffff 0%,#d6d8da 54%,#afb4b7 100%);
-          box-shadow:
-            0 6px 0 #515b61,
-            0 10px 16px rgba(0,0,0,.14),
-            inset 0 2px 0 rgba(255,255,255,.82);
-        }
-
-        .blueButton {
-          color: #073b68;
-          border: 2px solid #174b69;
-          background: linear-gradient(180deg,#d9f5ff 0%,#84cff1 53%,#55abd7 100%);
-          box-shadow:
-            0 6px 0 #174760,
-            0 10px 16px rgba(0,0,0,.15),
-            inset 0 2px 0 rgba(255,255,255,.8);
-        }
-
-        .mainBox,
-        .previewBox {
-          position: relative;
-          width: min(1320px,94%);
-          margin: 78px auto 0;
-          padding: 72px 30px 39px;
-          border: 2px solid #303b41;
-          border-radius: 25px;
-          background:
-            linear-gradient(145deg,#747c81 0%,#596167 37%,#3f474b 100%);
-          box-shadow:
-            0 11px 0 #2c363b,
-            0 20px 34px rgba(22,32,38,.23),
-            inset 0 3px 0 rgba(255,255,255,.38),
-            inset 0 -8px 14px rgba(0,0,0,.18);
-        }
-
-        .mainBox::before,
-        .previewBox::before {
-          content: "";
-          position: absolute;
-          inset: 15px 18px auto;
-          height: 3px;
-          border-radius: 999px;
-          background: rgba(255,255,255,.14);
-          pointer-events: none;
-        }
-
-        .floatingTitle {
-          position: absolute;
-          top: -29px;
-          left: 50%;
-          transform: translateX(-50%);
-          min-width: 250px;
-          padding: 12px 24px 14px;
-          text-align: center;
-          color: #073b68;
-          font-size: 21px;
-          font-weight: 900;
-          letter-spacing: .3px;
-          border: 2px solid #174a68;
-          border-radius: 12px;
-          background: linear-gradient(180deg,#ddf7ff 0%,#86cef0 53%,#57acd7 100%);
-          box-shadow:
-            0 7px 0 #174760,
-            0 12px 19px rgba(0,0,0,.18),
-            inset 0 2px 0 rgba(255,255,255,.86);
-          text-shadow: 0 1px 0 rgba(255,255,255,.52);
-          z-index: 2;
-        }
-
-        .introBox {
-          position: relative;
-          padding: 20px 22px;
-          border-radius: 16px;
-          background: linear-gradient(180deg,#f8fdff 0%,#e4f4fb 100%);
-          border: 2px solid #79a0b7;
-          box-shadow:
-            0 5px 0 #506d7e,
-            0 9px 14px rgba(0,0,0,.13),
-            inset 0 2px 0 rgba(255,255,255,.96);
-        }
-
-        .introBox strong {
-          display: block;
-          margin-bottom: 7px;
-          color: #073b68;
-          font-size: 19px;
-          text-shadow: 0 1px 0 #fff;
-        }
-
-        .introBox p {
-          margin: 0;
-          line-height: 1.58;
-          font-size: 16px;
-        }
-
-        .metaGrid {
-          margin-top: 22px;
-          display: grid;
-          grid-template-columns: repeat(4,minmax(0,1fr));
-          gap: 16px;
-        }
-
-        .metaGrid label {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-          color: #fff;
-          font-weight: 700;
-        }
-
-        .attemptField {
-          min-width: 0;
-        }
-
-        .attemptBox {
-          display: grid;
-          grid-template-columns: minmax(0,1fr) auto;
-          gap: 8px;
-          align-items: center;
-        }
-
-        .attemptToggle {
-          min-height: 47px;
-          padding: 0 12px;
-          border: 2px solid #606a70;
-          border-radius: 10px;
-          background: linear-gradient(#fafafa,#c5c5c5);
-          font-family: inherit;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .attemptToggle.active {
-          color: #07517e;
-          border-color: #174461;
-          background: linear-gradient(#d7f4ff,#7fc9ec);
-        }
-
-        .descriptionField {
-          grid-column: 1/-1;
-        }
-
-        .metaGrid input,
-        .metaGrid textarea {
-          width: 100%;
-          padding: 12px 13px;
-          border: 2px solid #69747a;
-          border-radius: 10px;
-          font-family: inherit;
-          font-size: 16px;
-          background: #fff;
-        }
-
-        .metaGrid textarea {
-          min-height: 85px;
-        }
-
-        .durationBox {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 8px;
-          align-items: center;
-        }
-
-        .uploadArea {
-          margin-top: 24px;
-          min-height: 270px;
-          padding: 30px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          text-align: center;
-          border: 3px dashed #7b858a;
-          border-radius: 18px;
-          background: linear-gradient(#f8f8f8,#e0e0e0);
-        }
-
-        .uploadArea.hasFile {
-          border-style: solid;
-          border-color: #3980a8;
-          background: linear-gradient(#f2fbff,#dceefa);
-        }
-
-        .pdfBadge {
-          min-width: 80px;
-          padding: 9px 14px;
-          color: #fff;
-          font-size: 20px;
-          font-weight: 900;
-          border-radius: 9px;
-          background: #ba3434;
-        }
-
-        .fileButton {
-          position: relative;
-          padding: 11px 18px;
-          cursor: pointer;
-          color: #073b68;
-          font-weight: 700;
-          border: 2px solid #174461;
-          border-radius: 10px;
-          background: #aee1fa;
-        }
-
-        .fileButton input {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          opacity: 0;
-        }
-
-        .selectedFile {
-          padding: 8px 12px;
-          background: #fff;
-          border-radius: 8px;
-        }
-
-        .selectedFile span {
-          margin-left: 10px;
-          color: #657178;
-        }
-
-        .messageBox {
-          margin-top: 17px;
-          padding: 13px 15px;
-          border-radius: 10px;
-          background: #fff;
-          font-weight: 700;
-        }
-
-        .analyzeActions,
-        .bottomSave {
-          margin-top: 20px;
-          display: flex;
-          justify-content: center;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-
-        .analyzeButton,
-        .saveDraftButton {
-          min-height: 56px;
-          padding: 11px 24px;
-          cursor: pointer;
-          color: #073b68;
-          font-family: inherit;
-          font-weight: 800;
-          border: 2px solid #174461;
-          border-radius: 12px;
-          background: linear-gradient(#c9efff,#5eacd8);
-          box-shadow: 0 5px 0 #17415c;
-        }
-
-        .previewHeader {
-          padding: 16px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 20px;
-          background: #fff;
-          border-radius: 13px;
-        }
-
-        .previewHeader > div {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .saveMessageBox {
-          margin: 12px 0 16px;
-          padding: 11px 14px;
-          border: 2px solid #6b7479;
-          border-radius: 10px;
-          background: #ffffff;
-          box-shadow: inset 0 2px 3px rgba(255,255,255,.9), 0 3px 0 rgba(70,80,86,.28);
-          font-weight: 700;
-          white-space: pre-wrap;
-        }
-
-        .previewActions {
-          display: flex !important;
-          flex-direction: row !important;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          gap: 10px !important;
-        }
-
-        .addQuestionButton {
-          min-height: 56px;
-          padding: 11px 24px;
-          cursor: pointer;
-          color: #125a32;
-          font-family: inherit;
-          font-weight: 800;
-          border: 2px solid #277b49;
-          border-radius: 12px;
-          background: linear-gradient(#d8f5e1,#75cf95);
-          box-shadow: 0 5px 0 #277144;
-        }
-
-        .questionsList {
-          margin-top: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .questionCard {
-          padding: 20px;
-          border: 2px solid #59646a;
-          border-radius: 17px;
-          background: linear-gradient(#fafafa,#e3e3e3);
-          box-shadow: 0 5px 0 #666d71;
-        }
-
-        .warningCard {
-          border-color: #bb7b25;
-        }
-
-        .questionTop {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-
-        .questionTools {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          align-items: center;
-          gap: 7px;
-        }
-
-        .toolButton,
-        .duplicateButton,
-        .imageButton {
-          min-height: 34px;
-          padding: 6px 10px;
-          border: 2px solid #626d73;
-          border-radius: 7px;
-          background: linear-gradient(#fff,#cfcfcf);
-          cursor: pointer;
-          font-family: inherit;
-          font-weight: 700;
-        }
-
-        .toolButton {
-          min-width: 38px;
-          font-size: 17px;
-        }
-
-        .toolButton:disabled {
-          opacity: .35;
-          cursor: not-allowed;
-        }
-
-        .duplicateButton {
-          color: #073b68;
-          border-color: #174461;
-          background: linear-gradient(#dff5ff,#91d3f0);
-        }
-
-        .imageButton {
-          position: relative;
-          color: #125a32;
-          border-color: #277b49;
-          background: linear-gradient(#e1f7e7,#9bd9ae);
-        }
-
-        .imageButtonActive {
-          color: #073b68;
-          border-color: #174461;
-          background: linear-gradient(#dff5ff,#91d3f0);
-        }
-
-        .imageButton input,
-        .imageReplaceButton input {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          opacity: 0;
-          pointer-events: none;
-        }
-
-        .questionNumber {
-          padding: 7px 13px;
-          color: #073b68;
-          font-weight: 800;
-          border: 2px solid #174461;
-          border-radius: 9px;
-          background: #9bd8f6;
-        }
-
-        .removeButton {
-          padding: 6px 11px;
-          border: 2px solid #9b2828;
-          border-radius: 7px;
-          background: #ef8d8d;
-          cursor: pointer;
-          font-family: inherit;
-          font-weight: 700;
-        }
-
-        .warningBox {
-          margin-bottom: 12px;
-          padding: 10px 12px;
-          color: #7b4b09;
-          background: #fff2d8;
-          border: 1px solid #c58a33;
-          border-radius: 8px;
-          font-weight: 700;
-        }
-
-        .questionTextField {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-          font-weight: 700;
-        }
-
-        .questionTextField textarea {
-          min-height: 150px;
-          padding: 18px 20px;
-          border: 2px solid #737d82;
-          border-radius: 10px;
-          font-family: inherit;
-          font-size: 21px;
-          line-height: 1.6;
-          text-align: justify;
-          text-justify: inter-word;
-          resize: vertical;
-        }
-
-        .questionImagePreview {
-          margin: 16px 0;
-          padding: 12px;
-          text-align: center;
-          border: 2px solid #365b70;
-          border-radius: 13px;
-          background: #fff;
-        }
-
-        .imageLabel {
-          width: fit-content;
-          margin: 0 auto 10px;
-          padding: 5px 10px;
-          color: #073b68;
-          font-size: 12px;
-          font-weight: 700;
-          border-radius: 999px;
-          background: #d8effc;
-        }
-
-        .questionImagePreview img {
-          display: block;
-          width: 100%;
-          max-width: 980px;
-          max-height: 620px;
-          margin: auto;
-          object-fit: contain;
-        }
-
-        .imageActions {
-          margin-top: 12px;
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          gap: 9px;
-        }
-
-        .imageReplaceButton,
-        .imageRemoveButton {
-          position: relative;
-          min-height: 38px;
-          padding: 8px 13px;
-          border-radius: 8px;
-          cursor: pointer;
-          font-family: inherit;
-          font-weight: 700;
-        }
-
-        .imageReplaceButton {
-          color: #073b68;
-          border: 2px solid #174461;
-          background: #bfe8fb;
-        }
-
-        .imageRemoveButton {
-          color: #7b1515;
-          border: 2px solid #9b2828;
-          background: #ffdede;
-        }
-
-        .visualEditor {
-          margin: 18px 0 22px;
-          overflow: hidden;
-          border: 2px solid #365b70;
-          border-radius: 14px;
-          background: #f8fbfc;
-          box-shadow: 0 3px 0 rgba(39,55,64,.18);
-        }
-
-        .visualEditor button,
-        .visualEditor label,
-        .visualEditor input {
-          font-family: "Bell MT", Georgia, serif;
-        }
-
-        .visualToolbar {
-          padding: 11px 12px;
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 10px;
-          border-bottom: 1px solid #9eabb2;
-          background: linear-gradient(#f8f8f8,#dedede);
-        }
-
-        .visualToolbar > strong {
-          color: #073b68;
-          margin-right: 4px;
-        }
-
-        .visualToolbarButtons {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 7px;
-        }
-
-        .visualTool {
-          position: relative;
-          min-width: 76px;
-          min-height: 38px;
-          padding: 7px 12px;
-          border: 1px solid #68747b;
-          border-radius: 7px;
-          background: linear-gradient(#ffffff,#d7d7d7);
-          box-shadow: inset 0 1px 0 #fff, 0 2px 0 rgba(0,0,0,.12);
-          cursor: pointer;
-          font-family: inherit;
-          font-size: 14px;
-          font-weight: 700;
-        }
-
-        .visualTool:hover {
-          filter: brightness(.98);
-          transform: translateY(-1px);
-        }
-
-        .imageVisualTool {
-          color: #125a32;
-          border-color: #277b49;
-          background: linear-gradient(#e9faee,#aee0bd);
-        }
-
-        .visualTool input {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          opacity: 0;
-          pointer-events: none;
-        }
-
-        .clipboardHint {
-          margin-left: auto;
-          color: #5c686f;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .shapeCanvasScroll {
-          width: 100%;
-          overflow: auto;
-          padding: 12px;
-          background:
-            linear-gradient(90deg, rgba(50,70,80,.05) 1px, transparent 1px),
-            linear-gradient(rgba(50,70,80,.05) 1px, transparent 1px),
-            #eef2f4;
-          background-size: 20px 20px;
-        }
-
-        .shapeCanvas {
-          position: relative;
-          width: 900px;
-          height: 500px;
-          margin: 0 auto;
-          overflow: hidden;
-          border: 2px solid #8d999f;
-          border-radius: 10px;
-          background: #fff;
-          box-shadow: inset 0 0 0 1px rgba(255,255,255,.9);
-          touch-action: none;
-          user-select: none;
-        }
-
-        .activeCanvas {
-          outline: 3px solid rgba(22,143,201,.25);
-          outline-offset: 2px;
-        }
-
-        .emptyCanvas {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 30px;
-          color: #7b878e;
-          font-size: 15px;
-          text-align: center;
-          pointer-events: none;
-        }
-
-        .canvasShape {
-          position: absolute;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-sizing: border-box;
-          cursor: move;
-          touch-action: none;
-        }
-
-        .selectedCanvasShape {
-          outline: 2px solid #168fc9;
-          outline-offset: 2px;
-        }
-
-        .shapeText {
-          width: 100%;
-          padding: 8px;
-          text-align: center;
-          overflow: hidden;
-          overflow-wrap: anywhere;
-          pointer-events: none;
-        }
-
-        .shapeDeleteX {
-          position: absolute;
-          top: -14px;
-          right: -14px;
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          color: #ffffff;
-          background: #df3434;
-          box-shadow: 0 2px 5px rgba(0,0,0,.28);
-          cursor: pointer;
-          font-family: Arial, sans-serif;
-          font-size: 20px;
-          font-weight: 900;
-          line-height: 1;
-          opacity: 0;
-          transform: scale(.85);
-          transition: .14s ease;
-          z-index: 1005;
-        }
-
-        .canvasShape:hover > .shapeDeleteX,
-        .selectedCanvasShape > .shapeDeleteX {
-          opacity: 1;
-          transform: scale(1);
-        }
-
-        .matchingItem {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          pointer-events: none;
-        }
-
-        .matchingTextBox {
-          position: absolute;
-          left: 40px;
-          right: 0;
-          top: 0;
-          bottom: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 10px 18px 10px 30px;
-          border: 2px solid #111;
-          border-radius: 4px;
-          background: #ffffff;
-          overflow: hidden;
-          text-align: center;
-          box-shadow: none;
-        }
-
-        .matchingRight .matchingTextBox {
-          justify-content: flex-start;
-          text-align: left;
-          padding-left: 34px;
-          line-height: 1.28;
-        }
-
-        .matchingKeyCircle {
-          position: relative;
-          z-index: 3;
-          width: 60px;
-          height: 60px;
-          flex: 0 0 60px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px solid #111;
-          border-radius: 50%;
-          background: #ffffff;
-          font-size: 22px;
-          font-weight: 400;
-        }
-
-        .matchingLeft .matchingKeyCircle {
-          margin-left: 0;
-        }
-
-        .matchingRight .matchingKeyCircle {
-          width: 54px;
-          height: 54px;
-          flex-basis: 54px;
-          font-size: 20px;
-        }
-
-        .matchingTool {
-          color: #6b3e00;
-          border-color: #a06616;
-          background: linear-gradient(#fff4d7,#f1c66b);
-        }
-
-        .matchingAddTool {
-          color: #073b68;
-          border-color: #174461;
-          background: linear-gradient(#e3f6ff,#9bd9f2);
-        }
-
-        .clearAllShapesTool {
-          color: #821818;
-          border-color: #a32828;
-          background: linear-gradient(#ffe6e6,#f39a9a);
-        }
-
-        .shapeColorControl {
-          min-width: 86px;
-          display: flex !important;
-          align-items: center;
-          justify-content: space-between;
-          gap: 7px;
-          padding: 4px 7px;
-          border: 1px solid #8c989e;
-          border-radius: 6px;
-          background: #fff;
-        }
-
-        .shapeColorControl input[type="color"] {
-          width: 34px;
-          height: 28px;
-          padding: 1px;
-          border: 1px solid #8c989e;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-
-        .resizeHandle {
-          position: absolute;
-          width: 13px;
-          height: 13px;
-          border: 2px solid #07517e;
-          background: #fff;
-          border-radius: 2px;
-          z-index: 999;
-        }
-
-        .handle-nw { left: -8px; top: -8px; cursor: nwse-resize; }
-        .handle-ne { right: -8px; top: -8px; cursor: nesw-resize; }
-        .handle-sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
-        .handle-se { right: -8px; bottom: -8px; cursor: nwse-resize; }
-
-        .selectedShapePanel {
-          padding: 10px 12px;
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 8px;
-          border-top: 1px solid #9eabb2;
-          background: #f7f9fa;
-        }
-
-        .selectedShapePanel > strong {
-          color: #073b68;
-          margin-right: 4px;
-        }
-
-        .selectedShapePanel label {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-weight: 700;
-        }
-
-        .selectedShapePanel input {
-          width: 100px;
-          min-height: 34px;
-          padding: 5px 7px;
-          border: 1px solid #8c989e;
-          border-radius: 6px;
-          font-family: inherit;
-        }
-
-        .selectedShapePanel > input {
-          width: min(260px, 100%);
-        }
-
-        .selectedShapePanel button {
-          min-height: 34px;
-          padding: 5px 10px;
-          border: 1px solid #68747b;
-          border-radius: 6px;
-          background: linear-gradient(#fff,#d9d9d9);
-          cursor: pointer;
-          font-family: inherit;
-          font-weight: 700;
-        }
-
-        .optionsList {
-          margin-top: 15px;
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
-
-        .optionRow {
-          display: grid;
-          grid-template-columns: 42px 34px minmax(0,1fr) auto;
-          align-items: center;
-          gap: 8px;
-          padding: 9px;
-          border: 1px solid #8d999f;
-          border-radius: 9px;
-          background: #f5f5f5;
-        }
-
-        .correctOption {
-          border: 2px solid #348255;
-          background: #e7f7ed;
-        }
-
-        .correctSelector {
-          width: 42px;
-          height: 42px;
-          cursor: pointer;
-          border: 2px solid #69747a;
-          border-radius: 50%;
-          background: #fff;
-          font-weight: 900;
-        }
-
-        .correctOption .correctSelector {
-          color: #fff;
-          background: #3d9b64;
-          font-size: 20px;
-        }
-
-        .optionLetter {
-          font-size: 21px;
-          font-weight: 800;
-        }
-
-        .optionRow textarea {
-          width: 100%;
-          min-height: 72px;
-          padding: 13px 15px;
-          border: 1px solid #8d999f;
-          border-radius: 8px;
-          font-family: inherit;
-          font-size: 19px;
-          line-height: 1.5;
-          text-align: justify;
-          text-justify: inter-word;
-          resize: vertical;
-        }
-
-        .correctBadge {
-          padding: 5px 8px;
-          color: #17623a;
-          font-size: 10px;
-          font-weight: 900;
-          background: #ccebd7;
-          border-radius: 999px;
-        }
-
-
-
-        .categoryField select {
-          width: 100%;
-          min-height: 47px;
-          padding: 8px 12px;
-          border: 2px solid #65747d;
-          border-radius: 10px;
-          color: #123548;
-          background:
-            linear-gradient(
-              180deg,
-              #ffffff 0%,
-              #e5ecef 100%
-            );
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.95),
-            0 3px 0 #68757c;
-          font-family: inherit;
-          font-size: 15px;
-          font-weight: 800;
-          outline: none;
-          cursor: pointer;
-        }
-
-        .categoryField select:focus {
-          border-color: #168fc8;
-          box-shadow:
-            0 0 0 3px rgba(22,143,200,.15),
-            0 3px 0 #477a92;
-        }
-
-        .customCategoryField input {
-          border-color: #b98729 !important;
-          background:
-            linear-gradient(
-              180deg,
-              #fffef8 0%,
-              #fff0c0 100%
-            ) !important;
-        }
-
-        .selectedTypeBanner {
-          min-height: 72px;
-          padding: 10px 14px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 4px;
-          border: 2px solid #174d6d;
-          border-radius: 11px;
-          color: #073b68;
-          background:
-            linear-gradient(
-              180deg,
-              #dff8ff 0%,
-              #83cae9 100%
-            );
-          box-shadow:
-            inset 0 3px 3px rgba(255,255,255,.9),
-            0 4px 0 #174760;
-        }
-
-        .selectedTypeBanner span {
-          font-size: 11px;
-          font-weight: 900;
-          letter-spacing: .8px;
-          opacity: .76;
-        }
-
-        .selectedTypeBanner strong {
-          font-size: 16px;
-          line-height: 1.15;
-        }
-
-        .metaGrid input,
-        .metaGrid textarea,
-        .attemptBox input,
-        .descriptionField textarea {
-          border: 2px solid #69777f !important;
-          background: linear-gradient(#ffffff,#f2f4f5);
-          box-shadow:
-            inset 0 2px 4px rgba(0,0,0,.08),
-            0 3px 0 rgba(37,48,55,.55);
-        }
-
-        .uploadBox,
-        .summaryBox,
-        .questionCard,
-        .visualEditor {
-          box-shadow:
-            0 6px 0 rgba(43,54,60,.74),
-            0 11px 20px rgba(0,0,0,.13),
-            inset 0 2px 0 rgba(255,255,255,.72);
-        }
-
-        .uploadBox {
-          background: linear-gradient(180deg,#f2fbff 0%,#dceff9 100%) !important;
-        }
-
-        .questionCard {
-          background: linear-gradient(180deg,#ffffff 0%,#f1f3f4 100%) !important;
-        }
-
-        .previewBox .floatingTitle {
-          min-width: 265px;
-        }
-
-        button:not(:disabled) {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        @media(max-width:600px) {
-          .header {
-            width: calc(100% - 8px);
-            margin-top: 5px;
-            padding: 10px;
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .headerActions,
-          .metaGrid {
-            display: grid;
-            grid-template-columns: 1fr;
-          }
-
-          .homeButton,
-          .grayButton,
-          .blueButton {
-            width: 100%;
-          }
-
-          .mainBox,
-          .previewBox {
-            width: calc(100% - 8px);
-            margin-top: 50px;
-            padding: 48px 8px 18px;
-          }
-
-          .previewHeader {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .previewActions {
-            width: 100%;
-            display: grid !important;
-            grid-template-columns: 1fr !important;
-          }
-
-          .questionTop {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .questionTools {
-            width: 100%;
-            justify-content: flex-start;
-          }
-
-          .questionTools > * {
-            flex: 1 1 auto;
-            text-align: center;
-          }
-
-          .attemptBox {
-            grid-template-columns: 1fr;
-          }
-
-          .questionTextField textarea {
-            min-height: 130px;
-            padding: 14px;
-            font-size: 17px;
-            line-height: 1.55;
-          }
-
-          .optionRow {
-            grid-template-columns: 36px 28px 1fr;
-          }
-
-          .correctSelector {
-            width: 34px;
-            height: 34px;
-          }
-
-          .optionLetter {
-            font-size: 18px;
-          }
-
-          .optionRow textarea {
-            min-height: 64px;
-            padding: 11px 12px;
-            font-size: 16px;
-            line-height: 1.45;
-          }
-
-          .questionImagePreview img {
-            max-height: 420px;
-          }
-
-          .visualToolbar {
-            align-items: stretch;
-          }
-
-          .visualToolbarButtons {
-            width: 100%;
-          }
-
-          .visualTool {
-            flex: 1 1 auto;
-            text-align: center;
-          }
-
-          .clipboardHint {
-            width: 100%;
-            margin-left: 0;
-          }
-
-          .shapeCanvasScroll {
-            padding: 7px;
-          }
-
-          .shapeCanvas {
-            width: 760px;
-            height: 460px;
-          }
-
-          .selectedShapePanel {
-            align-items: stretch;
-          }
-
-          .selectedShapePanel button,
-          .selectedShapePanel label {
-            flex: 1 1 auto;
-          }
-
-          .correctBadge {
-            grid-column: 3;
-          }
-        }
-        .topicsBox {
-          position: relative;
-          width: min(100%, 1180px);
-          margin: 34px auto 30px;
-          padding: 34px 22px 24px;
-          border: 2px solid #4b5961;
-          border-radius: 18px;
-          background:
-            linear-gradient(
-              180deg,
-              #e5e8ea 0%,
-              #cbd0d3 100%
-            );
-          box-shadow:
-            inset 0 2px 0 rgba(255,255,255,.9),
-            0 7px 0 #68747a,
-            0 12px 20px rgba(0,0,0,.14);
-        }
-
-        .topicsFloatingTitle {
-          position: absolute;
-          top: -22px;
-          left: 50%;
-          transform: translateX(-50%);
-          min-width: 190px;
-          padding: 9px 22px;
-          border: 2px solid #4d6572;
-          border-radius: 11px;
-          background:
-            linear-gradient(
-              180deg,
-              #f3f6f7 0%,
-              #c7d2d7 100%
-            );
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 5px 0 #63737b;
-          color: #1b303b;
-          font-size: 20px;
-          font-weight: 900;
-          text-align: center;
-        }
-
-        .topicsHeader {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-          margin-bottom: 16px;
-          color: #1b2b34;
-        }
-
-        .topicsHeader strong {
-          font-size: 20px;
-        }
-
-        .topicsHeader span {
-          padding: 7px 11px;
-          border-radius: 8px;
-          background: #eef2f4;
-          font-size: 13px;
-          font-weight: 800;
-        }
-
-        .topicsList {
-          display: grid;
-          gap: 11px;
-        }
-
-        .topicRow {
-          min-height: 58px;
-          display: grid;
-          grid-template-columns: 42px minmax(0,1fr) auto;
-          align-items: center;
-          gap: 13px;
-          padding: 9px 14px;
-          border: 2px solid #526a77;
-          border-radius: 11px;
-          background:
-            linear-gradient(
-              180deg,
-              #f8f9fa 0%,
-              #e2e7e9 100%
-            );
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 4px 0 #75828a;
-          color: #172a34;
-        }
-
-        .topicNumber {
-          width: 34px;
-          height: 34px;
-          display: grid;
-          place-items: center;
-          border-radius: 8px;
-          background: #d1dce1;
-          font-weight: 900;
-        }
-
-        .topicName {
-          font-size: 16px;
-          font-weight: 900;
-          line-height: 1.25;
-        }
-
-        .topicTotal {
-          white-space: nowrap;
-          padding: 7px 10px;
-          border-radius: 8px;
-          background: #cbd8de;
-          font-size: 13px;
-          font-weight: 900;
-        }
-
-        @media (max-width: 640px) {
-          .topicsBox {
-            padding: 32px 13px 18px;
-          }
-
-          .topicsHeader {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .topicRow {
-            grid-template-columns: 36px minmax(0,1fr);
-          }
-
-          .topicTotal {
-            grid-column: 2;
-            width: fit-content;
-          }
-
-          .topicName {
-            font-size: 14px;
-          }
-        }
-
-        .sharedTopicNote {
-          display: block;
-          margin-top: 4px;
-          color: #6a747a;
-          font-size: 11px;
-          font-weight: 700;
-          line-height: 1.25;
-        }
-
-        .specialDivider {
-          margin: 24px 0 13px;
-          padding: 10px 14px;
-          border: 2px solid #536773;
-          border-radius: 10px;
-          background:
-            linear-gradient(
-              180deg,
-              #dbe5e9 0%,
-              #c2d0d6 100%
-            );
-          box-shadow:
-            inset 0 2px 0 rgba(255,255,255,.85),
-            0 4px 0 #74828a;
-          color: #203741;
-          font-size: 17px;
-          font-weight: 900;
-          text-align: center;
-        }
-
-        .specialTopicRow {
-          border-color: #405d6d;
-        }
-
-        .specialTopicNumber {
-          background: #bfd2dc;
-          color: #183746;
-        }
-
-
-      `}
-</style>
-    </main>
-  );
 }
