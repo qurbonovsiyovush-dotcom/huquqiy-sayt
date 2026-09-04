@@ -85,6 +85,10 @@ type ImportedTopic = {
   title: string;
   questionCount?: number;
   questions: ImportedQuestion[];
+  lessonNumber?: number;
+  sharedSource?: boolean;
+  sourceSectionTitle?: string;
+  kind?: "lesson" | "control" | "glossary";
 };
 
 
@@ -834,6 +838,8 @@ export default function ImportPdfTestPage() {
     useState<ImportedQuestion[]>([]);
   const [importedTopics, setImportedTopics] =
     useState<ImportedTopic[]>([]);
+  const [specialSections, setSpecialSections] =
+    useState<ImportedTopic[]>([]);
 
 
   /*
@@ -936,6 +942,7 @@ export default function ImportPdfTestPage() {
     setMessage("");
     setQuestions([]);
     setImportedTopics([]);
+    setSpecialSections([]);
     setQuestionDrafts({});
 
     if (!file) {
@@ -998,6 +1005,7 @@ export default function ImportPdfTestPage() {
       setMessage("");
       setQuestions([]);
       setImportedTopics([]);
+      setSpecialSections([]);
       setQuestionDrafts({});
 
       const formData =
@@ -1116,15 +1124,28 @@ export default function ImportPdfTestPage() {
         setImportedTopics(
           data.topics as ImportedTopic[]
         );
+
+        setSpecialSections(
+          Array.isArray(
+            data?.specialSections
+          )
+            ? (data.specialSections as ImportedTopic[])
+            : []
+        );
       } else {
         setImportedTopics([]);
+        setSpecialSections([]);
       }
 
       setMessage(
         testType === "thematic" &&
         Array.isArray(data?.topics) &&
         data.topics.length > 0
-          ? `PDFdan ${imported.length} ta savol va ${data.topics.length} ta mavzu ajratildi.`
+          ? `PDFdan ${imported.length} ta savol, ${data.topics.length} ta dars va ${
+              Array.isArray(data?.specialSections)
+                ? data.specialSections.length
+                : 0
+            } ta qo‘shimcha bo‘lim ajratildi.`
           : `PDFdan ${imported.length} ta savol ajratildi.`
       );
     } catch (error) {
@@ -3427,7 +3448,7 @@ export default function ImportPdfTestPage() {
 
             <div className="topicsHeader">
               <strong>
-                {importedTopics.length} ta mavzu aniqlandi
+                33 ta dars aniqlandi
               </strong>
 
               <span>
@@ -3443,11 +3464,21 @@ export default function ImportPdfTestPage() {
                     className="topicRow"
                   >
                     <div className="topicNumber">
-                      {index + 1}
+                      {topic.lessonNumber ??
+                        index + 1}
                     </div>
 
                     <div className="topicName">
-                      {topic.title}
+                      <div>
+                        {topic.title}
+                      </div>
+
+                      {topic.sharedSource && (
+                        <small className="sharedTopicNote">
+                          PDFda bu dars qo‘shni dars bilan
+                          bitta umumiy test blokida berilgan.
+                        </small>
+                      )}
                     </div>
 
                     <div className="topicTotal">
@@ -3460,6 +3491,43 @@ export default function ImportPdfTestPage() {
                 )
               )}
             </div>
+
+            {specialSections.length > 0 && (
+              <>
+                <div className="specialDivider">
+                  Qo‘shimcha bo‘limlar
+                </div>
+
+                <div className="topicsList">
+                  {specialSections.map(
+                    (section, index) => (
+                      <div
+                        key={section.id}
+                        className="topicRow specialTopicRow"
+                      >
+                        <div className="topicNumber specialTopicNumber">
+                          {section.kind ===
+                          "control"
+                            ? "N"
+                            : "L"}
+                        </div>
+
+                        <div className="topicName">
+                          {section.title}
+                        </div>
+
+                        <div className="topicTotal">
+                          {section.questions?.length ??
+                            section.questionCount ??
+                            0}{" "}
+                          ta savol
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </>
+            )}
           </section>
         )}
 
@@ -5124,6 +5192,45 @@ export default function ImportPdfTestPage() {
             font-size: 14px;
           }
         }
+
+        .sharedTopicNote {
+          display: block;
+          margin-top: 4px;
+          color: #6a747a;
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.25;
+        }
+
+        .specialDivider {
+          margin: 24px 0 13px;
+          padding: 10px 14px;
+          border: 2px solid #536773;
+          border-radius: 10px;
+          background:
+            linear-gradient(
+              180deg,
+              #dbe5e9 0%,
+              #c2d0d6 100%
+            );
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.85),
+            0 4px 0 #74828a;
+          color: #203741;
+          font-size: 17px;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .specialTopicRow {
+          border-color: #405d6d;
+        }
+
+        .specialTopicNumber {
+          background: #bfd2dc;
+          color: #183746;
+        }
+
 
       `}
 </style>
