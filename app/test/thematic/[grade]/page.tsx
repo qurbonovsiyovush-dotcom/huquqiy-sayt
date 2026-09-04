@@ -62,7 +62,7 @@ function lessonNumberFromTitle(
   if (
     !Number.isInteger(value) ||
     value < 1 ||
-    value > 33
+    value > 200
   ) {
     return null;
   }
@@ -257,28 +257,22 @@ export default function ThematicGradePage() {
       }
 
       return Array.from(
-        { length: 33 },
-        (_, index) => {
-          const lessonNumber =
-            index + 1;
-
-          const test =
-            byLesson.get(
-              lessonNumber
-            ) || null;
-
-          return {
+        byLesson.entries()
+      )
+        .sort(
+          ([a], [b]) => a - b
+        )
+        .map(
+          ([lessonNumber, test]) => ({
             lessonNumber,
-            title: test
-              ? lessonLabelFromTitle(
-                  test.title,
-                  lessonNumber
-                )
-              : `${lessonNumber}-DARS`,
+            title:
+              lessonLabelFromTitle(
+                test.title,
+                lessonNumber
+              ),
             test,
-          };
-        }
-      );
+          })
+        );
     }, [tests]);
 
   const controlTest =
@@ -363,6 +357,14 @@ export default function ThematicGradePage() {
           !loading &&
           !error && (
             <>
+              {lessonRows.length === 0 &&
+                !controlTest &&
+                !glossaryTest && (
+                  <div className="statusBox">
+                    Bu sinf bo‘yicha hozircha e’lon qilingan mavzulashtirilgan test yo‘q.
+                  </div>
+                )}
+
               <section className="lessonList">
                 {lessonRows.map(
                   (row) => {
@@ -423,21 +425,17 @@ export default function ThematicGradePage() {
                 )}
               </section>
 
+              {(controlTest ||
+                glossaryTest) && (
               <section className="extraSection">
                 <div className="extraTitle">
                   Qo‘shimcha bo‘limlar
                 </div>
 
+                {controlTest && (
                 <button
                   type="button"
-                  className={`lessonButton extraButton ${
-                    controlTest
-                      ? "available"
-                      : "disabled"
-                  }`}
-                  disabled={
-                    !controlTest
-                  }
+                  className="lessonButton extraButton available"
                   onClick={() =>
                     openTest(
                       controlTest
@@ -468,17 +466,12 @@ export default function ThematicGradePage() {
                       : "—"}
                   </span>
                 </button>
+                )}
 
+                {glossaryTest && (
                 <button
                   type="button"
-                  className={`lessonButton extraButton ${
-                    glossaryTest
-                      ? "available"
-                      : "disabled"
-                  }`}
-                  disabled={
-                    !glossaryTest
-                  }
+                  className="lessonButton extraButton available"
                   onClick={() =>
                     openTest(
                       glossaryTest
@@ -511,7 +504,9 @@ export default function ThematicGradePage() {
                       : "—"}
                   </span>
                 </button>
+                )}
               </section>
+              )}
             </>
           )}
       </div>
@@ -964,4 +959,3 @@ export default function ThematicGradePage() {
     </main>
   );
 }
-
