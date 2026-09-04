@@ -1,5 +1,5 @@
 /*
-  MAVZULASHTIRILGAN TESTLAR UCHUN MAXSUS PDF IMPORTER
+  MAVZULASHTIRILGAN TESTLAR UCHUN MAXSUS PDF IMPORTER — EDITABLE SHAPES / NO CROP
 
   Joylashuvi:
   app/api/tests/import-pdf-thematic/route.ts
@@ -65,11 +65,41 @@ type PdfCrop = {
   height: number;
 };
 
+type ShapeType =
+  | "rectangle"
+  | "roundedRectangle"
+  | "circle"
+  | "ellipse"
+  | "text"
+  | "matchingItem";
+
+type EditorShape = {
+  id: string;
+  type: ShapeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  textColor?: string;
+  fontSize?: number;
+  borderWidth?: number;
+  borderRadius?: number;
+  opacity?: number;
+  zIndex?: number;
+  matchingSide?: "left" | "right";
+  matchingKey?: string;
+};
+
 type ImportedQuestion = {
   id: string;
   number: number;
   questionText: string;
   options: ImportedOption[];
+  shapes?: EditorShape[];
+  // Eski frontend bilan moslik uchun tur saqlanadi, ammo endi crop ishlatilmaydi.
   pdfCrop?: PdfCrop;
   warning?: string;
 };
@@ -2159,13 +2189,20 @@ function looksLikeVisualQuestion(value: string) {
   const text = normalizeOneLine(value).toLowerCase();
 
   return (
-    /\bjadval(?:da|ni|dan)?\b/.test(text) ||
-    /\bdiagramma(?:si|ga|ni|dan)?\b/.test(text) ||
+    /\bjadval(?:da|ni|dan|dagi)?\b/.test(text) ||
+    /\bdiagramma(?:si|ga|ni|dan|dagi)?\b/.test(text) ||
     /\beyler[\s\-–—]*venn\b/.test(text) ||
+    /\bvenn\b/.test(text) ||
+    /\bsxema(?:da|ni|dagi)?\b/.test(text) ||
+    /\bchizma(?:da|ni|dagi)?\b/.test(text) ||
+    /\brasm(?:da|ni|dagi)?\b/.test(text) ||
+    /\bmoslashtir(?:ing|ish|ilgan|uvchi)?\b/.test(text) ||
+    /\bmoslik\b/.test(text) ||
     /\bushbu\s+belgi\b/.test(text) ||
     /\bbelgi\s+qanday\s+ma[’'`ʻʼ]?noni\b/.test(text) ||
     /\byuridik\s+atamalar\b/.test(text) ||
-    /\batamalar\s+va\s+ularning\s+izohi\b/.test(text)
+    /\batamalar\s+va\s+ularning\s+izohi\b/.test(text) ||
+    /\bquyidagi\s+(?:shakl|tasvir|ko[‘’ʻʼ`']rinish)\b/.test(text)
   );
 }
 
@@ -2618,9 +2655,200 @@ function parseQuestion(
 }
 
 /* =========================================================
-   IMAGE / DIAGRAM
-   Only if there is a REAL large gap between question text
-   and first A/B/C/D line on the SAME page/column.
+   EDITABLE VISUAL SHAPES — NO PDF CROP / NO PNG
+
+   Maqsad:
+   - PDFdagi jadval / Venn / moslashtirish qismini rasmga aylantirmaslik;
+   - server text-layer koordinatalaridan saytning tahrirlanadigan
+     EditorShape[] obyektlarini yaratish;
+   - Neon'da shapes_json sifatida saqlanishi uchun frontendga shapes qaytarish.
+========================================================= */
+
+function buildEditableVisualShapes(
+  pageInfo: PageInfo,
+  firstOptionLine: TextLine | null,
+  promptEndLine: TextLine | null,
+  fullQuestionText: string
+): EditorShape[] {
+  if (!firstOptionLine || !promptEndLine) {
+    return [];
+  }
+
+  if (firstOptionLine.pageNumber !== promptEndLine.pageNumber) {
+    return [];
+  }
+
+  const targetColumn: "left" | "right" | "full" =
+    promptEndLine.column !== "full"
+      ? promptEndLine.column
+      : firstOptionLine.column !== "full"
+      ? firstOptionLine.column
+      : "full";
+
+  const middle = pageInfo.width / 2;
+  const separatorGap = Math.max(10, pageInfo.width * 0.018);
+
+  let hardLeft = pageInfo.width * 0.015;
+  let hardRight = pageInfo.width * 0.985;
+
+  if (targetColumn === "left") {
+    hardRight = middle - separatorGap;
+  } else if (targetColumn === "right") {
+    hardLeft = middle + separatorGap;
+  }
+
+  const topY =
+    promptEndLine.y -
+    Math.max(4, promptEndLine.height * 0.2);
+
+  const bottomY =
+    firstOptionLine.y +
+    Math.max(5, firstOptionLine.height * 0.45);
+
+  if (topY - bottomY < 18) {
+    return [];
+  }
+
+  const visualLines = (pageInfo.lines || [])
+    .filter((line) => {
+      if (line.pageNumber !== promptEndLine.pageNumber) {
+        return false;
+      }
+
+      if (targetColumn !== "full" && line.column !== targetColumn) {
+        return false;
+      }
+
+      if (optionLabelFromStart(line.text)) {
+        return false;
+      }
+
+      const lineTop = line.y + line.height * 0.8;
+      const lineBottom = line.y - line.height * 0.35;
+
+      return lineTop < topY && lineBottom > bottomY;
+    })
+    .filter((line) => !isPdfDecorationLine(line.text));
+
+  if (visualLines.length === 0) {
+    return [];
+  }
+
+  const editorLeft = 55;
+  const editorTop = 40;
+  const editorWidth = 790;
+  const editorHeight = 360;
+
+  const sourceWidth = Math.max(1, hardRight - hardLeft);
+  const sourceHeight = Math.max(1, topY - bottomY);
+
+  const xScale = editorWidth / sourceWidth;
+  const yScale = editorHeight / sourceHeight;
+
+  const toEditorX = (x: number) =>
+    editorLeft + (x - hardLeft) * xScale;
+
+  // PDF y pastdan yuqoriga; editor y yuqoridan pastga.
+  const toEditorY = (y: number) =>
+    editorTop + (topY - y) * yScale;
+
+  const text = normalizeOneLine(fullQuestionText).toLowerCase();
+  const isVenn = /\b(?:eyler[\s\-–—]*)?venn\b/.test(text);
+  const isTable =
+    /\bjadval/.test(text) ||
+    /\bmoslashtir/.test(text) ||
+    /\byuridik\s+atamalar\b/.test(text) ||
+    /\batamalar\s+va\s+ularning\s+izohi\b/.test(text);
+
+  const shapes: EditorShape[] = [];
+
+  if (isVenn) {
+    shapes.push(
+      {
+        id: makeId("venn-left"),
+        type: "ellipse",
+        x: 205,
+        y: 75,
+        width: 300,
+        height: 220,
+        backgroundColor: "rgba(255,255,255,0)",
+        borderColor: "#374151",
+        borderWidth: 3,
+        opacity: 1,
+        zIndex: 1,
+      },
+      {
+        id: makeId("venn-right"),
+        type: "ellipse",
+        x: 395,
+        y: 75,
+        width: 300,
+        height: 220,
+        backgroundColor: "rgba(255,255,255,0)",
+        borderColor: "#374151",
+        borderWidth: 3,
+        opacity: 1,
+        zIndex: 1,
+      }
+    );
+  }
+
+  visualLines.forEach((line, index) => {
+    const clean = normalizeOneLine(line.text);
+    if (!clean) return;
+
+    const x = Math.max(15, Math.min(820, toEditorX(line.x)));
+    const y = Math.max(15, Math.min(365, toEditorY(line.y + line.height * 0.55)));
+    const width = Math.max(70, Math.min(760, line.width * xScale + 28));
+    const height = Math.max(34, Math.min(72, line.height * yScale + 18));
+
+    if (isTable && !isVenn) {
+      shapes.push({
+        id: makeId(`table-cell-${index + 1}`),
+        type: "roundedRectangle",
+        x,
+        y,
+        width,
+        height,
+        text: clean,
+        backgroundColor: "#ffffff",
+        borderColor: "#374151",
+        textColor: "#111827",
+        fontSize: 16,
+        borderWidth: 2,
+        borderRadius: 4,
+        opacity: 1,
+        zIndex: 3,
+      });
+      return;
+    }
+
+    shapes.push({
+      id: makeId(`visual-text-${index + 1}`),
+      type: "text",
+      x,
+      y,
+      width,
+      height,
+      text: clean,
+      backgroundColor: "rgba(255,255,255,0)",
+      borderColor: "transparent",
+      textColor: "#111827",
+      fontSize: 17,
+      borderWidth: 0,
+      borderRadius: 0,
+      opacity: 1,
+      zIndex: 4,
+    });
+  });
+
+  return shapes;
+}
+
+/* =========================================================
+   LEGACY CROP HELPER
+   Hozir import oqimida chaqirilmaydi. Eski kod bilan moslik uchun
+   qoldirilgan, ammo PDF -> PNG jarayoni ishlatilmaydi.
 ========================================================= */
 
 function getQuestionPdfCrop(
@@ -3244,8 +3472,7 @@ export async function POST(
           pageInfos
         );
 
-      let pdfCrop:
-        PdfCrop | undefined;
+      let shapes: EditorShape[] = [];
 
       if (
         parsed.shouldRenderImage &&
@@ -3260,12 +3487,12 @@ export async function POST(
           );
 
         if (pageInfo) {
-          pdfCrop =
-            getQuestionPdfCrop(
-              pageInfo,
-              parsed.firstOptionLine,
-              parsed.promptEndLine
-            );
+          shapes = buildEditableVisualShapes(
+            pageInfo,
+            parsed.firstOptionLine,
+            parsed.promptEndLine,
+            parsed.fullQuestionText
+          );
         }
       }
 
@@ -3275,11 +3502,15 @@ export async function POST(
         ),
         number:
           parsed.number,
+        // Shape yaratilsa prompt matni alohida qoladi. Shape chiqmasa
+        // hech qanday matn yo‘qolmasligi uchun to‘liq savolni saqlaymiz.
         questionText:
-          parsed.questionText,
+          shapes.length > 0
+            ? parsed.questionText
+            : parsed.fullQuestionText,
         options:
           parsed.options,
-        pdfCrop,
+        shapes,
         warning:
           parsed.warning,
       });
@@ -3472,20 +3703,21 @@ export async function POST(
       answerKeyCount:
         answerKey.length,
 
-      // DIAGNOSTIKA: thematic parser vizual savollarni nechta aniqlaganini ko‘rsatadi.
-      // Bu qiymatlar faqat tekshiruv uchun; savollarni saqlash/parslash mantiqiga tegmaydi.
-      visualQuestionCount:
+      editableShapeQuestionCount:
         finalQuestions.filter(
-          (question) => Boolean(question.pdfCrop)
+          (question) =>
+            Array.isArray(question.shapes) &&
+            question.shapes.length > 0
         ).length,
-      pdfCropCount:
-        finalQuestions.filter(
-          (question) => Boolean(question.pdfCrop)
-        ).length,
-      pdfCropQuestionNumbers:
-        finalQuestions
-          .filter((question) => Boolean(question.pdfCrop))
-          .map((question) => question.number),
+      editableShapeCount:
+        finalQuestions.reduce(
+          (sum, question) =>
+            sum +
+            (Array.isArray(question.shapes)
+              ? question.shapes.length
+              : 0),
+          0
+        ),
 
       total:
         finalQuestions.length,
