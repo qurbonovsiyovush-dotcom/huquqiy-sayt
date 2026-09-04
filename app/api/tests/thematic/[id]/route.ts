@@ -17,6 +17,7 @@ type RouteContext = {
    MUHIM:
    - is_correct clientga yuborilmaydi
    - faqat published test ochiladi
+   - shapes_json clientga shapes sifatida qaytariladi
 ========================================================= */
 
 export async function GET(
@@ -92,6 +93,8 @@ export async function GET(
 
     /* ---------------------------------------------
        3. SAVOLLARNI OLISH
+
+       shapes_json ham Neon'dan olinadi.
     --------------------------------------------- */
 
     const questions = await sql`
@@ -101,6 +104,7 @@ export async function GET(
         question_number,
         question_text,
         question_html,
+        shapes_json,
         points
 
       FROM thematic_questions
@@ -126,6 +130,7 @@ export async function GET(
     /* ---------------------------------------------
        4. VARIANTLARNI BIR MARTADA OLISH
 
+       MUHIM:
        is_correct ATAYLAB SELECT QILINMAYDI.
     --------------------------------------------- */
 
@@ -150,7 +155,7 @@ export async function GET(
     `;
 
     /* ---------------------------------------------
-       5. OPTIONLARNI QUESTION BO'YICHA GURUHLASH
+       5. OPTIONLARNI SAVOLLAR BO'YICHA GURUHLASH
     --------------------------------------------- */
 
     const optionsByQuestion = new Map<
@@ -164,28 +169,81 @@ export async function GET(
     >();
 
     for (const option of options) {
-      const questionId = String(option.question_id);
+      const questionId = String(
+        option.question_id
+      );
 
       const list =
-        optionsByQuestion.get(questionId) || [];
+        optionsByQuestion.get(
+          questionId
+        ) || [];
 
       list.push({
         id: String(option.id),
-        key: String(option.option_key || ""),
-        text: String(option.option_text || ""),
-        html: String(option.option_html || ""),
+
+        key: String(
+          option.option_key || ""
+        ),
+
+        text: String(
+          option.option_text || ""
+        ),
+
+        html: String(
+          option.option_html || ""
+        ),
       });
 
-      optionsByQuestion.set(questionId, list);
+      optionsByQuestion.set(
+        questionId,
+        list
+      );
     }
 
     /* ---------------------------------------------
        6. PUBLIC QUESTION FORMAT
     --------------------------------------------- */
 
-    const publicQuestions = questions.map(
-      (question) => {
-        const questionId = String(question.id);
+    const publicQuestions =
+      questions.map((question) => {
+        const questionId =
+          String(question.id);
+
+        /*
+          Neon JSONB odatda JS array sifatida keladi.
+
+          Shunga qaramay xavfsizlik uchun:
+          - array bo'lsa to'g'ridan-to'g'ri ishlatamiz;
+          - string bo'lsa JSON.parse qilamiz;
+          - noto'g'ri qiymat bo'lsa [].
+        */
+        let shapes: unknown[] = [];
+
+        if (
+          Array.isArray(
+            question.shapes_json
+          )
+        ) {
+          shapes =
+            question.shapes_json;
+        } else if (
+          typeof question.shapes_json ===
+          "string"
+        ) {
+          try {
+            const parsed =
+              JSON.parse(
+                question.shapes_json
+              );
+
+            shapes =
+              Array.isArray(parsed)
+                ? parsed
+                : [];
+          } catch {
+            shapes = [];
+          }
+        }
 
         return {
           id: questionId,
@@ -206,9 +264,17 @@ export async function GET(
             question.question_html || ""
           ),
 
+          /*
+            ESKI TEST RENDERERI AYNAN
+            "shapes" MAYDONINI KUTADI.
+          */
+          shapes,
+
           points:
             Number(question.points) > 0
-              ? Number(question.points)
+              ? Number(
+                  question.points
+                )
               : 1,
 
           options:
@@ -216,8 +282,7 @@ export async function GET(
               questionId
             ) || [],
         };
-      }
-    );
+      });
 
     /* ---------------------------------------------
        7. CLIENT UCHUN TEST FORMAT
@@ -230,23 +295,30 @@ export async function GET(
 
       testType: "thematic",
 
-      bookId: String(test.book_id),
+      bookId: String(
+        test.book_id
+      ),
 
       bookTitle: String(
         test.book_title || ""
       ),
 
-      grade: Number(test.grade),
+      grade: Number(
+        test.grade
+      ),
 
       sectionOrder: Number(
         test.section_order
       ),
 
       sectionType: String(
-        test.section_type || "lesson"
+        test.section_type ||
+          "lesson"
       ),
 
-      title: String(test.title || ""),
+      title: String(
+        test.title || ""
+      ),
 
       subject: String(
         test.subject || ""
@@ -255,34 +327,43 @@ export async function GET(
       edition:
         test.edition === null
           ? ""
-          : String(test.edition),
+          : String(
+              test.edition
+            ),
 
       description: String(
         test.description || ""
       ),
 
       /*
-        Eski solve sahifamiz duration maydonini
-        kutadi. Shuning uchun duration_minutes ni
-        duration ko'rinishida ham qaytaramiz.
+        Eski solve dizayni duration
+        maydonini kutadi.
       */
       duration: Math.max(
         1,
-        Number(test.duration_minutes) || 60
+        Number(
+          test.duration_minutes
+        ) || 60
       ),
 
       durationMinutes: Math.max(
         1,
-        Number(test.duration_minutes) || 60
+        Number(
+          test.duration_minutes
+        ) || 60
       ),
 
       attemptLimit:
-        test.attempt_limit === null ||
-        test.attempt_limit === undefined
+        test.attempt_limit ===
+          null ||
+        test.attempt_limit ===
+          undefined
           ? null
           : Math.max(
               1,
-              Number(test.attempt_limit) || 1
+              Number(
+                test.attempt_limit
+              ) || 1
             ),
 
       status: "published",
@@ -290,7 +371,8 @@ export async function GET(
       questionCount:
         publicQuestions.length,
 
-      questions: publicQuestions,
+      questions:
+        publicQuestions,
     };
 
     return NextResponse.json(
@@ -317,7 +399,9 @@ export async function GET(
         message:
           "Mavzulashtirilgan testni yuklashda server xatosi yuz berdi.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
