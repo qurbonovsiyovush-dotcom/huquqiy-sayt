@@ -2493,14 +2493,10 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      questions:
-        finalQuestions,
-        answerKeyApplied,
-        answerKeyCount: answerKey.length,
-      total:
-        finalQuestions.length,
-      expectedTotal: 840,
-      missingNumbers,
+      questions: finalQuestions,
+      answerKeyApplied,
+      answerKeyCount: answerKey.length,
+      total: finalQuestions.length,
     });
   } catch (error) {
     console.error(
