@@ -223,7 +223,8 @@ function normalizeQuestionText(parts: string[]) {
 
   function flushCurrent() {
     const cleaned = current
-      .replace(/\s+([,.;:!?])/g, "$1")
+      .replace(/\s+([,.;:!])/g, "$1")
+      .replace(/\s*\?/g, " ?")
       .replace(/\(\s+/g, "(")
       .replace(/\s+\)/g, ")")
       .replace(/\s{2,}/g, " ")
@@ -268,7 +269,8 @@ function normalizeQuestionText(parts: string[]) {
 
   return paragraphs
     .join("\n")
-    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s+([,.;:!])/g, "$1")
+    .replace(/\s*\?/g, " ?")
     .trim();
 }
 
@@ -702,11 +704,66 @@ function groupItemsIntoLines(
    No item is discarded in the middle.
 ========================================================= */
 
+
+/*
+  =========================================================
+  SAHIFA ICHKI RAMKASI
+  =========================================================
+
+  Kitobda har sahifaning asosiy test qismi qora ramka ichida.
+  Ramkadan tashqaridagi:
+    - "Davlat va huquq asoslari (10-sinf)"
+    - "Qurbonov S.J."
+    - boshqa kolontitullar
+  savol yoki variantga qo‘shilmasligi kerak.
+
+  PDF.js koordinatalari pastdan yuqoriga o‘sadi. Shu sabab
+  yuqoridagi tashqi sarlavhani ham, juda pastdagi tashqi
+  elementlarni ham nisbiy chegara bilan chiqarib tashlaymiz.
+*/
+function keepItemInsideBookFrame(
+  item: PositionedText,
+  pageWidth: number,
+  pageHeight: number
+) {
+  const centerX =
+    item.x + item.width / 2;
+
+  const minX =
+    pageWidth * 0.045;
+
+  const maxX =
+    pageWidth * 0.955;
+
+  const minY =
+    pageHeight * 0.035;
+
+  const maxY =
+    pageHeight * 0.965;
+
+  return (
+    centerX >= minX &&
+    centerX <= maxX &&
+    item.y >= minY &&
+    item.y <= maxY
+  );
+}
+
 function pageLines(
   items: PositionedText[],
-  pageWidth: number
+  pageWidth: number,
+  pageHeight: number
 ) {
-  if (items.length === 0) {
+  const framedItems =
+    items.filter((item) =>
+      keepItemInsideBookFrame(
+        item,
+        pageWidth,
+        pageHeight
+      )
+    );
+
+  if (framedItems.length === 0) {
     return [] as TextLine[];
   }
 
@@ -717,14 +774,14 @@ function pageLines(
     We detect whether there is meaningful text on BOTH sides.
   */
   const leftCount =
-    items.filter(
+    framedItems.filter(
       (item) =>
         item.x <
         middle - 10
     ).length;
 
   const rightCount =
-    items.filter(
+    framedItems.filter(
       (item) =>
         item.x >
         middle + 10
@@ -736,7 +793,7 @@ function pageLines(
 
   if (!twoColumn) {
     return groupItemsIntoLines(
-      items,
+      framedItems,
       "full"
     );
   }
@@ -747,7 +804,7 @@ function pageLines(
     No dead zone, no dropped tokens.
   */
   const left =
-    items.filter(
+    framedItems.filter(
       (item) =>
         item.x +
           item.width / 2 <=
@@ -755,7 +812,7 @@ function pageLines(
     );
 
   const right =
-    items.filter(
+    framedItems.filter(
       (item) =>
         item.x +
           item.width / 2 >
@@ -794,6 +851,8 @@ function isPdfDecorationLine(value: string) {
 
   /* Har sahifada takrorlanadigan kolontitul / sahifa raqami */
   if (
+    /^davlat\s+va\s+huquq\s+asoslari\s*\(\s*10-sinf\s*\)$/i.test(text) ||
+    /^davlat\s+va\s+huquq\s+asoslari\s*\(\s*\d{1,2}-sinf\s*\)$/i.test(text) ||
     /^qurbonov\s+s\.j\.?$/i.test(text) ||
     /^qurbonob\s+siyovush$/i.test(text) ||
     /^\d{1,3}$/.test(text)
@@ -3214,7 +3273,8 @@ export async function POST(
       const lines =
         pageLines(
           items,
-          viewport.width
+          viewport.width,
+          viewport.height
         );
 
       pageInfos.set(
