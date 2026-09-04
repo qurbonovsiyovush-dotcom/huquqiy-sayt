@@ -1160,7 +1160,7 @@ function topicTitleFromLine(
 
   text = match[1]
     .replace(
-      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
+      /\s*Davlat va huquq asoslari\s*\(\s*(?:8|9|10|11)\s*-\s*sinf\s*\).*$/i,
       ""
     )
     .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
@@ -1473,7 +1473,7 @@ type PostSection = {
 function cleanPostSectionTitle(value: string) {
   return normalizeOneLine(value)
     .replace(
-      /\s*Davlat va huquq asoslari\s*\(10-sinf\).*$/i,
+      /\s*Davlat va huquq asoslari\s*\(\s*(?:8|9|10|11)\s*-\s*sinf\s*\).*$/i,
       ""
     )
     .replace(/\s+Qurbonov S\.?J\.?.*$/i, "")
@@ -1777,7 +1777,7 @@ function findQuestionStartLineIndexes(
   return indexes;
 }
 
-function build33LessonTopicsPostParse(
+function buildDynamicLessonTopicsPostParse(
   lines: TextLine[],
   questions: ImportedQuestion[]
 ) {
@@ -1791,8 +1791,9 @@ function build33LessonTopicsPostParse(
     );
 
   /*
-    Agar source-index aniqlash savollar soniga to‘liq mos kelmasa,
-    xavfsiz fallback: savollarni yo‘qotmaymiz.
+    Savollar soni va PDFdagi start-indexlar soni teng bo‘lsa,
+    har bir savolni o‘zining HAQIQIY sectioniga biriktiramiz.
+    30/33/36 kabi sun’iy limit YO‘Q.
   */
   const canMapByLine =
     questionLineIndexes.length ===
@@ -1814,22 +1815,18 @@ function build33LessonTopicsPostParse(
   if (canMapByLine) {
     for (
       let qIndex = 0;
-      qIndex <
-      questions.length;
+      qIndex < questions.length;
       qIndex++
     ) {
       const qLine =
-        questionLineIndexes[
-          qIndex
-        ];
+        questionLineIndexes[qIndex];
 
       let selected:
         PostSection | null = null;
 
       for (
         let sIndex = 0;
-        sIndex <
-        sections.length;
+        sIndex < sections.length;
         sIndex++
       ) {
         const current =
@@ -1839,14 +1836,11 @@ function build33LessonTopicsPostParse(
           sections[sIndex + 1];
 
         if (
-          qLine >
-            current.lineIndex &&
+          qLine > current.lineIndex &&
           (!next ||
-            qLine <
-              next.lineIndex)
+            qLine < next.lineIndex)
         ) {
-          selected =
-            current;
+          selected = current;
           break;
         }
       }
@@ -1861,133 +1855,66 @@ function build33LessonTopicsPostParse(
     }
   }
 
-  const sourceByLesson =
-    new Map<
-      number,
-      PostSection
-    >();
+  /*
+    ENG MUHIM O‘ZGARISH:
+    1–2-DARS bitta source section bo‘lsa, BIRTA topic bo‘lib qoladi.
+    3–4-DARS ham BIRTA topic.
+    PDFda nechta haqiqiy DARS heading bo‘lsa — shuncha topic.
+  */
+  const topics: TopicGroup[] =
+    sections
+      .filter(
+        (section) =>
+          section.kind ===
+          "lesson"
+      )
+      .map((section) => {
+        const sourceQuestions =
+          sectionQuestions.get(
+            section.key
+          ) || [];
 
-  for (const section of sections) {
-    if (
-      section.kind !==
-        "lesson" ||
-      !section.lessonStart
-    ) {
-      continue;
-    }
+        const start =
+          section.lessonStart;
 
-    const end =
-      section.lessonEnd ||
-      section.lessonStart;
+        const end =
+          section.lessonEnd ||
+          start;
 
-    for (
-      let lesson =
-        section.lessonStart;
-      lesson <= end;
-      lesson++
-    ) {
-      if (
-        lesson >= 1 &&
-        lesson <= 33
-      ) {
-        sourceByLesson.set(
-          lesson,
-          section
-        );
-      }
-    }
-  }
-
-  const topics: TopicGroup[] = [];
-
-  for (
-    let lesson = 1;
-    lesson <= 33;
-    lesson++
-  ) {
-    const section =
-      sourceByLesson.get(
-        lesson
+        return {
+          id: section.key,
+          title: section.title,
+          lessonNumber: start,
+          sourceSectionKey:
+            section.key,
+          sourceSectionTitle:
+            section.title,
+          sharedSource:
+            Boolean(
+              start &&
+              end &&
+              end > start
+            ),
+          kind: "lesson",
+          questionNumbers:
+            sourceQuestions.map(
+              (question) =>
+                question.number
+            ),
+          questions:
+            sourceQuestions.map(
+              (question, index) => ({
+                ...question,
+                number:
+                  index + 1,
+              })
+            ),
+        } as TopicGroup;
+      })
+      .filter(
+        (topic) =>
+          topic.questions.length > 0
       );
-
-    if (!section) {
-      topics.push({
-        id:
-          `lesson-${lesson}`,
-        title:
-          `${lesson}-DARS. Mavzu aniqlanmadi`,
-        lessonNumber:
-          lesson,
-        sourceSectionKey:
-          "missing",
-        sourceSectionTitle:
-          "Mavzu aniqlanmadi",
-        sharedSource: false,
-        kind: "lesson",
-        questionNumbers: [],
-        questions: [],
-      });
-
-      continue;
-    }
-
-    const sourceQuestions =
-      sectionQuestions.get(
-        section.key
-      ) || [];
-
-    const sourceStart =
-      section.lessonStart ||
-      lesson;
-
-    const sourceEnd =
-      section.lessonEnd ||
-      sourceStart;
-
-    const sharedSource =
-      sourceEnd >
-      sourceStart;
-
-    const sourceName =
-      section.title
-        .replace(
-          /^\d+\s*(?:[–—-]\s*\d+)?\s*-\s*DARS\.\s*/i,
-          ""
-        )
-        .trim();
-
-    topics.push({
-      id:
-        `lesson-${lesson}`,
-      title:
-        `${lesson}-DARS.${
-          sourceName
-            ? ` ${sourceName}`
-            : ""
-        }`,
-      lessonNumber:
-        lesson,
-      sourceSectionKey:
-        section.key,
-      sourceSectionTitle:
-        section.title,
-      sharedSource,
-      kind: "lesson",
-      questionNumbers:
-        sourceQuestions.map(
-          (question) =>
-            question.number
-        ),
-      questions:
-        sourceQuestions.map(
-          (question, index) => ({
-            ...question,
-            number:
-              index + 1,
-          })
-        ),
-    });
-  }
 
   const specialSections: TopicGroup[] =
     sections
@@ -1998,53 +1925,56 @@ function build33LessonTopicsPostParse(
           section.kind ===
             "glossary"
       )
-      .map(
-        (section) => {
-          const sourceQuestions =
-            sectionQuestions.get(
-              section.key
-            ) || [];
+      .map((section) => {
+        const sourceQuestions =
+          sectionQuestions.get(
+            section.key
+          ) || [];
 
-          return {
-            id:
-              section.kind ===
-                "control"
-                ? "control-questions"
-                : "legal-glossary",
-            title:
-              section.kind ===
-                "control"
-                ? "Nazorat savollari"
-                : "Ayrim yuridik atamalarning izohli lug‘ati",
-            sourceSectionKey:
-              section.key,
-            sourceSectionTitle:
-              section.title,
-            sharedSource: false,
-            kind:
-              section.kind,
-            questionNumbers:
-              sourceQuestions.map(
-                (question) =>
-                  question.number
-              ),
-            questions:
-              sourceQuestions.map(
-                (question, index) => ({
-                  ...question,
-                  number:
-                    index + 1,
-                })
-              ),
-          } as TopicGroup;
-        }
+        return {
+          id:
+            section.kind ===
+            "control"
+              ? "control-questions"
+              : "legal-glossary",
+          title:
+            section.kind ===
+            "control"
+              ? "Nazorat savollari"
+              : "Ayrim yuridik atamalarning izohli lug‘ati",
+          sourceSectionKey:
+            section.key,
+          sourceSectionTitle:
+            section.title,
+          sharedSource: false,
+          kind:
+            section.kind,
+          questionNumbers:
+            sourceQuestions.map(
+              (question) =>
+                question.number
+            ),
+          questions:
+            sourceQuestions.map(
+              (question, index) => ({
+                ...question,
+                number:
+                  index + 1,
+              })
+            ),
+        } as TopicGroup;
+      })
+      .filter(
+        (topic) =>
+          topic.questions.length > 0
       );
 
   return {
     topics,
     specialSections,
     sectionCount:
-      sections.length,
+      topics.length +
+      specialSections.length,
     mappedQuestionCount:
       canMapByLine
         ? questionLineIndexes.length
@@ -3437,7 +3367,7 @@ export async function POST(
       mavzular alohida biriktiriladi.
     */
     const thematicStructure =
-      build33LessonTopicsPostParse(
+      buildDynamicLessonTopicsPostParse(
         allLines,
         finalQuestions
       );
