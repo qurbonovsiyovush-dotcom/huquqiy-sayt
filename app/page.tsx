@@ -1450,8 +1450,9 @@ export default function Home() {
           width: 100%;
           min-height: 390px;
 
-          display: grid;
-          place-items: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
 
           padding: 25px;
 
@@ -1463,14 +1464,13 @@ export default function Home() {
           height: 390px;
           aspect-ratio: 1 / 1;
 
-          margin:
-            0
-            auto;
+          margin: 0 auto;
 
-          display: grid;
-          place-items: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
 
-          flex: 0 0 auto;
+          flex: 0 0 390px;
 
           border:
             5px solid #22292d;
@@ -1507,12 +1507,15 @@ export default function Home() {
           margin: 0;
 
           object-fit: contain;
-          object-position: 50% 50%;
+          object-position: center center;
 
           display: block;
 
-          /* PNG ichidagi optik qiyshiqlikni tuzatish */
-          transform: translate(8px, -4px);
+          position: relative;
+          left: 0;
+          top: 0;
+
+          transform: none;
 
           user-select: none;
 
