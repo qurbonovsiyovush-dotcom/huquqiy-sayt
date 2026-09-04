@@ -1353,11 +1353,12 @@ export default function Home() {
           position: relative;
 
           /*
-            Tepada .topPanel width:100%.
-            Pastdagi barcha katta bo‘limlar ham aynan shu kenglikda.
+            Tepdagi ko‘k panel 100%.
+            Pastdagi katta bo‘limlar undan faqat ozgina kichik:
+            chap va o‘ngdan taxminan 2.5% ichkarida.
           */
-          width: 100%;
-          max-width: none;
+          width: 95%;
+          max-width: 95%;
 
           margin:
             90px
@@ -1673,8 +1674,8 @@ export default function Home() {
         =========================== */
 
         .footer {
-          width: 100%;
-          max-width: none;
+          width: 95%;
+          max-width: 95%;
 
           min-height: 112px;
 
