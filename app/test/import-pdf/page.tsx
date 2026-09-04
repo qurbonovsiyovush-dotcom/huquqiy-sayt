@@ -80,6 +80,13 @@ type ImportedQuestion = {
   shapes?: EditorShape[];
   warning?: string;
 };
+type ImportedTopic = {
+  id: string;
+  title: string;
+  questionCount?: number;
+  questions: ImportedQuestion[];
+};
+
 
 
 type RichTextEditorProps = {
@@ -825,6 +832,9 @@ export default function ImportPdfTestPage() {
   const [message, setMessage] = useState("");
   const [questions, setQuestions] =
     useState<ImportedQuestion[]>([]);
+  const [importedTopics, setImportedTopics] =
+    useState<ImportedTopic[]>([]);
+
 
   /*
     SAVOL MATNI UCHUN ALOHIDA SOURCE OF TRUTH.
@@ -925,6 +935,7 @@ export default function ImportPdfTestPage() {
   ) {
     setMessage("");
     setQuestions([]);
+    setImportedTopics([]);
     setQuestionDrafts({});
 
     if (!file) {
@@ -986,6 +997,7 @@ export default function ImportPdfTestPage() {
       setAnalyzing(true);
       setMessage("");
       setQuestions([]);
+      setImportedTopics([]);
       setQuestionDrafts({});
 
       const formData =
@@ -1097,8 +1109,23 @@ export default function ImportPdfTestPage() {
 
       setQuestions(imported);
 
+      if (
+        testType === "thematic" &&
+        Array.isArray(data?.topics)
+      ) {
+        setImportedTopics(
+          data.topics as ImportedTopic[]
+        );
+      } else {
+        setImportedTopics([]);
+      }
+
       setMessage(
-        `PDFdan ${imported.length} ta savol ajratildi.`
+        testType === "thematic" &&
+        Array.isArray(data?.topics) &&
+        data.topics.length > 0
+          ? `PDFdan ${imported.length} ta savol va ${data.topics.length} ta mavzu ajratildi.`
+          : `PDFdan ${imported.length} ta savol ajratildi.`
       );
     } catch (error) {
       console.error(
@@ -3391,6 +3418,51 @@ export default function ImportPdfTestPage() {
         </div>
       </section>
 
+      {testType === "thematic" &&
+        importedTopics.length > 0 && (
+          <section className="topicsBox">
+            <div className="topicsFloatingTitle">
+              Mavzular
+            </div>
+
+            <div className="topicsHeader">
+              <strong>
+                {importedTopics.length} ta mavzu aniqlandi
+              </strong>
+
+              <span>
+                Jami {questions.length} ta savol
+              </span>
+            </div>
+
+            <div className="topicsList">
+              {importedTopics.map(
+                (topic, index) => (
+                  <div
+                    key={topic.id}
+                    className="topicRow"
+                  >
+                    <div className="topicNumber">
+                      {index + 1}
+                    </div>
+
+                    <div className="topicName">
+                      {topic.title}
+                    </div>
+
+                    <div className="topicTotal">
+                      {topic.questions?.length ??
+                        topic.questionCount ??
+                        0}{" "}
+                      ta savol
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </section>
+        )}
+
       {questions.length >
         0 && (
         <section className="previewBox">
@@ -4914,7 +4986,147 @@ export default function ImportPdfTestPage() {
             grid-column: 3;
           }
         }
-      `}</style>
+      `}
+        .topicsBox {
+          position: relative;
+          width: min(100%, 1180px);
+          margin: 34px auto 30px;
+          padding: 34px 22px 24px;
+          border: 2px solid #4b5961;
+          border-radius: 18px;
+          background:
+            linear-gradient(
+              180deg,
+              #e5e8ea 0%,
+              #cbd0d3 100%
+            );
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.9),
+            0 7px 0 #68747a,
+            0 12px 20px rgba(0,0,0,.14);
+        }
+
+        .topicsFloatingTitle {
+          position: absolute;
+          top: -22px;
+          left: 50%;
+          transform: translateX(-50%);
+          min-width: 190px;
+          padding: 9px 22px;
+          border: 2px solid #4d6572;
+          border-radius: 11px;
+          background:
+            linear-gradient(
+              180deg,
+              #f3f6f7 0%,
+              #c7d2d7 100%
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 #63737b;
+          color: #1b303b;
+          font-size: 20px;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .topicsHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 16px;
+          color: #1b2b34;
+        }
+
+        .topicsHeader strong {
+          font-size: 20px;
+        }
+
+        .topicsHeader span {
+          padding: 7px 11px;
+          border-radius: 8px;
+          background: #eef2f4;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .topicsList {
+          display: grid;
+          gap: 11px;
+        }
+
+        .topicRow {
+          min-height: 58px;
+          display: grid;
+          grid-template-columns: 42px minmax(0,1fr) auto;
+          align-items: center;
+          gap: 13px;
+          padding: 9px 14px;
+          border: 2px solid #526a77;
+          border-radius: 11px;
+          background:
+            linear-gradient(
+              180deg,
+              #f8f9fa 0%,
+              #e2e7e9 100%
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 #75828a;
+          color: #172a34;
+        }
+
+        .topicNumber {
+          width: 34px;
+          height: 34px;
+          display: grid;
+          place-items: center;
+          border-radius: 8px;
+          background: #d1dce1;
+          font-weight: 900;
+        }
+
+        .topicName {
+          font-size: 16px;
+          font-weight: 900;
+          line-height: 1.25;
+        }
+
+        .topicTotal {
+          white-space: nowrap;
+          padding: 7px 10px;
+          border-radius: 8px;
+          background: #cbd8de;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        @media (max-width: 640px) {
+          .topicsBox {
+            padding: 32px 13px 18px;
+          }
+
+          .topicsHeader {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .topicRow {
+            grid-template-columns: 36px minmax(0,1fr);
+          }
+
+          .topicTotal {
+            grid-column: 2;
+            width: fit-content;
+          }
+
+          .topicName {
+            font-size: 14px;
+          }
+        }
+
+</style>
     </main>
   );
 }
