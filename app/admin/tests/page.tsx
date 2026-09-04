@@ -478,22 +478,42 @@ export default function AdminTestsPage() {
   ========================================================= */
 
   async function publishVisibleDrafts() {
-    const drafts = filteredTests.filter(
-      (test) => test.status === "draft"
-    );
+    const allVisibleTests =
+      filteredTests;
 
-    if (drafts.length === 0) {
+    const drafts =
+      allVisibleTests.filter(
+        (test) =>
+          test.status ===
+          "draft"
+      );
+
+    if (
+      allVisibleTests.length ===
+      0
+    ) {
       window.alert(
-        "Hozirgi filtrda e’lon qilinadigan qoralama test yo‘q."
+        "Hozirgi filtrda test yo‘q."
       );
       return;
     }
 
-    const confirmed = window.confirm(
-      `${drafts.length} ta qoralama test BIR YO‘LA e’lon qilinadi.\n\n` +
-        "Faqat hozir tanlangan bo‘lim va qidiruv/holat filtriga mos qoralamalar e’lon qilinadi.\n\n" +
-        "Davom etasizmi?"
-    );
+    if (
+      drafts.length ===
+      0
+    ) {
+      window.alert(
+        "Hozirgi filtrdagi barcha testlar allaqachon e’lon qilingan."
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `${drafts.length} ta qoralama e’lon qilinadi.\n\n` +
+          `Hozirgi filtrdagi jami ${allVisibleTests.length} ta testning statusi serverda bir marta mustahkamlanadi.\n\n` +
+          "Davom etasizmi?"
+      );
 
     if (!confirmed) {
       return;
@@ -504,26 +524,32 @@ export default function AdminTestsPage() {
 
     try {
       /*
-        MUHIM:
-        Endi 31 ta alohida PUT yuborilmaydi.
-        Barcha ID lar BIRTA POST bilan /api/tests ga yuboriladi.
-        Server tests.json ni bir marta o‘qiydi va bir marta yozadi.
+        Faqat draft ID larni emas, HOZIRGI FILTRDAGI HAMMA test ID sini
+        yuboramiz. Bu oldin e’lon qilingan testlarga ham durable
+        "published" marker yozib, ularning yana draftga qaytishini
+        butunlay to‘xtatadi.
       */
-      const response = await fetch(
-        "/api/tests",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "bulk-publish-tests",
-            testIds: drafts.map(
-              (test) => test.id
-            ),
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/tests",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                action:
+                  "bulk-publish-tests",
+                testIds:
+                  allVisibleTests.map(
+                    (test) =>
+                      test.id
+                  ),
+              }),
+          }
+        );
 
       const data =
         await readJson(
@@ -547,8 +573,13 @@ export default function AdminTestsPage() {
             data.publishedIds
           )
             ? data.publishedIds.map(
-                (value: unknown) =>
-                  String(value)
+                (
+                  value:
+                    unknown
+                ) =>
+                  String(
+                    value
+                  )
               )
             : []
         );
@@ -570,19 +601,25 @@ export default function AdminTestsPage() {
       );
 
       window.alert(
-        `${Number(data.publishedCount) || publishedIds.size} ta test bir yo‘la e’lon qilindi.`
+        `${publishedIds.size} ta testning E’LON QILINGAN holati mustahkam saqlandi.`
       );
 
       await loadTests();
     } catch (error) {
-      console.error(error);
+      console.error(
+        error
+      );
 
       window.alert(
         "Testlarni bir yo‘la e’lon qilishda server xatosi."
       );
     } finally {
-      setWorkingId(null);
-      setBulkPublishing(false);
+      setWorkingId(
+        null
+      );
+      setBulkPublishing(
+        false
+      );
     }
   }
 
