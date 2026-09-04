@@ -2756,7 +2756,7 @@ export default function ImportPdfTestPage() {
       } catch {
         if (response.status === 413) {
           throw new Error(
-            "Yuborilayotgan ma’lumot hajmi server limitidan oshdi. Savollar kichikroq bo‘laklarda yuboriladi, lekin bitta rasm juda katta bo‘lsa uni kichraytirish kerak."
+            "Yuborilayotgan ma’lumot hajmi server limitidan oshdi. Bitta rasm juda katta bo‘lsa uni kichraytirish kerak."
           );
         }
 
@@ -2774,11 +2774,8 @@ export default function ImportPdfTestPage() {
       return data;
     }
 
-    try {
-      setSaving(true);
-      setMessage("Testni saqlash boshlandi...");
-
-      const preparedQuestions = questions.map((question) => ({
+    function prepareQuestion(question: ImportedQuestion) {
+      return {
         id: question.id,
 
         questionHtml: sanitizeRichHtml(
@@ -2895,11 +2892,32 @@ export default function ImportPdfTestPage() {
           : [],
 
         points: 1,
-      }));
+      };
+    }
 
-      /* =====================================================
-         1-BOSQICH: bo‘sh test yozuvini yaratamiz
-      ===================================================== */
+    const preparedById =
+      new Map(
+        questions.map((question) => [
+          question.id,
+          prepareQuestion(question),
+        ])
+      );
+
+    type PreparedQuestion =
+      ReturnType<typeof prepareQuestion>;
+
+    async function saveOneTest(args: {
+      testTitle: string;
+      testDescription: string;
+      preparedQuestions: PreparedQuestion[];
+      progressPrefix?: string;
+    }) {
+      const preparedQuestions =
+        args.preparedQuestions;
+
+      if (preparedQuestions.length === 0) {
+        return null;
+      }
 
       const createResponse = await fetch("/api/tests", {
         method: "POST",
@@ -2909,13 +2927,15 @@ export default function ImportPdfTestPage() {
         },
         body: JSON.stringify({
           action: "create-chunked-test",
-          title: title.trim(),
+          title: args.testTitle,
           subject: subject.trim(),
           duration: Number(duration) || 60,
-          description: description.trim(),
+          description: args.testDescription,
           testType,
           customTestTypeName:
-            testType === "custom" ? customTestTypeName.trim() : "",
+            testType === "custom"
+              ? customTestTypeName.trim()
+              : "",
           status: "draft",
           attemptLimit: attemptLimitEnabled
             ? Math.max(1, Number(attemptLimit) || 1)
@@ -2924,121 +2944,319 @@ export default function ImportPdfTestPage() {
         }),
       });
 
-      const createData = await readApiResponse(createResponse);
-      const testId = String(createData?.testId || "");
+      const createData =
+        await readApiResponse(createResponse);
+
+      const testId =
+        String(createData?.testId || "");
 
       if (!testId) {
-        throw new Error("Yangi test ID olinmadi.");
+        throw new Error(
+          `"${args.testTitle}" uchun test ID olinmadi.`
+        );
       }
-
-      /* =====================================================
-         2-BOSQICH: savollarni xavfsiz hajmdagi bo‘laklarda yuboramiz.
-
-         Faqat "10 tadan" emas: rasm/base64 bo‘lsa request hajmi ham
-         hisobga olinadi. Bu Vercel Request Entity Too Large xatosini
-         keskin kamaytiradi.
-      ===================================================== */
 
       const MAX_QUESTIONS_PER_CHUNK = 10;
       const MAX_CHUNK_BYTES = 1_800_000;
       const MAX_SINGLE_QUESTION_BYTES = 3_500_000;
       const encoder = new TextEncoder();
 
-      type PreparedQuestion = (typeof preparedQuestions)[number];
-      const chunks: { startIndex: number; items: PreparedQuestion[] }[] = [];
+      const chunks: {
+        startIndex: number;
+        items: PreparedQuestion[];
+      }[] = [];
 
       let currentChunk: PreparedQuestion[] = [];
       let currentChunkBytes = 0;
       let currentStartIndex = 0;
 
-      for (let index = 0; index < preparedQuestions.length; index++) {
-        const question = preparedQuestions[index];
-        const questionBytes = encoder.encode(
-          JSON.stringify(question)
-        ).length;
+      for (
+        let index = 0;
+        index < preparedQuestions.length;
+        index++
+      ) {
+        const question =
+          preparedQuestions[index];
 
-        if (questionBytes > MAX_SINGLE_QUESTION_BYTES) {
+        const questionBytes =
+          encoder.encode(
+            JSON.stringify(question)
+          ).length;
+
+        if (
+          questionBytes >
+          MAX_SINGLE_QUESTION_BYTES
+        ) {
           throw new Error(
-            `${index + 1}-savoldagi rasm yoki shakl juda katta. Shu savoldagi rasmni kichraytiring va qayta saqlang.`
+            `"${args.testTitle}" testining ${index + 1}-savolidagi rasm yoki shakl juda katta.`
           );
         }
 
         const shouldFlush =
           currentChunk.length > 0 &&
-          (currentChunk.length >= MAX_QUESTIONS_PER_CHUNK ||
-            currentChunkBytes + questionBytes > MAX_CHUNK_BYTES);
+          (
+            currentChunk.length >=
+              MAX_QUESTIONS_PER_CHUNK ||
+            currentChunkBytes +
+              questionBytes >
+              MAX_CHUNK_BYTES
+          );
 
         if (shouldFlush) {
           chunks.push({
-            startIndex: currentStartIndex,
-            items: currentChunk,
+            startIndex:
+              currentStartIndex,
+            items:
+              currentChunk,
           });
 
-          currentStartIndex = index;
+          currentStartIndex =
+            index;
           currentChunk = [];
           currentChunkBytes = 0;
         }
 
-        currentChunk.push(question);
-        currentChunkBytes += questionBytes;
+        currentChunk.push(
+          question
+        );
+        currentChunkBytes +=
+          questionBytes;
       }
 
-      if (currentChunk.length > 0) {
+      if (
+        currentChunk.length > 0
+      ) {
         chunks.push({
-          startIndex: currentStartIndex,
-          items: currentChunk,
+          startIndex:
+            currentStartIndex,
+          items:
+            currentChunk,
         });
       }
 
       let savedCount = 0;
 
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        const chunk = chunks[chunkIndex];
+      for (
+        let chunkIndex = 0;
+        chunkIndex < chunks.length;
+        chunkIndex++
+      ) {
+        const chunk =
+          chunks[chunkIndex];
 
         setMessage(
-          `${savedCount}/${preparedQuestions.length} ta savol saqlandi... (${chunkIndex + 1}/${chunks.length} bo‘lak)`
+          `${args.progressPrefix || ""}${savedCount}/${preparedQuestions.length} ta savol saqlanmoqda...`
         );
 
-        const chunkResponse = await fetch("/api/tests", {
+        const chunkResponse =
+          await fetch("/api/tests", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              action:
+                "append-questions",
+              testId,
+              startIndex:
+                chunk.startIndex,
+              questions:
+                chunk.items,
+            }),
+          });
+
+        const chunkData =
+          await readApiResponse(
+            chunkResponse
+          );
+
+        savedCount =
+          Number(
+            chunkData?.receivedQuestions
+          ) || 0;
+      }
+
+      const finalizeResponse =
+        await fetch("/api/tests", {
           method: "POST",
           credentials: "include",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            action: "append-questions",
+            action:
+              "finalize-chunked-test",
             testId,
-            startIndex: chunk.startIndex,
-            questions: chunk.items,
+            status: "draft",
           }),
         });
 
-        const chunkData = await readApiResponse(chunkResponse);
-        savedCount = Number(chunkData?.receivedQuestions) || 0;
+      await readApiResponse(
+        finalizeResponse
+      );
+
+      return testId;
+    }
+
+    try {
+      setSaving(true);
+
+      /*
+        MAVZULASHTIRILGAN TEST:
+        bitta 1609 savollik test emas.
+        33 ta dars + Nazorat + Lug‘at alohida test bo‘lib saqlanadi.
+      */
+      if (
+        testType === "thematic" &&
+        importedTopics.length > 0
+      ) {
+        const baseTitle =
+          title.trim() ||
+          "Davlat va huquq asoslari 10-sinf";
+
+        const allSections = [
+          ...importedTopics.map(
+            (topic) => ({
+              ...topic,
+              kind:
+                topic.kind ||
+                "lesson" as const,
+            })
+          ),
+          ...specialSections,
+        ].filter(
+          (section) =>
+            Array.isArray(
+              section.questions
+            ) &&
+            section.questions.length >
+              0
+        );
+
+        if (
+          allSections.length === 0
+        ) {
+          throw new Error(
+            "Mavzular bo‘yicha saqlash uchun savollar topilmadi."
+          );
+        }
+
+        let savedTests = 0;
+        let savedQuestions = 0;
+
+        for (
+          let sectionIndex = 0;
+          sectionIndex <
+          allSections.length;
+          sectionIndex++
+        ) {
+          const section =
+            allSections[
+              sectionIndex
+            ];
+
+          const sectionPrepared =
+            section.questions
+              .map(
+                (question) =>
+                  preparedById.get(
+                    question.id
+                  )
+              )
+              .filter(
+                (
+                  question
+                ): question is PreparedQuestion =>
+                  Boolean(question)
+              );
+
+          if (
+            sectionPrepared.length ===
+            0
+          ) {
+            continue;
+          }
+
+          const sectionTitle =
+            section.title.trim();
+
+          const testTitle =
+            `${baseTitle} — ${sectionTitle}`;
+
+          const sharedNote =
+            section.sharedSource
+              ? ` PDF manbasida bu dars qo‘shni dars bilan bitta umumiy test blokida berilgan.`
+              : "";
+
+          const testDescription =
+            [
+              description.trim(),
+              `Mavzulashtirilgan to‘plam: ${baseTitle}.`,
+              `Bo‘lim: ${sectionTitle}.`,
+              sharedNote.trim(),
+            ]
+              .filter(Boolean)
+              .join(" ");
+
+          setMessage(
+            `${sectionIndex + 1}/${allSections.length}: ${sectionTitle} saqlanmoqda...`
+          );
+
+          await saveOneTest({
+            testTitle,
+            testDescription,
+            preparedQuestions:
+              sectionPrepared,
+            progressPrefix:
+              `${sectionIndex + 1}/${allSections.length} — `,
+          });
+
+          savedTests++;
+          savedQuestions +=
+            sectionPrepared.length;
+        }
 
         setMessage(
-          `${savedCount}/${preparedQuestions.length} ta savol saqlandi...`
+          `${savedTests} ta alohida test muvaffaqiyatli saqlandi.`
         );
+
+        window.alert(
+          `Mavzulashtirilgan to‘plam saqlandi.\n\nAlohida testlar: ${savedTests} ta\nSaqlangan savollar: ${savedQuestions} ta`
+        );
+
+        router.push(
+          "/admin/tests"
+        );
+
+        return;
       }
 
-      /* =====================================================
-         3-BOSQICH: testni yakunlaymiz
-      ===================================================== */
+      /*
+        QOLGAN TEST TURLARI:
+        eski bir-test saqlash usuli o‘zgarishsiz qoladi.
+      */
+      const preparedQuestions =
+        questions.map(
+          (question) =>
+            prepareQuestion(
+              question
+            )
+        );
 
-      const finalizeResponse = await fetch("/api/tests", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "finalize-chunked-test",
-          testId,
-          status: "draft",
-        }),
+      setMessage(
+        "Testni saqlash boshlandi..."
+      );
+
+      await saveOneTest({
+        testTitle:
+          title.trim(),
+        testDescription:
+          description.trim(),
+        preparedQuestions,
       });
-
-      await readApiResponse(finalizeResponse);
 
       setMessage(
         `${preparedQuestions.length} ta savol muvaffaqiyatli saqlandi.`
@@ -3048,9 +3266,14 @@ export default function ImportPdfTestPage() {
         `Test muvaffaqiyatli saqlandi.\n\nJami: ${preparedQuestions.length} ta savol.`
       );
 
-      router.push("/admin/tests");
+      router.push(
+        "/admin/tests"
+      );
     } catch (error) {
-      console.error("SAVE IMPORTED TEST ERROR:", error);
+      console.error(
+        "SAVE IMPORTED TEST ERROR:",
+        error
+      );
 
       setMessage(
         error instanceof Error
