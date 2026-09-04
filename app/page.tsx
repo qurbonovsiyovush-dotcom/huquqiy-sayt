@@ -189,117 +189,65 @@ export default function Home() {
   if (!authenticated) {
     return (
       <main className="loginPage">
-        <section className="loginShell">
-
-          <aside className="loginBrand">
-            <div className="brandBadge">Q</div>
-
-            <div className="brandText">
-              <div className="brandEyebrow">
-                HUQUQIY TA’LIM PLATFORMASI
-              </div>
-
-              <h1>
-                Qurbonov
-                <span>S.J.</span>
-              </h1>
-
-              <p>
-                Talabalar va abituriyentlar uchun
-                huquqiy ta’lim platformasi.
-              </p>
-            </div>
-
-            <div className="brandFoot">
-              qurbonov.uz
-            </div>
-          </aside>
-
-          <div className="loginPanel">
-            <div className="loginHeader">
-              <div className="loginMiniBadge">
-                MAXSUS KIRISH
-              </div>
-
-              <h2>
-                Xush kelibsiz
-              </h2>
-
-              <p>
-                Platformaga kirish uchun sizga
-                berilgan maxsus kodni kiriting.
-              </p>
-            </div>
-
-            <form
-              onSubmit={handleLogin}
-              className="loginForm"
-            >
-              <label
-                htmlFor="access-code"
-                className="loginLabel"
-              >
-                Kirish kodi
-              </label>
-
-              <div className="loginInputWrapper">
-                <span
-                  className="loginKeyIcon"
-                  aria-hidden="true"
-                >
-                  ◆
-                </span>
-
-                <input
-                  id="access-code"
-                  className="loginInput"
-                  type="text"
-                  value={code}
-                  disabled={loginLoading}
-                  autoComplete="off"
-                  placeholder="Masalan: QUR-XXXX-XXXX"
-                  onChange={(e) => {
-                    setCode(
-                      e.target.value.toUpperCase()
-                    );
-                    setLoginError("");
-                  }}
-                />
-              </div>
-
-              {loginError && (
-                <div
-                  className="loginError"
-                  role="alert"
-                >
-                  {loginError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="loginButton"
-                disabled={loginLoading}
-              >
-                {loginLoading
-                  ? "Tekshirilmoqda..."
-                  : "Kirish"}
-              </button>
-            </form>
-
-            <div className="loginDivider">
-              <span />
-              <b>Qurbonov Siyovush Jamaliddinzoda</b>
-              <span />
-            </div>
-
-            <div className="loginInfo">
-              Platformaga faqat administrator
-              tomonidan berilgan maxsus kod
-              orqali kirish mumkin.
-            </div>
+        <section className="loginCard">
+          <div className="loginTab">
+            Maxsus kirish
           </div>
 
+          <div className="namePlate">
+            Qurbonov Siyovush
+            <br className="mobileNameBreak" />
+            <span className="desktopNameSpace"> </span>
+            Jamaliddinzoda
+          </div>
+
+          <form
+            onSubmit={handleLogin}
+            className="loginForm"
+          >
+            <div className="inputShell">
+              <span
+                className="lockIcon"
+                aria-hidden="true"
+              >
+                🔒
+              </span>
+
+              <input
+                className="loginInput"
+                type="text"
+                value={code}
+                disabled={loginLoading}
+                autoComplete="off"
+                placeholder="Kirish kodini kiriting"
+                onChange={(e) => {
+                  setCode(
+                    e.target.value.toUpperCase()
+                  );
+                  setLoginError("");
+                }}
+              />
+            </div>
+
+            {loginError && (
+              <div
+                className="loginError"
+                role="alert"
+              >
+                {loginError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="loginButton"
+              disabled={loginLoading}
+            >
+              {loginLoading
+                ? "Tekshirilmoqda..."
+                : "Kirish"}
+            </button>
+          </form>
         </section>
 
         <style jsx>{`
@@ -308,27 +256,16 @@ export default function Home() {
           }
 
           .loginPage {
-            width: 100%;
             min-height: 100vh;
+            width: 100%;
 
             display: flex;
             align-items: center;
             justify-content: center;
 
-            padding: 42px 24px;
+            padding: 34px 18px;
 
-            background:
-              radial-gradient(
-                circle at 18% 12%,
-                rgba(38, 155, 220, .14),
-                transparent 34%
-              ),
-              radial-gradient(
-                circle at 86% 86%,
-                rgba(14, 61, 95, .11),
-                transparent 36%
-              ),
-              #f5f7fa;
+            background: #f5f5f3;
 
             font-family:
               "Bell MT",
@@ -336,287 +273,152 @@ export default function Home() {
               serif;
           }
 
-          .loginShell {
-            width: min(100%, 980px);
-            min-height: 570px;
-
-            display: grid;
-            grid-template-columns:
-              minmax(300px, .9fr)
-              minmax(430px, 1.1fr);
-
-            overflow: hidden;
-
-            border:
-              1px solid
-              rgba(14, 50, 75, .14);
-
-            border-radius: 28px;
-
-            background: #ffffff;
-
-            box-shadow:
-              0 28px 70px
-                rgba(20, 42, 58, .16),
-              0 3px 10px
-                rgba(20, 42, 58, .08);
-          }
-
-          .loginBrand {
+          .loginCard {
             position: relative;
 
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-
-            min-height: 570px;
+            width: min(92vw, 440px);
 
             padding:
-              42px
-              38px
-              34px;
+              74px
+              24px
+              28px;
 
-            overflow: hidden;
+            border:
+              2px solid #2f373b;
 
-            color: #ffffff;
+            border-radius: 22px;
 
             background:
               linear-gradient(
-                155deg,
-                #0b2f49 0%,
-                #0d4f75 48%,
-                #137db0 100%
+                180deg,
+                #6f7477 0%,
+                #5d6265 52%,
+                #4d5356 100%
               );
-          }
-
-          .loginBrand::before {
-            content: "";
-
-            position: absolute;
-
-            width: 330px;
-            height: 330px;
-
-            right: -175px;
-            top: -115px;
-
-            border-radius: 50%;
-
-            border:
-              54px solid
-              rgba(255,255,255,.08);
-          }
-
-          .loginBrand::after {
-            content: "";
-
-            position: absolute;
-
-            width: 250px;
-            height: 250px;
-
-            left: -140px;
-            bottom: -130px;
-
-            border-radius: 50%;
-
-            border:
-              42px solid
-              rgba(255,255,255,.07);
-          }
-
-          .brandBadge {
-            position: relative;
-            z-index: 1;
-
-            width: 58px;
-            height: 58px;
-
-            display: grid;
-            place-items: center;
-
-            border:
-              1px solid
-              rgba(255,255,255,.42);
-
-            border-radius: 18px;
-
-            background:
-              rgba(255,255,255,.13);
 
             box-shadow:
               inset 0 1px 0
+                rgba(255,255,255,.38),
+              inset 0 0 0 10px
+                rgba(255,255,255,.04),
+              0 12px 0 #303639,
+              0 20px 28px
+                rgba(0,0,0,.22);
+          }
+
+          .loginCard::before {
+            content: "";
+
+            position: absolute;
+            inset: 10px;
+
+            pointer-events: none;
+
+            border:
+              1px solid
               rgba(255,255,255,.25);
 
-            font-size: 30px;
-            font-weight: 900;
+            border-radius: 14px;
           }
 
-          .brandText {
-            position: relative;
-            z-index: 1;
+          .loginTab {
+            position: absolute;
 
-            margin-top: auto;
-            margin-bottom: auto;
-          }
+            top: -34px;
+            left: 50%;
 
-          .brandEyebrow {
-            margin-bottom: 18px;
+            transform: translateX(-50%);
 
-            color:
-              rgba(255,255,255,.74);
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 12px;
-            font-weight: 800;
-
-            letter-spacing: 1.8px;
-          }
-
-          .brandText h1 {
-            margin: 0;
-
-            display: flex;
-            flex-direction: column;
-
-            font-size:
-              clamp(46px, 5vw, 66px);
-
-            line-height: .93;
-
-            letter-spacing: -1.5px;
-          }
-
-          .brandText h1 span {
-            color: #8fddff;
-          }
-
-          .brandText p {
-            max-width: 315px;
-
-            margin:
-              24px
-              0
-              0;
-
-            color:
-              rgba(255,255,255,.82);
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 15px;
-            line-height: 1.65;
-          }
-
-          .brandFoot {
-            position: relative;
-            z-index: 1;
-
-            color:
-              rgba(255,255,255,.66);
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 13px;
-            letter-spacing: .8px;
-          }
-
-          .loginPanel {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            min-width: 220px;
 
             padding:
-              52px
-              58px;
+              15px
+              26px
+              13px;
+
+            border:
+              2px solid #23546d;
+
+            border-radius: 15px;
 
             background:
-              rgba(255,255,255,.98);
+              linear-gradient(
+                180deg,
+                #c7efff 0%,
+                #65c3ee 32%,
+                #159bd6 100%
+              );
+
+            box-shadow:
+              inset 0 2px 0
+                rgba(255,255,255,.75),
+              0 7px 0 #17658a,
+              0 11px 18px
+                rgba(0,0,0,.18);
+
+            color: #0f3348;
+
+            font-size: 28px;
+            font-weight: 800;
+            text-align: center;
+
+            z-index: 2;
           }
 
-          .loginHeader {
-            margin-bottom: 30px;
-          }
+          .namePlate {
+            position: relative;
+            z-index: 1;
 
-          .loginMiniBadge {
-            width: fit-content;
+            width: 100%;
 
-            margin-bottom: 16px;
+            margin-bottom: 24px;
 
             padding:
-              7px
-              11px;
+              20px
+              16px;
 
-            border-radius: 999px;
+            border:
+              2px solid #595e61;
 
-            background: #e8f5fb;
+            border-radius: 14px;
 
-            color: #12688f;
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff 0%,
+                #ececec 55%,
+                #d4d4d4 100%
+              );
 
-            font-family:
-              Arial,
-              sans-serif;
+            box-shadow:
+              inset 0 2px 0 #ffffff,
+              0 7px 0 #373c3f,
+              0 10px 15px
+                rgba(0,0,0,.18);
 
-            font-size: 11px;
-            font-weight: 900;
+            color: #111;
 
-            letter-spacing: 1.2px;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.18;
+            text-align: center;
           }
 
-          .loginHeader h2 {
-            margin: 0;
-
-            color: #17252f;
-
-            font-size: 38px;
-            line-height: 1.05;
-            font-weight: 900;
-          }
-
-          .loginHeader p {
-            max-width: 430px;
-
-            margin:
-              12px
-              0
-              0;
-
-            color: #687782;
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 15px;
-            line-height: 1.55;
+          .mobileNameBreak {
+            display: none;
           }
 
           .loginForm {
+            position: relative;
+            z-index: 1;
+
             display: flex;
             flex-direction: column;
 
-            gap: 14px;
+            gap: 18px;
           }
 
-          .loginLabel {
-            color: #2b3b46;
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 13px;
-            font-weight: 800;
-          }
-
-          .loginInputWrapper {
+          .inputShell {
             min-height: 58px;
 
             display: flex;
@@ -624,39 +426,34 @@ export default function Home() {
 
             padding:
               0
-              17px;
+              16px;
 
             border:
-              1.5px solid #cbd8df;
+              2px solid #2f7fa7;
 
-            border-radius: 14px;
+            border-radius: 12px;
 
-            background: #f8fafb;
-
-            transition:
-              border-color .18s ease,
-              box-shadow .18s ease,
-              background .18s ease;
-          }
-
-          .loginInputWrapper:focus-within {
-            border-color: #1684b9;
-
-            background: #ffffff;
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff 0%,
+                #f5f5f5 55%,
+                #e9e9e9 100%
+              );
 
             box-shadow:
-              0 0 0 4px
-              rgba(22,132,185,.12);
+              inset 0 2px 0 #ffffff,
+              0 6px 0 #3b464b,
+              0 9px 14px
+                rgba(0,0,0,.17);
           }
 
-          .loginKeyIcon {
-            margin-right: 12px;
+          .lockIcon {
+            flex: 0 0 auto;
 
-            color: #1b86b8;
+            margin-right: 11px;
 
-            font-size: 12px;
-
-            transform: rotate(45deg);
+            font-size: 18px;
           }
 
           .loginInput {
@@ -668,280 +465,184 @@ export default function Home() {
 
             background: transparent;
 
-            color: #17252f;
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 16px;
-            font-weight: 700;
-
-            letter-spacing: .5px;
-          }
-
-          .loginInput::placeholder {
-            color: #9aa8b2;
-            font-weight: 500;
-          }
-
-          .loginError {
-            padding:
-              11px
-              13px;
-
-            border:
-              1px solid #f0b7b7;
-
-            border-radius: 11px;
-
-            background: #fff4f4;
-
-            color: #a22c2c;
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 13px;
-            font-weight: 700;
-
-            text-align: center;
-          }
-
-          .loginButton {
-            min-height: 58px;
-
-            margin-top: 2px;
-
-            border: 0;
-            border-radius: 14px;
-
-            background:
-              linear-gradient(
-                135deg,
-                #0e5c87 0%,
-                #118bc2 100%
-              );
-
-            box-shadow:
-              0 12px 22px
-                rgba(15,111,157,.22);
-
-            color: #ffffff;
+            color: #222;
 
             font-family:
               "Bell MT",
               "Times New Roman",
               serif;
 
-            font-size: 22px;
+            font-size: 19px;
+            font-weight: 700;
+          }
+
+          .loginInput::placeholder {
+            color: #777;
+            opacity: 1;
+          }
+
+          .loginError {
+            margin-top: -2px;
+
+            padding:
+              10px
+              12px;
+
+            border:
+              1px solid #c86b6b;
+
+            border-radius: 9px;
+
+            background: #ffecec;
+
+            color: #9b2222;
+
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
+          }
+
+          .loginButton {
+            min-height: 58px;
+
+            border:
+              2px solid #20729a;
+
+            border-radius: 12px;
+
+            background:
+              linear-gradient(
+                180deg,
+                #d4f4ff 0%,
+                #65c9f0 28%,
+                #0e9bd8 100%
+              );
+
+            box-shadow:
+              inset 0 2px 0
+                rgba(255,255,255,.85),
+              0 7px 0 #17698e,
+              0 11px 15px
+                rgba(0,0,0,.18);
+
+            color: #0a3349;
+
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
+
+            font-size: 25px;
             font-weight: 900;
 
             cursor: pointer;
 
             transition:
-              transform .16s ease,
-              box-shadow .16s ease,
-              filter .16s ease;
+              transform .12s ease,
+              box-shadow .12s ease;
           }
 
           .loginButton:hover {
-            transform:
-              translateY(-1px);
-
-            box-shadow:
-              0 15px 26px
-              rgba(15,111,157,.27);
-
-            filter: brightness(1.03);
+            transform: translateY(-1px);
           }
 
           .loginButton:active {
-            transform:
-              translateY(1px);
+            transform: translateY(4px);
+
+            box-shadow:
+              inset 0 2px 0
+                rgba(255,255,255,.65),
+              0 3px 0 #17698e,
+              0 7px 10px
+                rgba(0,0,0,.15);
           }
 
           .loginButton:disabled {
-            opacity: .6;
+            opacity: .65;
             cursor: wait;
-            transform: none;
           }
 
-          .loginDivider {
-            display: flex;
-            align-items: center;
-
-            gap: 12px;
-
-            margin:
-              29px
-              0
-              18px;
-
-            color: #7a8892;
-
-            font-size: 13px;
-            text-align: center;
-          }
-
-          .loginDivider span {
-            flex: 1;
-            height: 1px;
-
-            background: #e1e7eb;
-          }
-
-          .loginDivider b {
-            max-width: 265px;
-
-            color: #485761;
-
-            font-weight: 700;
-          }
-
-          .loginInfo {
-            color: #7f8c95;
-
-            font-family:
-              Arial,
-              sans-serif;
-
-            font-size: 12px;
-            line-height: 1.5;
-            text-align: center;
-          }
-
-          @media (max-width: 780px) {
+          @media (max-width: 520px) {
             .loginPage {
               padding:
-                22px
+                38px
                 14px;
             }
 
-            .loginShell {
-              width: min(100%, 430px);
-              min-height: auto;
-
-              grid-template-columns: 1fr;
-
-              border-radius: 22px;
-            }
-
-            .loginBrand {
-              min-height: 195px;
+            .loginCard {
+              width: min(91vw, 360px);
 
               padding:
-                25px
-                24px
-                23px;
+                66px
+                18px
+                24px;
+
+              border-radius: 18px;
             }
 
-            .brandBadge {
-              width: 46px;
-              height: 46px;
+            .loginTab {
+              top: -29px;
 
-              border-radius: 14px;
+              min-width: 190px;
 
-              font-size: 24px;
+              padding:
+                12px
+                22px
+                11px;
+
+              border-radius: 13px;
+
+              font-size: 23px;
             }
 
-            .brandText {
-              margin:
-                28px
-                0
-                0;
+            .namePlate {
+              margin-bottom: 21px;
+
+              padding:
+                17px
+                12px;
+
+              font-size: 21px;
             }
 
-            .brandEyebrow {
-              margin-bottom: 9px;
-
-              font-size: 10px;
+            .mobileNameBreak {
+              display: initial;
             }
 
-            .brandText h1 {
-              display: block;
-
-              font-size: 37px;
-              line-height: 1;
-            }
-
-            .brandText h1 span {
-              margin-left: 8px;
-            }
-
-            .brandText p {
+            .desktopNameSpace {
               display: none;
             }
 
-            .brandFoot {
-              display: none;
-            }
-
-            .loginPanel {
-              padding:
-                32px
-                24px
-                28px;
-            }
-
-            .loginHeader {
-              margin-bottom: 24px;
-            }
-
-            .loginMiniBadge {
-              margin-bottom: 12px;
-            }
-
-            .loginHeader h2 {
-              font-size: 31px;
-            }
-
-            .loginHeader p {
-              font-size: 14px;
-            }
-
-            .loginInputWrapper,
+            .inputShell,
             .loginButton {
-              min-height: 56px;
+              min-height: 54px;
             }
 
-            .loginDivider {
-              margin-top: 24px;
+            .loginInput {
+              font-size: 17px;
+            }
+
+            .loginButton {
+              font-size: 23px;
             }
           }
 
-          @media (max-width: 390px) {
-            .loginPage {
-              padding:
-                12px
-                10px;
+          @media (max-width: 360px) {
+            .loginCard {
+              width: 93vw;
+
+              padding-left: 15px;
+              padding-right: 15px;
             }
 
-            .loginBrand {
-              min-height: 170px;
+            .loginTab {
+              min-width: 176px;
 
-              padding:
-                20px;
+              font-size: 21px;
             }
 
-            .brandText {
-              margin-top: 22px;
-            }
-
-            .brandText h1 {
-              font-size: 33px;
-            }
-
-            .loginPanel {
-              padding:
-                27px
-                19px
-                24px;
-            }
-
-            .loginHeader h2 {
-              font-size: 29px;
+            .namePlate {
+              font-size: 19px;
             }
           }
         `}</style>
