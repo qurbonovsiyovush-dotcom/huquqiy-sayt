@@ -156,6 +156,7 @@ export default function AdminTestsPage() {
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -623,6 +624,92 @@ export default function AdminTestsPage() {
       );
     } finally {
       setWorkingId(null);
+    }
+  }
+
+  /* =========================================================
+     KO'RINIB TURGAN QORALAMALARNI BIR YO'LA O'CHIRISH
+  ========================================================= */
+
+  async function deleteVisibleDrafts() {
+    const drafts = filteredTests.filter(
+      (test) => test.status === "draft"
+    );
+
+    if (drafts.length === 0) {
+      window.alert(
+        "Hozirgi filtrda o‘chiriladigan qoralama test yo‘q."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${drafts.length} ta qoralama test BUTUNLAY o‘chiriladi.\n\n` +
+        "Faqat hozir tanlangan bo‘lim va qidiruv/holat filtriga mos QORALAMA testlar o‘chiriladi.\n" +
+        "E’lon qilingan testlarga tegilmaydi.\n\n" +
+        "Bu amalni ortga qaytarib bo‘lmaydi.\n\n" +
+        "Davom etasizmi?"
+    );
+
+    if (!confirmed) return;
+
+    const secondConfirmed = window.confirm(
+      `DIQQAT!\n\n${drafts.length} ta qoralamani o‘chirishni tasdiqlaysizmi?`
+    );
+
+    if (!secondConfirmed) return;
+
+    setBulkDeleting(true);
+    const deletedIds: string[] = [];
+    const failed: string[] = [];
+
+    try {
+      // Ketma-ket o‘chiramiz: umumiy test omboriga parallel yozuv yubormaymiz.
+      for (const test of drafts) {
+        try {
+          setWorkingId(test.id);
+
+          const response = await fetch(
+            `/api/tests/${encodeURIComponent(test.id)}`,
+            {
+              method: "DELETE",
+              cache: "no-store",
+            }
+          );
+
+          const data = await readJson(response);
+
+          if (!response.ok || !data.success) {
+            failed.push(test.title || test.id);
+            continue;
+          }
+
+          deletedIds.push(test.id);
+
+          setTests((current) =>
+            current.filter((item) => item.id !== test.id)
+          );
+        } catch (error) {
+          console.error(error);
+          failed.push(test.title || test.id);
+        }
+      }
+
+      if (failed.length === 0) {
+        window.alert(
+          `${deletedIds.length} ta qoralama test muvaffaqiyatli o‘chirildi.`
+        );
+      } else {
+        window.alert(
+          `${deletedIds.length} ta qoralama o‘chirildi.\n` +
+            `${failed.length} ta testni o‘chirishda xatolik yuz berdi.`
+        );
+      }
+
+      await loadTests();
+    } finally {
+      setWorkingId(null);
+      setBulkDeleting(false);
     }
   }
 
@@ -1958,11 +2045,32 @@ margin: 10px auto 12px;
             </button>
           )}
 
+          {selectedCategory === "thematic" && (
+            <button
+              type="button"
+              className="deleteButton"
+              onClick={deleteVisibleDrafts}
+              disabled={
+                loading ||
+                bulkPublishing ||
+                bulkDeleting ||
+                filteredTests.every(
+                  (test) => test.status !== "draft"
+                )
+              }
+              title="Hozir ko‘rinib turgan qoralama testlarni bir yo‘la o‘chirish"
+            >
+              {bulkDeleting
+                ? "O‘chirilmoqda..."
+                : "Qoralamalarni o‘chirish"}
+            </button>
+          )}
+
           <button
             type="button"
             className="refreshButton"
             onClick={loadTests}
-            disabled={loading || bulkPublishing}
+            disabled={loading || bulkPublishing || bulkDeleting}
           >
             ↻ Yangilash
           </button>
