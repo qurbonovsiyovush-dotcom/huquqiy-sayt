@@ -490,8 +490,8 @@ export default function AdminTestsPage() {
     }
 
     const confirmed = window.confirm(
-      `${drafts.length} ta qoralama test bir yo‘la e’lon qilinadi.\n\n` +
-        "Faqat hozir tanlangan bo‘lim va qidiruv/holat filtriga mos testlar e’lon qilinadi.\n\n" +
+      `${drafts.length} ta qoralama test BIR YO‘LA e’lon qilinadi.\n\n` +
+        "Faqat hozir tanlangan bo‘lim va qidiruv/holat filtriga mos qoralamalar e’lon qilinadi.\n\n" +
         "Davom etasizmi?"
     );
 
@@ -500,75 +500,86 @@ export default function AdminTestsPage() {
     }
 
     setBulkPublishing(true);
-
-    const publishedIds: string[] = [];
-    const failed: string[] = [];
+    setError("");
 
     try {
       /*
-        Har bir test uchun faqat status maydonini PUT qilamiz.
-        Savollar qayta yuborilmaydi, shuning uchun katta testlarda
-        request hajmi oshib ketmaydi.
-
-        So‘rovlarni ketma-ket yuboramiz: Blob faylga bir vaqtning
-        o‘zida ko‘p yozish natijasida ma’lumot yo‘qolib qolmasin.
+        MUHIM:
+        Endi 31 ta alohida PUT yuborilmaydi.
+        Barcha ID lar BIRTA POST bilan /api/tests ga yuboriladi.
+        Server tests.json ni bir marta o‘qiydi va bir marta yozadi.
       */
-      for (const test of drafts) {
-        try {
-          setWorkingId(test.id);
-
-          const response = await fetch(
-            `/api/tests/${encodeURIComponent(test.id)}`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                status: "published",
-              }),
-            }
-          );
-
-          const data = await readJson(response);
-
-          if (!response.ok || !data.success) {
-            failed.push(test.title || test.id);
-            continue;
-          }
-
-          publishedIds.push(test.id);
-
-          setTests((current) =>
-            current.map((item) =>
-              item.id === test.id
-                ? {
-                    ...item,
-                    ...(data.test || {}),
-                    status: "published",
-                  }
-                : item
-            )
-          );
-        } catch (error) {
-          console.error(error);
-          failed.push(test.title || test.id);
+      const response = await fetch(
+        "/api/tests",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "bulk-publish-tests",
+            testIds: drafts.map(
+              (test) => test.id
+            ),
+          }),
         }
+      );
+
+      const data =
+        await readJson(
+          response
+        );
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        window.alert(
+          data.message ||
+            "Testlarni bir yo‘la e’lon qilib bo‘lmadi."
+        );
+        return;
       }
 
-      if (failed.length === 0) {
-        window.alert(
-          `${publishedIds.length} ta test muvaffaqiyatli e’lon qilindi.`
+      const publishedIds =
+        new Set<string>(
+          Array.isArray(
+            data.publishedIds
+          )
+            ? data.publishedIds.map(
+                (value: unknown) =>
+                  String(value)
+              )
+            : []
         );
-      } else {
-        window.alert(
-          `${publishedIds.length} ta test e’lon qilindi.\n` +
-            `${failed.length} ta testda xatolik yuz berdi.\n\n` +
-            "Xatolik bo‘lgan testlarni ro‘yxatdan tekshiring."
-        );
-      }
+
+      setTests(
+        (current) =>
+          current.map(
+            (test) =>
+              publishedIds.has(
+                test.id
+              )
+                ? {
+                    ...test,
+                    status:
+                      "published",
+                  }
+                : test
+          )
+      );
+
+      window.alert(
+        `${Number(data.publishedCount) || publishedIds.size} ta test bir yo‘la e’lon qilindi.`
+      );
 
       await loadTests();
+    } catch (error) {
+      console.error(error);
+
+      window.alert(
+        "Testlarni bir yo‘la e’lon qilishda server xatosi."
+      );
     } finally {
       setWorkingId(null);
       setBulkPublishing(false);
