@@ -3471,6 +3471,22 @@ export async function POST(
       answerKeyApplied,
       answerKeyCount:
         answerKey.length,
+
+      // DIAGNOSTIKA: thematic parser vizual savollarni nechta aniqlaganini ko‘rsatadi.
+      // Bu qiymatlar faqat tekshiruv uchun; savollarni saqlash/parslash mantiqiga tegmaydi.
+      visualQuestionCount:
+        finalQuestions.filter(
+          (question) => Boolean(question.pdfCrop)
+        ).length,
+      pdfCropCount:
+        finalQuestions.filter(
+          (question) => Boolean(question.pdfCrop)
+        ).length,
+      pdfCropQuestionNumbers:
+        finalQuestions
+          .filter((question) => Boolean(question.pdfCrop))
+          .map((question) => question.number),
+
       total:
         finalQuestions.length,
     });
