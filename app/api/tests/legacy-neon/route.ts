@@ -144,13 +144,13 @@ export async function POST(
       ? body.testIds
       : [];
 
-    const testIds = Array.from(
-      new Set(
+    const testIds: string[] = Array.from(
+      new Set<string>(
         rawIds
-          .map((value: unknown) =>
+          .map((value: unknown): string =>
             String(value || "").trim()
           )
-          .filter(Boolean)
+          .filter((value: string): boolean => Boolean(value))
       )
     );
 
@@ -255,4 +255,3 @@ export async function POST(
     );
   }
 }
-
