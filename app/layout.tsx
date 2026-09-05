@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    "https://qurbonov.uz"
+    "https://qurbonovv.uz"
   ),
 
   title: {
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "Qurbonov S.J.",
     "Qurbonov Siyovush",
     "Qurbonov Siyovush Jamaliddinzoda",
-    "qurbonov.uz",
+    "qurbonovv.uz",
     "huquq",
     "huquqiy ta'lim",
     "huquqiy ta'lim platformasi",
@@ -55,6 +55,7 @@ export const metadata: Metadata = {
     {
       name:
         "Qurbonov Siyovush Jamaliddinzoda",
+      url: "https://qurbonovv.uz",
     },
   ],
 
@@ -65,7 +66,7 @@ export const metadata: Metadata = {
     "Qurbonov Siyovush Jamaliddinzoda",
 
   alternates: {
-    canonical: "https://qurbonov.uz",
+    canonical: "https://qurbonovv.uz/",
   },
 
   icons: {
@@ -78,7 +79,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "uz_UZ",
 
-    url: "https://qurbonov.uz",
+    url: "https://qurbonovv.uz/",
 
     siteName:
       "Qurbonov S.J.",
