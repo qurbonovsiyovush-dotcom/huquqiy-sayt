@@ -1,503 +1,301 @@
 import { cookies } from "next/headers";
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
-import {
-  del,
-  get,
-  put,
-} from "@vercel/blob";
+import { NextRequest, NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const TESTS_BLOB_PATH =
-  "huquqiy-sayt/tests.json";
-
-/*
-  YANGI TEZKOR SAQLASH:
-  Har bir test alohida blob sifatida ham saqlanadi.
-
-  Masalan:
-  huquqiy-sayt/tests-by-id/abc-123.json
-
-  Shunda /api/tests/[id] har safar ulkan tests.json ni
-  to‘liq yuklab, JSON.parse qilib, find() qilishga majbur bo‘lmaydi.
-*/
-const TEST_BY_ID_DIR =
-  "huquqiy-sayt/tests-by-id";
-
-const MEMORY_TTL_MS =
-  60_000;
-
-type TestStatus =
-  | "draft"
-  | "published";
-
-type TestData = {
-  id: string;
-  title?: string;
-  subject?: string;
-  duration?: number;
-  description?: string;
-  status?: TestStatus;
-  questions?: unknown[];
-  testType?: string;
-  customTestTypeName?: string;
-  attemptLimit?:
-    | number
-    | null;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: unknown;
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
 };
 
-type MemoryItem = {
-  test: TestData;
-  expiresAt: number;
+type IncomingOption = {
+  id?: unknown;
+  text?: unknown;
+  optionText?: unknown;
+  html?: unknown;
+  isCorrect?: unknown;
+  correct?: unknown;
 };
 
-/*
-  Bitta server instance ichida takroriy GETlarda
-  Blobga ham qayta murojaat qilmaslik uchun.
-*/
-const memoryCache =
-  new Map<
-    string,
-    MemoryItem
-  >();
+type IncomingQuestion = {
+  id?: unknown;
+  questionText?: unknown;
+  questionHtml?: unknown;
+  points?: unknown;
+  shapes?: unknown;
+  options?: IncomingOption[];
+};
 
 async function isAdmin() {
-  const cookieStore =
-    await cookies();
+  const cookieStore = await cookies();
 
-  return Boolean(
-    cookieStore.get(
-      "qurbonov_session"
-    )?.value &&
-      cookieStore.get(
-        "qurbonov_role"
-      )?.value === "admin"
+  return (
+    cookieStore.get("qurbonov_session")?.value &&
+    cookieStore.get("qurbonov_role")?.value === "admin"
   );
 }
 
-function checkBlobToken() {
-  if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
+function normalizeStatus(value: unknown) {
+  return value === "published"
+    ? "published"
+    : "draft";
 }
 
-function normalizeTests(
+function optionKey(index: number) {
+  return String.fromCharCode(
+    65 + index
+  );
+}
+
+function asObject(
   value: unknown
-): TestData[] {
-  if (
+): Record<string, unknown> {
+  return (
+    value &&
+    typeof value === "object" &&
     !Array.isArray(value)
-  ) {
-    throw new Error(
-      "tests.json formati noto‘g‘ri."
-    );
-  }
-
-  return value as TestData[];
-}
-
-function testBlobPath(
-  id: string
-) {
-  return `${TEST_BY_ID_DIR}/${encodeURIComponent(
-    id
-  )}.json`;
-}
-
-function putMemory(
-  test: TestData
-) {
-  memoryCache.set(
-    test.id,
-    {
-      test,
-      expiresAt:
-        Date.now() +
-        MEMORY_TTL_MS,
-    }
-  );
-}
-
-function getMemory(
-  id: string
-) {
-  const item =
-    memoryCache.get(id);
-
-  if (!item) {
-    return null;
-  }
-
-  if (
-    item.expiresAt <=
-    Date.now()
-  ) {
-    memoryCache.delete(id);
-    return null;
-  }
-
-  return item.test;
-}
-
-function removeMemory(
-  id: string
-) {
-  memoryCache.delete(id);
-}
-
-/*
-  Eski katta tests.json ni o‘qish.
-  Bu endi faqat:
-  1) individual blob hali yaratilmagan birinchi GETda;
-  2) PUT/DELETE paytida umumiy tests.json ni sinxron saqlashda
-  ishlatiladi.
-*/
-async function readTests(): Promise<
-  TestData[]
-> {
-  checkBlobToken();
-
-  const result =
-    await get(
-      TESTS_BLOB_PATH,
-      {
-        access: "private",
-      }
-    );
-
-  if (
-    !result ||
-    result.statusCode !==
-      200 ||
-    !result.stream
-  ) {
-    throw new Error(
-      `tests.json o‘qilmadi. Status: ${
-        result?.statusCode ??
-        "noma'lum"
-      }`
-    );
-  }
-
-  const text =
-    await new Response(
-      result.stream
-    ).text();
-
-  if (!text.trim()) {
-    throw new Error(
-      "tests.json bo‘sh."
-    );
-  }
-
-  return normalizeTests(
-    JSON.parse(text)
-  );
-}
-
-async function writeTests(
-  tests: TestData[]
-) {
-  checkBlobToken();
-
-  await put(
-    TESTS_BLOB_PATH,
-    JSON.stringify(
-      tests,
-      null,
-      2
-    ),
-    {
-      access: "private",
-      addRandomSuffix:
-        false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge:
-        0,
-    }
-  );
-}
-
-/*
-  Bitta testni alohida Blobga yozish.
-*/
-async function writeTestById(
-  test: TestData
-) {
-  checkBlobToken();
-
-  await put(
-    testBlobPath(
-      test.id
-    ),
-    JSON.stringify(test),
-    {
-      access: "private",
-      addRandomSuffix:
-        false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-
-      /*
-        Vercel Blob CDN keshi eski testni ushlab qolmasin.
-        Biz yuqorida o‘zimiz memory cache boshqaryapmiz.
-      */
-      cacheControlMaxAge:
-        0,
-    }
-  );
-
-  putMemory(test);
-}
-
-/*
-  Eng tez o‘qish tartibi:
-
-  1. RAM cache
-  2. tests-by-id/<id>.json
-  3. Faqat individual fayl yo‘q bo‘lsa eski tests.json
-     va topilgan test uchun individual faylni avtomatik yaratish.
-
-  Bu usul eski testlarni migratsiya qilmasdan ham ishlaydi:
-  test birinchi marta ochilganda o‘zi tezkor formatga ko‘chadi.
-*/
-async function readTestFast(
-  id: string
-): Promise<TestData | null> {
-  const memory =
-    getMemory(id);
-
-  if (memory) {
-    return memory;
-  }
-
-  checkBlobToken();
-
-  try {
-    const result =
-      await get(
-        testBlobPath(id),
-        {
-          access:
-            "private",
-        }
-      );
-
-    if (
-      result &&
-      result.statusCode ===
-        200 &&
-      result.stream
-    ) {
-      const text =
-        await new Response(
-          result.stream
-        ).text();
-
-      if (text.trim()) {
-        const parsed =
-          JSON.parse(
-            text
-          ) as TestData;
-
-        if (
-          parsed &&
-          parsed.id === id
-        ) {
-          putMemory(parsed);
-          return parsed;
-        }
-      }
-    }
-  } catch (error) {
-    /*
-      Individual Blob hali yo‘q bo‘lishi mumkin.
-      Buni fatal xato deb hisoblamaymiz,
-      eski tests.json fallbackga o‘tamiz.
-    */
-    console.warn(
-      `Individual test blob o‘qilmadi (${id}), fallback tests.json:`,
-      error
-    );
-  }
-
-  const tests =
-    await readTests();
-
-  const test =
-    tests.find(
-      (item) =>
-        item.id === id
-    ) || null;
-
-  if (!test) {
-    return null;
-  }
-
-  /*
-    Birinchi sekin GETdan keyin shu test uchun
-    alohida tezkor fayl yaratamiz.
-    Bu yozish xatosi testni ochishga halaqit bermasin.
-  */
-  try {
-    await writeTestById(
-      test
-    );
-  } catch (error) {
-    console.warn(
-      `Individual test blob yaratilmadi (${id}):`,
-      error
-    );
-
-    putMemory(test);
-  }
-
-  return test;
-}
-
-async function removeTestByIdBlob(
-  id: string
-) {
-  removeMemory(id);
-
-  try {
-    await del(
-      testBlobPath(id)
-    );
-  } catch (error) {
-    /*
-      Individual fayl bo‘lmasa DELETE baribir muvaffaqiyatli
-      hisoblanishi kerak.
-    */
-    console.warn(
-      `Individual test blob o‘chirilmadi (${id}):`,
-      error
-    );
-  }
-}
-
-async function getId(
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
-) {
-  const params =
-    await context.params;
-
-  return decodeURIComponent(
-    String(
-      params?.id || ""
-    )
-  ).trim();
+  )
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 export async function GET(
   _request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
+  context: RouteContext
 ) {
   try {
-    const id =
-      await getId(context);
+    const { id } = await context.params;
 
-    if (!id) {
+    const testRows = await sql`
+      SELECT
+        id,
+        title,
+        subject,
+        duration,
+        description,
+        test_type,
+        custom_test_type_name,
+        status,
+        attempt_limit,
+        extra_json,
+        created_at,
+        updated_at
+      FROM legacy_tests
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+
+    if (testRows.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Test ID topilmadi.",
+          message: "Test topilmadi.",
         },
-        {
-          status: 400,
-        }
+        { status: 404 }
       );
     }
 
-    const test =
-      await readTestFast(
-        id
-      );
-
-    if (!test) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
-    }
+    const testRow: any =
+      testRows[0];
 
     /*
-      Qoralamani oddiy foydalanuvchi IDni bilib olib
-      ochib ketmasligi kerak.
-      Admin esa qoralamani tahrirlash uchun ko‘ra oladi.
+      Draft testni foydalanuvchiga bermaymiz.
+      Admin esa tahrirlash uchun ko‘ra oladi.
     */
+    const admin = await isAdmin();
+
     if (
-      test.status !==
-        "published" &&
-      !(await isAdmin())
+      testRow.status !== "published" &&
+      !admin
     ) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "Test topilmadi.",
+            "Bu test hali e’lon qilinmagan.",
         },
-        {
-          status: 404,
-        }
+        { status: 403 }
       );
     }
 
-    const admin =
-      await isAdmin();
+    const questionRows = await sql`
+      SELECT
+        id,
+        question_number,
+        question_text,
+        question_html,
+        points,
+        shapes_json,
+        extra_json
+      FROM legacy_test_questions
+      WHERE test_id = ${id}
+      ORDER BY question_number ASC, id ASC
+    `;
 
-    return NextResponse.json(
-      {
-        success: true,
-        test,
-      },
-      {
-        status: 200,
-        headers: {
-          /*
-            Admin uchun hech qanday browser cache yo‘q.
-            Published test foydalanuvchida 15 soniya turishi mumkin.
-            Asosiy tezlik baribir individual Blob + memory cache dan keladi.
-          */
-          "Cache-Control":
-            admin
-              ? "no-store, no-cache, must-revalidate"
-              : "private, max-age=15, stale-while-revalidate=30",
-        },
-      }
-    );
+    const questionIds =
+      questionRows.map(
+        (row: any) =>
+          Number(row.id)
+      );
+
+    let optionRows: any[] = [];
+
+    if (questionIds.length > 0) {
+      optionRows = await sql`
+        SELECT
+          id,
+          question_id,
+          option_key,
+          option_text,
+          option_html,
+          is_correct,
+          extra_json
+        FROM legacy_test_options
+        WHERE question_id = ANY(${questionIds})
+        ORDER BY
+          question_id ASC,
+          option_key ASC,
+          id ASC
+      `;
+    }
+
+    const optionsByQuestion =
+      new Map<number, any[]>();
+
+    for (const row of optionRows) {
+      const questionId =
+        Number(row.question_id);
+
+      const current =
+        optionsByQuestion.get(
+          questionId
+        ) || [];
+
+      current.push({
+        id: String(row.id),
+        text:
+          String(
+            row.option_html ||
+              row.option_text ||
+              ""
+          ),
+        optionText:
+          String(
+            row.option_text ||
+              ""
+          ),
+        html:
+          row.option_html
+            ? String(row.option_html)
+            : "",
+        isCorrect:
+          row.is_correct === true,
+        correct:
+          row.is_correct === true,
+      });
+
+      optionsByQuestion.set(
+        questionId,
+        current
+      );
+    }
+
+    const questions =
+      questionRows.map(
+        (row: any) => ({
+          id: String(row.id),
+          questionText:
+            String(
+              row.question_text || ""
+            ),
+          questionHtml:
+            String(
+              row.question_html ||
+                row.question_text ||
+                ""
+            ),
+          points:
+            Number(row.points) || 1,
+          shapes:
+            Array.isArray(row.shapes_json)
+              ? row.shapes_json
+              : [],
+          options:
+            optionsByQuestion.get(
+              Number(row.id)
+            ) || [],
+        })
+      );
+
+    const test = {
+      id: String(testRow.id),
+      title:
+        String(testRow.title || ""),
+      subject:
+        String(testRow.subject || ""),
+      duration:
+        Number(testRow.duration) || 30,
+      description:
+        testRow.description == null
+          ? ""
+          : String(
+              testRow.description
+            ),
+      status:
+        normalizeStatus(
+          testRow.status
+        ),
+      testType:
+        testRow.test_type == null
+          ? undefined
+          : String(
+              testRow.test_type
+            ),
+      customTestTypeName:
+        testRow.custom_test_type_name ==
+        null
+          ? undefined
+          : String(
+              testRow.custom_test_type_name
+            ),
+      attemptLimit:
+        testRow.attempt_limit == null
+          ? null
+          : Number(
+              testRow.attempt_limit
+            ),
+      questions,
+      questionCount:
+        questions.length,
+      storage: "legacy",
+      createdAt:
+        testRow.created_at
+          ? new Date(
+              testRow.created_at
+            ).toISOString()
+          : undefined,
+      updatedAt:
+        testRow.updated_at
+          ? new Date(
+              testRow.updated_at
+            ).toISOString()
+          : undefined,
+      ...asObject(
+        testRow.extra_json
+      ),
+    };
+
+    return NextResponse.json({
+      success: true,
+      test,
+    });
   } catch (error) {
     console.error(
-      "GET /api/tests/[id] ERROR:",
+      "LEGACY NEON GET ONE ERROR:",
       error
     );
 
@@ -505,118 +303,147 @@ export async function GET(
       {
         success: false,
         message:
-          error instanceof
-          Error
+          error instanceof Error
             ? error.message
-            : "Testni yuklashda server xatosi.",
+            : "Testni yuklab bo‘lmadi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
+  context: RouteContext
 ) {
   try {
-    if (
-      !(await isAdmin())
-    ) {
+    if (!(await isAdmin())) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "Bu amal faqat administrator uchun.",
+            "Faqat administrator uchun.",
         },
-        {
-          status: 403,
-        }
+        { status: 403 }
       );
     }
 
-    const id =
-      await getId(context);
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID topilmadi.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+    const { id } =
+      await context.params;
 
     const body =
       await request.json();
 
-    /*
-      PUTda umumiy tests.json hali source-of-truth bo‘lib qoladi.
-      Shuning uchun eski admin/import tizimlari buzilmaydi.
-    */
-    const tests =
-      await readTests();
+    const existing =
+      await sql`
+        SELECT id
+        FROM legacy_tests
+        WHERE id = ${id}
+        LIMIT 1
+      `;
 
-    const index =
-      tests.findIndex(
-        (item) =>
-          item.id === id
-      );
-
-    if (index < 0) {
+    if (existing.length === 0) {
       return NextResponse.json(
         {
           success: false,
           message:
             "Test topilmadi.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    const current =
-      tests[index];
+    /*
+      Admin paneldagi "E'lon qilish / Qoralama" tugmasi
+      faqat { status } yuboradi.
+    */
+    if (
+      body?.status &&
+      !Array.isArray(body?.questions)
+    ) {
+      const status =
+        normalizeStatus(
+          body.status
+        );
 
-    const requestedStatus: TestStatus =
-      body?.status ===
-      "published"
-        ? "published"
-        : body?.status ===
-          "draft"
-        ? "draft"
-        : current.status ===
-          "published"
-        ? "published"
-        : "draft";
+      if (
+        status === "published"
+      ) {
+        const counts =
+          await sql`
+            SELECT
+              COUNT(*)::int AS question_count
+            FROM legacy_test_questions
+            WHERE test_id = ${id}
+          `;
 
-    const nextQuestions =
+        if (
+          Number(
+            counts[0]?.question_count
+          ) <= 0
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "Savolsiz testni e’lon qilib bo‘lmaydi.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      await sql`
+        UPDATE legacy_tests
+        SET
+          status = ${status},
+          updated_at = NOW()
+        WHERE id = ${id}
+      `;
+
+      return NextResponse.json({
+        success: true,
+        testId: id,
+        status,
+      });
+    }
+
+    /*
+      /test/editor to‘liq test obyektini yuborsa,
+      Neon jadvallarini qayta saqlaymiz.
+    */
+    const title =
+      String(
+        body?.title || ""
+      ).trim();
+
+    if (!title) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Test nomi bo‘sh bo‘lishi mumkin emas.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const questions:
+      IncomingQuestion[] =
       Array.isArray(
         body?.questions
       )
         ? body.questions
-        : Array.isArray(
-            current.questions
-          )
-        ? current.questions
         : [];
 
+    const status =
+      normalizeStatus(
+        body?.status
+      );
+
     if (
-      requestedStatus ===
-        "published" &&
-      nextQuestions.length ===
-        0
+      status === "published" &&
+      questions.length === 0
     ) {
       return NextResponse.json(
         {
@@ -624,89 +451,215 @@ export async function PUT(
           message:
             "Savolsiz testni e’lon qilib bo‘lmaydi.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const now =
-      new Date().toISOString();
-
-    const updatedTest: TestData =
-      {
-        ...current,
-        ...body,
-
-        /*
-          ID clientdan o‘zgartirib yuborilmaydi.
-        */
-        id: current.id,
-
-        questions:
-          nextQuestions,
-
-        status:
-          requestedStatus,
-
-        createdAt:
-          current.createdAt ||
+    await sql`
+      UPDATE legacy_tests
+      SET
+        title = ${title},
+        subject = ${
           String(
-            body?.createdAt ||
-              now
-          ),
-
-        updatedAt: now,
-      };
-
-    tests[index] =
-      updatedTest;
+            body?.subject || ""
+          ).trim()
+        },
+        duration = ${
+          Math.max(
+            1,
+            Number(
+              body?.duration
+            ) || 30
+          )
+        },
+        description = ${
+          String(
+            body?.description ||
+              ""
+          )
+        },
+        test_type = ${
+          body?.testType
+            ? String(
+                body.testType
+              )
+            : null
+        },
+        custom_test_type_name = ${
+          body?.customTestTypeName
+            ? String(
+                body.customTestTypeName
+              )
+            : null
+        },
+        status = ${status},
+        attempt_limit = ${
+          body?.attemptLimit == null ||
+          body?.attemptLimit === ""
+            ? null
+            : Math.max(
+                1,
+                Number(
+                  body.attemptLimit
+                ) || 1
+              )
+        },
+        questions_json =
+          '[]'::jsonb,
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
 
     /*
-      Avval source-of-truth tests.json,
-      keyin tezkor individual test.
+      ON DELETE CASCADE variantlarni ham o‘chiradi.
     */
-    await writeTests(tests);
+    await sql`
+      DELETE FROM legacy_test_questions
+      WHERE test_id = ${id}
+    `;
 
-    try {
-      await writeTestById(
-        updatedTest
-      );
-    } catch (error) {
-      /*
-        Asosiy tests.json allaqachon saqlandi.
-        Individual tezkor nusxa yozilmasa PUTni yiqitmaymiz;
-        keyingi GET tests.jsondan topib uni qayta yaratadi.
-      */
-      console.error(
-        `Individual test blob yangilanmadi (${id}):`,
-        error
-      );
+    for (
+      let questionIndex = 0;
+      questionIndex <
+      questions.length;
+      questionIndex++
+    ) {
+      const question =
+        questions[
+          questionIndex
+        ];
 
-      removeMemory(id);
+      const questionText =
+        String(
+          question?.questionText ??
+            question?.questionHtml ??
+            ""
+        ).trim();
+
+      const questionHtml =
+        String(
+          question?.questionHtml ??
+            questionText
+        );
+
+      const shapes =
+        Array.isArray(
+          question?.shapes
+        )
+          ? question.shapes
+          : [];
+
+      const insertedQuestions =
+        await sql`
+          INSERT INTO legacy_test_questions (
+            test_id,
+            question_number,
+            question_text,
+            question_html,
+            points,
+            shapes_json,
+            extra_json,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ${id},
+            ${questionIndex + 1},
+            ${questionText},
+            ${questionHtml},
+            ${
+              Number(
+                question?.points
+              ) || 1
+            },
+            ${JSON.stringify(
+              shapes
+            )}::jsonb,
+            '{}'::jsonb,
+            NOW(),
+            NOW()
+          )
+          RETURNING id
+        `;
+
+      const questionId =
+        Number(
+          insertedQuestions[0]?.id
+        );
+
+      const options =
+        Array.isArray(
+          question?.options
+        )
+          ? question.options
+          : [];
+
+      for (
+        let optionIndex = 0;
+        optionIndex <
+        options.length;
+        optionIndex++
+      ) {
+        const option =
+          options[optionIndex];
+
+        const optionText =
+          String(
+            option?.optionText ??
+              option?.text ??
+              ""
+          );
+
+        const optionHtml =
+          String(
+            option?.html ?? ""
+          );
+
+        const isCorrect =
+          option?.isCorrect === true ||
+          option?.correct === true;
+
+        await sql`
+          INSERT INTO legacy_test_options (
+            question_id,
+            option_key,
+            option_text,
+            option_html,
+            is_correct,
+            extra_json,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ${questionId},
+            ${optionKey(
+              optionIndex
+            )},
+            ${optionText},
+            ${
+              optionHtml ||
+              null
+            },
+            ${isCorrect},
+            '{}'::jsonb,
+            NOW(),
+            NOW()
+          )
+        `;
+      }
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message:
-          requestedStatus ===
-          "published"
-            ? "Test muvaffaqiyatli e’lon qilindi."
-            : "Test qoralama holatida saqlandi.",
-        test: updatedTest,
-      },
-      {
-        status: 200,
-        headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
-        },
-      }
-    );
+    return NextResponse.json({
+      success: true,
+      message:
+        "Test Neon bazasida saqlandi.",
+      testId: id,
+      questionCount:
+        questions.length,
+    });
   } catch (error) {
     console.error(
-      "PUT /api/tests/[id] ERROR:",
+      "LEGACY NEON PUT ERROR:",
       error
     );
 
@@ -714,115 +667,61 @@ export async function PUT(
       {
         success: false,
         message:
-          error instanceof
-          Error
+          error instanceof Error
             ? error.message
-            : "Testni yangilashda server xatosi.",
+            : "Testni saqlab bo‘lmadi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
 export async function DELETE(
   _request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
+  context: RouteContext
 ) {
   try {
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Faqat administrator uchun.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const { id } =
+      await context.params;
+
+    const deleted =
+      await sql`
+        DELETE FROM legacy_tests
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
     if (
-      !(await isAdmin())
+      deleted.length === 0
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Bu amal faqat administrator uchun.",
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-    const id =
-      await getId(context);
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Test ID topilmadi.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    const tests =
-      await readTests();
-
-    const index =
-      tests.findIndex(
-        (item) =>
-          item.id === id
-      );
-
-    if (index < 0) {
       return NextResponse.json(
         {
           success: false,
           message:
             "Test topilmadi.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    const deletedTest =
-      tests[index];
-
-    const nextTests =
-      tests.filter(
-        (item) =>
-          item.id !== id
-      );
-
-    await writeTests(
-      nextTests
-    );
-
-    await removeTestByIdBlob(
-      id
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        message:
-          "Test o‘chirildi.",
-        test: deletedTest,
-      },
-      {
-        status: 200,
-        headers: {
-          "Cache-Control":
-            "no-store",
-        },
-      }
-    );
+    return NextResponse.json({
+      success: true,
+      deletedId: id,
+    });
   } catch (error) {
     console.error(
-      "DELETE /api/tests/[id] ERROR:",
+      "LEGACY NEON DELETE ERROR:",
       error
     );
 
@@ -830,14 +729,11 @@ export async function DELETE(
       {
         success: false,
         message:
-          error instanceof
-          Error
+          error instanceof Error
             ? error.message
-            : "Testni o‘chirishda server xatosi.",
+            : "Testni o‘chirib bo‘lmadi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
