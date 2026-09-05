@@ -166,12 +166,12 @@ export default function Constitution840ImportPage() {
     const invalid = questions.filter(
       (question) =>
         question.options.length !== 4 ||
-        question.options.filter((option) => option.isCorrect).length !== 1
+        question.options.filter((option) => option.isCorrect).length > 1
     );
 
     if (invalid.length > 0) {
       setError(
-        `Import to‘xtatildi. Muammoli savollar: ${invalid
+        `Import to‘xtatildi. A/B/C/D to‘liq bo‘lmagan yoki bir nechta to‘g‘ri javobi bor savollar: ${invalid
           .slice(0, 30)
           .map((question) => question.number)
           .join(", ")}`
@@ -179,8 +179,15 @@ export default function Constitution840ImportPage() {
       return;
     }
 
+    const missingCorrect = questions.filter(
+      (question) =>
+        question.options.filter((option) => option.isCorrect).length === 0
+    );
+
     const confirmed = window.confirm(
-      "840 ta Konstitutsiya testini Neon bazasiga yozamizmi? Shu ID bilan oldingi test bo‘lsa, savollari yangidan almashtiriladi."
+      missingCorrect.length > 0
+        ? `840 ta Konstitutsiya testini Neon bazasiga yozamizmi? ${missingCorrect.length} ta savolda to‘g‘ri javob hozircha belgilanmagan. Test draft holatda saqlanadi va keyin tahrirlashingiz mumkin.`
+        : "840 ta Konstitutsiya testini Neon bazasiga yozamizmi? Shu ID bilan oldingi test bo‘lsa, savollari yangidan almashtiriladi."
     );
 
     if (!confirmed) return;
@@ -588,4 +595,3 @@ export default function Constitution840ImportPage() {
     </main>
   );
 }
-
