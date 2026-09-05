@@ -217,14 +217,14 @@ export default function AdminTestsPage() {
 
     try {
       /*
-        MUHIM:
-        - Eski kategoriyalar hali /api/tests (Blob) dan keladi.
-        - Mavzulashtirilgan testlar /api/tests/thematic (Neon) dan keladi.
-        - Blob vaqtincha 403 bersa ham Neon thematic testlar admin panelda
-          ko‘rinishda davom etadi.
+        ENDI:
+        - Qonunchilik / blok / 30 talik / boshqa eski-format testlar
+          Vercel Blob'dan EMAS, Neon legacy jadvalidan keladi.
+        - Mavzulashtirilgan testlar ham Neon'dan keladi.
+        - Shu sabab Blob 403 admin ro'yxatiga ta'sir qilmaydi.
       */
       const [legacyResult, thematicResult] = await Promise.allSettled([
-        fetch("/api/tests", {
+        fetch("/api/tests/legacy-neon", {
           method: "GET",
           cache: "no-store",
         }),
@@ -250,18 +250,15 @@ export default function AdminTestsPage() {
               }))
             : [];
         } else {
-          // Blob vaqtincha bloklangan bo‘lsa, Neon thematic bo‘limida
-          // qizil 403 xabarini ko‘rsatmaymiz. Eski testlar shunchaki
-          // vaqtincha ro‘yxatga qo‘shilmaydi.
-          console.warn(
-            "Legacy Blob tests unavailable:",
-            data.message || response.statusText
+          warnings.push(
+            data.message ||
+              "Neon'dagi qonunchilik va boshqa testlarni yuklab bo‘lmadi."
           );
         }
       } else {
-        console.warn(
-          "Legacy Blob tests request failed:",
-          legacyResult.reason
+        console.error(legacyResult.reason);
+        warnings.push(
+          "Neon legacy testlari bilan bog‘lanishda xatolik yuz berdi."
         );
       }
 
@@ -336,8 +333,8 @@ export default function AdminTestsPage() {
       }
 
       /*
-        Eski Blob'dagi thematic testlar dublikat ko‘rinmasligi uchun
-        admin ro‘yxatidan chiqaramiz. Endi thematic uchun yagona manba Neon.
+        Thematic testlar alohida Neon jadvallaridan keladi.
+        legacy_tests ichida tasodifan thematic yozuv qolgan bo‘lsa dublikat qilmaymiz.
       */
       const legacyWithoutThematic =
         legacyTests.filter(
@@ -693,7 +690,7 @@ export default function AdminTestsPage() {
         await fetch(
           thematicMode
             ? "/api/tests/thematic"
-            : "/api/tests",
+            : "/api/tests/legacy-neon",
           {
             method: "POST",
             headers: {
@@ -2400,7 +2397,9 @@ margin: 10px auto 12px;
             <div className="testList">
               {filteredTests.map((test) => {
                 const questionCount =
-                  isNeonThematicTest(test)
+                  Number(test.questionCount) > 0
+                    ? Number(test.questionCount)
+                    : isNeonThematicTest(test)
                     ? Number(test.questionCount) || 0
                     : Array.isArray(test.questions)
                     ? test.questions.length
