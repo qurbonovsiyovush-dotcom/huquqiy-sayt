@@ -39,54 +39,203 @@ function uid() {
     .slice(2, 8)}`;
 }
 
+function normalizeQuestionContent(root: HTMLElement) {
+  /*
+    ESKI / PDF IMPORT SAVOLLARINI BIR XIL KO‘RINISHGA KELTIRADI.
 
-/*
-  Import qilingan matnda tinish belgisi oldida qolib ketgan
-  bo‘shliqni tozalaydi:
-    "qiladi ?"  -> "qiladi?"
-    "bo‘ladi ." -> "bo‘ladi."
-  HTML teglar, rasmlar, jadvallar va shakllarga tegmaydi.
-*/
-function normalizeTextNodes(root: HTMLElement) {
-  const walker = document.createTreeWalker(
-    root,
-    NodeFilter.SHOW_TEXT
+    1) Savol matni qalin bo‘ladi.
+    2) "1. ... 2. ... 3. ..." va "I. ... II. ... III. ..."
+       bitta qatorda kelgan bo‘lsa, har biri alohida qatorga chiqadi.
+    3) Foydalanuvchi xohlagan ko‘rinish: so‘roq belgisi oldidan
+       aynan bitta bo‘sh joy qoladi: "keladi ?".
+    4) Rasm, jadval, Venn va boshqa designer obyektlariga tegmaydi.
+  */
+
+  const hasDesignerObject = Boolean(
+    root.querySelector(
+      'table,img,svg,[data-object-id],[data-manual-table="true"]'
+    )
   );
 
-  const nodes: Text[] = [];
-  let current = walker.nextNode();
-
-  while (current) {
-    nodes.push(current as Text);
-    current = walker.nextNode();
+  function tidyText(text: string) {
+    return text
+      .replace(/\u00A0/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/[ \t]+([,.;:!])/g, "$1")
+      // MUHIM: "MUVOFIQ?" emas, "MUVOFIQ ?"
+      .replace(/[ \t]*\?/g, " ?")
+      .trim();
   }
 
-  nodes.forEach((node) => {
-    const parent = node.parentElement;
+  /*
+    Oddiy savol matnida HTML span/font bo‘laklari PDFdan qolgan bo‘lishi
+    mumkin. Raqamlar turli spanlarda turgan bo‘lsa ham topish uchun
+    butun matnni birgalikda ko‘ramiz.
+  */
+  if (!hasDesignerObject) {
+    const plainText = tidyText(
+      (root.innerText || root.textContent || "")
+        .replace(/\r/g, " ")
+        .replace(/\n+/g, " ")
+    );
 
-    // Muharrirning texnik UI qismi yoki script/style ichiga tegmaymiz.
-    if (
-      !parent ||
-      parent.closest("[data-nc-ui]") ||
-      parent.closest("script,style")
-    ) {
-      return;
+    const markerRegex =
+      /(?:^|\s)((?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|[1-9]|[1-9]\d)\.)\s+/g;
+
+    const matches = Array.from(
+      plainText.matchAll(markerRegex)
+    );
+
+    /*
+      Kamida 2 ta marker bo‘lsa bu ro‘yxat deb hisoblanadi.
+      Masalan:
+        Savol matni 1. birinchi; 2. ikkinchi; 3. uchinchi.
+      quyidagicha chiqadi:
+        Savol matni
+        1. birinchi;
+        2. ikkinchi;
+        3. uchinchi.
+    */
+    if (matches.length >= 2) {
+      const rows: string[] = [];
+      const firstMatch = matches[0];
+      const firstIndex = firstMatch.index ?? 0;
+      const firstLeading = firstMatch[0].startsWith(" ") ? 1 : 0;
+      const stem = tidyText(
+        plainText.slice(0, firstIndex + firstLeading)
+      );
+
+      matches.forEach((match, index) => {
+        const markerIndex = match.index ?? 0;
+        const leading = match[0].startsWith(" ") ? 1 : 0;
+        const contentStart = markerIndex + match[0].length;
+
+        const next = matches[index + 1];
+        const contentEnd = next
+          ? (next.index ?? plainText.length) +
+            (next[0].startsWith(" ") ? 1 : 0)
+          : plainText.length;
+
+        const marker = match[1];
+        const content = tidyText(
+          plainText.slice(contentStart, contentEnd)
+        );
+
+        rows.push(
+          tidyText(`${marker} ${content}`)
+        );
+      });
+
+      root.innerHTML = "";
+
+      if (stem) {
+        const stemLine = document.createElement("div");
+        stemLine.style.fontWeight = "700";
+        stemLine.style.lineHeight = "1.55";
+        stemLine.style.margin = "0 0 10px";
+        stemLine.textContent = stem;
+        root.appendChild(stemLine);
+      }
+
+      rows.forEach((row) => {
+        const line = document.createElement("div");
+        line.style.fontWeight = "700";
+        line.style.lineHeight = "1.55";
+        line.style.margin = "0 0 4px";
+        line.textContent = row;
+        root.appendChild(line);
+      });
+    } else {
+      // Ro‘yxat bo‘lmasa mavjud HTML tuzilishini buzmaymiz,
+      // faqat tinish belgisi va qalinlikni to‘g‘rilaymiz.
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT
+      );
+
+      const textNodes: Text[] = [];
+      let current = walker.nextNode();
+
+      while (current) {
+        if (current instanceof Text) {
+          textNodes.push(current);
+        }
+        current = walker.nextNode();
+      }
+
+      textNodes.forEach((node) => {
+        const parent = node.parentElement;
+        if (!parent) return;
+        if (parent.closest('[data-object-id]')) return;
+
+        const before = node.nodeValue || "";
+        const after = before
+          .replace(/\u00A0/g, " ")
+          .replace(/[ \t]+([,.;:!])/g, "$1")
+          .replace(/[ \t]*\?/g, " ?");
+
+        if (before !== after) {
+          node.nodeValue = after;
+        }
+      });
+    }
+  } else {
+    // Designer obyektlari bor savolda faqat oddiy text node'larda
+    // so‘roq belgisi va tinish belgilarini tozalaymiz.
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT
+    );
+
+    const textNodes: Text[] = [];
+    let current = walker.nextNode();
+
+    while (current) {
+      if (current instanceof Text) {
+        textNodes.push(current);
+      }
+      current = walker.nextNode();
     }
 
-    const before = node.nodeValue || "";
+    textNodes.forEach((node) => {
+      const parent = node.parentElement;
+      if (!parent || parent.closest('[data-object-id]')) return;
 
-    // NBSP va oddiy bo‘shliqlarni ? ! , . ; : oldidan olib tashlaymiz.
-    const after = before
-      .replace(/[\u00A0 \t]+([?!,.;:])/g, "$1")
-      // Ochuvchi qavsdan keyingi ortiqcha bo‘shliq.
-      .replace(/([(\[{])[\u00A0 \t]+/g, "$1")
-      // Yopuvchi qavsdan oldingi ortiqcha bo‘shliq.
-      .replace(/[\u00A0 \t]+([)\]}])/g, "$1");
+      const before = node.nodeValue || "";
+      const after = before
+        .replace(/\u00A0/g, " ")
+        .replace(/[ \t]+([,.;:!])/g, "$1")
+        .replace(/[ \t]*\?/g, " ?");
 
-    if (after !== before) {
-      node.nodeValue = after;
-    }
+      if (before !== after) {
+        node.nodeValue = after;
+      }
+    });
+  }
+
+  /*
+    Public testdagi namuna kabi savolning asosiy matni qalin chiqadi.
+    Designer obyektlarining ichki font sozlamalarini o‘zgartirmaymiz.
+  */
+  root.querySelectorAll("*").forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+    if (node.closest('[data-object-id]')) return;
+    if (node.tagName === "BR") return;
+
+    node.style.fontWeight = "700";
   });
+
+  Array.from(root.childNodes).forEach((node) => {
+    if (!(node instanceof Text)) return;
+    if (!node.nodeValue?.trim()) return;
+
+    const span = document.createElement("span");
+    span.style.fontWeight = "700";
+    span.textContent = node.nodeValue;
+    node.replaceWith(span);
+  });
+
+  root.style.fontWeight = "700";
 }
 
 function cleanHtml(root: HTMLElement) {
@@ -198,10 +347,16 @@ export default function QuestionDesigner({
       root.innerHTML =
         value || "";
 
-      // Importdan kelgan "so‘z ?" kabi joylarni darhol tuzatamiz.
-      normalizeTextNodes(root);
+      normalizeQuestionContent(root);
+
+      const normalized =
+        cleanHtml(root);
+
+      if (normalized !== (value || "")) {
+        onChange(normalized);
+      }
     }
-  }, [value]);
+  }, [value, onChange]);
 
   useEffect(() => {
     function move(
@@ -508,9 +663,6 @@ export default function QuestionDesigner({
       editorRef.current;
 
     if (!root) return;
-
-    // Saqlashdan oldin tinish belgilarini standart ko‘rinishga keltiramiz.
-    normalizeTextNodes(root);
 
     onChange(
       cleanHtml(root)
@@ -2603,34 +2755,26 @@ export default function QuestionDesigner({
             "Times New Roman",
             serif;
           font-size: 18px;
-          line-height: 1.5;
           font-weight: 700;
+          line-height: 1.65;
+          white-space: normal;
           box-shadow:
             inset 0 0 0 1px #b4c2c9;
           overflow: hidden;
         }
 
+        .canvas :global(p),
+        .canvas :global(div:not(.nc-object)) {
+          margin-top: 0;
+          margin-bottom: 10px;
+        }
+
+        .canvas :global(br) {
+          line-height: 1.95;
+        }
+
         .canvas :global(.nc-object) {
           cursor: pointer;
-        }
-
-
-        /* Savol ichidagi qatorlar yopishib ketmasin. */
-        .canvas :global(p),
-        .canvas :global(div:not(.nc-object):not([data-nc-editable="true"])) {
-          margin-top: 0;
-          margin-bottom: 8px;
-        }
-
-        .canvas :global(ol),
-        .canvas :global(ul) {
-          margin-top: 8px;
-          margin-bottom: 8px;
-          padding-left: 34px;
-        }
-
-        .canvas :global(li) {
-          margin-bottom: 5px;
         }
 
         .canvas :global(.nc-image-object) {
