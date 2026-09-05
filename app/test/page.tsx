@@ -32,6 +32,7 @@ type PublicTest = {
   updatedAt?: string;
   source?:
     | "classic"
+    | "thematic"
     | "national-certificate";
 };
 
@@ -205,7 +206,7 @@ export default function TestPage() {
               {
                 method: "GET",
                 cache:
-                  "force-cache",
+                  "no-store",
               }
             ),
             fetch(
@@ -244,7 +245,9 @@ export default function TestPage() {
                 (test: any) => ({
                   ...test,
                   source:
-                    "classic" as const,
+                    test?.source === "thematic"
+                      ? ("thematic" as const)
+                      : ("classic" as const),
                 })
               )
             : [];
@@ -274,8 +277,8 @@ export default function TestPage() {
         }
 
         /*
-          Agar eski Blob ichida ham national-certificate test bo‘lsa,
-          duplicate id bo‘lmasligi uchun Set.
+          Neon public ro‘yxati va Milliy sertifikat ro‘yxati
+          birlashtirilganda duplicate id bo‘lmasligi uchun Set.
         */
         const merged =
           [
@@ -403,6 +406,19 @@ export default function TestPage() {
     ) {
       router.push(
         `/national-certificate/${encodeURIComponent(
+          test.id
+        )}`
+      );
+
+      return;
+    }
+
+    if (
+      test.source === "thematic" ||
+      test.testType === "thematic"
+    ) {
+      router.push(
+        `/test/thematic/solve/${encodeURIComponent(
           test.id
         )}`
       );
