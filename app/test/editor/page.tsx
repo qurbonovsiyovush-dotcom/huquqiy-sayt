@@ -14,6 +14,8 @@ import {
   useSearchParams,
 } from "next/navigation";
 
+import QuestionDesigner from "./QuestionDesigner";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -2212,790 +2214,53 @@ function TestEditorPageContent() {
 
 
       {/* =================================================
-          WORD TOOLBAR
-      ================================================= */}
-
-      <section className="wordRibbon">
-
-        <div className="ribbonTitle">
-          Bosh sahifa
-        </div>
-
-        <div className="toolbar">
-
-          <div className="toolGroup">
-
-            <button
-              title="Bekor qilish"
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "undo"
-                )
-              }
-            >
-              ↶
-            </button>
-
-            <button
-              title="Qaytarish"
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "redo"
-                )
-              }
-            >
-              ↷
-            </button>
-
-          </div>
-
-
-          <div className="toolGroup">
-
-            <select
-              value={
-                fontFamily
-              }
-              onChange={(e) =>
-                changeFont(
-                  e.target.value
-                )
-              }
-            >
-              <option>
-                Bell MT
-              </option>
-
-              <option>
-                Times New Roman
-              </option>
-
-              <option>
-                Arial
-              </option>
-
-              <option>
-                Calibri
-              </option>
-
-              <option>
-                Georgia
-              </option>
-
-              <option>
-                Verdana
-              </option>
-
-              <option>
-                Courier New
-              </option>
-            </select>
-
-            <select
-              value={
-                fontSize
-              }
-              onChange={(e) =>
-                changeFontSize(
-                  e.target.value
-                )
-              }
-            >
-              {[
-                10,
-                12,
-                14,
-                16,
-                18,
-                20,
-                22,
-                24,
-                28,
-                32,
-                36,
-                48,
-                60,
-                72,
-              ].map(
-                (size) => (
-                  <option
-                    key={size}
-                    value={size}
-                  >
-                    {size}
-                  </option>
-                )
-              )}
-            </select>
-
-          </div>
-
-
-          <div className="toolGroup">
-
-            <button
-              className="bold"
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "bold"
-                )
-              }
-            >
-              B
-            </button>
-
-            <button
-              className="italic"
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "italic"
-                )
-              }
-            >
-              I
-            </button>
-
-            <button
-              className="underline"
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "underline"
-                )
-              }
-            >
-              U
-            </button>
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "strikeThrough"
-                )
-              }
-            >
-              abc
-            </button>
-
-          </div>
-
-
-          <div className="toolGroup">
-
-            <label className="colorButton">
-              A
-
-              <input
-                type="color"
-                onChange={(e) =>
-                  command(
-                    "foreColor",
-                    e.target.value
-                  )
-                }
-              />
-            </label>
-
-            <label className="colorButton">
-              ▰
-
-              <input
-                type="color"
-                onChange={(e) =>
-                  command(
-                    "hiliteColor",
-                    e.target.value
-                  )
-                }
-              />
-            </label>
-
-          </div>
-
-
-          <div className="toolGroup">
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "justifyLeft"
-                )
-              }
-            >
-              ≡←
-            </button>
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "justifyCenter"
-                )
-              }
-            >
-              ≡
-            </button>
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "justifyRight"
-                )
-              }
-            >
-              →≡
-            </button>
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "justifyFull"
-                )
-              }
-            >
-              ☰
-            </button>
-
-          </div>
-
-
-          <div className="toolGroup">
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "insertOrderedList"
-                )
-              }
-            >
-              1.
-            </button>
-
-            <button
-              onMouseDown={(e) =>
-                e.preventDefault()
-              }
-              onClick={() =>
-                command(
-                  "insertUnorderedList"
-                )
-              }
-            >
-              •
-            </button>
-
-          </div>
-
-        </div>
-
-      </section>
-
-
-      {/* =================================================
-          QUESTION
+          QUESTION — MILLIY SERTIFIKATDAGI TO‘LIQ MUHARRIR
       ================================================= */}
 
       {activeQuestion && (
         <section className="editorSection">
 
           <div className="questionHeader">
-
             <h2>
-              Savol{" "}
-              {questions.findIndex(
-                (item) =>
-                  item.id ===
-                  activeQuestion.id
+              Savol {pageStartIndex + questions.findIndex(
+                (item) => item.id === activeQuestion.id
               ) + 1}
             </h2>
 
             <div>
-
-              <button
-                onClick={
-                  duplicateQuestion
-                }
-              >
+              <button onClick={duplicateQuestion}>
                 Nusxalash
               </button>
 
               <button
                 className="dangerButton"
-                onClick={
-                  deleteQuestion
-                }
+                onClick={deleteQuestion}
               >
                 Savolni o‘chirish
               </button>
-
             </div>
-
           </div>
 
+          <div className="fullDesignerBlock">
+            <div className="fullDesignerTitle">
+              SAVOL MATNI — TO‘LIQ MUHARRIR
+            </div>
 
-          {/* WORD PAGE */}
+            <p className="fullDesignerHint">
+              Matn, rasm, jadval, Venn va shakllar shu maydonning o‘zida tahrirlanadi.
+              Obyektni sudrash va 8 nuqtadan o‘lchamini o‘zgartirish mumkin.
+            </p>
 
-          <div className="paperOuter">
-
-            <div
-              key={
-                activeQuestion.id
+            <QuestionDesigner
+              key={activeQuestion.id}
+              value={activeQuestion.questionHtml || ""}
+              onChange={(html) =>
+                updateQuestion(activeQuestion.id, {
+                  questionHtml: html,
+                })
               }
-              ref={(element) => {
-                editorRef.current =
-                  element;
-
-                if (
-                  element &&
-                  element.innerHTML !==
-                    activeQuestion
-                      .questionHtml
-                ) {
-                  element.innerHTML =
-                    activeQuestion
-                      .questionHtml ||
-                    "";
-                }
-              }}
-              className="wordPage"
-              contentEditable
-              suppressContentEditableWarning
-              dir="ltr"
-              onBlur={
-                saveEditorHtml
-              }
-              data-placeholder="Savol matnini shu yerga yozing..."
             />
-
           </div>
-
-
-          {/* =================================================
-              SHAPES
-          ================================================= */}
-
-          <div className="shapesToolbar">
-
-            <strong>
-              Shakllar
-            </strong>
-
-            <button
-              onClick={() =>
-                addShape(
-                  "rectangle"
-                )
-              }
-            >
-              ▭ To‘rtburchak
-            </button>
-
-            <button
-              onClick={() =>
-                addShape(
-                  "roundedRectangle"
-                )
-              }
-            >
-              ▢ Yumaloq
-            </button>
-
-            <button
-              onClick={() =>
-                addShape(
-                  "circle"
-                )
-              }
-            >
-              ○ Doira
-            </button>
-
-            <button
-              onClick={() =>
-                addShape(
-                  "ellipse"
-                )
-              }
-            >
-              ⬭ Oval
-            </button>
-
-            <button
-              onClick={() =>
-                addShape(
-                  "venn"
-                )
-              }
-            >
-              ◯◯ Venn
-            </button>
-
-            <button onClick={() => addShape("text")}>
-              T Matn
-            </button>
-
-            <button className="imageButton" onClick={() => imageInputRef.current?.click()}>
-              🖼 Rasm joylash
-            </button>
-            <input
-              ref={imageInputRef}
-              className="hiddenImageInput"
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-            />
-
-          </div>
-
-
-          <div
-            ref={canvasRef}
-            className="shapeCanvas"
-            onMouseDown={(
-              e
-            ) => {
-              e.stopPropagation();
-
-              setSelectedShapeId(
-                null
-              );
-            }}
-          >
-
-            <div className="canvasHint">
-              Shakllarni shu maydonda
-              joylashtiring
-            </div>
-
-            {activeQuestion
-              .shapes
-              .map(
-                (shape) => {
-                  const selected =
-                    shape.id ===
-                    selectedShapeId;
-
-                  return (
-                    <div
-                      key={
-                        shape.id
-                      }
-                      className={`shapeItem ${
-                        selected
-                          ? "selectedShape"
-                          : ""
-                      }`}
-                      style={{
-                        left:
-                          shape.x,
-
-                        top:
-                          shape.y,
-
-                        width:
-                          shape.width,
-
-                        height: shape.height,
-                        zIndex: shape.zIndex ?? 1,
-                        opacity: shape.opacity ?? 1,
-                      }}
-                      onMouseDown={(
-                        e
-                      ) =>
-                        startDrag(
-                          e,
-                          shape
-                        )
-                      }
-                    >
-
-                      {shape.type === "image" ? (
-                        <div
-                          className="imageShapeBody"
-                          style={{
-                            borderColor: shape.borderColor,
-                            borderWidth: `${shape.borderWidth ?? 2}px`,
-                            borderRadius: `${shape.borderRadius ?? 8}px`,
-                          }}
-                        >
-                          {shape.imageSrc ? (
-                            <img
-                              src={shape.imageSrc}
-                              alt="Test rasmi"
-                              draggable={false}
-                              style={{ objectFit: shape.objectFit ?? "contain" }}
-                            />
-                          ) : <span>Rasm tanlanmagan</span>}
-                        </div>
-                      ) : shape.type ===
-                      "venn" ? (
-
-                        <div className="venn">
-
-                          <div
-                            className="vennCircle vennOne"
-                            style={{
-                              background:
-                                shape.backgroundColor,
-
-                              borderColor:
-                                shape.borderColor,
-                            }}
-                          >
-                            <span>
-                              A
-                            </span>
-                          </div>
-
-                          <div
-                            className="vennCircle vennTwo"
-                            style={{
-                              background:
-                                shape.backgroundColor,
-
-                              borderColor:
-                                shape.borderColor,
-                            }}
-                          >
-                            <span>
-                              B
-                            </span>
-                          </div>
-
-                        </div>
-
-                      ) : (
-
-                        <div
-                          className={`shapeBody ${shape.type}`}
-                          style={{
-                            background:
-                              shape.type ===
-                              "text"
-                                ? "transparent"
-                                : shape.backgroundColor,
-
-                            borderColor:
-                              shape.borderColor,
-
-                            color:
-                              shape.textColor,
-
-                            fontFamily:
-                              shape.fontFamily,
-
-                            fontSize:
-                              `${shape.fontSize}px`,
-
-                            fontWeight:
-                              shape.fontWeight,
-
-                            fontStyle:
-                              shape.fontStyle,
-
-                            textAlign: shape.textAlign,
-                            textDecoration: shape.textDecoration ?? "none",
-                            textTransform: shape.textTransform ?? "none",
-                            borderWidth: `${shape.borderWidth ?? 2}px`,
-                            borderRadius: `${shape.borderRadius ?? 4}px`,
-                          }}
-                        >
-
-                          <input
-                            className="shapeInput"
-                            value={
-                              shape.text
-                            }
-                            onMouseDown={(
-                              e
-                            ) =>
-                              e.stopPropagation()
-                            }
-                            onChange={(
-                              e
-                            ) =>
-                              updateShape(
-                                shape.id,
-                                {
-                                  text:
-                                    e
-                                      .target
-                                      .value,
-                                }
-                              )
-                            }
-                          />
-
-                        </div>
-
-                      )}
-
-
-                      {selected && (
-                        <>
-
-                          <button
-                            className="shapeDelete"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            onClick={(
-                              e
-                            ) => {
-                              e.stopPropagation();
-
-                              deleteShape();
-                            }}
-                          >
-                            ×
-                          </button>
-
-
-                          {(
-                            [
-                              "n",
-                              "s",
-                              "e",
-                              "w",
-                              "ne",
-                              "nw",
-                              "se",
-                              "sw",
-                            ] as const
-                          ).map(
-                            (
-                              direction
-                            ) => (
-                              <span
-                                key={
-                                  direction
-                                }
-                                className={`resizeHandle resize-${direction}`}
-                                onMouseDown={(
-                                  e
-                                ) =>
-                                  startResize(
-                                    e,
-                                    shape,
-                                    direction
-                                  )
-                                }
-                              />
-                            )
-                          )}
-
-                        </>
-                      )}
-
-                    </div>
-                  );
-                }
-              )}
-
-          </div>
-
-
-          {/* SHAPE / IMAGE SETTINGS */}
-          {selectedShape && (
-            <div className="shapeSettings" onMouseDown={(e) => e.stopPropagation()}>
-              <strong className="settingsHeading">
-                {selectedShape.type === "image" ? "Rasm sozlamalari" : "Shakl va matn sozlamalari"}
-              </strong>
-
-              {selectedShape.type !== "image" && <>
-                <label>Shrift
-                  <select value={selectedShape.fontFamily} onChange={(e) => updateShape(selectedShape.id,{fontFamily:e.target.value})}>
-                    <option>Bell MT</option><option>Times New Roman</option><option>Arial</option>
-                    <option>Calibri</option><option>Georgia</option><option>Verdana</option><option>Courier New</option>
-                  </select>
-                </label>
-                <label>O‘lcham
-                  <input className="smallNumber" type="number" min={8} max={160} value={selectedShape.fontSize}
-                    onChange={(e)=>updateShape(selectedShape.id,{fontSize:Math.max(8,Number(e.target.value)||8)})}/>
-                </label>
-                <button className={selectedShape.fontWeight==="bold"?"activeSetting":""}
-                  onClick={()=>updateShape(selectedShape.id,{fontWeight:selectedShape.fontWeight==="bold"?"normal":"bold"})}>B</button>
-                <button className={selectedShape.fontStyle==="italic"?"activeSetting":""}
-                  onClick={()=>updateShape(selectedShape.id,{fontStyle:selectedShape.fontStyle==="italic"?"normal":"italic"})}><i>I</i></button>
-                <button className={selectedShape.textDecoration==="underline"?"activeSetting":""}
-                  onClick={()=>updateShape(selectedShape.id,{textDecoration:selectedShape.textDecoration==="underline"?"none":"underline"})}><u>U</u></button>
-                <button className={selectedShape.textTransform==="uppercase"?"activeSetting":""}
-                  onClick={()=>updateShape(selectedShape.id,{textTransform:selectedShape.textTransform==="uppercase"?"none":"uppercase"})}>AA</button>
-                <button onClick={()=>updateShape(selectedShape.id,{textAlign:"left"})}>≡←</button>
-                <button onClick={()=>updateShape(selectedShape.id,{textAlign:"center"})}>≡</button>
-                <button onClick={()=>updateShape(selectedShape.id,{textAlign:"right"})}>→≡</button>
-                <label>Matn rangi <input type="color" value={selectedShape.textColor}
-                  onChange={(e)=>updateShape(selectedShape.id,{textColor:e.target.value})}/></label>
-              </>}
-
-              {selectedShape.type !== "text" && selectedShape.type !== "image" &&
-                <label>Fon <input type="color" value={selectedShape.backgroundColor}
-                  onChange={(e)=>updateShape(selectedShape.id,{backgroundColor:e.target.value})}/></label>}
-
-              <label>Chegara <input type="color" value={selectedShape.borderColor}
-                onChange={(e)=>updateShape(selectedShape.id,{borderColor:e.target.value})}/></label>
-              <label>Chegara qalinligi <input className="smallNumber" type="number" min={0} max={20}
-                value={selectedShape.borderWidth ?? 2}
-                onChange={(e)=>updateShape(selectedShape.id,{borderWidth:Math.max(0,Number(e.target.value)||0)})}/></label>
-              <label>Burchak <input className="smallNumber" type="number" min={0} max={999}
-                value={selectedShape.borderRadius ?? 4}
-                onChange={(e)=>updateShape(selectedShape.id,{borderRadius:Math.max(0,Number(e.target.value)||0)})}/></label>
-              <label>Shaffoflik <input className="rangeInput" type="range" min={0.1} max={1} step={0.05}
-                value={selectedShape.opacity ?? 1}
-                onChange={(e)=>updateShape(selectedShape.id,{opacity:Number(e.target.value)})}/></label>
-
-              {selectedShape.type === "image" && <>
-                <label>Rasm moslashuvi
-                  <select value={selectedShape.objectFit ?? "contain"}
-                    onChange={(e)=>updateShape(selectedShape.id,{objectFit:e.target.value as "contain"|"cover"|"fill"})}>
-                    <option value="contain">To‘liq ko‘rsatish</option>
-                    <option value="cover">Maydonni to‘ldirish</option>
-                    <option value="fill">Cho‘zib to‘ldirish</option>
-                  </select>
-                </label>
-                <button onClick={()=>imageInputRef.current?.click()}>Yangi rasm qo‘shish</button>
-              </>}
-
-              <span className="settingsDivider"/>
-              <button onClick={duplicateShape}>Nusxalash</button>
-              <button onClick={bringShapeForward}>Oldinga</button>
-              <button onClick={sendShapeBackward}>Orqaga</button>
-              <button className="dangerSetting" onClick={deleteShape}>O‘chirish</button>
-            </div>
-          )}
-
 
           {/* =================================================
               OPTIONS
@@ -3517,6 +2782,36 @@ function TestEditorPageContent() {
           white-space: nowrap;
         }
 
+
+        .fullDesignerBlock {
+          width: 100%;
+          padding: 0;
+          border-radius: 14px;
+          overflow: visible;
+        }
+
+        .fullDesignerTitle {
+          display: inline-flex;
+          align-items: center;
+          min-height: 42px;
+          margin-bottom: 8px;
+          padding: 7px 18px;
+          border: 2px solid #1c5677;
+          border-radius: 10px;
+          background: linear-gradient(#36b9f2, #047eae);
+          box-shadow: inset 0 3px 2px rgba(255,255,255,.58), 0 4px 0 #315868;
+          color: #fff;
+          font-size: 19px;
+          font-weight: 900;
+        }
+
+        .fullDesignerHint {
+          margin: 0 0 10px;
+          color: #f4f7f8;
+          font-size: 15px;
+          font-weight: 700;
+          line-height: 1.45;
+        }
 
         /* QUESTION BAR */
 
