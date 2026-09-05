@@ -50,9 +50,7 @@ function readIds(key: string): string[] {
     const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : [];
 
-    return Array.isArray(parsed)
-      ? parsed.map(String)
-      : [];
+    return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {
     return [];
   }
@@ -126,7 +124,9 @@ export default function SynonymsPage() {
             : "Ma’lumotlarni yuklashda xatolik."
         );
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
@@ -178,19 +178,16 @@ export default function SynonymsPage() {
     []
   );
 
-  const saveHard = useCallback(
-    (next: string[]) => {
-      setHardIds(next);
+  const saveHard = useCallback((next: string[]) => {
+    setHardIds(next);
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          HARD_KEY,
-          JSON.stringify(next)
-        );
-      }
-    },
-    []
-  );
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        HARD_KEY,
+        JSON.stringify(next)
+      );
+    }
+  }, []);
 
   function addMistake(id: string | number) {
     const value = String(id);
@@ -351,10 +348,6 @@ export default function SynonymsPage() {
     }
   }
 
-  function mixedAction() {
-    randomNext();
-  }
-
   const progress =
     activeItems.length > 0
       ? ((index + 1) / activeItems.length) * 100
@@ -394,7 +387,7 @@ export default function SynonymsPage() {
   if (loadError) {
     return (
       <main className="statePage">
-        <div className="stateBox">
+        <div className="stateBox errorBox">
           {loadError}
         </div>
 
@@ -410,12 +403,15 @@ export default function SynonymsPage() {
 
           .stateBox {
             padding: 25px 35px;
-            color: #7b1616;
-            border: 2px solid #b45d5d;
             border-radius: 16px;
-            background: #fff0f0;
             font-size: 19px;
             font-weight: 900;
+          }
+
+          .errorBox {
+            color: #7b1616;
+            border: 2px solid #b45d5d;
+            background: #fff0f0;
           }
         `}</style>
       </main>
@@ -424,20 +420,17 @@ export default function SynonymsPage() {
 
   return (
     <main className="page">
+      {/* FAQAT TUGMALAR QOLDI */}
       <header className="topbar">
         <button
           type="button"
           className="metalButton"
-          onClick={() => router.push("/dictionaries")}
+          onClick={() =>
+            router.push("/dictionaries")
+          }
         >
           ← Lug‘atlar
         </button>
-
-        <div className="brand">
-          <span>QURBONOV.UZ</span>
-          <strong>Synonyms</strong>
-          <small>Sinonimlarni yodlash</small>
-        </div>
 
         <button
           type="button"
@@ -455,8 +448,11 @@ export default function SynonymsPage() {
 
         <div className="tabs">
           <button
+            type="button"
             className={
-              mode === "learn" ? "tab active" : "tab"
+              mode === "learn"
+                ? "tab active"
+                : "tab"
             }
             onClick={() => changeMode("learn")}
           >
@@ -464,6 +460,7 @@ export default function SynonymsPage() {
           </button>
 
           <button
+            type="button"
             className={
               mode === "choose"
                 ? "tab active"
@@ -475,8 +472,11 @@ export default function SynonymsPage() {
           </button>
 
           <button
+            type="button"
             className={
-              mode === "write" ? "tab active" : "tab"
+              mode === "write"
+                ? "tab active"
+                : "tab"
             }
             onClick={() => changeMode("write")}
           >
@@ -484,20 +484,26 @@ export default function SynonymsPage() {
           </button>
 
           <button
+            type="button"
             className={
               mode === "mistakes"
                 ? "tab active"
                 : "tab"
             }
-            onClick={() => changeMode("mistakes")}
+            onClick={() =>
+              changeMode("mistakes")
+            }
           >
             Xatolarim
             <span>{mistakeIds.length}</span>
           </button>
 
           <button
+            type="button"
             className={
-              mode === "hard" ? "tab active" : "tab"
+              mode === "hard"
+                ? "tab active"
+                : "tab"
             }
             onClick={() => changeMode("hard")}
           >
@@ -506,8 +512,11 @@ export default function SynonymsPage() {
           </button>
 
           <button
+            type="button"
             className={
-              mode === "mixed" ? "tab active" : "tab"
+              mode === "mixed"
+                ? "tab active"
+                : "tab"
             }
             onClick={() => changeMode("mixed")}
           >
@@ -542,7 +551,8 @@ export default function SynonymsPage() {
             <div className="progressBox">
               <div className="progressText">
                 <strong>
-                  {index + 1} / {activeItems.length}
+                  {index + 1} /{" "}
+                  {activeItems.length}
                 </strong>
 
                 <span>
@@ -606,7 +616,9 @@ export default function SynonymsPage() {
                 <div className="quizArea">
                   <div className="question">
                     Qaysi biri{" "}
-                    <strong>{current.word}</strong>{" "}
+                    <strong>
+                      {current.word}
+                    </strong>{" "}
                     so‘zining sinonimi?
                   </div>
 
@@ -617,7 +629,9 @@ export default function SynonymsPage() {
                       if (
                         answerState !== "idle" &&
                         normalize(option) ===
-                          normalize(current.synonym)
+                          normalize(
+                            current.synonym
+                          )
                       ) {
                         className += " correct";
                       } else if (
@@ -645,7 +659,8 @@ export default function SynonymsPage() {
                     })}
                   </div>
 
-                  {answerState === "correct" && (
+                  {answerState ===
+                    "correct" && (
                     <div className="correctMessage">
                       To‘g‘ri! ✓
                     </div>
@@ -665,7 +680,9 @@ export default function SynonymsPage() {
               {mode === "write" && (
                 <div className="writeArea">
                   <div className="question">
-                    <strong>{current.word}</strong>{" "}
+                    <strong>
+                      {current.word}
+                    </strong>{" "}
                     so‘zining sinonimini yozing:
                   </div>
 
@@ -681,7 +698,9 @@ export default function SynonymsPage() {
                         )
                       }
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") {
+                        if (
+                          event.key === "Enter"
+                        ) {
                           checkWrittenAnswer();
                         }
                       }}
@@ -692,7 +711,9 @@ export default function SynonymsPage() {
                     <button
                       type="button"
                       className="blueButton checkButton"
-                      onClick={checkWrittenAnswer}
+                      onClick={
+                        checkWrittenAnswer
+                      }
                       disabled={
                         !writtenAnswer.trim() ||
                         answerState !== "idle"
@@ -702,7 +723,8 @@ export default function SynonymsPage() {
                     </button>
                   </div>
 
-                  {answerState === "correct" && (
+                  {answerState ===
+                    "correct" && (
                     <div className="correctMessage">
                       To‘g‘ri! ✓
                     </div>
@@ -732,7 +754,7 @@ export default function SynonymsPage() {
                   <button
                     type="button"
                     className="blueButton mixButton"
-                    onClick={mixedAction}
+                    onClick={randomNext}
                   >
                     Tasodifiy keyingi so‘z
                   </button>
@@ -803,22 +825,29 @@ export default function SynonymsPage() {
             );
         }
 
+        /*
+          HEADERDA ENDI HECH QANDAY YOZUV YO‘Q.
+          FAQAT IKKITA TUGMA.
+        */
         .topbar {
           width: min(1450px, 96%);
-          margin: 0 auto 75px;
-          padding: 18px 22px;
-          display: grid;
-          grid-template-columns: auto 1fr auto;
+          margin: 0 auto 76px;
+          padding: 16px 20px;
+
+          display: flex;
           align-items: center;
-          gap: 18px;
+          justify-content: space-between;
+
           border: 2px solid #2d373c;
           border-radius: 22px;
+
           background: linear-gradient(
             145deg,
-            #737b80,
+            #737b80 0%,
             #555e63 48%,
-            #3c4448
+            #3c4448 100%
           );
+
           box-shadow:
             0 10px 0 #293237,
             0 18px 30px rgba(0, 0, 0, 0.18),
@@ -828,32 +857,6 @@ export default function SynonymsPage() {
               rgba(0, 0, 0, 0.2);
         }
 
-        .brand {
-          text-align: center;
-          color: white;
-          text-shadow: 0 2px 2px
-            rgba(0, 0, 0, 0.42);
-        }
-
-        .brand span {
-          display: block;
-          font-size: 11px;
-          font-weight: 900;
-          letter-spacing: 2px;
-        }
-
-        .brand strong {
-          display: block;
-          margin-top: 2px;
-          font-size: 30px;
-        }
-
-        .brand small {
-          display: block;
-          margin-top: 3px;
-          font-size: 14px;
-        }
-
         .metalButton,
         .blueButton {
           min-height: 48px;
@@ -861,17 +864,23 @@ export default function SynonymsPage() {
           border-radius: 10px;
           font-weight: 900;
           cursor: pointer;
+
+          transition:
+            transform 0.12s ease,
+            filter 0.12s ease;
         }
 
         .metalButton {
           border: 2px solid #626c71;
           color: #253039;
+
           background: linear-gradient(
             180deg,
-            #fff,
+            #ffffff 0%,
             #d3d6d8 58%,
-            #adb3b6
+            #adb3b6 100%
           );
+
           box-shadow:
             0 5px 0 #515b60,
             inset 0 2px 0
@@ -881,36 +890,56 @@ export default function SynonymsPage() {
         .blueButton {
           border: 2px solid #174b69;
           color: #073b68;
+
           background: linear-gradient(
             180deg,
-            #d9f5ff,
+            #d9f5ff 0%,
             #85d0f2 55%,
-            #57add8
+            #57add8 100%
           );
+
           box-shadow:
             0 5px 0 #174760,
             inset 0 2px 0
               rgba(255, 255, 255, 0.84);
         }
 
+        .metalButton:hover,
+        .blueButton:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+        }
+
+        .metalButton:active,
+        .blueButton:active {
+          transform: translateY(3px);
+        }
+
         .mainPanel {
           position: relative;
+
           width: min(1200px, 96%);
           margin: 0 auto;
+
           padding: 75px 30px 40px;
+
           border: 2px solid #303a3f;
           border-radius: 25px;
+
           background: linear-gradient(
             145deg,
-            #6d757a,
+            #6d757a 0%,
             #535b60 42%,
-            #3c4448
+            #3c4448 100%
           );
+
           box-shadow:
             0 11px 0 #293237,
             0 20px 34px rgba(0, 0, 0, 0.22),
             inset 0 3px 0
-              rgba(255, 255, 255, 0.34);
+              rgba(255, 255, 255, 0.34),
+            inset 0 -8px 14px
+              rgba(0, 0, 0, 0.18);
         }
 
         .floatingTitle {
@@ -918,20 +947,25 @@ export default function SynonymsPage() {
           top: -31px;
           left: 50%;
           transform: translateX(-50%);
+
           min-width: 290px;
           padding: 13px 25px;
+
           text-align: center;
           color: #073b68;
           font-size: 28px;
           font-weight: 900;
+
           border: 2px solid #174a68;
           border-radius: 13px;
+
           background: linear-gradient(
             180deg,
-            #ddf7ff,
+            #ddf7ff 0%,
             #87cef0 53%,
-            #58acd7
+            #58acd7 100%
           );
+
           box-shadow:
             0 7px 0 #174760,
             0 12px 19px rgba(0, 0, 0, 0.2),
@@ -944,19 +978,25 @@ export default function SynonymsPage() {
           grid-template-columns:
             repeat(6, minmax(0, 1fr));
           gap: 10px;
+
           margin-bottom: 20px;
         }
 
         .tab {
           min-height: 50px;
+          padding: 8px;
+
           border: 2px solid #727b80;
           border-radius: 10px;
+
           background: linear-gradient(
             180deg,
-            #fff,
+            #ffffff,
             #d5d9dc
           );
+
           box-shadow: 0 4px 0 #515b60;
+
           color: #283239;
           font-weight: 900;
           cursor: pointer;
@@ -965,6 +1005,7 @@ export default function SynonymsPage() {
         .tab span {
           margin-left: 5px;
           padding: 2px 6px;
+
           border-radius: 10px;
           background: rgba(0, 0, 0, 0.1);
         }
@@ -972,11 +1013,13 @@ export default function SynonymsPage() {
         .tab.active {
           color: #073b68;
           border-color: #174b69;
+
           background: linear-gradient(
             180deg,
             #ddf7ff,
             #83cdef
           );
+
           box-shadow: 0 4px 0 #174760;
         }
 
@@ -985,24 +1028,30 @@ export default function SynonymsPage() {
           grid-template-columns:
             repeat(4, minmax(0, 1fr));
           gap: 12px;
+
           margin-bottom: 20px;
         }
 
         .stats div {
           padding: 11px;
+
           text-align: center;
+
           border: 2px solid #7d878c;
           border-radius: 11px;
+
           background: linear-gradient(
             180deg,
-            #fff,
+            #ffffff,
             #e1e4e6
           );
+
           box-shadow: 0 4px 0 #596267;
         }
 
         .stats span {
           display: block;
+
           color: #5b656b;
           font-size: 13px;
           font-weight: 700;
@@ -1011,6 +1060,7 @@ export default function SynonymsPage() {
         .stats strong {
           display: block;
           margin-top: 3px;
+
           color: #073b68;
           font-size: 21px;
         }
@@ -1022,41 +1072,52 @@ export default function SynonymsPage() {
         .progressText {
           display: flex;
           justify-content: space-between;
+
           margin-bottom: 6px;
+
           color: white;
         }
 
         .progressTrack {
           height: 13px;
           overflow: hidden;
+
           border: 2px solid #283238;
           border-radius: 20px;
+
           background: #252d31;
         }
 
         .progressFill {
           height: 100%;
+
           background: linear-gradient(
             90deg,
             #5bb3dd,
             #b9ecff
           );
+
           transition: width 0.2s ease;
         }
 
         .studyCard {
           position: relative;
+
           min-height: 430px;
           padding: 45px 35px 35px;
+
           text-align: center;
+
           border: 2px solid #747d82;
           border-radius: 20px;
+
           background: linear-gradient(
             180deg,
             #fafafa,
             #e0e2e4 68%,
             #c9ccce
           );
+
           box-shadow:
             0 9px 0 #596267,
             0 15px 22px rgba(0, 0, 0, 0.18),
@@ -1067,12 +1128,16 @@ export default function SynonymsPage() {
           position: absolute;
           top: 18px;
           right: 20px;
+
           width: 48px;
           height: 44px;
+
           border: 2px solid #8b8b78;
           border-radius: 10px;
-          background: #eee;
+
+          background: #eeeeee;
           color: #8b8b78;
+
           font-size: 25px;
           cursor: pointer;
         }
@@ -1085,12 +1150,19 @@ export default function SynonymsPage() {
 
         .word {
           color: #111820;
-          font-size: clamp(38px, 6vw, 68px);
+
+          font-size: clamp(
+            38px,
+            6vw,
+            68px
+          );
+
           font-weight: 900;
         }
 
         .translation {
           margin-top: 7px;
+
           color: #526068;
           font-size: 22px;
           font-weight: 700;
@@ -1105,14 +1177,17 @@ export default function SynonymsPage() {
 
         .label {
           color: #5a656b;
+
           font-size: 15px;
           font-weight: 900;
+
           text-transform: uppercase;
           letter-spacing: 1px;
         }
 
         .synonymWord {
           margin-top: 8px;
+
           color: #07559a;
           font-size: 43px;
           font-weight: 900;
@@ -1120,12 +1195,14 @@ export default function SynonymsPage() {
 
         .synonymTranslation {
           margin-top: 5px;
+
           color: #566168;
           font-size: 18px;
         }
 
         .question {
           margin-bottom: 20px;
+
           color: #273138;
           font-size: 21px;
           font-weight: 700;
@@ -1141,17 +1218,22 @@ export default function SynonymsPage() {
         .option {
           min-height: 62px;
           padding: 10px 15px;
+
           border: 2px solid #747d82;
           border-radius: 11px;
+
           background: linear-gradient(
             180deg,
-            #fff,
+            #ffffff,
             #d8dcde
           );
+
           box-shadow: 0 5px 0 #596267;
+
           color: #1b242a;
           font-size: 20px;
           font-weight: 900;
+
           cursor: pointer;
         }
 
@@ -1159,6 +1241,7 @@ export default function SynonymsPage() {
           color: #155b29;
           border-color: #4d9661;
           background: #dff5e5;
+
           box-shadow: 0 5px 0 #3e774d;
         }
 
@@ -1166,6 +1249,7 @@ export default function SynonymsPage() {
           color: #851d1d;
           border-color: #ae5555;
           background: #ffe0e0;
+
           box-shadow: 0 5px 0 #843f3f;
         }
 
@@ -1173,19 +1257,23 @@ export default function SynonymsPage() {
         .wrongMessage {
           margin-top: 20px;
           padding: 12px;
+
           border-radius: 10px;
+
           font-size: 18px;
           font-weight: 900;
         }
 
         .correctMessage {
           color: #155b29;
+
           border: 1px solid #65a875;
           background: #dff5e5;
         }
 
         .wrongMessage {
           color: #851d1d;
+
           border: 1px solid #bc6969;
           background: #ffe3e3;
         }
@@ -1199,17 +1287,22 @@ export default function SynonymsPage() {
         .writeRow input {
           min-height: 55px;
           padding: 10px 16px;
+
           border: 2px solid #778288;
           border-radius: 10px;
+
           outline: none;
           background: white;
+
           font-size: 19px;
           font-weight: 700;
         }
 
         .writeRow input:focus {
           border-color: #2a7fb0;
-          box-shadow: 0 0 0 3px
+
+          box-shadow:
+            0 0 0 3px
             rgba(72, 167, 218, 0.2);
         }
 
@@ -1226,36 +1319,34 @@ export default function SynonymsPage() {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 18px;
+
           margin-top: 28px;
         }
 
         .navButton {
           width: 100%;
           min-height: 55px;
+
           font-size: 17px;
         }
 
         .emptyBox {
           padding: 60px 25px;
+
           text-align: center;
+
           border: 2px solid #778187;
           border-radius: 16px;
+
           background: #f5f6f7;
+
           box-shadow: 0 6px 0 #596267;
+
           font-size: 20px;
           font-weight: 900;
         }
 
         @media (max-width: 900px) {
-          .topbar {
-            grid-template-columns: 1fr;
-          }
-
-          .metalButton,
-          .blueButton {
-            width: 100%;
-          }
-
           .tabs {
             grid-template-columns:
               repeat(3, minmax(0, 1fr));
@@ -1266,6 +1357,17 @@ export default function SynonymsPage() {
           .page {
             padding-left: 9px;
             padding-right: 9px;
+          }
+
+          .topbar {
+            width: 100%;
+            padding: 12px;
+          }
+
+          .topbar .metalButton,
+          .topbar .blueButton {
+            min-height: 44px;
+            padding: 8px 12px;
           }
 
           .mainPanel {
