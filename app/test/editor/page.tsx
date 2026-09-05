@@ -3686,7 +3686,7 @@ function TestEditorPageContent() {
         .answerRow textarea {
           width: 100%;
 
-          min-height: 70px;
+          min-height: 88px;
 
           padding: 12px 15px;
 
@@ -3704,8 +3704,13 @@ function TestEditorPageContent() {
 
           background: white;
 
-          font-size: 17px;
+          font-size: 24px;
+          line-height: 1.5;
           font-weight: 700;
+          text-align: justify;
+          text-justify: inter-word;
+          overflow-wrap: normal;
+          word-break: normal;
         }
 
         .pointsRow {
