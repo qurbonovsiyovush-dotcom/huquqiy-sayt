@@ -1668,7 +1668,7 @@ function TestEditorPageContent() {
 
         const response =
           await fetch(
-            "/api/tests",
+            "/api/tests/legacy-neon",
             {
               method: "POST",
               credentials:
