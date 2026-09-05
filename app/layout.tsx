@@ -18,27 +18,27 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    "https://qurbonovv.uz"
+    "https://qurbonov.uz"
   ),
 
   title: {
     default:
-      "Qurbonov S.J. | Huquqiy ta’lim platformasi",
+      "Qurbonov S.J. | Huquqiy ta'lim platformasi",
     template:
       "%s | Qurbonov S.J.",
   },
 
   description:
-    "Qurbonov Siyovush Jamaliddinzodaning huquqiy ta’lim platformasi. Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar, kodekslar, qonunchilik hujjatlari va qo‘llanmalar.",
+    "Qurbonov Siyovush Jamaliddinzodaning huquqiy ta'lim platformasi. Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar, kodekslar, qonunchilik hujjatlari va qo‘llanmalar.",
 
   keywords: [
     "Qurbonov S.J.",
     "Qurbonov Siyovush",
     "Qurbonov Siyovush Jamaliddinzoda",
-    "qurbonovv.uz",
+    "qurbonov.uz",
     "huquq",
-    "huquqiy ta’lim",
-    "huquqiy ta’lim platformasi",
+    "huquqiy ta'lim",
+    "huquqiy ta'lim platformasi",
     "huquq testlari",
     "yuridik testlar",
     "kodekslar",
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     "Qurbonov Siyovush Jamaliddinzoda",
 
   alternates: {
-    canonical: "/",
+    canonical: "https://qurbonov.uz",
   },
 
   icons: {
@@ -77,13 +77,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "uz_UZ",
-    url: "https://qurbonovv.uz",
+
+    url: "https://qurbonov.uz",
 
     siteName:
       "Qurbonov S.J.",
 
     title:
-      "Qurbonov S.J. | Huquqiy ta’lim platformasi",
+      "Qurbonov S.J. | Huquqiy ta'lim platformasi",
 
     description:
       "Talabalar va abituriyentlar uchun huquqiy materiallar, testlar, kazuslar, kodekslar, qonunchilik hujjatlari va qo‘llanmalar.",
@@ -96,6 +97,9 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
     },
   },
 };
