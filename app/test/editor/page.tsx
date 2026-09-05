@@ -3705,6 +3705,7 @@ function TestEditorPageContent() {
           background: white;
 
           font-size: 17px;
+          font-weight: 700;
         }
 
         .pointsRow {
