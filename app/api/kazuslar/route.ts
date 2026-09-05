@@ -1,1373 +1,786 @@
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
+import "server-only";
 
-import {
-  del,
-  get,
-  list,
-  put,
-} from "@vercel/blob";
+import { NextRequest, NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-/* =========================================================
-   TYPES
-========================================================= */
+type KazusQuestionInput = {
+  id?: string;
+  question?: string;
+  answer?: string;
+};
 
-type CaseQuestion = {
+type KazusInput = {
+  id?: string;
+  subject?: string;
+  title?: string;
+  caseText?: string;
+  questions?: KazusQuestionInput[];
+};
+
+type DbKazus = {
   id: string;
+  subject: string;
+  title: string;
+  case_text: string;
+  case_type: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+type DbQuestion = {
+  id: string;
+  kazus_id: string;
+  question_order: number;
   question: string;
   answer: string;
+  created_at: string | Date;
+  updated_at: string | Date;
 };
 
-type PlatformCase = {
-  id: string;
-  type: "platform";
-  subject: string;
-  title: string;
-  caseText: string;
-  questions: CaseQuestion[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-type PdfCase = {
-  id: string;
-  type: "pdf";
-  subject: string;
-  title: string;
-  originalFileName: string;
-  fileSize: number;
-  mimeType: string;
-  url: string;
-  pathname: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type AnyCase = PlatformCase | PdfCase;
-
-type RawQuestion = {
-  id?: unknown;
-  question?: unknown;
-  answer?: unknown;
-};
-
-type CreateCaseBody = {
-  subject?: unknown;
-  title?: unknown;
-  caseText?: unknown;
-  questions?: unknown;
-};
-
-type UpdateCaseBody = {
-  id?: unknown;
-  subject?: unknown;
-  title?: unknown;
-  caseText?: unknown;
-  questions?: unknown;
-};
-
-type DeleteCaseBody = {
-  id?: unknown;
-};
-
-type MeResponse = {
-  role?: unknown;
-};
-
-/* =========================================================
-   CONSTANTS
-========================================================= */
-
-const CASES_PREFIX =
-  "huquqiy-sayt/kazuslar/";
-
-const PDF_META_PREFIX =
-  "huquqiy-sayt/kazuslar-pdf/meta/";
-
-const NO_CACHE_HEADERS = {
-  "Cache-Control":
-    "no-store, no-cache, must-revalidate, proxy-revalidate",
-  Pragma: "no-cache",
-  Expires: "0",
-};
-
-/* =========================================================
-   COMMON HELPERS
-========================================================= */
-
-function checkBlobToken() {
-  if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-}
-
-function cleanText(
-  value: unknown
-) {
-  return String(
-    value ?? ""
-  ).trim();
-}
-
-function createId() {
-  const random =
-    Math.random()
-      .toString(36)
-      .slice(2, 9);
-
-  return (
-    `${Date.now()}-${random}`
-  );
-}
-
-function getCasePath(
-  id: string
-) {
-  return (
-    `${CASES_PREFIX}${id}.json`
-  );
-}
-
-/* =========================================================
-   ADMIN TEKSHIRISH
-
-   Saytingizda /api/me allaqachon ishlayotgani uchun
-   shu endpoint orqali cookie va rol tekshiriladi.
-========================================================= */
-
-async function requireAdmin(
-  request: NextRequest
-) {
-  const cookie =
-    request.headers.get(
-      "cookie"
-    ) ?? "";
-
-  const meUrl =
-    new URL(
-      "/api/me",
-      request.url
-    );
-
-  const response =
-    await fetch(
-      meUrl,
-      {
-        method: "GET",
-        headers: {
-          cookie,
-        },
-        cache: "no-store",
-      }
-    );
-
-  if (
-    response.status ===
-    401
-  ) {
-    return {
-      ok: false as const,
-      status: 401,
-      message:
-        "Avval tizimga kiring.",
-    };
-  }
-
-  if (
-    !response.ok
-  ) {
-    return {
-      ok: false as const,
-      status: 500,
-      message:
-        "Foydalanuvchi rolini tekshirib bo‘lmadi.",
-    };
-  }
-
-  const data =
-    (await response.json()) as MeResponse;
-
-  if (
-    data.role !==
-    "admin"
-  ) {
-    return {
-      ok: false as const,
-      status: 403,
-      message:
-        "Bu amal faqat administrator uchun.",
-    };
-  }
-
+function noStoreHeaders() {
   return {
-    ok: true as const,
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
   };
 }
 
-/* =========================================================
-   QUESTION NORMALIZE
-========================================================= */
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: noStoreHeaders(),
+  });
+}
+
+function clean(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function makeId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+function toIso(value: string | Date | null | undefined) {
+  if (!value) return new Date().toISOString();
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return date.toISOString();
+}
 
 function normalizeQuestions(
-  value: unknown
-): CaseQuestion[] {
-  if (
-    !Array.isArray(value)
-  ) {
-    return [];
-  }
-
-  const result:
-    CaseQuestion[] = [];
-
-  for (
-    const item of value
-  ) {
-    if (
-      !item ||
-      typeof item !==
-        "object"
-    ) {
-      continue;
-    }
-
-    const raw =
-      item as RawQuestion;
-
-    const question =
-      cleanText(
-        raw.question
-      );
-
-    const answer =
-      cleanText(
-        raw.answer
-      );
-
-    if (
-      !question ||
-      !answer
-    ) {
-      continue;
-    }
-
-    result.push({
-      id:
-        cleanText(
-          raw.id
-        ) ||
-        createId(),
-
-      question,
-      answer,
-    });
-  }
-
-  return result;
-}
-
-/* =========================================================
-   CASE NORMALIZE
-========================================================= */
-
-function normalizeCase(
-  value: unknown
-): PlatformCase | null {
-  if (
-    !value ||
-    typeof value !==
-      "object"
-  ) {
-    return null;
-  }
-
-  const raw =
-    value as Record<
-      string,
-      unknown
-    >;
-
-  const id =
-    cleanText(raw.id);
-
-  const subject =
-    cleanText(
-      raw.subject
-    );
-
-  const title =
-    cleanText(
-      raw.title
-    );
-
-  const caseText =
-    cleanText(
-      raw.caseText
-    );
-
-  const questions =
-    normalizeQuestions(
-      raw.questions
-    );
-
-  if (
-    !id ||
-    !subject ||
-    !title ||
-    !caseText ||
-    questions.length === 0
-  ) {
-    return null;
-  }
-
-  return {
-    id,
-    type: "platform",
-    subject,
-    title,
-    caseText,
-    questions,
-
-    createdAt:
-      cleanText(
-        raw.createdAt
-      ),
-
-    updatedAt:
-      cleanText(
-        raw.updatedAt
-      ),
-  };
-}
-
-/* =========================================================
-   BLOB O‘QISH
-========================================================= */
-
-async function readCase(
-  id: string
-): Promise<
-  PlatformCase | null
-> {
-  checkBlobToken();
-
-  try {
-    const result =
-      await get(
-        getCasePath(id),
-        {
-          access:
-            "private",
-        }
-      );
-
-    if (
-      !result ||
-      result.statusCode !==
-        200 ||
-      !result.stream
-    ) {
-      return null;
-    }
-
-    const text =
-      await new Response(
-        result.stream
-      ).text();
-
-    if (
-      !text.trim()
-    ) {
-      return null;
-    }
-
-    const parsed:
-      unknown =
-      JSON.parse(text);
-
-    return normalizeCase(
-      parsed
-    );
-  } catch (error) {
-    console.warn(
-      `Kazus o‘qilmadi: ${id}`,
-      error
-    );
-
-    return null;
-  }
-}
-
-/* =========================================================
-   BLOB YOZISH
-========================================================= */
-
-async function writeCase(
-  data: PlatformCase
+  questions: KazusQuestionInput[] | undefined
 ) {
-  checkBlobToken();
+  if (!Array.isArray(questions)) return [];
 
-  await put(
-    getCasePath(
-      data.id
-    ),
-
-    JSON.stringify(
-      data,
-      null,
-      2
-    ),
-
-    {
-      access:
-        "private",
-
-      addRandomSuffix:
-        false,
-
-      allowOverwrite:
-        true,
-
-      contentType:
-        "application/json; charset=utf-8",
-
-      cacheControlMaxAge:
-        60,
-    }
-  );
+  return questions
+    .map((item) => ({
+      id: clean(item?.id),
+      question: clean(item?.question),
+      answer: clean(item?.answer),
+    }))
+    .filter((item) => item.question && item.answer);
 }
 
-/* =========================================================
-   LIST
-========================================================= */
-
-async function readAllCases(): Promise<
-  PlatformCase[]
-> {
-  checkBlobToken();
-
-  const cases:
-    PlatformCase[] = [];
-
-  let cursor:
-    string | undefined =
-    undefined;
-
-  do {
-    const result: {
-      blobs: Array<{
-        pathname: string;
-      }>;
-      hasMore: boolean;
-      cursor?: string;
-    } =
-      await list({
-        prefix:
-          CASES_PREFIX,
-
-        cursor,
-
-        limit:
-          100,
-      });
-
-    for (
-      const blob of result.blobs
-    ) {
-      if (
-        !blob.pathname.endsWith(
-          ".json"
-        )
-      ) {
-        continue;
-      }
-
-      const id =
-        blob.pathname
-          .slice(
-            CASES_PREFIX.length
-          )
-          .replace(
-            /\.json$/,
-            ""
-          );
-
-      if (
-        !id
-      ) {
-        continue;
-      }
-
-      const item =
-        await readCase(id);
-
-      if (
-        item
-      ) {
-        cases.push(
-          item
-        );
-      }
-    }
-
-    cursor =
-      result.hasMore
-        ? result.cursor
-        : undefined;
-  } while (cursor);
-
-  cases.sort(
-    (
-      a,
-      b
-    ) =>
-      new Date(
-        b.createdAt
-      ).getTime() -
-      new Date(
-        a.createdAt
-      ).getTime()
-  );
-
-  return cases;
-}
-
-/* =========================================================
-   PDF KAZUSLAR
-========================================================= */
-
-function normalizePdfCase(value: unknown): PdfCase | null {
-  if (!value || typeof value !== "object") return null;
-
-  const raw = value as Record<string, unknown>;
-  const id = cleanText(raw.id);
-  const subject = cleanText(raw.subject);
-  const title = cleanText(raw.title);
-  const url = cleanText(raw.url);
-  const pathname = cleanText(raw.pathname);
-  const fileSize = Number(raw.fileSize ?? 0);
-
-  if (!id || !subject || !title || !url || !pathname) return null;
-
-  return {
-    id,
-    type: "pdf",
-    subject,
-    title,
-    originalFileName: cleanText(raw.originalFileName),
-    fileSize: Number.isFinite(fileSize) ? fileSize : 0,
-    mimeType: cleanText(raw.mimeType) || "application/pdf",
-    url,
-    pathname,
-    createdAt: cleanText(raw.createdAt),
-    updatedAt: cleanText(raw.updatedAt),
-  };
-}
-
-function getPdfMetaPath(id: string) {
-  return `${PDF_META_PREFIX}${id}.json`;
-}
-
-async function readPdfCase(id: string): Promise<PdfCase | null> {
-  checkBlobToken();
-
-  try {
-    const result = await get(getPdfMetaPath(id), {
-      access: "private",
-    });
-
-    if (!result || result.statusCode !== 200 || !result.stream) return null;
-
-    const text = await new Response(result.stream).text();
-    if (!text.trim()) return null;
-
-    return normalizePdfCase(JSON.parse(text));
-  } catch (error) {
-    console.warn(`PDF kazus o‘qilmadi: ${id}`, error);
-    return null;
-  }
-}
-
-async function readAllPdfCases(): Promise<PdfCase[]> {
-  checkBlobToken();
-
-  const cases: PdfCase[] = [];
-  let cursor: string | undefined = undefined;
-
-  do {
-    const result: {
-      blobs: Array<{ pathname: string }>;
-      hasMore: boolean;
-      cursor?: string;
-    } = await list({
-      prefix: PDF_META_PREFIX,
-      cursor,
-      limit: 100,
-    });
-
-    for (const blob of result.blobs) {
-      if (!blob.pathname.endsWith(".json")) continue;
-
-      const id = blob.pathname
-        .slice(PDF_META_PREFIX.length)
-        .replace(/\.json$/, "");
-
-      if (!id) continue;
-
-      const item = await readPdfCase(id);
-      if (item) cases.push(item);
-    }
-
-    cursor = result.hasMore ? result.cursor : undefined;
-  } while (cursor);
-
-  return cases;
-}
-
-function sortCasesNewestFirst(cases: AnyCase[]) {
-  return cases.sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() -
-      new Date(a.createdAt).getTime()
-  );
-}
-
-/* =========================================================
-   VALIDATION
-========================================================= */
-
-function validateCaseInput(
-  body:
-    CreateCaseBody |
-    UpdateCaseBody
+function mapKazus(
+  row: DbKazus,
+  questions: DbQuestion[]
 ) {
-  const subject =
-    cleanText(
-      body.subject
-    );
-
-  const title =
-    cleanText(
-      body.title
-    );
-
-  const caseText =
-    cleanText(
-      body.caseText
-    );
-
-  const questions =
-    normalizeQuestions(
-      body.questions
-    );
-
-  if (
-    !subject
-  ) {
-    return {
-      ok: false as const,
-      message:
-        "Fan nomini kiriting.",
-    };
-  }
-
-  if (
-    !title
-  ) {
-    return {
-      ok: false as const,
-      message:
-        "Kazus nomini kiriting.",
-    };
-  }
-
-  if (
-    !caseText
-  ) {
-    return {
-      ok: false as const,
-      message:
-        "Kazus matnini kiriting.",
-    };
-  }
-
-  if (
-    questions.length ===
-    0
-  ) {
-    return {
-      ok: false as const,
-      message:
-        "Kamida bitta savol va uning javobini kiriting.",
-    };
-  }
-
   return {
-    ok: true as const,
-    subject,
-    title,
-    caseText,
-    questions,
+    id: row.id,
+    type: "platform" as const,
+    subject: row.subject,
+    title: row.title,
+    caseText: row.case_text,
+
+    questions: questions
+      .sort(
+        (a, b) =>
+          Number(a.question_order) -
+          Number(b.question_order)
+      )
+      .map((question) => ({
+        id: question.id,
+        question: question.question,
+        answer: question.answer,
+      })),
+
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
   };
 }
 
 /* =========================================================
    GET
+   ---------------------------------------------------------
    /api/kazuslar
-   /api/kazuslar?id=...
-========================================================= */
+       -> barcha platform kazuslar
 
-export async function GET(
-  request:
-    NextRequest
-) {
+   /api/kazuslar?id=abc
+       -> bitta kazus
+   ========================================================= */
+
+export async function GET(request: NextRequest) {
   try {
-    const {
-      searchParams,
-    } =
-      new URL(
-        request.url
-      );
+    const id = clean(
+      request.nextUrl.searchParams.get("id")
+    );
 
-    const id =
-      cleanText(
-        searchParams.get(
-          "id"
-        )
-      );
+    /* ---------------- Bitta kazus ---------------- */
 
-    if (
-      id
-    ) {
-      const platformItem =
-        await readCase(
-          id
-        );
+    if (id) {
+      const rows = (await sql`
+        SELECT
+          id,
+          subject,
+          title,
+          case_text,
+          case_type,
+          created_at,
+          updated_at
+        FROM kazuslar
+        WHERE id = ${id}
+        LIMIT 1
+      `) as DbKazus[];
 
-      const item =
-        platformItem ??
-        await readPdfCase(
-          id
-        );
-
-      if (
-        !item
-      ) {
-        return NextResponse.json(
+      if (!rows.length) {
+        return json(
           {
-            success:
-              false,
-
-            message:
-              "Kazus topilmadi.",
+            success: false,
+            ok: false,
+            error: "KAZUS_NOT_FOUND",
+            message: "Kazus topilmadi.",
           },
-          {
-            status:
-              404,
-
-            headers:
-              NO_CACHE_HEADERS,
-          }
+          404
         );
       }
 
-      return NextResponse.json(
-        {
-          success:
-            true,
+      const questionRows = (await sql`
+        SELECT
+          id,
+          kazus_id,
+          question_order,
+          question,
+          answer,
+          created_at,
+          updated_at
+        FROM kazus_questions
+        WHERE kazus_id = ${id}
+        ORDER BY question_order ASC
+      `) as DbQuestion[];
 
-          case:
-            item,
-        },
-        {
-          status:
-            200,
+      const item = mapKazus(
+        rows[0],
+        questionRows
+      );
 
-          headers:
-            NO_CACHE_HEADERS,
-        }
+      return json({
+        success: true,
+        ok: true,
+        item,
+        kazus: item,
+      });
+    }
+
+    /* ---------------- Barcha kazuslar ---------------- */
+
+    const kazusRows = (await sql`
+      SELECT
+        id,
+        subject,
+        title,
+        case_text,
+        case_type,
+        created_at,
+        updated_at
+      FROM kazuslar
+      WHERE case_type = 'platform'
+      ORDER BY created_at DESC
+    `) as DbKazus[];
+
+    if (!kazusRows.length) {
+      return json({
+        success: true,
+        ok: true,
+        count: 0,
+        total: 0,
+        items: [],
+        kazuslar: [],
+      });
+    }
+
+    const questionRows = (await sql`
+      SELECT
+        id,
+        kazus_id,
+        question_order,
+        question,
+        answer,
+        created_at,
+        updated_at
+      FROM kazus_questions
+      ORDER BY kazus_id, question_order ASC
+    `) as DbQuestion[];
+
+    const questionsByKazus =
+      new Map<string, DbQuestion[]>();
+
+    for (const question of questionRows) {
+      const current =
+        questionsByKazus.get(question.kazus_id) ?? [];
+
+      current.push(question);
+
+      questionsByKazus.set(
+        question.kazus_id,
+        current
       );
     }
 
-    const [
-      platformCases,
-      pdfCases,
-    ] = await Promise.all([
-      readAllCases(),
-      readAllPdfCases(),
-    ]);
-
-    const cases =
-      sortCasesNewestFirst([
-        ...platformCases,
-        ...pdfCases,
-      ]);
-
-    return NextResponse.json(
-      {
-        success:
-          true,
-
-        count:
-          cases.length,
-
-        platformCount:
-          platformCases.length,
-
-        pdfCount:
-          pdfCases.length,
-
-        cases,
-      },
-      {
-        status:
-          200,
-
-        headers:
-          NO_CACHE_HEADERS,
-      }
+    const items = kazusRows.map((row) =>
+      mapKazus(
+        row,
+        questionsByKazus.get(row.id) ?? []
+      )
     );
+
+    return json({
+      success: true,
+      ok: true,
+      count: items.length,
+      total: items.length,
+
+      // Eski frontendlarning turli variantlari
+      // bilan mos bo‘lishi uchun ikkala nom ham.
+      items,
+      kazuslar: items,
+    });
   } catch (error) {
-    console.error(
-      "GET /api/kazuslar ERROR:",
-      error
-    );
+    console.error("GET /api/kazuslar error:", error);
 
-    return NextResponse.json(
+    return json(
       {
-        success:
-          false,
-
+        success: false,
+        ok: false,
+        error: "KAZUS_GET_FAILED",
         message:
           error instanceof Error
             ? error.message
-            : "Kazuslarni yuklashda server xatosi.",
+            : "Kazuslarni olishda xatolik yuz berdi.",
       },
-      {
-        status:
-          500,
-
-        headers:
-          NO_CACHE_HEADERS,
-      }
+      500
     );
   }
 }
 
 /* =========================================================
    POST
-   YANGI PLATFORM KAZUSINI SAQLASH
-========================================================= */
+   ---------------------------------------------------------
+   Yangi platform kazus yaratadi.
 
-export async function POST(
-  request:
-    NextRequest
-) {
+   Body:
+   {
+     subject,
+     title,
+     caseText,
+     questions: [
+       {
+         id?,
+         question,
+         answer
+       }
+     ]
+   }
+   ========================================================= */
+
+export async function POST(request: NextRequest) {
   try {
-    const auth =
-      await requireAdmin(
-        request
-      );
+    const body = (await request.json()) as KazusInput;
 
-    if (
-      !auth.ok
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
+    const id = clean(body.id) || makeId("kazus");
+    const subject = clean(body.subject);
+    const title = clean(body.title);
+    const caseText = clean(body.caseText);
 
-          message:
-            auth.message,
-        },
-        {
-          status:
-            auth.status,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const body =
-      (await request.json()) as CreateCaseBody;
-
-    const validated =
-      validateCaseInput(
-        body
-      );
-
-    if (
-      !validated.ok
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            validated.message,
-        },
-        {
-          status:
-            400,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const now =
-      new Date()
-        .toISOString();
-
-    const data:
-      PlatformCase =
-      {
-        id:
-          createId(),
-
-        type:
-          "platform",
-
-        subject:
-          validated.subject,
-
-        title:
-          validated.title,
-
-        caseText:
-          validated.caseText,
-
-        questions:
-          validated.questions,
-
-        createdAt:
-          now,
-
-        updatedAt:
-          now,
-      };
-
-    await writeCase(
-      data
+    const questions = normalizeQuestions(
+      body.questions
     );
 
-    /*
-      Saqlanganini qayta tekshiramiz.
-    */
-    const verified =
-      await readCase(
-        data.id
-      );
-
-    if (
-      !verified
-    ) {
-      throw new Error(
-        "Kazus Blobga yuborildi, lekin saqlanganini tasdiqlab bo‘lmadi."
+    if (!subject) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "SUBJECT_REQUIRED",
+          message: "Fan nomi kiritilmagan.",
+        },
+        400
       );
     }
 
-    return NextResponse.json(
-      {
-        success:
-          true,
+    if (!title) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "TITLE_REQUIRED",
+          message: "Kazus sarlavhasi kiritilmagan.",
+        },
+        400
+      );
+    }
 
-        message:
-          "Kazus muvaffaqiyatli saqlandi.",
+    if (!caseText) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "CASE_TEXT_REQUIRED",
+          message: "Kazus matni kiritilmagan.",
+        },
+        400
+      );
+    }
 
-        case:
-          verified,
-      },
-      {
-        status:
-          201,
+    if (!questions.length) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "QUESTION_REQUIRED",
+          message:
+            "Kamida bitta to‘liq savol va javob bo‘lishi kerak.",
+        },
+        400
+      );
+    }
 
-        headers:
-          NO_CACHE_HEADERS,
+    const existing = await sql`
+      SELECT id
+      FROM kazuslar
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+
+    if (existing.length) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "KAZUS_ALREADY_EXISTS",
+          message:
+            "Bu ID bilan kazus allaqachon mavjud.",
+        },
+        409
+      );
+    }
+
+    await sql`
+      INSERT INTO kazuslar (
+        id,
+        subject,
+        title,
+        case_text,
+        case_type,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${id},
+        ${subject},
+        ${title},
+        ${caseText},
+        'platform',
+        NOW(),
+        NOW()
+      )
+    `;
+
+    try {
+      for (let i = 0; i < questions.length; i++) {
+        const question = questions[i];
+
+        const questionId =
+          question.id || makeId("kq");
+
+        await sql`
+          INSERT INTO kazus_questions (
+            id,
+            kazus_id,
+            question_order,
+            question,
+            answer,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ${questionId},
+            ${id},
+            ${i + 1},
+            ${question.question},
+            ${question.answer},
+            NOW(),
+            NOW()
+          )
+        `;
       }
+    } catch (questionError) {
+      // Savollarni yozishda xato bo‘lsa,
+      // yarim kazus qolib ketmasin.
+      await sql`
+        DELETE FROM kazuslar
+        WHERE id = ${id}
+      `;
+
+      throw questionError;
+    }
+
+    const createdRows = (await sql`
+      SELECT
+        id,
+        subject,
+        title,
+        case_text,
+        case_type,
+        created_at,
+        updated_at
+      FROM kazuslar
+      WHERE id = ${id}
+      LIMIT 1
+    `) as DbKazus[];
+
+    const createdQuestions = (await sql`
+      SELECT
+        id,
+        kazus_id,
+        question_order,
+        question,
+        answer,
+        created_at,
+        updated_at
+      FROM kazus_questions
+      WHERE kazus_id = ${id}
+      ORDER BY question_order ASC
+    `) as DbQuestion[];
+
+    const item = mapKazus(
+      createdRows[0],
+      createdQuestions
+    );
+
+    return json(
+      {
+        success: true,
+        ok: true,
+        message: "Kazus saqlandi.",
+        item,
+        kazus: item,
+      },
+      201
     );
   } catch (error) {
-    console.error(
-      "POST /api/kazuslar ERROR:",
-      error
-    );
+    console.error("POST /api/kazuslar error:", error);
 
-    return NextResponse.json(
+    return json(
       {
-        success:
-          false,
-
+        success: false,
+        ok: false,
+        error: "KAZUS_CREATE_FAILED",
         message:
           error instanceof Error
             ? error.message
-            : "Kazusni saqlashda server xatosi.",
+            : "Kazusni saqlashda xatolik yuz berdi.",
       },
-      {
-        status:
-          500,
-
-        headers:
-          NO_CACHE_HEADERS,
-      }
+      500
     );
   }
 }
 
 /* =========================================================
-   PATCH
-   KAZUSNI TAHRIRLASH
-========================================================= */
+   PUT
+   ---------------------------------------------------------
+   Mavjud kazusni tahrirlaydi.
 
-export async function PATCH(
-  request:
-    NextRequest
-) {
+   Body:
+   {
+     id,
+     subject,
+     title,
+     caseText,
+     questions:[...]
+   }
+   ========================================================= */
+
+export async function PUT(request: NextRequest) {
   try {
-    const auth =
-      await requireAdmin(
-        request
-      );
+    const body = (await request.json()) as KazusInput;
 
-    if (
-      !auth.ok
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
+    const id = clean(body.id);
+    const subject = clean(body.subject);
+    const title = clean(body.title);
+    const caseText = clean(body.caseText);
 
-          message:
-            auth.message,
-        },
-        {
-          status:
-            auth.status,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const body =
-      (await request.json()) as UpdateCaseBody;
-
-    const id =
-      cleanText(
-        body.id
-      );
-
-    if (
-      !id
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            "Kazus ID topilmadi.",
-        },
-        {
-          status:
-            400,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const existing =
-      await readCase(
-        id
-      );
-
-    if (
-      !existing
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            "Kazus topilmadi.",
-        },
-        {
-          status:
-            404,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const validated =
-      validateCaseInput(
-        body
-      );
-
-    if (
-      !validated.ok
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            validated.message,
-        },
-        {
-          status:
-            400,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const updated:
-      PlatformCase =
-      {
-        ...existing,
-
-        subject:
-          validated.subject,
-
-        title:
-          validated.title,
-
-        caseText:
-          validated.caseText,
-
-        questions:
-          validated.questions,
-
-        updatedAt:
-          new Date()
-            .toISOString(),
-      };
-
-    await writeCase(
-      updated
+    const questions = normalizeQuestions(
+      body.questions
     );
 
-    const verified =
-      await readCase(
-        id
-      );
-
-    if (
-      !verified
-    ) {
-      throw new Error(
-        "Kazus yangilandi, lekin saqlanganini tasdiqlab bo‘lmadi."
+    if (!id) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "ID_REQUIRED",
+          message: "Kazus ID topilmadi.",
+        },
+        400
       );
     }
 
-    return NextResponse.json(
-      {
-        success:
-          true,
+    if (!subject || !title || !caseText) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "INVALID_KAZUS",
+          message:
+            "Fan, sarlavha va kazus matni to‘liq kiritilishi kerak.",
+        },
+        400
+      );
+    }
 
-        message:
-          "Kazus muvaffaqiyatli yangilandi.",
+    if (!questions.length) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "QUESTION_REQUIRED",
+          message:
+            "Kamida bitta to‘liq savol va javob bo‘lishi kerak.",
+        },
+        400
+      );
+    }
 
-        case:
-          verified,
-      },
-      {
-        status:
-          200,
+    const existing = await sql`
+      SELECT id
+      FROM kazuslar
+      WHERE id = ${id}
+      LIMIT 1
+    `;
 
-        headers:
-          NO_CACHE_HEADERS,
+    if (!existing.length) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "KAZUS_NOT_FOUND",
+          message: "Kazus topilmadi.",
+        },
+        404
+      );
+    }
+
+    await sql`
+      UPDATE kazuslar
+      SET
+        subject = ${subject},
+        title = ${title},
+        case_text = ${caseText},
+        updated_at = NOW()
+      WHERE id = ${id}
+    `;
+
+    await sql`
+      DELETE FROM kazus_questions
+      WHERE kazus_id = ${id}
+    `;
+
+    try {
+      for (let i = 0; i < questions.length; i++) {
+        const question = questions[i];
+
+        const questionId =
+          question.id || makeId("kq");
+
+        await sql`
+          INSERT INTO kazus_questions (
+            id,
+            kazus_id,
+            question_order,
+            question,
+            answer,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ${questionId},
+            ${id},
+            ${i + 1},
+            ${question.question},
+            ${question.answer},
+            NOW(),
+            NOW()
+          )
+        `;
       }
+    } catch (questionError) {
+      console.error(
+        "Kazus questions update error:",
+        questionError
+      );
+
+      throw questionError;
+    }
+
+    const updatedRows = (await sql`
+      SELECT
+        id,
+        subject,
+        title,
+        case_text,
+        case_type,
+        created_at,
+        updated_at
+      FROM kazuslar
+      WHERE id = ${id}
+      LIMIT 1
+    `) as DbKazus[];
+
+    const updatedQuestions = (await sql`
+      SELECT
+        id,
+        kazus_id,
+        question_order,
+        question,
+        answer,
+        created_at,
+        updated_at
+      FROM kazus_questions
+      WHERE kazus_id = ${id}
+      ORDER BY question_order ASC
+    `) as DbQuestion[];
+
+    const item = mapKazus(
+      updatedRows[0],
+      updatedQuestions
     );
+
+    return json({
+      success: true,
+      ok: true,
+      message: "Kazus yangilandi.",
+      item,
+      kazus: item,
+    });
   } catch (error) {
-    console.error(
-      "PATCH /api/kazuslar ERROR:",
-      error
-    );
+    console.error("PUT /api/kazuslar error:", error);
 
-    return NextResponse.json(
+    return json(
       {
-        success:
-          false,
-
+        success: false,
+        ok: false,
+        error: "KAZUS_UPDATE_FAILED",
         message:
           error instanceof Error
             ? error.message
-            : "Kazusni yangilashda server xatosi.",
+            : "Kazusni yangilashda xatolik yuz berdi.",
       },
-      {
-        status:
-          500,
-
-        headers:
-          NO_CACHE_HEADERS,
-      }
+      500
     );
   }
 }
 
 /* =========================================================
    DELETE
-   KAZUSNI O‘CHIRISH
-========================================================= */
+   ---------------------------------------------------------
+   /api/kazuslar?id=abc
 
-export async function DELETE(
-  request:
-    NextRequest
-) {
+   yoki body:
+   { id: "abc" }
+
+   ON DELETE CASCADE sabab savol-javoblar ham
+   avtomatik o‘chadi.
+   ========================================================= */
+
+export async function DELETE(request: NextRequest) {
   try {
-    const auth =
-      await requireAdmin(
-        request
-      );
-
-    if (
-      !auth.ok
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            auth.message,
-        },
-        {
-          status:
-            auth.status,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const body =
-      (await request.json()) as DeleteCaseBody;
-
-    const id =
-      cleanText(
-        body.id
-      );
-
-    if (
-      !id
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            "Kazus ID topilmadi.",
-        },
-        {
-          status:
-            400,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    const existing =
-      await readCase(
-        id
-      );
-
-    if (
-      !existing
-    ) {
-      return NextResponse.json(
-        {
-          success:
-            false,
-
-          message:
-            "Kazus topilmadi.",
-        },
-        {
-          status:
-            404,
-
-          headers:
-            NO_CACHE_HEADERS,
-        }
-      );
-    }
-
-    await del(
-      getCasePath(
-        id
-      )
+    let id = clean(
+      request.nextUrl.searchParams.get("id")
     );
 
-    return NextResponse.json(
-      {
-        success:
-          true,
-
-        message:
-          "Kazus o‘chirildi.",
-
-        id,
-      },
-      {
-        status:
-          200,
-
-        headers:
-          NO_CACHE_HEADERS,
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = clean(body?.id);
+      } catch {
+        // Body bo‘lmasligi mumkin.
       }
-    );
+    }
+
+    if (!id) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "ID_REQUIRED",
+          message: "Kazus ID topilmadi.",
+        },
+        400
+      );
+    }
+
+    const existing = await sql`
+      SELECT id
+      FROM kazuslar
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+
+    if (!existing.length) {
+      return json(
+        {
+          success: false,
+          ok: false,
+          error: "KAZUS_NOT_FOUND",
+          message: "Kazus topilmadi.",
+        },
+        404
+      );
+    }
+
+    await sql`
+      DELETE FROM kazuslar
+      WHERE id = ${id}
+    `;
+
+    return json({
+      success: true,
+      ok: true,
+      id,
+      message: "Kazus o‘chirildi.",
+    });
   } catch (error) {
-    console.error(
-      "DELETE /api/kazuslar ERROR:",
-      error
-    );
+    console.error("DELETE /api/kazuslar error:", error);
 
-    return NextResponse.json(
+    return json(
       {
-        success:
-          false,
-
+        success: false,
+        ok: false,
+        error: "KAZUS_DELETE_FAILED",
         message:
           error instanceof Error
             ? error.message
-            : "Kazusni o‘chirishda server xatosi.",
+            : "Kazusni o‘chirishda xatolik yuz berdi.",
       },
-      {
-        status:
-          500,
-
-        headers:
-          NO_CACHE_HEADERS,
-      }
+      500
     );
   }
 }
