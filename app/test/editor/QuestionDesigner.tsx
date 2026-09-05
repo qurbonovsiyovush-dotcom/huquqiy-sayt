@@ -39,87 +39,123 @@ function uid() {
     .slice(2, 8)}`;
 }
 
-
-function normalizeLegacyQuestionHtml(html: string) {
-  if (!html.trim()) return "";
-
-  const holder = document.createElement("div");
-  holder.innerHTML = html;
-
-  // Oddiy matndagi tinish belgilarini bir xil qilamiz.
-  // Foydalanuvchi talabi bo‘yicha so‘roq belgisi oldidan 1 ta bo‘sh joy qoladi.
+function normalizeQuestionContent(root: HTMLElement) {
+  /*
+    Import qilingan savollarda PDF matni ko‘pincha bitta uzun qatorda
+    keladi: "I. ... II. ... III. ..." yoki "1. ... 2. ... 3. ...".
+    Bu funksiya faqat oddiy savol matniga ishlaydi; rasm, Venn, jadval
+    va boshqa designer obyektlariga tegmaydi.
+  */
   const walker = document.createTreeWalker(
-    holder,
+    root,
     NodeFilter.SHOW_TEXT
   );
 
   const textNodes: Text[] = [];
-  let current: Node | null;
+  let current = walker.nextNode();
 
-  while ((current = walker.nextNode())) {
-    textNodes.push(current as Text);
+  while (current) {
+    if (current instanceof Text) {
+      textNodes.push(current);
+    }
+    current = walker.nextNode();
   }
+
+  const markerPattern = /(^|\s+)((?:I|II|III|IV|V|VI|VII|VIII|IX|X)|(?:[1-9]|[1-9]\d))\.\s+/g;
 
   textNodes.forEach((node) => {
     const parent = node.parentElement;
+    if (!parent) return;
 
-    if (
-      !parent ||
-      parent.closest('[contenteditable="false"]') ||
-      parent.closest("svg") ||
-      parent.closest("table")
-    ) {
+    // Designer obyektlari ichidagi yozuvlarga avtomatik format bermaymiz.
+    if (parent.closest('[data-object-id]')) return;
+
+    let text = node.nodeValue || "";
+
+    // "keladi ?" -> "keladi?" va boshqa tinish belgilarida ham shu qoida.
+    text = text
+      .replace(/[ \t\u00A0]+([?!,.;:])/g, "$1")
+      .replace(/([?!])(?=[^\s<])/g, "$1 ");
+
+    const matches = Array.from(text.matchAll(markerPattern));
+
+    /*
+      Kamida ikkita ro‘yxat markeri topilsa, PDFdan yopishib kelgan
+      raqamlarni alohida qatorga ajratamiz. Bitta oddiy "2." uchrashi
+      tasodifan qatorni buzib yubormaydi.
+    */
+    if (matches.length >= 2) {
+      const fragment = document.createDocumentFragment();
+      let lastIndex = 0;
+
+      matches.forEach((match, index) => {
+        const matchIndex = match.index ?? 0;
+        const full = match[0];
+        const leading = match[1] || "";
+        const marker = match[2];
+        const markerStart = Math.max(
+          lastIndex,
+          matchIndex + leading.length
+        );
+
+        const before = text.slice(lastIndex, markerStart);
+        if (before) {
+          fragment.appendChild(document.createTextNode(before));
+        }
+
+        // Birinchi marker ham oldingi gapga yopishgan bo‘lsa, yangi qatordan boshlanadi.
+        if (markerStart > 0 || index > 0) {
+          fragment.appendChild(document.createElement("br"));
+        }
+
+        fragment.appendChild(
+          document.createTextNode(`${marker}. `)
+        );
+
+        lastIndex = matchIndex + full.length;
+      });
+
+      const rest = text.slice(lastIndex);
+      if (rest) {
+        fragment.appendChild(document.createTextNode(rest));
+      }
+
+      node.replaceWith(fragment);
       return;
     }
 
-    node.textContent = (node.textContent || "")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\s+([,.;:])/g, "$1")
-      .replace(/\s*\?/g, " ?");
-  });
-
-  // Eski importdan bitta qatorda kelgan I. II. III. bandlarni
-  // alohida qatorlarga chiqaramiz. Hech qanday bold/normal stil bermaymiz:
-  // mavjud format o‘z holicha qoladi.
-  const blockCandidates = Array.from(
-    holder.querySelectorAll("p,div")
-  ).filter((el) => !el.closest('[data-object-id]'));
-
-  const candidates = blockCandidates.length
-    ? blockCandidates
-    : [holder];
-
-  candidates.forEach((element) => {
-    if (element.children.length > 0) return;
-
-    const text = (element.textContent || "")
-      .replace(/\u00a0/g, " ")
-      .replace(/[ \t]+/g, " ")
-      .trim();
-
-    if (!/\s(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s/.test(` ${text}`)) {
-      return;
+    if (node.nodeValue !== text) {
+      node.nodeValue = text;
     }
-
-    const parts = text
-      .split(/\s+(?=(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s)/g)
-      .map((part) => part.trim())
-      .filter(Boolean);
-
-    if (parts.length < 2) return;
-
-    element.innerHTML = "";
-
-    parts.forEach((part, index) => {
-      const line = document.createElement("div");
-      line.style.margin = index === 0 ? "0 0 14px" : "0 0 10px";
-      line.style.lineHeight = "1.55";
-      line.textContent = part.replace(/\s*\?/g, " ?");
-      element.appendChild(line);
-    });
   });
 
-  return holder.innerHTML;
+  /*
+    Savolning asosiy matni public testdagi ko‘rinishdek qalin chiqadi.
+    Importdan qolgan font-weight: normal qiymatlari qalinlikni sindirmasin.
+    Designer obyektlarining o‘z font sozlamalari esa saqlanadi.
+  */
+  root.querySelectorAll("*").forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+    if (node.closest('[data-object-id]')) return;
+
+    // HTMLning o‘ziga yoziladi, shuning uchun public sahifada ham qalin qoladi.
+    if (node.tagName !== "BR") {
+      node.style.fontWeight = "700";
+    }
+  });
+
+  // Root ichida bevosita turgan oddiy text node'larni ham saqlanadigan span'ga o‘raymiz.
+  Array.from(root.childNodes).forEach((node) => {
+    if (!(node instanceof Text)) return;
+    if (!node.nodeValue?.trim()) return;
+
+    const span = document.createElement("span");
+    span.style.fontWeight = "700";
+    span.textContent = node.nodeValue;
+    node.replaceWith(span);
+  });
+
+  root.style.fontWeight = "700";
 }
 
 function cleanHtml(root: HTMLElement) {
@@ -224,21 +260,21 @@ export default function QuestionDesigner({
 
     if (!root) return;
 
-    const normalized =
-      normalizeLegacyQuestionHtml(
-        value || ""
-      );
-
     if (
       cleanHtml(root) !==
-      normalized
+      (value || "")
     ) {
       root.innerHTML =
-        normalized;
-    }
+        value || "";
 
-    if (normalized !== (value || "")) {
-      onChange(normalized);
+      normalizeQuestionContent(root);
+
+      const normalized =
+        cleanHtml(root);
+
+      if (normalized !== (value || "")) {
+        onChange(normalized);
+      }
     }
   }, [value, onChange]);
 
@@ -2639,10 +2675,22 @@ export default function QuestionDesigner({
             "Times New Roman",
             serif;
           font-size: 18px;
-          line-height: 1.5;
+          font-weight: 700;
+          line-height: 1.65;
+          white-space: normal;
           box-shadow:
             inset 0 0 0 1px #b4c2c9;
           overflow: hidden;
+        }
+
+        .canvas :global(p),
+        .canvas :global(div:not(.nc-object)) {
+          margin-top: 0;
+          margin-bottom: 10px;
+        }
+
+        .canvas :global(br) {
+          line-height: 1.95;
         }
 
         .canvas :global(.nc-object) {
