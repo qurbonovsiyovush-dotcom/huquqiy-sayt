@@ -205,11 +205,11 @@ export async function POST(request: NextRequest) {
 
         const correctCount = question.options.filter((option: { key: string; text: string; isCorrect: boolean }) => option.isCorrect).length;
 
-        if (correctCount !== 1) {
+        if (correctCount > 1) {
           return NextResponse.json(
             {
               success: false,
-              message: `${question.number}-savolda to‘g‘ri javoblar soni ${correctCount}. Aynan 1 ta bo‘lishi kerak.`,
+              message: `${question.number}-savolda ${correctCount} ta to‘g‘ri javob belgilangan. Ko‘pi bilan 1 ta bo‘lishi kerak.`,
             },
             { status: 400 }
           );
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
       const optionCount = Number(optionRows?.[0]?.count || 0);
       const correctCount = Number(correctRows?.[0]?.count || 0);
 
-      if (questionCount !== 840 || optionCount !== 3360 || correctCount !== 840) {
+      if (questionCount !== 840 || optionCount !== 3360) {
         return NextResponse.json(
           {
             success: false,
@@ -341,16 +341,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const hasMissingCorrectAnswers = correctCount !== 840;
+      const finalStatus = hasMissingCorrectAnswers ? "draft" : "published";
+
       await sql`
         UPDATE legacy_tests
         SET
-          status = 'published',
+          status = ${finalStatus},
           questions_json = '[]'::jsonb,
           extra_json = ${JSON.stringify({
             source: "constitution-840-pdf",
             expectedQuestions: 840,
             importedQuestions: 840,
             importedOptions: 3360,
+            correctAnswers: correctCount,
+            missingCorrectAnswers: Math.max(0, 840 - correctCount),
             completed: true,
           })}::jsonb,
           updated_at = NOW()
@@ -359,11 +364,15 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "Tayyor! 840 ta savol va 3360 ta variant Neon bazasiga saqlandi va test e’lon qilindi.",
+        message: hasMissingCorrectAnswers
+          ? `Tayyor! 840 ta savol va 3360 ta variant Neon bazasiga draft holatda saqlandi. ${840 - correctCount} ta savolda to‘g‘ri javobni keyin tahrirlash kerak.`
+          : "Tayyor! 840 ta savol va 3360 ta variant Neon bazasiga saqlandi va test e’lon qilindi.",
         testId: TEST_ID,
+        status: finalStatus,
         questionCount,
         optionCount,
         correctCount,
+        missingCorrectAnswers: Math.max(0, 840 - correctCount),
       });
     }
 
