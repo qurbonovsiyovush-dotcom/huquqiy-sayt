@@ -1,589 +1,333 @@
-import {
-  get,
-  list,
-  put,
-} from "@vercel/blob";
+import "server-only";
+
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type SynonymWord = {
-  id: string;
-  word: string;
-  uzbek: string;
-  synonyms: string[];
-  createdAt: string;
-  updatedAt: string;
-};
+async function isAdmin() {
+  const cookieStore = await cookies();
 
-type SynonymData = {
-  words: SynonymWord[];
-  updatedAt: string;
-};
-
-const BLOB_PATH =
-  "huquqiy-sayt/dictionary-synonyms.json";
-
-/* =====================================================
-   BO‘SH MA’LUMOT
-===================================================== */
-
-function emptyData(): SynonymData {
-  return {
-    words: [],
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-/* =====================================================
-   LUG‘ATNI O‘QISH
-===================================================== */
-
-async function readData(): Promise<SynonymData> {
-  try {
-    const result = await list({
-      prefix: BLOB_PATH,
-      limit: 100,
-    });
-
-    const blobs = result.blobs
-      .filter(
-        (blob) =>
-          blob.pathname === BLOB_PATH
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.uploadedAt).getTime() -
-          new Date(a.uploadedAt).getTime()
-      );
-
-    const latest = blobs[0];
-
-    if (!latest) {
-      return emptyData();
-    }
-
-    const blob = await get(
-      latest.pathname,
-      {
-        access: "private",
-      }
-    );
-
-    if (
-      !blob ||
-      blob.statusCode !== 200 ||
-      !blob.stream
-    ) {
-      return emptyData();
-    }
-
-    const text =
-      await new Response(
-        blob.stream
-      ).text();
-
-    const parsed =
-      JSON.parse(text);
-
-    return {
-      words: Array.isArray(parsed.words)
-        ? parsed.words
-        : [],
-      updatedAt:
-        parsed.updatedAt ||
-        new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error(
-      "Synonyms read error:",
-      error
-    );
-
-    return emptyData();
-  }
-}
-
-/* =====================================================
-   SAQLASH
-===================================================== */
-
-async function saveData(
-  data: SynonymData
-) {
-  return put(
-    BLOB_PATH,
-    JSON.stringify(data, null, 2),
-    {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "application/json",
-    }
+  return (
+    Boolean(cookieStore.get("qurbonov_session")?.value) &&
+    cookieStore.get("qurbonov_role")?.value === "admin"
   );
 }
 
-/* =====================================================
-   TARTIBLASH
-===================================================== */
-
-function sortWords(
-  words: SynonymWord[]
-) {
-  return [...words].sort((a, b) =>
-    a.word.localeCompare(
-      b.word,
-      "en",
-      {
-        sensitivity: "base",
-      }
-    )
-  );
+function cleanText(value: unknown) {
+  return typeof value === "string"
+    ? value.trim().replace(/\s+/g, " ")
+    : "";
 }
 
-/* =====================================================
-   SYNONYMLARNI TOZALASH
-===================================================== */
-
-function cleanSynonyms(
-  value: unknown
-): string[] {
-  let items: string[] = [];
-
-  if (Array.isArray(value)) {
-    items = value.map(String);
-  } else if (
-    typeof value === "string"
-  ) {
-    items = value.split(",");
-  }
-
-  const seen = new Set<string>();
-
-  return items
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .filter((item) => {
-      const key =
-        item.toLowerCase();
-
-      if (seen.has(key)) {
-        return false;
-      }
-
-      seen.add(key);
-
-      return true;
-    });
-}
-
-/* =====================================================
+/* =========================
    GET
-===================================================== */
+   ========================= */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const data =
-      await readData();
+    const { searchParams } = new URL(request.url);
+    const q = cleanText(searchParams.get("q"));
 
-    const words =
-      sortWords(data.words);
+    let rows;
 
-    return NextResponse.json({
-      ok: true,
-      total: words.length,
-      words,
-    });
-  } catch (error) {
-    console.error(
-      "GET synonyms error:",
-      error
-    );
+    if (q) {
+      rows = await sql`
+        SELECT
+          id,
+          word,
+          uzbek,
+          synonym,
+          synonym_uzbek AS "synonymUzbek",
+          word_order AS "wordOrder"
+        FROM synonyms
+        WHERE
+          LOWER(word) LIKE ${`%${q.toLowerCase()}%`}
+          OR LOWER(synonym) LIKE ${`%${q.toLowerCase()}%`}
+          OR LOWER(uzbek) LIKE ${`%${q.toLowerCase()}%`}
+        ORDER BY word_order ASC, id ASC
+      `;
+    } else {
+      rows = await sql`
+        SELECT
+          id,
+          word,
+          uzbek,
+          synonym,
+          synonym_uzbek AS "synonymUzbek",
+          word_order AS "wordOrder"
+        FROM synonyms
+        ORDER BY word_order ASC, id ASC
+      `;
+    }
 
     return NextResponse.json(
       {
-        ok: false,
-        message:
-          "Sinonimlarni yuklab bo‘lmadi.",
+        success: true,
+        synonyms: rows,
+        total: rows.length,
       },
       {
-        status: 500,
+        headers: {
+          "Cache-Control":
+            "public, s-maxage=300, stale-while-revalidate=600",
+        },
       }
+    );
+  } catch (error) {
+    console.error("SYNONYMS GET ERROR:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Sinonimlarni yuklashda xatolik yuz berdi.",
+        synonyms: [],
+        total: 0,
+      },
+      { status: 500 }
     );
   }
 }
 
-/* =====================================================
-   POST — BITTA SO‘Z QO‘SHISH
-===================================================== */
+/* =========================
+   POST — ADMIN
+   ========================= */
 
-export async function POST(
-  request: NextRequest
-) {
+export async function POST(request: NextRequest) {
   try {
-    const body =
-      await request.json();
-
-    const word =
-      String(
-        body.word || ""
-      ).trim();
-
-    const uzbek =
-      String(
-        body.uzbek || ""
-      ).trim();
-
-    const synonyms =
-      cleanSynonyms(
-        body.synonyms
-      );
-
-    if (!word) {
+    if (!(await isAdmin())) {
       return NextResponse.json(
         {
-          ok: false,
-          message:
-            "Inglizcha so‘zni kiriting.",
+          success: false,
+          message: "Ruxsat berilmagan.",
         },
-        {
-          status: 400,
-        }
+        { status: 403 }
       );
     }
 
-    if (!uzbek) {
+    const body = await request.json();
+
+    const word = cleanText(body?.word);
+    const uzbek = cleanText(body?.uzbek);
+    const synonym = cleanText(body?.synonym);
+
+    const synonymUzbek =
+      cleanText(
+        body?.synonymUzbek ??
+          body?.synonym_uzbek
+      ) || null;
+
+    if (!word || !uzbek || !synonym) {
       return NextResponse.json(
         {
-          ok: false,
+          success: false,
           message:
-            "O‘zbekcha tarjimani kiriting.",
+            "word, uzbek va synonym maydonlari majburiy.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    if (
-      synonyms.length === 0
-    ) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "Kamida bitta sinonim kiriting.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+    const orderResult = await sql`
+      SELECT
+        COALESCE(MAX(word_order), 0) + 1 AS next_order
+      FROM synonyms
+    `;
 
-    const data =
-      await readData();
+    const wordOrder =
+      Number(orderResult[0]?.next_order ?? 1);
 
-    const exists =
-      data.words.some(
-        (item) =>
-          item.word
-            .trim()
-            .toLowerCase() ===
-          word.toLowerCase()
-      );
-
-    if (exists) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "Bu so‘z lug‘atda mavjud.",
-        },
-        {
-          status: 409,
-        }
-      );
-    }
-
-    const now =
-      new Date().toISOString();
-
-    const newWord: SynonymWord = {
-      id: crypto.randomUUID(),
-      word,
-      uzbek,
-      synonyms,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    data.words.push(newWord);
-
-    data.words =
-      sortWords(data.words);
-
-    data.updatedAt = now;
-
-    await saveData(data);
+    const rows = await sql`
+      INSERT INTO synonyms (
+        word,
+        uzbek,
+        synonym,
+        synonym_uzbek,
+        word_order
+      )
+      VALUES (
+        ${word},
+        ${uzbek},
+        ${synonym},
+        ${synonymUzbek},
+        ${wordOrder}
+      )
+      RETURNING
+        id,
+        word,
+        uzbek,
+        synonym,
+        synonym_uzbek AS "synonymUzbek",
+        word_order AS "wordOrder"
+    `;
 
     return NextResponse.json({
-      ok: true,
-      message:
-        "So‘z muvaffaqiyatli qo‘shildi.",
-      total: data.words.length,
-      word: newWord,
-      words: data.words,
+      success: true,
+      synonym: rows[0],
     });
   } catch (error) {
-    console.error(
-      "POST synonyms error:",
-      error
-    );
+    console.error("SYNONYMS POST ERROR:", error);
 
     return NextResponse.json(
       {
-        ok: false,
-        message:
-          "So‘zni qo‘shishda xatolik yuz berdi.",
+        success: false,
+        message: "Sinonimni saqlashda xatolik yuz berdi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-/* =====================================================
-   PUT — TAHRIRLASH
-===================================================== */
+/* =========================
+   PUT — ADMIN
+   ========================= */
 
-export async function PUT(
-  request: NextRequest
-) {
+export async function PUT(request: NextRequest) {
   try {
-    const body =
-      await request.json();
-
-    const id =
-      String(
-        body.id || ""
-      ).trim();
-
-    const word =
-      String(
-        body.word || ""
-      ).trim();
-
-    const uzbek =
-      String(
-        body.uzbek || ""
-      ).trim();
-
-    const synonyms =
-      cleanSynonyms(
-        body.synonyms
-      );
-
-    if (!id) {
+    if (!(await isAdmin())) {
       return NextResponse.json(
         {
-          ok: false,
-          message:
-            "So‘z ID topilmadi.",
+          success: false,
+          message: "Ruxsat berilmagan.",
         },
-        {
-          status: 400,
-        }
+        { status: 403 }
       );
     }
 
+    const body = await request.json();
+
+    const id = Number(body?.id);
+    const word = cleanText(body?.word);
+    const uzbek = cleanText(body?.uzbek);
+    const synonym = cleanText(body?.synonym);
+
+    const synonymUzbek =
+      cleanText(
+        body?.synonymUzbek ??
+          body?.synonym_uzbek
+      ) || null;
+
     if (
+      !Number.isInteger(id) ||
+      id <= 0 ||
       !word ||
       !uzbek ||
-      synonyms.length === 0
+      !synonym
     ) {
       return NextResponse.json(
         {
-          ok: false,
-          message:
-            "Word, tarjima va sinonimlar to‘ldirilishi kerak.",
+          success: false,
+          message: "Ma’lumotlar noto‘g‘ri.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const data =
-      await readData();
+    const rows = await sql`
+      UPDATE synonyms
+      SET
+        word = ${word},
+        uzbek = ${uzbek},
+        synonym = ${synonym},
+        synonym_uzbek = ${synonymUzbek},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING
+        id,
+        word,
+        uzbek,
+        synonym,
+        synonym_uzbek AS "synonymUzbek",
+        word_order AS "wordOrder"
+    `;
 
-    const index =
-      data.words.findIndex(
-        (item) =>
-          item.id === id
-      );
-
-    if (index === -1) {
+    if (!rows.length) {
       return NextResponse.json(
         {
-          ok: false,
-          message:
-            "So‘z topilmadi.",
+          success: false,
+          message: "Sinonim topilmadi.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
-
-    const duplicate =
-      data.words.some(
-        (item) =>
-          item.id !== id &&
-          item.word
-            .trim()
-            .toLowerCase() ===
-            word.toLowerCase()
-      );
-
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "Bunday so‘z lug‘atda mavjud.",
-        },
-        {
-          status: 409,
-        }
-      );
-    }
-
-    const now =
-      new Date().toISOString();
-
-    data.words[index] = {
-      ...data.words[index],
-      word,
-      uzbek,
-      synonyms,
-      updatedAt: now,
-    };
-
-    data.words =
-      sortWords(data.words);
-
-    data.updatedAt = now;
-
-    await saveData(data);
 
     return NextResponse.json({
-      ok: true,
-      message:
-        "So‘z muvaffaqiyatli tahrirlandi.",
-      total: data.words.length,
-      words: data.words,
+      success: true,
+      synonym: rows[0],
     });
   } catch (error) {
-    console.error(
-      "PUT synonyms error:",
-      error
-    );
+    console.error("SYNONYMS PUT ERROR:", error);
 
     return NextResponse.json(
       {
-        ok: false,
-        message:
-          "So‘zni tahrirlashda xatolik yuz berdi.",
+        success: false,
+        message: "Sinonimni tahrirlashda xatolik yuz berdi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-/* =====================================================
-   DELETE
-===================================================== */
+/* =========================
+   DELETE — ADMIN
+   ========================= */
 
-export async function DELETE(
-  request: NextRequest
-) {
+export async function DELETE(request: NextRequest) {
   try {
-    const id =
-      request.nextUrl.searchParams.get(
-        "id"
-      );
-
-    if (!id) {
+    if (!(await isAdmin())) {
       return NextResponse.json(
         {
-          ok: false,
-          message:
-            "O‘chiriladigan so‘z ID topilmadi.",
+          success: false,
+          message: "Ruxsat berilmagan.",
         },
-        {
-          status: 400,
-        }
+        { status: 403 }
       );
     }
 
-    const data =
-      await readData();
+    const { searchParams } = new URL(request.url);
+    const id = Number(searchParams.get("id"));
 
-    const exists =
-      data.words.some(
-        (item) =>
-          item.id === id
-      );
-
-    if (!exists) {
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
         {
-          ok: false,
-          message:
-            "So‘z topilmadi.",
+          success: false,
+          message: "ID noto‘g‘ri.",
         },
-        {
-          status: 404,
-        }
+        { status: 400 }
       );
     }
 
-    data.words =
-      data.words.filter(
-        (item) =>
-          item.id !== id
+    const rows = await sql`
+      DELETE FROM synonyms
+      WHERE id = ${id}
+      RETURNING id
+    `;
+
+    if (!rows.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Sinonim topilmadi.",
+        },
+        { status: 404 }
       );
-
-    data.updatedAt =
-      new Date().toISOString();
-
-    await saveData(data);
+    }
 
     return NextResponse.json({
-      ok: true,
-      message:
-        "So‘z o‘chirildi.",
-      total: data.words.length,
-      words: data.words,
+      success: true,
+      deletedId: id,
     });
   } catch (error) {
-    console.error(
-      "DELETE synonyms error:",
-      error
-    );
+    console.error("SYNONYMS DELETE ERROR:", error);
 
     return NextResponse.json(
       {
-        ok: false,
-        message:
-          "So‘zni o‘chirishda xatolik yuz berdi.",
+        success: false,
+        message: "Sinonimni o‘chirishda xatolik yuz berdi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
