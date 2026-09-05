@@ -235,7 +235,49 @@ function normalizeQuestionContent(root: HTMLElement) {
     node.replaceWith(span);
   });
 
+  /*
+    BARCHA ODDIY SAVOL MATNI UCHUN BIR XIL STANDART:
+    - 24px;
+    - qalin;
+    - ikki cheti tekis (justify);
+    - PDFdan qolgan tor width/absolute joylashuvlar olib tashlanadi.
+    Designer obyektlarining ichki geometriyasiga tegmaymiz.
+  */
+  root.querySelectorAll("p,div,span,font,li").forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+    if (node.closest('[data-object-id]')) return;
+    if (node.closest('svg')) return;
+
+    node.style.fontSize = "24px";
+    node.style.lineHeight = "1.55";
+    node.style.fontWeight = "700";
+    node.style.textAlign = "justify";
+    node.style.textJustify = "inter-word";
+
+    if (node.tagName === "P" || node.tagName === "DIV" || node.tagName === "LI") {
+      node.style.width = "100%";
+      node.style.maxWidth = "100%";
+      node.style.boxSizing = "border-box";
+
+      /* PDF importdan qolgan tor/absolute bloklar matnni pastga
+         ustun ko‘rinishida tushirib yubormasligi uchun. */
+      if (!node.closest('table')) {
+        node.style.position = "static";
+        node.style.left = "auto";
+        node.style.right = "auto";
+        node.style.top = "auto";
+        node.style.bottom = "auto";
+        node.style.transform = "none";
+        node.style.float = "none";
+      }
+    }
+  });
+
   root.style.fontWeight = "700";
+  root.style.fontSize = "24px";
+  root.style.lineHeight = "1.55";
+  root.style.textAlign = "justify";
+  root.style.textJustify = "inter-word";
 }
 
 function cleanHtml(root: HTMLElement) {
@@ -2048,7 +2090,7 @@ export default function QuestionDesigner({
         </select>
 
         <select
-          defaultValue="3"
+          defaultValue="5"
           onChange={(e) =>
             command(
               "fontSize",
@@ -2174,6 +2216,19 @@ export default function QuestionDesigner({
           disabled={disabled}
         >
           →≡
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            command(
+              "justifyFull"
+            )
+          }
+          disabled={disabled}
+          title="Ikki chetini tekislash (Justify)"
+        >
+          ☰
         </button>
 
         <button
@@ -2754,10 +2809,14 @@ export default function QuestionDesigner({
             Georgia,
             "Times New Roman",
             serif;
-          font-size: 18px;
+          font-size: 24px;
           font-weight: 700;
-          line-height: 1.65;
+          line-height: 1.55;
+          text-align: justify;
+          text-justify: inter-word;
           white-space: normal;
+          overflow-wrap: normal;
+          word-break: normal;
           box-shadow:
             inset 0 0 0 1px #b4c2c9;
           overflow: hidden;
@@ -2765,8 +2824,26 @@ export default function QuestionDesigner({
 
         .canvas :global(p),
         .canvas :global(div:not(.nc-object)) {
+          width: 100% !important;
+          max-width: 100% !important;
           margin-top: 0;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
+          font-size: 24px !important;
+          line-height: 1.55 !important;
+          font-weight: 700 !important;
+          text-align: justify !important;
+          text-justify: inter-word;
+          overflow-wrap: normal !important;
+          word-break: normal !important;
+          box-sizing: border-box;
+        }
+
+        .canvas :global(span:not([data-nc-editable])),
+        .canvas :global(font),
+        .canvas :global(li) {
+          font-size: 24px !important;
+          line-height: 1.55 !important;
+          font-weight: 700 !important;
         }
 
         .canvas :global(br) {
