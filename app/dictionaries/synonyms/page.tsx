@@ -55,7 +55,9 @@ function readIds(key: string): string[] {
     const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : [];
 
-    return Array.isArray(parsed) ? parsed.map(String) : [];
+    return Array.isArray(parsed)
+      ? parsed.map(String)
+      : [];
   } catch {
     return [];
   }
@@ -84,18 +86,10 @@ export default function SynonymsPage() {
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
 
-  /* =========================
-     LOCAL STORAGE
-     ========================= */
-
   useEffect(() => {
     setMistakeIds(readIds(MISTAKES_KEY));
     setHardIds(readIds(HARD_KEY));
   }, []);
-
-  /* =========================
-     NEON API
-     ========================= */
 
   useEffect(() => {
     let active = true;
@@ -150,10 +144,6 @@ export default function SynonymsPage() {
     };
   }, []);
 
-  /* =========================
-     ACTIVE WORDS
-     ========================= */
-
   const activeItems = useMemo(() => {
     if (mode === "mistakes") {
       return items.filter((item) =>
@@ -180,10 +170,6 @@ export default function SynonymsPage() {
   const isHard = current
     ? hardIds.includes(String(current.id))
     : false;
-
-  /* =========================
-     SAVE
-     ========================= */
 
   const saveMistakes = useCallback(
     (next: string[]) => {
@@ -240,10 +226,6 @@ export default function SynonymsPage() {
     }
   }
 
-  /* =========================
-     OPTIONS
-     ========================= */
-
   const createOptions = useCallback(
     (question: SynonymItem) => {
       const distractors = shuffle(
@@ -291,10 +273,6 @@ export default function SynonymsPage() {
     setWrittenAnswer("");
   }, [current?.id, mode, createOptions]);
 
-  /* =========================
-     NAVIGATION
-     ========================= */
-
   function changeMode(nextMode: Mode) {
     setMode(nextMode);
     setIndex(0);
@@ -336,10 +314,6 @@ export default function SynonymsPage() {
 
     setIndex(nextIndex);
   }
-
-  /* =========================
-     ANSWERS
-     ========================= */
 
   function chooseAnswer(answer: string) {
     if (!current || answerState !== "idle") {
@@ -390,10 +364,6 @@ export default function SynonymsPage() {
       ? ((index + 1) / activeItems.length) * 100
       : 0;
 
-  /* =========================
-     LOADING
-     ========================= */
-
   if (loading) {
     return (
       <main className="statePage">
@@ -407,8 +377,10 @@ export default function SynonymsPage() {
             display: grid;
             place-items: center;
             background: #e7edf1;
-            font-family: "Bell MT",
-              "Times New Roman", serif;
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
           }
 
           .stateBox {
@@ -438,8 +410,10 @@ export default function SynonymsPage() {
             display: grid;
             place-items: center;
             background: #e7edf1;
-            font-family: "Bell MT",
-              "Times New Roman", serif;
+            font-family:
+              "Bell MT",
+              "Times New Roman",
+              serif;
           }
 
           .stateBox {
@@ -459,14 +433,8 @@ export default function SynonymsPage() {
     );
   }
 
-  /* =========================
-     PAGE
-     ========================= */
-
   return (
     <main className="page">
-      {/* TOP */}
-
       <header className="topbar">
         <button
           type="button"
@@ -487,14 +455,10 @@ export default function SynonymsPage() {
         </button>
       </header>
 
-      {/* MAIN */}
-
       <section className="mainPanel">
         <div className="floatingTitle">
           Synonyms
         </div>
-
-        {/* MODES */}
 
         <div className="tabs">
           <button
@@ -574,8 +538,6 @@ export default function SynonymsPage() {
           </button>
         </div>
 
-        {/* STATS */}
-
         <div className="stats">
           <div className="statBox">
             <span>Jami</span>
@@ -584,24 +546,28 @@ export default function SynonymsPage() {
 
           <div className="statBox">
             <span>To‘g‘ri</span>
-            <strong>{correctCount}</strong>
+            <strong className="greenNumber">
+              {correctCount}
+            </strong>
           </div>
 
           <div className="statBox">
             <span>Xato</span>
-            <strong>{wrongCount}</strong>
+            <strong className="redNumber">
+              {wrongCount}
+            </strong>
           </div>
 
           <div className="statBox">
             <span>Qiyinlar</span>
-            <strong>{hardIds.length}</strong>
+            <strong className="orangeNumber">
+              {hardIds.length}
+            </strong>
           </div>
         </div>
 
         {current ? (
           <>
-            {/* PROGRESS */}
-
             <div className="progressBox">
               <div className="progressText">
                 <strong>
@@ -623,8 +589,6 @@ export default function SynonymsPage() {
               </div>
             </div>
 
-            {/* CARD */}
-
             <article className="studyCard">
               <button
                 type="button"
@@ -634,80 +598,81 @@ export default function SynonymsPage() {
                     : "starButton"
                 }
                 onClick={toggleHard}
-                title="Qiyin so‘z sifatida belgilash"
               >
                 ★
               </button>
 
-              {/* =====================
-                  O‘RGANISH
-                  ===================== */}
+              {/* O‘RGANISH */}
 
               {mode === "learn" && (
                 <div className="learnArea">
                   <div className="relationRow">
-                    {/* ACCEPT */}
-
-                    <div className="relationCard wordCard">
-                      <strong>{current.word}</strong>
+                    <div className="wordCard">
+                      {current.word}
                     </div>
 
-                    {/* ARROW */}
-
-                    <div className="synonymConnector">
-                      <div className="connectorLine" />
-
-                      <span className="leftArrow">
+                    <div className="connector">
+                      <span className="connectorArrow left">
                         ◀
                       </span>
 
-                      <div className="connectorButton">
+                      <div className="connectorBar" />
+
+                      <div className="connectorLabel">
                         Sinonimi
                       </div>
 
-                      <span className="rightArrow">
+                      <span className="connectorArrow right">
                         ▶
                       </span>
                     </div>
 
-                    {/* RECEIVE */}
-
-                    <div className="relationCard synonymCard">
-                      <strong>
-                        {current.synonym}
-                      </strong>
+                    <div className="synonymCard">
+                      {current.synonym}
                     </div>
                   </div>
 
-                  {/* TARJIMA */}
-
-                  <div className="meaningButton">
+                  <div className="learnMeaning">
                     {current.uzbek}
                   </div>
                 </div>
               )}
 
-              {/* =====================
-                  TANLASH
-                  ===================== */}
+              {/* TANLASH / XATOLAR / QIYINLAR */}
 
               {(mode === "choose" ||
                 mode === "mistakes" ||
                 mode === "hard") && (
                 <div className="quizArea">
-                  <div className="questionWord">
-                    {current.word}
-                  </div>
-
-                  <div className="questionTranslation">
-                    {current.uzbek}
-                  </div>
-
-                  <div className="question">
-                    Qaysi biri{" "}
-                    <strong>
+                  <div className="quizTopRow">
+                    <div className="quizWordCard">
                       {current.word}
-                    </strong>{" "}
+                    </div>
+
+                    <div className="translationConnector">
+                      <span className="translationArrow left">
+                        ◀
+                      </span>
+
+                      <div className="translationLine" />
+
+                      <div className="translationLabel">
+                        Tarjimasi
+                      </div>
+
+                      <span className="translationArrow right">
+                        ▶
+                      </span>
+                    </div>
+
+                    <div className="translationCard">
+                      {current.uzbek}
+                    </div>
+                  </div>
+
+                  <div className="questionBadge">
+                    Qaysi biri{" "}
+                    <strong>{current.word}</strong>{" "}
                     so‘zining sinonimi?
                   </div>
 
@@ -718,9 +683,7 @@ export default function SynonymsPage() {
                       if (
                         answerState !== "idle" &&
                         normalize(option) ===
-                          normalize(
-                            current.synonym
-                          )
+                          normalize(current.synonym)
                       ) {
                         className += " correct";
                       } else if (
@@ -765,25 +728,39 @@ export default function SynonymsPage() {
                 </div>
               )}
 
-              {/* =====================
-                  YOZISH
-                  ===================== */}
+              {/* YOZISH */}
 
               {mode === "write" && (
-                <div className="writeArea">
-                  <div className="questionWord">
-                    {current.word}
-                  </div>
-
-                  <div className="questionTranslation">
-                    {current.uzbek}
-                  </div>
-
-                  <div className="question">
-                    <strong>
+                <div className="quizArea">
+                  <div className="quizTopRow">
+                    <div className="quizWordCard">
                       {current.word}
-                    </strong>{" "}
-                    so‘zining sinonimini yozing
+                    </div>
+
+                    <div className="translationConnector">
+                      <span className="translationArrow left">
+                        ◀
+                      </span>
+
+                      <div className="translationLine" />
+
+                      <div className="translationLabel">
+                        Tarjimasi
+                      </div>
+
+                      <span className="translationArrow right">
+                        ▶
+                      </span>
+                    </div>
+
+                    <div className="translationCard">
+                      {current.uzbek}
+                    </div>
+                  </div>
+
+                  <div className="questionBadge">
+                    {current.word} so‘zining sinonimini
+                    yozing
                   </div>
 
                   <div className="writeRow">
@@ -841,41 +818,37 @@ export default function SynonymsPage() {
                 </div>
               )}
 
-              {/* =====================
-                  ARALASH
-                  ===================== */}
+              {/* ARALASH */}
 
               {mode === "mixed" && (
                 <div className="learnArea">
                   <div className="relationRow">
-                    <div className="relationCard wordCard">
-                      <strong>{current.word}</strong>
+                    <div className="wordCard">
+                      {current.word}
                     </div>
 
-                    <div className="synonymConnector">
-                      <div className="connectorLine" />
-
-                      <span className="leftArrow">
+                    <div className="connector">
+                      <span className="connectorArrow left">
                         ◀
                       </span>
 
-                      <div className="connectorButton">
+                      <div className="connectorBar" />
+
+                      <div className="connectorLabel">
                         Sinonimi
                       </div>
 
-                      <span className="rightArrow">
+                      <span className="connectorArrow right">
                         ▶
                       </span>
                     </div>
 
-                    <div className="relationCard synonymCard">
-                      <strong>
-                        {current.synonym}
-                      </strong>
+                    <div className="synonymCard">
+                      {current.synonym}
                     </div>
                   </div>
 
-                  <div className="meaningButton">
+                  <div className="learnMeaning">
                     {current.uzbek}
                   </div>
 
@@ -889,8 +862,6 @@ export default function SynonymsPage() {
                 </div>
               )}
             </article>
-
-            {/* NAVIGATION */}
 
             <div className="navigation">
               <button
@@ -948,21 +919,17 @@ export default function SynonymsPage() {
 
           background:
             radial-gradient(
-              circle at 50% 0%,
-              rgba(98, 192, 240, 0.2),
-              transparent 34%
+              circle at top,
+              rgba(88, 191, 239, 0.2),
+              transparent 35%
             ),
             linear-gradient(
               180deg,
-              #eef5f8 0%,
-              #dfe8ed 48%,
-              #edf2f5 100%
+              #edf4f7 0%,
+              #dce6eb 50%,
+              #edf2f4 100%
             );
         }
-
-        /* =========================
-           TOPBAR
-           ========================= */
 
         .topbar {
           width: min(1480px, 96%);
@@ -972,36 +939,26 @@ export default function SynonymsPage() {
           padding: 14px 20px;
 
           display: flex;
-          align-items: center;
           justify-content: space-between;
+          align-items: center;
 
-          border: 2px solid #263a47;
+          border: 2px solid #273d49;
           border-radius: 20px;
 
           background:
             linear-gradient(
               180deg,
-              #647581 0%,
-              #455965 47%,
-              #2f424d 100%
+              #647985,
+              #405865 55%,
+              #2f444f
             );
 
           box-shadow:
-            0 9px 0 #1e313c,
+            0 9px 0 #1e323d,
             0 16px 25px rgba(0, 0, 0, 0.18),
             inset 0 3px 0
-              rgba(255, 255, 255, 0.36),
-            inset 0 -6px 9px
-              rgba(0, 0, 0, 0.2);
+              rgba(255, 255, 255, 0.35);
         }
-
-        .topButton {
-          min-width: 150px;
-        }
-
-        /* =========================
-           BUTTONS
-           ========================= */
 
         .metalButton,
         .blueButton {
@@ -1014,10 +971,6 @@ export default function SynonymsPage() {
           font-weight: 900;
 
           cursor: pointer;
-
-          transition:
-            transform 0.12s ease,
-            filter 0.12s ease;
         }
 
         .metalButton {
@@ -1028,15 +981,14 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #e9eef1 38%,
-              #bdc9cf 100%
+              #ffffff,
+              #e9eef1 45%,
+              #bdc9cf
             );
 
           box-shadow:
             0 5px 0 #526570,
-            inset 0 3px 0
-              rgba(255, 255, 255, 0.95);
+            inset 0 3px 0 white;
         }
 
         .blueButton {
@@ -1047,10 +999,10 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #dff8ff 0%,
+              #dff8ff,
               #8edcff 35%,
-              #34b2ee 70%,
-              #1496d4 100%
+              #34b2ee 72%,
+              #1496d4
             );
 
           box-shadow:
@@ -1059,20 +1011,9 @@ export default function SynonymsPage() {
               rgba(255, 255, 255, 0.9);
         }
 
-        .metalButton:hover,
-        .blueButton:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
+        .topButton {
+          min-width: 150px;
         }
-
-        .metalButton:active,
-        .blueButton:active {
-          transform: translateY(3px);
-        }
-
-        /* =========================
-           MAIN
-           ========================= */
 
         .mainPanel {
           position: relative;
@@ -1088,18 +1029,16 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               145deg,
-              #708a99 0%,
+              #708a99,
               #506b79 42%,
-              #354c59 100%
+              #354c59
             );
 
           box-shadow:
             0 11px 0 #263b46,
             0 19px 32px rgba(0, 0, 0, 0.22),
             inset 0 3px 0
-              rgba(255, 255, 255, 0.35),
-            inset 0 -8px 14px
-              rgba(0, 0, 0, 0.18);
+              rgba(255, 255, 255, 0.35);
         }
 
         .floatingTitle {
@@ -1111,7 +1050,7 @@ export default function SynonymsPage() {
 
           min-width: 350px;
 
-          padding: 13px 35px 15px;
+          padding: 13px 35px;
 
           text-align: center;
 
@@ -1126,25 +1065,21 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #e4faff 0%,
+              #e4faff,
               #9be2ff 35%,
               #42bdf4 72%,
-              #1c9cdb 100%
+              #1c9cdb
             );
 
           box-shadow:
             0 7px 0 #075c8a,
-            0 12px 18px rgba(0, 0, 0, 0.2),
             inset 0 3px 0
               rgba(255, 255, 255, 0.9);
         }
 
-        /* =========================
-           TABS
-           ========================= */
-
         .tabs {
           display: grid;
+
           grid-template-columns:
             repeat(6, minmax(0, 1fr));
 
@@ -1154,8 +1089,7 @@ export default function SynonymsPage() {
         }
 
         .tab {
-          min-height: 59px;
-
+          min-height: 58px;
           padding: 10px 12px;
 
           border: 2px solid #71848f;
@@ -1166,48 +1100,19 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
+              #ffffff,
               #edf1f3 44%,
-              #c5d0d6 100%
+              #c5d0d6
             );
 
           box-shadow:
             0 6px 0 #4b606c,
-            inset 0 3px 0
-              rgba(255, 255, 255, 0.95);
+            inset 0 3px 0 white;
 
           font-size: 16px;
           font-weight: 900;
 
           cursor: pointer;
-
-          transition:
-            transform 0.12s ease,
-            filter 0.12s ease;
-        }
-
-        .tab:hover {
-          transform: translateY(-2px);
-        }
-
-        .tab:active {
-          transform: translateY(3px);
-        }
-
-        .tab span {
-          display: inline-grid;
-          place-items: center;
-
-          min-width: 23px;
-          height: 23px;
-
-          margin-left: 6px;
-
-          border-radius: 50%;
-
-          background: #d6e2e8;
-
-          font-size: 12px;
         }
 
         .tab.active {
@@ -1218,24 +1123,30 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #e2f9ff 0%,
+              #e2f9ff,
               #8edcff 40%,
               #31b2ef 76%,
-              #1596d3 100%
+              #1596d3
             );
 
           box-shadow:
             0 6px 0 #075b88,
-            inset 0 3px 0
-              rgba(255, 255, 255, 0.92);
+            inset 0 3px 0 white;
         }
 
-        /* =========================
-           STATS
-           ========================= */
+        .tab span {
+          margin-left: 6px;
+
+          padding: 3px 7px;
+
+          border-radius: 50%;
+
+          background: rgba(0, 0, 0, 0.09);
+        }
 
         .stats {
           display: grid;
+
           grid-template-columns:
             repeat(4, minmax(0, 1fr));
 
@@ -1247,12 +1158,10 @@ export default function SynonymsPage() {
         .statBox {
           min-height: 82px;
 
-          padding: 12px;
-
           display: flex;
           flex-direction: column;
-          align-items: center;
           justify-content: center;
+          align-items: center;
 
           border: 2px solid #71838d;
           border-radius: 13px;
@@ -1260,15 +1169,14 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
+              #ffffff,
               #eef3f5 48%,
-              #ccd7dc 100%
+              #ccd7dc
             );
 
           box-shadow:
             0 6px 0 #4c606b,
-            inset 0 3px 0
-              rgba(255, 255, 255, 0.96);
+            inset 0 3px 0 white;
         }
 
         .statBox span {
@@ -1283,13 +1191,20 @@ export default function SynonymsPage() {
 
           color: #064d83;
 
-          font-size: 24px;
-          font-weight: 900;
+          font-size: 25px;
         }
 
-        /* =========================
-           PROGRESS
-           ========================= */
+        .greenNumber {
+          color: #168c32 !important;
+        }
+
+        .redNumber {
+          color: #c52222 !important;
+        }
+
+        .orangeNumber {
+          color: #df8a00 !important;
+        }
 
         .progressBox {
           margin-bottom: 22px;
@@ -1305,22 +1220,15 @@ export default function SynonymsPage() {
               #3e5b6a,
               #29424f
             );
-
-          box-shadow:
-            inset 0 2px 4px
-              rgba(0, 0, 0, 0.25);
         }
 
         .progressText {
           display: flex;
-          align-items: center;
           justify-content: space-between;
 
           margin-bottom: 7px;
 
           color: white;
-
-          font-size: 15px;
         }
 
         .progressTrack {
@@ -1332,16 +1240,10 @@ export default function SynonymsPage() {
           border-radius: 20px;
 
           background: #172c38;
-
-          box-shadow:
-            inset 0 2px 5px
-              rgba(0, 0, 0, 0.45);
         }
 
         .progressFill {
           height: 100%;
-
-          border-radius: 20px;
 
           background:
             linear-gradient(
@@ -1350,24 +1252,14 @@ export default function SynonymsPage() {
               #34b8f1 60%,
               #1498d6
             );
-
-          box-shadow:
-            inset 0 2px 0
-              rgba(255, 255, 255, 0.7);
-
-          transition: width 0.2s ease;
         }
-
-        /* =========================
-           STUDY CARD
-           ========================= */
 
         .studyCard {
           position: relative;
 
-          min-height: 385px;
+          min-height: 400px;
 
-          padding: 52px 55px 45px;
+          padding: 54px 55px 45px;
 
           border: 2px solid #81929c;
           border-radius: 19px;
@@ -1375,21 +1267,19 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
+              #ffffff,
               #f3f7f9 47%,
-              #dfe7eb 100%
+              #dfe7eb
             );
 
           box-shadow:
             0 8px 0 #425967,
             0 14px 20px rgba(0, 0, 0, 0.16),
-            inset 0 4px 4px
-              rgba(255, 255, 255, 0.95);
+            inset 0 4px 4px white;
         }
 
         .starButton {
           position: absolute;
-          z-index: 10;
 
           top: 18px;
           right: 20px;
@@ -1400,14 +1290,14 @@ export default function SynonymsPage() {
           border: 2px solid #71828b;
           border-radius: 11px;
 
-          color: #60727c;
-
           background:
             linear-gradient(
               180deg,
-              #ffffff,
+              #fff,
               #dce5e9
             );
+
+          color: #60727c;
 
           box-shadow:
             0 4px 0 #536772,
@@ -1419,7 +1309,7 @@ export default function SynonymsPage() {
         }
 
         .starButton.starred {
-          color: #8d6500;
+          color: #926800;
 
           border-color: #c68c00;
 
@@ -1429,20 +1319,13 @@ export default function SynonymsPage() {
               #fff8c9,
               #ffd33f
             );
-
-          box-shadow:
-            0 4px 0 #a57500,
-            inset 0 2px 0 white;
         }
 
-        /* =========================
-           LEARN DESIGN
-           ========================= */
+        /* O‘RGANISH */
 
         .learnArea {
           width: 100%;
-
-          padding-top: 20px;
+          padding-top: 18px;
         }
 
         .relationRow {
@@ -1462,10 +1345,9 @@ export default function SynonymsPage() {
           gap: 34px;
         }
 
-        .relationCard {
+        .wordCard,
+        .synonymCard {
           min-height: 145px;
-
-          padding: 24px;
 
           display: flex;
           align-items: center;
@@ -1473,103 +1355,65 @@ export default function SynonymsPage() {
 
           border-radius: 19px;
 
-          transition:
-            transform 0.15s ease,
-            filter 0.15s ease;
-        }
-
-        .relationCard:hover {
-          transform: translateY(-3px);
-          filter: brightness(1.03);
-        }
-
-        .relationCard strong {
-          font-size: clamp(
-            35px,
-            4vw,
-            52px
-          );
-
-          line-height: 1;
-
+          font-size: clamp(35px, 4vw, 52px);
           font-weight: 900;
         }
-
-        /* ACCEPT */
 
         .wordCard {
           border: 2px solid #596d78;
 
-          color: #101820;
-
           background:
             linear-gradient(
               180deg,
-              #ffffff 0%,
-              #edf2f4 23%,
-              #d3dde2 70%,
-              #b5c2c9 100%
+              #fff,
+              #edf2f4,
+              #b5c2c9
             );
 
           box-shadow:
             0 8px 0 #536671,
-            0 14px 19px
-              rgba(0, 0, 0, 0.18),
-            inset 0 4px 3px
-              rgba(255, 255, 255, 0.96),
-            inset 0 -5px 8px
-              rgba(45, 64, 74, 0.15);
+            inset 0 4px 3px white;
         }
 
-        /* RECEIVE */
-
         .synonymCard {
-          border: 2px solid #0877b8;
-
           color: #063f70;
+
+          border: 2px solid #0877b8;
 
           background:
             linear-gradient(
               180deg,
-              #e5f9ff 0%,
-              #b9eaff 23%,
-              #72cef7 68%,
-              #35abe2 100%
+              #e5f9ff,
+              #b9eaff,
+              #35abe2
             );
 
           box-shadow:
             0 8px 0 #12648e,
-            0 14px 19px
-              rgba(0, 86, 135, 0.2),
-            inset 0 4px 3px
-              rgba(255, 255, 255, 0.96),
-            inset 0 -6px 9px
-              rgba(0, 82, 130, 0.17);
+            inset 0 4px 3px white;
         }
 
-        /* =========================
-           ARROW
-           ========================= */
-
-        .synonymConnector {
+        .connector,
+        .translationConnector {
           position: relative;
 
-          min-height: 100px;
+          min-height: 90px;
 
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
-        .connectorLine {
+        .connectorBar,
+        .translationLine {
           position: absolute;
 
-          left: 22px;
-          right: 22px;
+          left: 25px;
+          right: 25px;
 
           top: 50%;
 
-          height: 25px;
+          height: 23px;
 
           transform: translateY(-50%);
 
@@ -1579,20 +1423,14 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #c4f0ff 0%,
-              #57c4f5 48%,
-              #209fdc 100%
+              #c4f0ff,
+              #57c4f5,
+              #209fdc
             );
-
-          box-shadow:
-            inset 0 3px 0
-              rgba(255, 255, 255, 0.7),
-            0 4px 5px
-              rgba(0, 0, 0, 0.14);
         }
 
-        .leftArrow,
-        .rightArrow {
+        .connectorArrow,
+        .translationArrow {
           position: absolute;
 
           top: 50%;
@@ -1601,27 +1439,25 @@ export default function SynonymsPage() {
 
           z-index: 2;
 
-          color: #25a7e6;
+          color: #22a4e4;
 
-          font-size: 54px;
+          font-size: 52px;
 
-          line-height: 1;
-
-          text-shadow:
-            0 3px 0 #075b88,
-            0 5px 5px
-              rgba(0, 0, 0, 0.2);
+          text-shadow: 0 3px 0 #075b88;
         }
 
-        .leftArrow {
-          left: -3px;
+        .connectorArrow.left,
+        .translationArrow.left {
+          left: -2px;
         }
 
-        .rightArrow {
-          right: -3px;
+        .connectorArrow.right,
+        .translationArrow.right {
+          right: -2px;
         }
 
-        .connectorButton {
+        .connectorLabel,
+        .translationLabel {
           position: relative;
 
           z-index: 3;
@@ -1634,7 +1470,7 @@ export default function SynonymsPage() {
 
           color: #073e6b;
 
-          font-size: 22px;
+          font-size: 21px;
           font-weight: 900;
 
           border: 2px solid #0877b7;
@@ -1643,44 +1479,30 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #dff8ff 0%,
-              #8ddcff 43%,
-              #32b1ed 100%
+              #dff8ff,
+              #8ddcff,
+              #32b1ed
             );
 
           box-shadow:
             0 6px 0 #075b87,
-            inset 0 3px 0
-              rgba(255, 255, 255, 0.9);
+            inset 0 3px 0 white;
         }
 
-        /* =========================
-           MEANING
-           ========================= */
-
-        .meaningButton {
+        .learnMeaning {
           width: min(530px, 82%);
 
           min-height: 86px;
 
           margin: 58px auto 0;
 
-          padding: 16px 28px;
-
           display: flex;
           align-items: center;
           justify-content: center;
 
-          text-align: center;
-
           color: #063e6d;
 
-          font-size: clamp(
-            28px,
-            3vw,
-            39px
-          );
-
+          font-size: clamp(28px, 3vw, 39px);
           font-weight: 900;
 
           border: 2px solid #0876b4;
@@ -1689,78 +1511,157 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #e3faff 0%,
-              #a5e5ff 27%,
-              #5bc6f3 68%,
-              #27a6df 100%
+              #e3faff,
+              #a5e5ff,
+              #27a6df
             );
 
           box-shadow:
             0 8px 0 #0a608d,
-            0 14px 19px
-              rgba(0, 70, 110, 0.18),
-            inset 0 4px 3px
-              rgba(255, 255, 255, 0.95),
-            inset 0 -5px 8px
-              rgba(0, 76, 120, 0.15);
+            inset 0 4px 3px white;
         }
 
-        /* =========================
-           QUIZ
-           ========================= */
+        /* TANLASH TEPASI */
 
-        .quizArea,
-        .writeArea {
-          width: min(900px, 100%);
-
+        .quizArea {
+          width: min(1180px, 100%);
           margin: 0 auto;
-
-          text-align: center;
         }
 
-        .questionWord {
-          color: #0d1820;
+        .quizTopRow {
+          width: min(1080px, 100%);
 
-          font-size: clamp(
-            38px,
-            5vw,
-            61px
-          );
+          margin: 0 auto 34px;
 
+          display: grid;
+
+          grid-template-columns:
+            minmax(260px, 1fr)
+            minmax(180px, 250px)
+            minmax(260px, 1fr);
+
+          align-items: center;
+
+          gap: 30px;
+        }
+
+        .quizWordCard {
+          min-height: 125px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border: 2px solid #596d78;
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #edf1f3 42%,
+              #bdc8ce
+            );
+
+          box-shadow:
+            0 8px 0 #536671,
+            0 12px 18px rgba(0, 0, 0, 0.12),
+            inset 0 4px 3px white;
+
+          font-size: clamp(32px, 4vw, 48px);
           font-weight: 900;
         }
 
-        .questionTranslation {
-          margin-top: 7px;
+        /* YASHIL TARJIMA */
 
-          color: #536671;
+        .translationCard {
+          min-height: 125px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          padding: 18px 25px;
+
+          text-align: center;
+
+          color: #063b1a;
+
+          border: 2px solid #087f35;
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #a8f7bd 0%,
+              #3ddd6c 35%,
+              #10c64b 68%,
+              #08a93c 100%
+            );
+
+          box-shadow:
+            0 8px 0 #087530,
+            0 13px 18px rgba(0, 100, 40, 0.18),
+            inset 0 4px 3px
+              rgba(255, 255, 255, 0.85),
+            inset 0 -5px 8px
+              rgba(0, 80, 30, 0.15);
+
+          font-size: clamp(28px, 3.5vw, 43px);
+          font-weight: 900;
+        }
+
+        /* SARIQ SAVOL TUGMASI */
+
+        .questionBadge {
+          width: fit-content;
+          max-width: 90%;
+
+          margin: 0 auto 30px;
+
+          padding: 13px 32px;
+
+          text-align: center;
+
+          color: #372800;
+
+          border: 2px solid #bc8900;
+          border-radius: 13px;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff7a8 0%,
+              #ffe34f 35%,
+              #ffc51b 75%,
+              #eaaa00 100%
+            );
+
+          box-shadow:
+            0 6px 0 #9c7200,
+            0 10px 15px rgba(0, 0, 0, 0.14),
+            inset 0 3px 0
+              rgba(255, 255, 255, 0.9);
 
           font-size: 20px;
           font-weight: 900;
         }
 
-        .question {
-          margin: 27px 0 21px;
-
-          color: #273943;
-
-          font-size: 21px;
-          font-weight: 900;
-        }
-
         .options {
+          width: min(900px, 100%);
+
+          margin: 0 auto;
+
           display: grid;
 
           grid-template-columns:
             repeat(2, minmax(0, 1fr));
 
-          gap: 17px;
+          gap: 18px;
         }
 
         .option {
-          min-height: 68px;
-
-          padding: 12px 18px;
+          min-height: 67px;
 
           border: 2px solid #71848e;
           border-radius: 12px;
@@ -1770,8 +1671,8 @@ export default function SynonymsPage() {
           background:
             linear-gradient(
               180deg,
-              #ffffff,
-              #edf2f4 42%,
+              #fff,
+              #edf2f4,
               #c4d0d6
             );
 
@@ -1786,8 +1687,6 @@ export default function SynonymsPage() {
         }
 
         .option:hover:not(:disabled) {
-          transform: translateY(-2px);
-
           border-color: #0c82be;
 
           background:
@@ -1828,11 +1727,11 @@ export default function SynonymsPage() {
           box-shadow: 0 6px 0 #843e3e;
         }
 
-        /* =========================
-           WRITE
-           ========================= */
-
         .writeRow {
+          width: min(900px, 100%);
+
+          margin: 0 auto;
+
           display: grid;
 
           grid-template-columns: 1fr auto;
@@ -1845,48 +1744,32 @@ export default function SynonymsPage() {
 
           padding: 12px 18px;
 
-          outline: none;
-
           border: 2px solid #6c818c;
           border-radius: 11px;
 
+          outline: none;
+
           background: white;
-
-          box-shadow:
-            inset 0 3px 6px
-              rgba(0, 0, 0, 0.08);
-
-          color: #152630;
 
           font-size: 20px;
           font-weight: 900;
-        }
-
-        .writeRow input:focus {
-          border-color: #168dca;
-
-          box-shadow:
-            0 0 0 3px
-              rgba(39, 165, 224, 0.18),
-            inset 0 3px 6px
-              rgba(0, 0, 0, 0.08);
         }
 
         .checkButton {
           min-width: 170px;
         }
 
-        /* =========================
-           MESSAGES
-           ========================= */
-
         .correctMessage,
         .wrongMessage {
-          margin-top: 20px;
+          width: min(900px, 100%);
+
+          margin: 20px auto 0;
 
           padding: 13px 17px;
 
           border-radius: 11px;
+
+          text-align: center;
 
           font-size: 18px;
           font-weight: 900;
@@ -1916,10 +1799,6 @@ export default function SynonymsPage() {
           margin: 28px auto 0;
         }
 
-        /* =========================
-           NAVIGATION
-           ========================= */
-
         .navigation {
           display: grid;
 
@@ -1932,7 +1811,6 @@ export default function SynonymsPage() {
 
         .navButton {
           width: 100%;
-
           min-height: 59px;
 
           font-size: 18px;
@@ -1954,79 +1832,58 @@ export default function SynonymsPage() {
           font-weight: 900;
         }
 
-        /* =========================
-           TABLET
-           ========================= */
-
         @media (max-width: 1000px) {
           .tabs {
             grid-template-columns:
               repeat(3, minmax(0, 1fr));
           }
 
-          .relationRow {
+          .relationRow,
+          .quizTopRow {
             grid-template-columns: 1fr;
 
-            gap: 25px;
+            gap: 24px;
           }
 
-          .relationCard {
+          .wordCard,
+          .synonymCard,
+          .quizWordCard,
+          .translationCard {
             width: min(600px, 100%);
-
             margin: 0 auto;
           }
 
-          .synonymConnector {
+          .connector,
+          .translationConnector {
             width: min(300px, 90%);
-
             margin: 0 auto;
-          }
-
-          .meaningButton {
-            margin-top: 35px;
           }
         }
 
-        /* =========================
-           MOBILE
-           ========================= */
-
         @media (max-width: 650px) {
           .page {
-            padding:
-              15px 8px 45px;
+            padding: 15px 8px 45px;
           }
 
           .topbar {
             width: 100%;
-
-            min-height: 67px;
-
             margin-bottom: 58px;
-
             padding: 10px;
           }
 
           .topButton {
             min-width: 0;
-
             padding: 8px 11px;
-
             font-size: 14px;
           }
 
           .mainPanel {
             width: 100%;
-
-            padding:
-              62px 12px 26px;
+            padding: 62px 12px 26px;
           }
 
           .floatingTitle {
             min-width: 230px;
-
-            padding: 11px 20px;
-
             font-size: 25px;
           }
 
@@ -2037,44 +1894,24 @@ export default function SynonymsPage() {
             gap: 11px;
           }
 
-          .tab {
-            min-height: 54px;
-
-            font-size: 14px;
-          }
-
           .stats {
             grid-template-columns:
               repeat(2, minmax(0, 1fr));
-
-            gap: 11px;
           }
 
           .studyCard {
-            min-height: 390px;
-
-            padding:
-              58px 14px 30px;
+            padding: 58px 14px 30px;
           }
 
-          .relationCard {
-            min-height: 120px;
+          .quizWordCard,
+          .translationCard {
+            min-height: 105px;
           }
 
-          .relationCard strong {
-            font-size: 38px;
-          }
-
-          .connectorButton {
-            font-size: 18px;
-          }
-
-          .meaningButton {
-            width: 100%;
-
-            min-height: 74px;
-
-            font-size: 28px;
+          .questionBadge {
+            max-width: 100%;
+            padding: 12px 18px;
+            font-size: 17px;
           }
 
           .options {
@@ -2087,8 +1924,6 @@ export default function SynonymsPage() {
 
           .navigation {
             grid-template-columns: 1fr;
-
-            gap: 14px;
           }
         }
       `}</style>
