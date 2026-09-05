@@ -202,6 +202,12 @@ export default function VocabularyBackupImportPage() {
         );
       }
 
+      if (!data) {
+        throw new Error(
+          "Serverdan yaroqli JSON javob kelmadi."
+        );
+      }
+
       if (
         !response.ok ||
         !data.success
@@ -635,4 +641,3 @@ export default function VocabularyBackupImportPage() {
     </main>
   );
 }
-
