@@ -479,7 +479,7 @@ function TestEditorPageContent() {
         ) {
           const saveResponse =
             await fetch(
-              "/api/tests",
+              "/api/tests/legacy-neon",
               {
                 method: "POST",
                 credentials:
@@ -520,7 +520,7 @@ function TestEditorPageContent() {
 
       const response =
         await fetch(
-          "/api/tests",
+          "/api/tests/legacy-neon",
           {
             method: "POST",
             credentials:
@@ -1796,7 +1796,7 @@ function TestEditorPageContent() {
 
       const response =
         await fetch(
-          "/api/tests",
+          "/api/tests/legacy-neon",
           {
             method: "POST",
 
@@ -4670,4 +4670,3 @@ export default function TestEditorPage() {
     </Suspense>
   );
 }
-
