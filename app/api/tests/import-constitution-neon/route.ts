@@ -55,7 +55,7 @@ function normalizeQuestion(raw: ImportQuestion) {
           text: String(option?.text || "").trim(),
           isCorrect: Boolean(option?.isCorrect),
         }))
-        .filter((option) => option.key)
+        .filter((option: { key: string; text: string; isCorrect: boolean }) => option.key)
     : [];
 
   return {
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const correctCount = question.options.filter((option) => option.isCorrect).length;
+        const correctCount = question.options.filter((option: { key: string; text: string; isCorrect: boolean }) => option.isCorrect).length;
 
         if (correctCount !== 1) {
           return NextResponse.json(
@@ -389,4 +389,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
