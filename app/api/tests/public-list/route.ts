@@ -1,285 +1,195 @@
-import {
-  NextResponse,
-} from "next/server";
-import { get } from "@vercel/blob";
-import { unstable_cache } from "next/cache";
+import { NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /*
+  PUBLIC TEST RO'YXATI
+
   MUHIM:
-  Bu endpoint foydalanuvchiga savollarni YUBORMAYDI.
-  /api/tests esa butun tests.json va barcha questions ni yuborishi mumkin.
-  Katta test bazasida bu juda og‘ir.
-
-  Bu endpoint faqat test kartasi uchun kerakli metadata qaytaradi.
+  - Vercel Blob umuman ishlatilmaydi.
+  - Oddiy/qonunchilik/blok/30 talik/boshqa testlar -> legacy_tests (Neon)
+  - Mavzulashtirilgan testlar -> thematic_* (Neon)
+  - Faqat published testlar qaytariladi.
+  - Savollar va to'g'ri javoblar bu endpoint orqali yuborilmaydi.
 */
-
-const TESTS_BLOB_PATH =
-  "huquqiy-sayt/tests.json";
-
-type TestStatus =
-  | "draft"
-  | "published";
-
-type TestCategory =
-  | "legislation"
-  | "thematic"
-  | "block"
-  | "national-certificate"
-  | "thirty"
-  | "custom";
-
-type StoredTest = {
-  id?: string;
-  title?: string;
-  subject?: string;
-  duration?: number;
-  description?: string;
-  status?: TestStatus;
-  testType?: string;
-  customTestTypeName?: string;
-  attemptLimit?: number | null;
-  questions?: unknown[];
-  createdAt?: string;
-  updatedAt?: string;
-  importState?: {
-    expectedQuestions?: number;
-    receivedQuestions?: number;
-    completed?: boolean;
-  };
-};
-
-function checkBlobToken() {
-  if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-}
-
-function normalizeTestType(
-  test: StoredTest
-): TestCategory {
-  const value =
-    String(
-      test.testType || ""
-    ).trim();
-
-  if (
-    value === "legislation" ||
-    value === "thematic" ||
-    value === "block" ||
-    value ===
-      "national-certificate" ||
-    value === "thirty" ||
-    value === "custom"
-  ) {
-    return value;
-  }
-
-  /*
-    Eski testlarda testType bo‘lmasa:
-    nomi va savollar sonidan ehtiyotkor fallback.
-  */
-  const title =
-    String(
-      test.title || ""
-    ).toLowerCase();
-
-  if (
-    title.includes(
-      "milliy sertifikat"
-    )
-  ) {
-    return "national-certificate";
-  }
-
-  if (
-    title.includes(
-      "mavzulashtiril"
-    )
-  ) {
-    return "thematic";
-  }
-
-  if (
-    title.includes("blok")
-  ) {
-    return "block";
-  }
-
-  if (
-    title.includes("30") &&
-    Array.isArray(
-      test.questions
-    ) &&
-    test.questions.length ===
-      30
-  ) {
-    return "thirty";
-  }
-
-  return "legislation";
-}
-
-async function readPublishedList() {
-  checkBlobToken();
-
-  const result =
-    await get(
-      TESTS_BLOB_PATH,
-      {
-        access: "private",
-      }
-    );
-
-  if (
-    !result ||
-    result.statusCode !== 200 ||
-    !result.stream
-  ) {
-    throw new Error(
-      "tests.json o‘qilmadi."
-    );
-  }
-
-  const text =
-    await new Response(
-      result.stream
-    ).text();
-
-  if (!text.trim()) {
-    return [];
-  }
-
-  const parsed =
-    JSON.parse(text);
-
-  const tests: StoredTest[] =
-    Array.isArray(parsed)
-      ? parsed
-      : [];
-
-  return tests
-    .filter(
-      (test) =>
-        test.status ===
-        "published" &&
-        Boolean(test.id)
-    )
-    .map((test) => ({
-      id: String(test.id),
-      title:
-        String(
-          test.title ||
-            "Nomsiz test"
-        ),
-      subject:
-        String(
-          test.subject || ""
-        ),
-      description:
-        String(
-          test.description || ""
-        ),
-      duration:
-        Math.max(
-          1,
-          Number(
-            test.duration
-          ) || 30
-        ),
-      testType:
-        normalizeTestType(
-          test
-        ),
-      customTestTypeName:
-        String(
-          test.customTestTypeName ||
-            ""
-        ),
-      questionCount:
-        Array.isArray(
-          test.questions
-        )
-          ? test.questions.length
-          : Math.max(
-              0,
-              Number(
-                test.importState
-                  ?.receivedQuestions
-              ) || 0
-            ),
-      attemptLimit:
-        test.attemptLimit ??
-        null,
-      updatedAt:
-        test.updatedAt ||
-        test.createdAt ||
-        "",
-    }))
-    .sort((a, b) => {
-      const aTime =
-        new Date(
-          a.updatedAt || ""
-        ).getTime() || 0;
-
-      const bTime =
-        new Date(
-          b.updatedAt || ""
-        ).getTime() || 0;
-
-      return bTime - aTime;
-    });
-}
-
-/*
-  60 soniyalik server cache:
-  foydalanuvchi har safar /test ga kirganda katta tests.json ni
-  qayta-qayta Blobdan o‘qimaslik uchun.
-*/
-const getCachedPublishedList =
-  unstable_cache(
-    readPublishedList,
-    [
-      "public-test-list-v1",
-    ],
-    {
-      revalidate: 60,
-      tags: [
-        "public-test-list",
-      ],
-    }
-  );
 
 export async function GET() {
   try {
-    const tests =
-      await getCachedPublishedList();
+    const legacyRows = await sql`
+      SELECT
+        t.id,
+        t.title,
+        t.subject,
+        t.duration,
+        t.description,
+        t.test_type,
+        t.custom_test_type_name,
+        t.status,
+        t.attempt_limit,
+        t.created_at,
+        t.updated_at,
+        COUNT(q.id)::int AS question_count
+      FROM legacy_tests t
+      LEFT JOIN legacy_test_questions q
+        ON q.test_id = t.id
+      WHERE t.status = 'published'
+        AND COALESCE(t.test_type, '') <> 'thematic'
+        AND COALESCE(t.test_type, '') <> 'national-certificate'
+      GROUP BY
+        t.id,
+        t.title,
+        t.subject,
+        t.duration,
+        t.description,
+        t.test_type,
+        t.custom_test_type_name,
+        t.status,
+        t.attempt_limit,
+        t.created_at,
+        t.updated_at
+      ORDER BY t.updated_at DESC, t.created_at DESC
+    `;
+
+    const thematicRows = await sql`
+      SELECT
+        tt.id,
+        tt.book_id,
+        tt.section_order,
+        tt.section_type,
+        tt.title AS section_title,
+        tt.description,
+        tt.duration_minutes,
+        tt.attempt_limit,
+        tt.status,
+        tt.question_count,
+        tt.created_at,
+        tt.updated_at,
+        tb.grade,
+        tb.title AS book_title,
+        tb.subject
+      FROM thematic_tests tt
+      INNER JOIN thematic_books tb
+        ON tb.id = tt.book_id
+      WHERE tt.status = 'published'
+        AND tb.status = 'published'
+      ORDER BY
+        tb.grade ASC,
+        tt.section_order ASC,
+        tt.id ASC
+    `;
+
+    const legacyTests = legacyRows.map((row: any) => ({
+      id: String(row.id),
+      title: String(row.title || ""),
+      subject: String(row.subject || ""),
+      duration: Number(row.duration) || 30,
+      description:
+        row.description == null
+          ? ""
+          : String(row.description),
+      status: "published",
+      testType:
+        row.test_type == null || String(row.test_type).trim() === ""
+          ? "custom"
+          : String(row.test_type),
+      customTestTypeName:
+        row.custom_test_type_name == null
+          ? undefined
+          : String(row.custom_test_type_name),
+      attemptLimit:
+        row.attempt_limit == null
+          ? null
+          : Number(row.attempt_limit),
+      questionCount:
+        Number(row.question_count) || 0,
+      questionsCount:
+        Number(row.question_count) || 0,
+      storage: "legacy",
+      source: "legacy",
+      createdAt:
+        row.created_at
+          ? new Date(row.created_at).toISOString()
+          : undefined,
+      updatedAt:
+        row.updated_at
+          ? new Date(row.updated_at).toISOString()
+          : undefined,
+    }));
+
+    const thematicTests = thematicRows.map((row: any) => ({
+      /*
+        Public /test sahifasi thematic testni tanisa,
+        mavjud openTest() logikasi uchun testType="thematic" saqlanadi.
+        ID oldiga thematic: qo'shmaymiz — public solve route raw Neon id bilan ishlaydi.
+      */
+      id: String(row.id),
+      thematicId: String(row.id),
+      bookId: String(row.book_id),
+      grade: Number(row.grade) || undefined,
+      bookTitle: String(row.book_title || ""),
+      title: [
+        String(row.book_title || "").trim(),
+        String(row.section_title || "").trim(),
+      ]
+        .filter(Boolean)
+        .join(" — "),
+      subject:
+        String(row.subject || "").trim() ||
+        "Davlat va huquq asoslari",
+      duration:
+        Number(row.duration_minutes) || 60,
+      description:
+        row.description == null
+          ? ""
+          : String(row.description),
+      status: "published",
+      testType: "thematic",
+      sectionType: String(row.section_type || "lesson"),
+      sectionOrder: Number(row.section_order) || 0,
+      attemptLimit:
+        row.attempt_limit == null
+          ? null
+          : Number(row.attempt_limit),
+      questionCount:
+        Number(row.question_count) || 0,
+      questionsCount:
+        Number(row.question_count) || 0,
+      storage: "thematic",
+      source: "thematic",
+      createdAt:
+        row.created_at
+          ? new Date(row.created_at).toISOString()
+          : undefined,
+      updatedAt:
+        row.updated_at
+          ? new Date(row.updated_at).toISOString()
+          : undefined,
+    }));
+
+    const tests = [
+      ...legacyTests,
+      ...thematicTests,
+    ];
 
     return NextResponse.json(
       {
         success: true,
         tests,
+        total: tests.length,
       },
       {
-        status: 200,
         headers: {
-          /*
-            Brauzer/CDN ham qisqa muddat saqlashi mumkin.
-          */
           "Cache-Control":
-            "public, s-maxage=60, stale-while-revalidate=300",
+            "no-store, no-cache, must-revalidate",
         },
       }
     );
   } catch (error) {
     console.error(
-      "GET /api/tests/public-list ERROR:",
+      "PUBLIC TEST LIST NEON ERROR:",
       error
     );
 
@@ -292,10 +202,7 @@ export async function GET() {
             : "Testlar ro‘yxatini yuklab bo‘lmadi.",
         tests: [],
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
-
