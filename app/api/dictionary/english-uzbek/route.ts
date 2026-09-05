@@ -1,12 +1,12 @@
+import "server-only";
+
 import { NextRequest, NextResponse } from "next/server";
-import { put, list, get } from "@vercel/blob";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BLOB_PATH = "data-storage/english-uzbek-dictionary.json";
-
-export type DictionaryWord = {
+type DictionaryWord = {
   id: string;
   english: string;
   uzbek: string;
@@ -14,206 +14,107 @@ export type DictionaryWord = {
   updatedAt: string;
 };
 
-type DictionaryData = {
-  words: DictionaryWord[];
-  updatedAt: string;
-};
-
-/* =========================================================
-   BO'SH BAZA
-========================================================= */
-
-function emptyData(): DictionaryData {
+function noStoreHeaders() {
   return {
-    words: [],
-    updatedAt: new Date().toISOString(),
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
   };
 }
 
-/* =========================================================
-   MATNNI TOZALASH
-========================================================= */
-
-function cleanText(value: unknown): string {
-  if (typeof value !== "string") {
-    return "";
-  }
-
-  return value.trim().replace(/\s+/g, " ");
+function cleanText(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-/* =========================================================
-   ID YARATISH
-========================================================= */
-
-function createId(): string {
-  return `${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}`;
+function makeId() {
+  return `dict_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/* =========================================================
-   PRIVATE BLOB'DAN MA'LUMOTNI O'QISH
-========================================================= */
+function mapRow(row: any): DictionaryWord {
+  return {
+    id: String(row.id),
+    english: String(row.english ?? ""),
+    uzbek: String(row.uzbek ?? ""),
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at ?? ""),
+    updatedAt:
+      row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : String(row.updated_at ?? ""),
+  };
+}
 
-async function readDictionary(): Promise<DictionaryData> {
+export async function GET(request: NextRequest) {
   try {
-    const result = await list({
-      prefix: BLOB_PATH,
-    });
+    const { searchParams } = new URL(request.url);
+    const q = cleanText(searchParams.get("q"));
 
-    if (!result.blobs.length) {
-      return emptyData();
-    }
-
-    const latest = [...result.blobs].sort(
-      (a, b) =>
-        new Date(b.uploadedAt).getTime() -
-        new Date(a.uploadedAt).getTime()
-    )[0];
-
-    /*
-      Store PRIVATE bo'lgani uchun oddiy:
-      fetch(latest.url)
-      ishlatmaymiz.
-
-      @vercel/blob get() orqali o'qiymiz.
-    */
-    const blob = await get(latest.pathname, {
-      access: "private",
-    });
-
-    if (!blob || blob.statusCode !== 200 || !blob.stream) {
-      console.error(
-        "Dictionary blob topilmadi yoki o'qib bo'lmadi."
-      );
-
-      return emptyData();
-    }
-
-    const text = await new Response(blob.stream).text();
-
-    if (!text.trim()) {
-      return emptyData();
-    }
-
-    const data = JSON.parse(text);
-
-    if (!data || !Array.isArray(data.words)) {
-      return emptyData();
-    }
-
-    return {
-      words: data.words,
-      updatedAt:
-        typeof data.updatedAt === "string"
-          ? data.updatedAt
-          : new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error("Dictionary read error:", error);
-
-    return emptyData();
-  }
-}
-
-/* =========================================================
-   PRIVATE BLOB'GA SAQLASH
-========================================================= */
-
-async function saveDictionary(
-  data: DictionaryData
-) {
-  return put(
-    BLOB_PATH,
-    JSON.stringify(data, null, 2),
-    {
-      access: "private",
-      allowOverwrite: true,
-      contentType: "application/json",
-    }
-  );
-}
-
-/* =========================================================
-   GET
-   BARCHA SO'ZLARNI OLISH
-
-   /api/dictionary/english-uzbek
-
-   QIDIRISH:
-   /api/dictionary/english-uzbek?q=book
-========================================================= */
-
-export async function GET(
-  request: NextRequest
-) {
-  try {
-    const data = await readDictionary();
-
-    const q = cleanText(
-      request.nextUrl.searchParams.get("q")
-    ).toLowerCase();
-
-    let words = data.words;
+    let rows: any[];
 
     if (q) {
-      words = words.filter((word) => {
-        return (
-          word.english.toLowerCase().includes(q) ||
-          word.uzbek.toLowerCase().includes(q)
-        );
-      });
+      const pattern = `%${q}%`;
+
+      rows = await sql`
+        SELECT
+          id,
+          english,
+          uzbek,
+          created_at,
+          updated_at
+        FROM english_uzbek_dictionary
+        WHERE
+          english ILIKE ${pattern}
+          OR uzbek ILIKE ${pattern}
+        ORDER BY LOWER(english) ASC, created_at ASC
+      `;
+    } else {
+      rows = await sql`
+        SELECT
+          id,
+          english,
+          uzbek,
+          created_at,
+          updated_at
+        FROM english_uzbek_dictionary
+        ORDER BY LOWER(english) ASC, created_at ASC
+      `;
     }
+
+    const words = rows.map(mapRow);
 
     return NextResponse.json(
       {
         ok: true,
-        total: data.words.length,
-        resultCount: words.length,
+        success: true,
+        total: words.length,
+        count: words.length,
         words,
-        updatedAt: data.updatedAt,
       },
       {
         status: 200,
-        headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
-        },
+        headers: noStoreHeaders(),
       }
     );
   } catch (error) {
-    console.error(
-      "GET dictionary error:",
-      error
-    );
+    console.error("ENGLISH-UZBEK GET ERROR:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        message:
-          "Lug‘atni yuklashda xatolik yuz berdi.",
+        success: false,
+        message: "Lug‘atni yuklab bo‘lmadi.",
       },
       {
         status: 500,
+        headers: noStoreHeaders(),
       }
     );
   }
 }
 
-/* =========================================================
-   POST
-   BITTA YANGI SO'Z QO'SHISH
-
-   {
-     "english": "book",
-     "uzbek": "kitob"
-   }
-========================================================= */
-
-export async function POST(
-  request: NextRequest
-) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
@@ -224,11 +125,12 @@ export async function POST(
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "Inglizcha so‘zni kiriting.",
+          success: false,
+          message: "Inglizcha so‘zni kiriting.",
         },
         {
           status: 400,
+          headers: noStoreHeaders(),
         }
       );
     }
@@ -237,110 +139,95 @@ export async function POST(
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "O‘zbekcha tarjimani kiriting.",
+          success: false,
+          message: "O‘zbekcha tarjimani kiriting.",
         },
         {
           status: 400,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    const data = await readDictionary();
+    const duplicateRows = await sql`
+      SELECT id
+      FROM english_uzbek_dictionary
+      WHERE LOWER(english) = LOWER(${english})
+      LIMIT 1
+    `;
 
-    const duplicate = data.words.find(
-      (word) =>
-        word.english.toLowerCase() ===
-          english.toLowerCase() &&
-        word.uzbek.toLowerCase() ===
-          uzbek.toLowerCase()
-    );
-
-    if (duplicate) {
+    if (duplicateRows.length > 0) {
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "Bu so‘z lug‘atda allaqachon mavjud.",
-          word: duplicate,
+          success: false,
+          message: "Bu inglizcha so‘z lug‘atda allaqachon mavjud.",
         },
         {
           status: 409,
+          headers: noStoreHeaders(),
         }
       );
     }
 
+    const id = cleanText(body?.id) || makeId();
     const now = new Date().toISOString();
 
-    const newWord: DictionaryWord = {
-      id: createId(),
-      english,
-      uzbek,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    data.words.push(newWord);
-
-    data.words.sort((a, b) =>
-      a.english.localeCompare(
-        b.english,
-        "en",
-        {
-          sensitivity: "base",
-        }
+    const rows = await sql`
+      INSERT INTO english_uzbek_dictionary (
+        id,
+        english,
+        uzbek,
+        created_at,
+        updated_at
       )
-    );
+      VALUES (
+        ${id},
+        ${english},
+        ${uzbek},
+        ${now},
+        ${now}
+      )
+      RETURNING
+        id,
+        english,
+        uzbek,
+        created_at,
+        updated_at
+    `;
 
-    data.updatedAt = now;
-
-    await saveDictionary(data);
+    const word = mapRow(rows[0]);
 
     return NextResponse.json(
       {
         ok: true,
-        message:
-          "Yangi so‘z lug‘atga qo‘shildi.",
-        word: newWord,
-        total: data.words.length,
+        success: true,
+        message: "So‘z muvaffaqiyatli qo‘shildi.",
+        word,
       },
       {
         status: 201,
+        headers: noStoreHeaders(),
       }
     );
   } catch (error) {
-    console.error(
-      "POST dictionary error:",
-      error
-    );
+    console.error("ENGLISH-UZBEK POST ERROR:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        message:
-          "So‘zni saqlashda xatolik yuz berdi.",
+        success: false,
+        message: "So‘zni saqlashda xatolik yuz berdi.",
       },
       {
         status: 500,
+        headers: noStoreHeaders(),
       }
     );
   }
 }
 
-/* =========================================================
-   PUT
-   SO'ZNI TAHRIRLASH
-
-   {
-     "id": "...",
-     "english": "book",
-     "uzbek": "kitob"
-   }
-========================================================= */
-
-export async function PUT(
-  request: NextRequest
-) {
+export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
 
@@ -352,197 +239,200 @@ export async function PUT(
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "So‘z ID topilmadi.",
+          success: false,
+          message: "So‘z ID topilmadi.",
         },
         {
           status: 400,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    if (!english || !uzbek) {
+    if (!english) {
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "Inglizcha so‘z va o‘zbekcha tarjima majburiy.",
+          success: false,
+          message: "Inglizcha so‘zni kiriting.",
         },
         {
           status: 400,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    const data = await readDictionary();
-
-    const index = data.words.findIndex(
-      (word) => word.id === id
-    );
-
-    if (index === -1) {
+    if (!uzbek) {
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "So‘z topilmadi.",
+          success: false,
+          message: "O‘zbekcha tarjimani kiriting.",
         },
         {
-          status: 404,
+          status: 400,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    const duplicate = data.words.find(
-      (word) =>
-        word.id !== id &&
-        word.english.toLowerCase() ===
-          english.toLowerCase() &&
-        word.uzbek.toLowerCase() ===
-          uzbek.toLowerCase()
-    );
+    const duplicateRows = await sql`
+      SELECT id
+      FROM english_uzbek_dictionary
+      WHERE
+        LOWER(english) = LOWER(${english})
+        AND id <> ${id}
+      LIMIT 1
+    `;
 
-    if (duplicate) {
+    if (duplicateRows.length > 0) {
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "Bunday so‘z allaqachon mavjud.",
+          success: false,
+          message: "Bu inglizcha so‘z boshqa yozuvda allaqachon mavjud.",
         },
         {
           status: 409,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    const now = new Date().toISOString();
+    const rows = await sql`
+      UPDATE english_uzbek_dictionary
+      SET
+        english = ${english},
+        uzbek = ${uzbek},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING
+        id,
+        english,
+        uzbek,
+        created_at,
+        updated_at
+    `;
 
-    data.words[index] = {
-      ...data.words[index],
-      english,
-      uzbek,
-      updatedAt: now,
-    };
-
-    data.words.sort((a, b) =>
-      a.english.localeCompare(
-        b.english,
-        "en",
+    if (rows.length === 0) {
+      return NextResponse.json(
         {
-          sensitivity: "base",
+          ok: false,
+          success: false,
+          message: "So‘z topilmadi.",
+        },
+        {
+          status: 404,
+          headers: noStoreHeaders(),
         }
-      )
+      );
+    }
+
+    const word = mapRow(rows[0]);
+
+    return NextResponse.json(
+      {
+        ok: true,
+        success: true,
+        message: "So‘z muvaffaqiyatli yangilandi.",
+        word,
+      },
+      {
+        status: 200,
+        headers: noStoreHeaders(),
+      }
     );
-
-    data.updatedAt = now;
-
-    await saveDictionary(data);
-
-    return NextResponse.json({
-      ok: true,
-      message:
-        "So‘z muvaffaqiyatli tahrirlandi.",
-      word: data.words.find(
-        (word) => word.id === id
-      ),
-      total: data.words.length,
-    });
   } catch (error) {
-    console.error(
-      "PUT dictionary error:",
-      error
-    );
+    console.error("ENGLISH-UZBEK PUT ERROR:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        message:
-          "So‘zni tahrirlashda xatolik yuz berdi.",
+        success: false,
+        message: "So‘zni yangilashda xatolik yuz berdi.",
       },
       {
         status: 500,
+        headers: noStoreHeaders(),
       }
     );
   }
 }
 
-/* =========================================================
-   DELETE
-   SO'ZNI O'CHIRISH
-
-   /api/dictionary/english-uzbek?id=SOZ_ID
-========================================================= */
-
-export async function DELETE(
-  request: NextRequest
-) {
+export async function DELETE(request: NextRequest) {
   try {
-    const id = cleanText(
-      request.nextUrl.searchParams.get("id")
-    );
+    const { searchParams } = new URL(request.url);
+
+    let id = cleanText(searchParams.get("id"));
+
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = cleanText(body?.id);
+      } catch {
+        // body bo‘lmasligi mumkin
+      }
+    }
 
     if (!id) {
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "O‘chiriladigan so‘z ID topilmadi.",
+          success: false,
+          message: "O‘chirish uchun so‘z ID topilmadi.",
         },
         {
           status: 400,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    const data = await readDictionary();
+    const rows = await sql`
+      DELETE FROM english_uzbek_dictionary
+      WHERE id = ${id}
+      RETURNING id
+    `;
 
-    const word = data.words.find(
-      (item) => item.id === id
-    );
-
-    if (!word) {
+    if (rows.length === 0) {
       return NextResponse.json(
         {
           ok: false,
-          message:
-            "So‘z topilmadi.",
+          success: false,
+          message: "So‘z topilmadi.",
         },
         {
           status: 404,
+          headers: noStoreHeaders(),
         }
       );
     }
 
-    data.words = data.words.filter(
-      (item) => item.id !== id
+    return NextResponse.json(
+      {
+        ok: true,
+        success: true,
+        message: "So‘z muvaffaqiyatli o‘chirildi.",
+        id,
+      },
+      {
+        status: 200,
+        headers: noStoreHeaders(),
+      }
     );
-
-    data.updatedAt =
-      new Date().toISOString();
-
-    await saveDictionary(data);
-
-    return NextResponse.json({
-      ok: true,
-      message:
-        "So‘z lug‘atdan o‘chirildi.",
-      deletedWord: word,
-      total: data.words.length,
-    });
   } catch (error) {
-    console.error(
-      "DELETE dictionary error:",
-      error
-    );
+    console.error("ENGLISH-UZBEK DELETE ERROR:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        message:
-          "So‘zni o‘chirishda xatolik yuz berdi.",
+        success: false,
+        message: "So‘zni o‘chirishda xatolik yuz berdi.",
       },
       {
         status: 500,
+        headers: noStoreHeaders(),
       }
     );
   }
