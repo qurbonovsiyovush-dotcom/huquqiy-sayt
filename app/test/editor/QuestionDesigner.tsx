@@ -252,7 +252,6 @@ function normalizeQuestionContent(root: HTMLElement) {
     node.style.lineHeight = "1.55";
     node.style.fontWeight = "700";
     node.style.textAlign = "justify";
-    node.style.textJustify = "inter-word";
 
     if (node.tagName === "P" || node.tagName === "DIV" || node.tagName === "LI") {
       node.style.width = "100%";
@@ -277,7 +276,6 @@ function normalizeQuestionContent(root: HTMLElement) {
   root.style.fontSize = "24px";
   root.style.lineHeight = "1.55";
   root.style.textAlign = "justify";
-  root.style.textJustify = "inter-word";
 }
 
 function cleanHtml(root: HTMLElement) {
