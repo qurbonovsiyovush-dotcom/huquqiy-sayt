@@ -74,6 +74,120 @@ function cleanHtml(root: HTMLElement) {
   return clone.innerHTML;
 }
 
+
+function tidyPunctuationInTextNodes(root: HTMLElement) {
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT
+  );
+
+  const nodes: Text[] = [];
+  let current = walker.nextNode();
+
+  while (current) {
+    nodes.push(current as Text);
+    current = walker.nextNode();
+  }
+
+  nodes.forEach((node) => {
+    const parent = node.parentElement;
+
+    if (
+      !parent ||
+      parent.closest('[contenteditable="false"]') ||
+      parent.closest('svg')
+    ) {
+      return;
+    }
+
+    node.textContent = (node.textContent || '')
+      .replace(/\s+([?!,.;:])/g, '$1')
+      .replace(/([?!,.;:])(?=[A-Za-zА-Яа-яЁёOʻGʻ‘’])/g, '$1 ');
+  });
+}
+
+function normalizeLegacyQuestionHtml(html: string) {
+  if (!html.trim()) return '';
+
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+
+  tidyPunctuationInTextNodes(holder);
+
+  const hasRichBlocks = Boolean(
+    holder.querySelector(
+      'p,div,ol,ul,table,img,svg,[data-object-id]'
+    )
+  );
+
+  if (!hasRichBlocks) {
+    const raw = (holder.textContent || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\s+([?!,.;:])/g, '$1')
+      .trim();
+
+    const romanPattern = /\s+(?=(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s)/g;
+
+    if (romanPattern.test(raw)) {
+      const parts = raw
+        .split(romanPattern)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      const firstRoman = parts.findIndex((part) =>
+        /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s/.test(part)
+      );
+
+      if (firstRoman > 0) {
+        const intro = parts.slice(0, firstRoman).join(' ');
+        const romanParts = parts.slice(firstRoman);
+
+        holder.innerHTML = '';
+
+        const introP = document.createElement('p');
+        introP.style.margin = '0 0 18px';
+        introP.style.fontWeight = '700';
+        introP.textContent = intro;
+        holder.appendChild(introP);
+
+        romanParts.forEach((part) => {
+          const match = part.match(
+            /^((?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.)\s*(.*)$/
+          );
+
+          const p = document.createElement('p');
+          p.style.margin = '0 0 12px';
+          p.style.fontWeight = '400';
+          p.style.display = 'grid';
+          p.style.gridTemplateColumns = '54px 1fr';
+          p.style.columnGap = '10px';
+          p.style.alignItems = 'start';
+
+          if (match) {
+            const n = document.createElement('span');
+            n.style.fontWeight = '700';
+            n.textContent = match[1];
+
+            const t = document.createElement('span');
+            t.textContent = match[2];
+
+            p.appendChild(n);
+            p.appendChild(t);
+          } else {
+            p.textContent = part;
+          }
+
+          holder.appendChild(p);
+        });
+      }
+    }
+  }
+
+  tidyPunctuationInTextNodes(holder);
+  return holder.innerHTML;
+}
+
 export default function QuestionDesigner({
   value,
   onChange,
@@ -141,14 +255,23 @@ export default function QuestionDesigner({
 
     if (!root) return;
 
+    const normalized =
+      normalizeLegacyQuestionHtml(
+        value || ""
+      );
+
     if (
       cleanHtml(root) !==
-      (value || "")
+      normalized
     ) {
       root.innerHTML =
-        value || "";
+        normalized;
     }
-  }, [value]);
+
+    if (normalized !== (value || "")) {
+      onChange(normalized);
+    }
+  }, [value, onChange]);
 
   useEffect(() => {
     function move(
