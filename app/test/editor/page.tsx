@@ -3176,9 +3176,9 @@ function TestEditorPageContent() {
             0 5px 15px
               rgba(0,0,0,.25);
 
-          font-size: 18px;
+          font-size: 24px;
 
-          line-height: 1.6;
+          line-height: 1.55;
         }
 
         .wordPage:empty:before {
@@ -3704,10 +3704,8 @@ function TestEditorPageContent() {
 
           background: white;
 
-          font-size: 24px;
-          line-height: 1.45;
-          text-align: justify;
-          text-justify: inter-word;
+          font-size: 18px;
+          line-height: 1.5;
         }
 
         .pointsRow {
