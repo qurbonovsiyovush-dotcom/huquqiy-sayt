@@ -39,245 +39,6 @@ function uid() {
     .slice(2, 8)}`;
 }
 
-function normalizeQuestionContent(root: HTMLElement) {
-  /*
-    ESKI / PDF IMPORT SAVOLLARINI BIR XIL KO‘RINISHGA KELTIRADI.
-
-    1) Savol matni qalin bo‘ladi.
-    2) "1. ... 2. ... 3. ..." va "I. ... II. ... III. ..."
-       bitta qatorda kelgan bo‘lsa, har biri alohida qatorga chiqadi.
-    3) Foydalanuvchi xohlagan ko‘rinish: so‘roq belgisi oldidan
-       aynan bitta bo‘sh joy qoladi: "keladi ?".
-    4) Rasm, jadval, Venn va boshqa designer obyektlariga tegmaydi.
-  */
-
-  const hasDesignerObject = Boolean(
-    root.querySelector(
-      'table,img,svg,[data-object-id],[data-manual-table="true"]'
-    )
-  );
-
-  function tidyText(text: string) {
-    return text
-      .replace(/\u00A0/g, " ")
-      .replace(/[ \t]+/g, " ")
-      .replace(/[ \t]+([,.;:!])/g, "$1")
-      // MUHIM: "MUVOFIQ?" emas, "MUVOFIQ ?"
-      .replace(/[ \t]*\?/g, " ?")
-      .trim();
-  }
-
-  /*
-    Oddiy savol matnida HTML span/font bo‘laklari PDFdan qolgan bo‘lishi
-    mumkin. Raqamlar turli spanlarda turgan bo‘lsa ham topish uchun
-    butun matnni birgalikda ko‘ramiz.
-  */
-  if (!hasDesignerObject) {
-    const plainText = tidyText(
-      (root.innerText || root.textContent || "")
-        .replace(/\r/g, " ")
-        .replace(/\n+/g, " ")
-    );
-
-    const markerRegex =
-      /(?:^|\s)((?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|[1-9]|[1-9]\d)\.)\s+/g;
-
-    const matches = Array.from(
-      plainText.matchAll(markerRegex)
-    );
-
-    /*
-      Kamida 2 ta marker bo‘lsa bu ro‘yxat deb hisoblanadi.
-      Masalan:
-        Savol matni 1. birinchi; 2. ikkinchi; 3. uchinchi.
-      quyidagicha chiqadi:
-        Savol matni
-        1. birinchi;
-        2. ikkinchi;
-        3. uchinchi.
-    */
-    if (matches.length >= 2) {
-      const rows: string[] = [];
-      const firstMatch = matches[0];
-      const firstIndex = firstMatch.index ?? 0;
-      const firstLeading = firstMatch[0].startsWith(" ") ? 1 : 0;
-      const stem = tidyText(
-        plainText.slice(0, firstIndex + firstLeading)
-      );
-
-      matches.forEach((match, index) => {
-        const markerIndex = match.index ?? 0;
-        const leading = match[0].startsWith(" ") ? 1 : 0;
-        const contentStart = markerIndex + match[0].length;
-
-        const next = matches[index + 1];
-        const contentEnd = next
-          ? (next.index ?? plainText.length) +
-            (next[0].startsWith(" ") ? 1 : 0)
-          : plainText.length;
-
-        const marker = match[1];
-        const content = tidyText(
-          plainText.slice(contentStart, contentEnd)
-        );
-
-        rows.push(
-          tidyText(`${marker} ${content}`)
-        );
-      });
-
-      root.innerHTML = "";
-
-      if (stem) {
-        const stemLine = document.createElement("div");
-        stemLine.style.fontWeight = "700";
-        stemLine.style.lineHeight = "1.55";
-        stemLine.style.margin = "0 0 10px";
-        stemLine.textContent = stem;
-        root.appendChild(stemLine);
-      }
-
-      rows.forEach((row) => {
-        const line = document.createElement("div");
-        line.style.fontWeight = "700";
-        line.style.lineHeight = "1.55";
-        line.style.margin = "0 0 4px";
-        line.textContent = row;
-        root.appendChild(line);
-      });
-    } else {
-      // Ro‘yxat bo‘lmasa mavjud HTML tuzilishini buzmaymiz,
-      // faqat tinish belgisi va qalinlikni to‘g‘rilaymiz.
-      const walker = document.createTreeWalker(
-        root,
-        NodeFilter.SHOW_TEXT
-      );
-
-      const textNodes: Text[] = [];
-      let current = walker.nextNode();
-
-      while (current) {
-        if (current instanceof Text) {
-          textNodes.push(current);
-        }
-        current = walker.nextNode();
-      }
-
-      textNodes.forEach((node) => {
-        const parent = node.parentElement;
-        if (!parent) return;
-        if (parent.closest('[data-object-id]')) return;
-
-        const before = node.nodeValue || "";
-        const after = before
-          .replace(/\u00A0/g, " ")
-          .replace(/[ \t]+([,.;:!])/g, "$1")
-          .replace(/[ \t]*\?/g, " ?");
-
-        if (before !== after) {
-          node.nodeValue = after;
-        }
-      });
-    }
-  } else {
-    // Designer obyektlari bor savolda faqat oddiy text node'larda
-    // so‘roq belgisi va tinish belgilarini tozalaymiz.
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_TEXT
-    );
-
-    const textNodes: Text[] = [];
-    let current = walker.nextNode();
-
-    while (current) {
-      if (current instanceof Text) {
-        textNodes.push(current);
-      }
-      current = walker.nextNode();
-    }
-
-    textNodes.forEach((node) => {
-      const parent = node.parentElement;
-      if (!parent || parent.closest('[data-object-id]')) return;
-
-      const before = node.nodeValue || "";
-      const after = before
-        .replace(/\u00A0/g, " ")
-        .replace(/[ \t]+([,.;:!])/g, "$1")
-        .replace(/[ \t]*\?/g, " ?");
-
-      if (before !== after) {
-        node.nodeValue = after;
-      }
-    });
-  }
-
-  /*
-    Public testdagi namuna kabi savolning asosiy matni qalin chiqadi.
-    Designer obyektlarining ichki font sozlamalarini o‘zgartirmaymiz.
-  */
-  root.querySelectorAll("*").forEach((node) => {
-    if (!(node instanceof HTMLElement)) return;
-    if (node.closest('[data-object-id]')) return;
-    if (node.tagName === "BR") return;
-
-    node.style.fontWeight = "700";
-  });
-
-  Array.from(root.childNodes).forEach((node) => {
-    if (!(node instanceof Text)) return;
-    if (!node.nodeValue?.trim()) return;
-
-    const span = document.createElement("span");
-    span.style.fontWeight = "700";
-    span.textContent = node.nodeValue;
-    node.replaceWith(span);
-  });
-
-  /*
-    BARCHA ODDIY SAVOL MATNI UCHUN BIR XIL STANDART:
-    - 24px;
-    - qalin;
-    - ikki cheti tekis (justify);
-    - PDFdan qolgan tor width/absolute joylashuvlar olib tashlanadi.
-    Designer obyektlarining ichki geometriyasiga tegmaymiz.
-  */
-  root.querySelectorAll("p,div,span,font,li").forEach((node) => {
-    if (!(node instanceof HTMLElement)) return;
-    if (node.closest('[data-object-id]')) return;
-    if (node.closest('svg')) return;
-
-    node.style.fontSize = "24px";
-    node.style.lineHeight = "1.55";
-    node.style.fontWeight = "700";
-    node.style.textAlign = "justify";
-
-    if (node.tagName === "P" || node.tagName === "DIV" || node.tagName === "LI") {
-      node.style.width = "100%";
-      node.style.maxWidth = "100%";
-      node.style.boxSizing = "border-box";
-
-      /* PDF importdan qolgan tor/absolute bloklar matnni pastga
-         ustun ko‘rinishida tushirib yubormasligi uchun. */
-      if (!node.closest('table')) {
-        node.style.position = "static";
-        node.style.left = "auto";
-        node.style.right = "auto";
-        node.style.top = "auto";
-        node.style.bottom = "auto";
-        node.style.transform = "none";
-        node.style.float = "none";
-      }
-    }
-  });
-
-  root.style.fontWeight = "700";
-  root.style.fontSize = "24px";
-  root.style.lineHeight = "1.55";
-  root.style.textAlign = "justify";
-}
-
 function cleanHtml(root: HTMLElement) {
   const clone =
     root.cloneNode(true) as HTMLElement;
@@ -311,6 +72,23 @@ function cleanHtml(root: HTMLElement) {
     });
 
   return clone.innerHTML;
+}
+
+function normalizeQuestionMarks(root: HTMLElement) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node as Text;
+    const parent = text.parentElement;
+    if (!parent) continue;
+    const tag = parent.tagName.toLowerCase();
+    if (tag === "script" || tag === "style") continue;
+    if (/\s\?/.test(text.nodeValue || "")) nodes.push(text);
+  }
+  for (const text of nodes) {
+    text.nodeValue = (text.nodeValue || "").replace(/\s+\?/g, "?");
+  }
 }
 
 export default function QuestionDesigner({
@@ -386,17 +164,8 @@ export default function QuestionDesigner({
     ) {
       root.innerHTML =
         value || "";
-
-      normalizeQuestionContent(root);
-
-      const normalized =
-        cleanHtml(root);
-
-      if (normalized !== (value || "")) {
-        onChange(normalized);
-      }
     }
-  }, [value, onChange]);
+  }, [value]);
 
   useEffect(() => {
     function move(
@@ -2224,9 +1993,9 @@ export default function QuestionDesigner({
             )
           }
           disabled={disabled}
-          title="Ikki chetini tekislash (Justify)"
+          title="Ikki chetini tekislash"
         >
-          ☰
+          ≡≡
         </button>
 
         <button
@@ -2808,44 +2577,12 @@ export default function QuestionDesigner({
             "Times New Roman",
             serif;
           font-size: 24px;
-          font-weight: 700;
-          line-height: 1.55;
+          line-height: 1.45;
           text-align: justify;
-          text-justify: inter-word;
-          white-space: normal;
-          overflow-wrap: normal;
-          word-break: normal;
+          line-height: 1.5;
           box-shadow:
             inset 0 0 0 1px #b4c2c9;
           overflow: hidden;
-        }
-
-        .canvas :global(p),
-        .canvas :global(div:not(.nc-object)) {
-          width: 100% !important;
-          max-width: 100% !important;
-          margin-top: 0;
-          margin-bottom: 12px;
-          font-size: 24px !important;
-          line-height: 1.55 !important;
-          font-weight: 700 !important;
-          text-align: justify !important;
-          text-justify: inter-word;
-          overflow-wrap: normal !important;
-          word-break: normal !important;
-          box-sizing: border-box;
-        }
-
-        .canvas :global(span:not([data-nc-editable])),
-        .canvas :global(font),
-        .canvas :global(li) {
-          font-size: 24px !important;
-          line-height: 1.55 !important;
-          font-weight: 700 !important;
-        }
-
-        .canvas :global(br) {
-          line-height: 1.95;
         }
 
         .canvas :global(.nc-object) {
