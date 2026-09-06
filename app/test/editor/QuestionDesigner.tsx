@@ -76,24 +76,20 @@ function normalizeQuestionText(root: HTMLElement) {
       return;
     }
 
-    if (
-      el.style.fontSize ||
-      el.tagName === "FONT"
-    ) {
+    if (el.tagName !== "IMG") {
       el.style.fontSize = "24px";
     }
   });
 
   const markerPattern =
-    /\\s+(?=(?:I{1,3}|IV|V|VI|VII|VIII|IX|X|\\d{1,2})\\.\\s+)/g;
+    /\s+(?=(?:I{1,3}|IV|V|VI|VII|VIII|IX|X|\d{1,2})\.\s+)/g;
 
   for (const textNode of nodes) {
     let text = textNode.nodeValue || "";
 
-    // Savol oxiridagi "?" belgisi oldingi so‘zga yopishmaydi:
-    // "savol?" -> "savol ?". Nuqtalarga tegilmaydi.
-    // Faqat text node oxiridagi savol belgisi tuzatiladi.
-    text = text.replace(/\s*\?(?=\s*$)/, " ?");
+    // Savol oxiridagi ? belgisi oldingi so‘zga yopishmaydi.
+    // Nuqtalarga (.) tegilmaydi.
+    text = text.replace(/\s*\?/g, " ?");
 
     // Keep structured Roman/Arabic numbered statements on separate lines.
     // This only affects markers followed by a space, e.g. " I. ", " II. ", " 1. ".
@@ -2655,7 +2651,7 @@ export default function QuestionDesigner({
         }
 
         .canvas :global(font[size="4"]) {
-          font-size: 18px !important;
+          font-size: 24px !important;
         }
 
 .canvas :global(.nc-object) {
