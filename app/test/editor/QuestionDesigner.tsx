@@ -3174,14 +3174,12 @@ function TestEditorPageContent() {
             0 5px 15px
               rgba(0,0,0,.25);
 
-          /* SAVOL MATNI RAZMERI 24px VA QALIN */
           font-size: 24px;
           font-weight: bold;
 
           line-height: 1.6;
         }
 
-        /* Raqamlar va rim raqamlari (I., II., III. / 1., 2. va h.k.) matnga yopishib qolmasligi va yangi qatordan chiqishi uchun */
         .wordPage :global(span), 
         .wordPage :global(p), 
         .wordPage :global(div) {
@@ -3716,7 +3714,6 @@ function TestEditorPageContent() {
 
           background: white;
 
-          /* JAVOB VARIANTLARI RAZMERI 18px VA QALIN */
           font-size: 18px;
           font-weight: bold;
 
