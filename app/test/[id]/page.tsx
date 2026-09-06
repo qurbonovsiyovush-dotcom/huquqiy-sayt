@@ -68,7 +68,6 @@ type TestData = {
   description?: string;
   status: TestStatus;
   questions: TestQuestion[];
-  attemptLimit?: number | null;
 };
 
 type Answers = Record<string, string>;
@@ -93,39 +92,12 @@ export default function TestSolvePage() {
 
   const [answers, setAnswers] = useState<Answers>({});
 
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [remainingSeconds, setRemainingSeconds] =
+    useState(0);
 
   const [showReview, setShowReview] = useState(false);
 
-  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
-
-  const [reviewMode, setReviewMode] =
-    useState<"all" | "wrong">("all");
-
-  const [zoomQuestionId, setZoomQuestionId] =
-    useState<string | null>(null);
-
-  const [saveState, setSaveState] =
-    useState<"saved" | "saving">("saved");
-
-  const [isOnline, setIsOnline] = useState(true);
-
-  const [attemptLoading, setAttemptLoading] = useState(true);
-
-  const [attemptLimit, setAttemptLimit] =
-    useState<number | null>(null);
-
-  const [attemptsUsed, setAttemptsUsed] = useState(0);
-
-  const [attemptsRemaining, setAttemptsRemaining] =
-    useState<number | null>(null);
-
-  const [canAttempt, setCanAttempt] = useState(true);
-
-  const restoredRef = useRef(false);
-
   const finishLock = useRef(false);
-
   const resultSavedRef = useRef(false);
 
   /* =====================================================
@@ -152,7 +124,6 @@ export default function TestSolvePage() {
     }
 
     loadTest();
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testId]);
 
@@ -177,6 +148,16 @@ export default function TestSolvePage() {
         );
       }
 
+      /*
+        API quyidagilardan birini qaytarsa ham ishlaydi:
+
+        { success: true, test: {...} }
+
+        yoki:
+
+        {...test}
+      */
+
       const receivedTest =
         data?.test && typeof data.test === "object"
           ? data.test
@@ -185,6 +166,10 @@ export default function TestSolvePage() {
       if (!receivedTest?.id) {
         throw new Error("Test topilmadi.");
       }
+
+      /*
+        Oddiy foydalanuvchi draft testni ishlamasligi kerak.
+      */
 
       if (receivedTest.status !== "published") {
         throw new Error(
@@ -214,17 +199,6 @@ export default function TestSolvePage() {
 
         status: receivedTest.status,
 
-        attemptLimit:
-          receivedTest.attemptLimit === null ||
-          receivedTest.attemptLimit === undefined
-            ? null
-            : Math.max(
-                1,
-                Math.floor(
-                  Number(receivedTest.attemptLimit) || 1
-                )
-              ),
-
         questions: Array.isArray(receivedTest.questions)
           ? receivedTest.questions
           : [],
@@ -238,141 +212,9 @@ export default function TestSolvePage() {
 
       setTest(normalizedTest);
 
-      setAttemptLoading(true);
-
-      try {
-        const attemptResponse = await fetch(
-          `/api/results?testId=${encodeURIComponent(
-            normalizedTest.id
-          )}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
-        );
-
-        const attemptData =
-          await readJson(attemptResponse);
-
-        if (attemptResponse.ok) {
-          setAttemptLimit(
-            attemptData?.attemptLimit === null ||
-              attemptData?.unlimited === true
-              ? null
-              : Math.max(
-                  1,
-                  Number(attemptData?.attemptLimit) || 1
-                )
-          );
-
-          setAttemptsUsed(
-            Math.max(
-              0,
-              Number(attemptData?.attemptsUsed) || 0
-            )
-          );
-
-          setAttemptsRemaining(
-            attemptData?.attemptsRemaining === null
-              ? null
-              : Math.max(
-                  0,
-                  Number(
-                    attemptData?.attemptsRemaining
-                  ) || 0
-                )
-          );
-
-          setCanAttempt(
-            attemptData?.canAttempt !== false
-          );
-        } else {
-          setCanAttempt(false);
-
-          setError(
-            attemptData?.message ||
-              "Urinish holatini tekshirib bo‘lmadi."
-          );
-        }
-      } catch (attemptError) {
-        console.error(
-          "ATTEMPT CHECK ERROR:",
-          attemptError
-        );
-
-        setCanAttempt(false);
-
-        setError(
-          "Urinish holatini tekshirib bo‘lmadi."
-        );
-      } finally {
-        setAttemptLoading(false);
-      }
-
       setRemainingSeconds(
         normalizedTest.duration * 60
       );
-
-      try {
-        const raw = window.localStorage.getItem(
-          `quiz-progress:${normalizedTest.id}`
-        );
-
-        if (raw) {
-          const saved = JSON.parse(raw);
-
-          if (
-            saved?.started === true &&
-            saved?.finished !== true
-          ) {
-            setAnswers(
-              saved.answers &&
-                typeof saved.answers === "object"
-                ? saved.answers
-                : {}
-            );
-
-            setFlagged(
-              saved.flagged &&
-                typeof saved.flagged === "object"
-                ? saved.flagged
-                : {}
-            );
-
-            setCurrentIndex(
-              Math.min(
-                Math.max(
-                  0,
-                  Number(saved.currentIndex) || 0
-                ),
-                Math.max(
-                  0,
-                  normalizedTest.questions.length - 1
-                )
-              )
-            );
-
-            setRemainingSeconds(
-              Math.max(
-                1,
-                Number(saved.remainingSeconds) ||
-                  normalizedTest.duration * 60
-              )
-            );
-
-            setStarted(true);
-
-            setFinished(false);
-          }
-        }
-      } catch (restoreError) {
-        console.error(
-          "TEST PROGRESS RESTORE ERROR:",
-          restoreError
-        );
-      } finally {
-        restoredRef.current = true;
-      }
     } catch (err) {
       console.error("TEST LOAD ERROR:", err);
 
@@ -391,6 +233,24 @@ export default function TestSolvePage() {
   /* =====================================================
      SAVOL MATNI
   ===================================================== */
+
+  function cleanRichTextHtml(value: string) {
+    if (!value) return "";
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(value, "text/html");
+      const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+      const nodes: Text[] = [];
+      let node = walker.nextNode();
+      while (node) { nodes.push(node as Text); node = walker.nextNode(); }
+      for (const textNode of nodes) {
+        textNode.nodeValue = textNode.nodeValue?.replace(/\s+([?!.;,:%…])/g, "$1") ?? "";
+      }
+      return doc.body.innerHTML;
+    } catch {
+      return value.replace(/\s+([?!.;,:%…])/g, "$1");
+    }
+  }
 
   function getQuestionText(question: TestQuestion) {
     return (
@@ -419,179 +279,11 @@ export default function TestSolvePage() {
   }
 
   /* =====================================================
-     RIM RAQAM / RAQAMLI BANDLARNI FORMATLASH
-
-     I.
-     II.
-     III.
-     IV.
-     V.
-
-     yoki
-
-     1.
-     2.
-     3.
-
-     bir qatorda yopishib qolsa, avtomatik ajratadi.
-  ===================================================== */
-
-  function formatStructuredQuestionHtml(raw: string) {
-    if (!raw) {
-      return "";
-    }
-
-    let html = String(raw);
-
-    /*
-      &nbsp; larni oddiy bo‘shliqqa aylantiramiz.
-    */
-    html = html.replace(/&nbsp;/gi, " ");
-
-    /*
-      Ketma-ket ortiqcha oddiy bo‘shliqlarni kamaytiramiz.
-      HTML teglariga tegmaydi.
-    */
-    html = html.replace(/[ \t]{2,}/g, " ");
-
-    /*
-      Rim raqamli bandlar:
-
-      I.
-      II.
-      III.
-      IV.
-      V.
-      VI.
-      VII.
-      VIII.
-      IX.
-      X.
-      ...
-
-      Birinchi band oldidan <br> qo‘ymaymiz.
-      Keyingi bandlar oldidan yangi qator qo‘yamiz.
-    */
-
-    const romanPattern =
-      /(^|[\s>])((?:M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3}))\.)\s+/g;
-
-    let romanSeen = false;
-
-    html = html.replace(
-      romanPattern,
-      (match, prefix, marker) => {
-        const normalizedMarker =
-          String(marker || "").trim();
-
-        if (!normalizedMarker) {
-          return match;
-        }
-
-        if (!romanSeen) {
-          romanSeen = true;
-
-          return `${prefix}${normalizedMarker} `;
-        }
-
-        /*
-          Agar oldinda allaqachon <br> bo‘lsa,
-          yana qo‘shmaymiz.
-        */
-        if (
-          String(prefix).includes(">") &&
-          /<br\s*\/?>\s*$/i.test(
-            html.slice(
-              0,
-              Math.max(
-                0,
-                html.indexOf(match)
-              )
-            )
-          )
-        ) {
-          return `${prefix}${normalizedMarker} `;
-        }
-
-        return `${prefix}<br class="autoListBreak">${normalizedMarker} `;
-      }
-    );
-
-    /*
-      Rim regex juda keng bo‘lgani uchun ayrim holatda
-      oddiy I. II. III. ketma-ketlikni qo‘shimcha
-      tekshiruv bilan ham ushlaymiz.
-    */
-
-    html = html.replace(
-      /(\s)(II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.\s+/g,
-      `$1<br class="autoListBreak">$2. `
-    );
-
-    /*
-      Oddiy raqamli bandlar:
-
-      1.
-      2.
-      3.
-
-      Lekin 1-modda, 2-modda kabi yozuvlarga tegmaydi,
-      chunki nuqtadan keyin bo‘shliq talab qilinadi.
-    */
-
-    let numericSeen = false;
-
-    html = html.replace(
-      /(^|[\s>])(\d{1,3}\.)\s+/g,
-      (match, prefix, marker) => {
-        if (!numericSeen) {
-          numericSeen = true;
-
-          return `${prefix}${marker} `;
-        }
-
-        return `${prefix}<br class="autoListBreak">${marker} `;
-      }
-    );
-
-    /*
-      Bir joyda tasodifan ikki yoki undan ortiq
-      autoListBreak paydo bo‘lsa bittaga tushiramiz.
-    */
-
-    html = html.replace(
-      /(?:<br class="autoListBreak">\s*){2,}/gi,
-      '<br class="autoListBreak">'
-    );
-
-    /*
-      Mavjud <br> bilan yangi <br> ustma-ust kelsa.
-    */
-
-    html = html.replace(
-      /<br\s*\/?>\s*<br class="autoListBreak">/gi,
-      '<br class="autoListBreak">'
-    );
-
-    return html;
-  }
-
-  /* =====================================================
      TESTNI BOSHLASH
   ===================================================== */
 
   function startTest() {
-    if (!test || attemptLoading) {
-      return;
-    }
-
-    if (!canAttempt) {
-      window.alert(
-        attemptLimit === null
-          ? "Hozir testni boshlash mumkin emas."
-          : `Siz ushbu test uchun berilgan ${attemptLimit} ta urinishdan foydalanib bo‘lgansiz.`
-      );
-
+    if (!test) {
       return;
     }
 
@@ -602,15 +294,6 @@ export default function TestSolvePage() {
     setCurrentIndex(0);
     setFinished(false);
     setShowReview(false);
-    setReviewMode("all");
-    setFlagged({});
-    setZoomQuestionId(null);
-
-    try {
-      window.localStorage.removeItem(
-        `quiz-progress:${test.id}`
-      );
-    } catch {}
 
     setRemainingSeconds(
       Math.max(1, Number(test.duration)) * 60
@@ -633,19 +316,10 @@ export default function TestSolvePage() {
         (question) => !answers[question.id]
       ).length;
 
-      const flaggedCount = test.questions.filter(
-        (question) => flagged[question.id]
-      ).length;
-
-      const answered =
-        test.questions.length - unanswered;
-
       const message =
-        `Testni yakunlashdan oldin tekshiring:\n\n` +
-        `✓ Javob berilgan: ${answered} ta\n` +
-        `— Javobsiz: ${unanswered} ta\n` +
-        `⚑ Belgilangan: ${flaggedCount} ta\n\n` +
-        `Testni yakunlaysizmi ?`;
+        unanswered > 0
+          ? `Siz ${unanswered} ta savolga javob bermadingiz.\n\nTestni yakunlaysizmi?`
+          : "Testni yakunlaysizmi?";
 
       if (!window.confirm(message)) {
         return;
@@ -656,13 +330,6 @@ export default function TestSolvePage() {
 
     setFinished(true);
     setStarted(false);
-    setZoomQuestionId(null);
-
-    try {
-      window.localStorage.removeItem(
-        `quiz-progress:${test.id}`
-      );
-    } catch {}
 
     window.scrollTo({
       top: 0,
@@ -703,216 +370,7 @@ export default function TestSolvePage() {
   }, [started, finished, test]);
 
   /* =====================================================
-     ONLINE
-  ===================================================== */
-
-  useEffect(() => {
-    const syncOnline = () =>
-      setIsOnline(window.navigator.onLine);
-
-    syncOnline();
-
-    window.addEventListener(
-      "online",
-      syncOnline
-    );
-
-    window.addEventListener(
-      "offline",
-      syncOnline
-    );
-
-    return () => {
-      window.removeEventListener(
-        "online",
-        syncOnline
-      );
-
-      window.removeEventListener(
-        "offline",
-        syncOnline
-      );
-    };
-  }, []);
-
-  /* =====================================================
-     AUTOSAVE
-  ===================================================== */
-
-  useEffect(() => {
-    if (
-      !test ||
-      !started ||
-      finished ||
-      !restoredRef.current
-    ) {
-      return;
-    }
-
-    setSaveState("saving");
-
-    const timeout = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(
-          `quiz-progress:${test.id}`,
-          JSON.stringify({
-            version: 1,
-            testId: test.id,
-            started: true,
-            finished: false,
-            answers,
-            flagged,
-            currentIndex,
-            remainingSeconds,
-            savedAt: Date.now(),
-          })
-        );
-
-        setSaveState("saved");
-      } catch (saveError) {
-        console.error(
-          "TEST PROGRESS SAVE ERROR:",
-          saveError
-        );
-
-        setSaveState("saved");
-      }
-    }, 180);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [
-    test,
-    started,
-    finished,
-    answers,
-    flagged,
-    currentIndex,
-    remainingSeconds,
-  ]);
-
-  useEffect(() => {
-    if (!started || finished) {
-      return;
-    }
-
-    const beforeUnload = (
-      event: BeforeUnloadEvent
-    ) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    window.addEventListener(
-      "beforeunload",
-      beforeUnload
-    );
-
-    return () =>
-      window.removeEventListener(
-        "beforeunload",
-        beforeUnload
-      );
-  }, [started, finished]);
-
-  /* =====================================================
-     KLAVIATURA
-  ===================================================== */
-
-  useEffect(() => {
-    if (!started || finished || !test) {
-      return;
-    }
-
-    const onKeyDown = (
-      event: KeyboardEvent
-    ) => {
-      const target =
-        event.target as HTMLElement | null;
-
-      if (
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
-        target?.isContentEditable ||
-        zoomQuestionId
-      ) {
-        return;
-      }
-
-      const question =
-        test.questions[currentIndex];
-
-      if (!question) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-
-      const optionIndex = [
-        "a",
-        "b",
-        "c",
-        "d",
-      ].indexOf(key);
-
-      if (optionIndex >= 0) {
-        const option =
-          question.options?.[optionIndex];
-
-        if (option) {
-          event.preventDefault();
-
-          selectAnswer(
-            question.id,
-            option.id
-          );
-        }
-
-        return;
-      }
-
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-
-        setCurrentIndex((current) =>
-          Math.max(0, current - 1)
-        );
-      }
-
-      if (event.key === "ArrowRight") {
-        event.preventDefault();
-
-        setCurrentIndex((current) =>
-          Math.min(
-            test.questions.length - 1,
-            current + 1
-          )
-        );
-      }
-    };
-
-    window.addEventListener(
-      "keydown",
-      onKeyDown
-    );
-
-    return () =>
-      window.removeEventListener(
-        "keydown",
-        onKeyDown
-      );
-  }, [
-    started,
-    finished,
-    test,
-    currentIndex,
-    zoomQuestionId,
-  ]);
-
-  /* =====================================================
-     JAVOB
+     VARIANT TANLASH
   ===================================================== */
 
   function selectAnswer(
@@ -926,13 +384,6 @@ export default function TestSolvePage() {
     setAnswers((current) => ({
       ...current,
       [questionId]: optionId,
-    }));
-  }
-
-  function toggleFlag(questionId: string) {
-    setFlagged((current) => ({
-      ...current,
-      [questionId]: !current[questionId],
     }));
   }
 
@@ -956,6 +407,7 @@ export default function TestSolvePage() {
     let correct = 0;
     let incorrect = 0;
     let unanswered = 0;
+
     let earnedPoints = 0;
     let totalPoints = 0;
 
@@ -993,14 +445,11 @@ export default function TestSolvePage() {
       }
     }
 
-    const total =
-      test.questions.length;
+    const total = test.questions.length;
 
     const percentage =
       total > 0
-        ? Math.round(
-            (correct / total) * 100
-          )
+        ? Math.round((correct / total) * 100)
         : 0;
 
     return {
@@ -1015,153 +464,62 @@ export default function TestSolvePage() {
   }, [test, answers]);
 
   /* =====================================================
-     NATIJANI SAQLASH
+     NATIJANI SERVERGA SAQLASH
   ===================================================== */
 
   useEffect(() => {
-    if (
-      !finished ||
-      !test ||
-      resultSavedRef.current
-    ) {
+    if (!finished || !test || resultSavedRef.current) {
       return;
     }
 
     resultSavedRef.current = true;
 
     const totalSeconds =
-      Math.max(
-        1,
-        Number(test.duration)
-      ) * 60;
+      Math.max(1, Number(test.duration)) * 60;
 
     const spentSeconds = Math.max(
       0,
-      totalSeconds -
-        Math.max(0, remainingSeconds)
+      totalSeconds - Math.max(0, remainingSeconds)
     );
 
-    async function saveResult() {
-      if (!test) {
-        return;
-      }
-
+async function saveResult() {
+  if (!test) return;
       try {
-        const response = await fetch(
-          "/api/results",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              testId: test.id,
-              testTitle: test.title,
-              subject: test.subject,
-              total: result.total,
-              correct: result.correct,
-              incorrect: result.incorrect,
-              unanswered:
-                result.unanswered,
-              percentage:
-                result.percentage,
-              earnedPoints:
-                result.earnedPoints,
-              totalPoints:
-                result.totalPoints,
-              spentSeconds,
-            }),
-          }
-        );
-
-        const data =
-          await readJson(response);
+        const response = await fetch("/api/results", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            testId: test.id,
+            testTitle: test.title,
+            subject: test.subject,
+            total: result.total,
+            correct: result.correct,
+            incorrect: result.incorrect,
+            unanswered: result.unanswered,
+            percentage: result.percentage,
+            earnedPoints: result.earnedPoints,
+            totalPoints: result.totalPoints,
+            spentSeconds,
+          }),
+        });
 
         if (!response.ok) {
           resultSavedRef.current = false;
-
-          if (
-            data?.code ===
-            "ATTEMPT_LIMIT_REACHED"
-          ) {
-            setCanAttempt(false);
-
-            setAttemptLimit(
-              data?.attemptLimit ??
-                attemptLimit
-            );
-
-            setAttemptsUsed(
-              Number(
-                data?.attemptsUsed
-              ) || attemptsUsed
-            );
-
-            setAttemptsRemaining(0);
-          }
-
-          console.error(
-            "RESULT SAVE ERROR:",
-            data?.message ||
-              response.status
-          );
-
-          return;
+          console.error("RESULT SAVE ERROR");
         }
-
-        setAttemptLimit(
-          data?.attemptLimit ?? null
-        );
-
-        setAttemptsUsed(
-          Math.max(
-            0,
-            Number(data?.attemptsUsed) || 0
-          )
-        );
-
-        setAttemptsRemaining(
-          data?.attemptsRemaining === null
-            ? null
-            : Math.max(
-                0,
-                Number(
-                  data?.attemptsRemaining
-                ) || 0
-              )
-        );
-
-        setCanAttempt(
-          data?.attemptLimit === null ||
-            (Number(
-              data?.attemptsRemaining
-            ) || 0) > 0
-        );
       } catch (error) {
         resultSavedRef.current = false;
-
-        console.error(
-          "RESULT SAVE ERROR:",
-          error
-        );
+        console.error("RESULT SAVE ERROR:", error);
       }
     }
 
     saveResult();
-  }, [
-    finished,
-    test,
-    result,
-    remainingSeconds,
-    attemptLimit,
-    attemptsUsed,
-  ]);
+  }, [finished, test, result, remainingSeconds]);
 
   /* =====================================================
-     VAQT
+     VAQT FORMAT
   ===================================================== */
 
   function formatTime(seconds: number) {
@@ -1174,135 +532,71 @@ export default function TestSolvePage() {
       safeSeconds / 60
     );
 
-    const secs =
-      safeSeconds % 60;
+    const secs = safeSeconds % 60;
 
     return `${String(minutes).padStart(
       2,
       "0"
-    )}:${String(secs).padStart(
-      2,
-      "0"
-    )}`;
+    )}:${String(secs).padStart(2, "0")}`;
   }
 
+  /* =====================================================
+     CURRENT QUESTION
+  ===================================================== */
+
   const currentQuestion =
-    test?.questions?.[currentIndex] ||
-    null;
+    test?.questions?.[currentIndex] || null;
 
   const answeredCount = test
     ? test.questions.filter(
-        (question) =>
-          !!answers[question.id]
+        (question) => !!answers[question.id]
       ).length
     : 0;
 
   const progress = test
     ? Math.round(
         (answeredCount /
-          Math.max(
-            test.questions.length,
-            1
-          )) *
+          Math.max(test.questions.length, 1)) *
           100
       )
     : 0;
 
-  const spentSeconds = test
-    ? Math.max(
-        0,
-        Math.max(
-          1,
-          Number(test.duration)
-        ) *
-          60 -
-          remainingSeconds
-      )
-    : 0;
-
-  /* =====================================================
-     SHAPES
-  ===================================================== */
-
-  function renderQuestionShapes(
-    question: TestQuestion,
-    zoomed = false
-  ) {
-    const shapes =
-      Array.isArray(question.shapes)
-        ? question.shapes
-        : [];
+  function renderQuestionShapes(question: TestQuestion) {
+    const shapes = Array.isArray(question.shapes)
+      ? question.shapes
+      : [];
 
     if (shapes.length === 0) {
       return null;
     }
 
-    const minX = Math.min(
-      ...shapes.map(
-        (shape) =>
-          Number(shape.x) || 0
-      )
-    );
-
-    const minY = Math.min(
-      ...shapes.map(
-        (shape) =>
-          Number(shape.y) || 0
-      )
-    );
-
+    const minX = Math.min(...shapes.map((shape) => Number(shape.x) || 0));
+    const minY = Math.min(...shapes.map((shape) => Number(shape.y) || 0));
     const maxX = Math.max(
       ...shapes.map(
         (shape) =>
           (Number(shape.x) || 0) +
-          Math.max(
-            1,
-            Number(shape.width) || 1
-          )
+          Math.max(1, Number(shape.width) || 1)
       )
     );
-
     const maxY = Math.max(
       ...shapes.map(
         (shape) =>
           (Number(shape.y) || 0) +
-          Math.max(
-            1,
-            Number(shape.height) || 1
-          )
+          Math.max(1, Number(shape.height) || 1)
       )
     );
 
-    const stageWidth = Math.max(
-      1,
-      Math.ceil(maxX - minX)
-    );
-
-    const stageHeight = Math.max(
-      1,
-      Math.ceil(maxY - minY)
-    );
+    /*
+      Muhim: sahifada bo‘sh katta canvas yasamaymiz.
+      Maydon faqat joylashtirilgan rasm/shakllarning real chegarasi
+      qancha bo‘lsa, shuncha bo‘ladi.
+    */
+    const stageWidth = Math.max(1, Math.ceil(maxX - minX));
+    const stageHeight = Math.max(1, Math.ceil(maxY - minY));
 
     return (
-      <div
-        className={
-          zoomed
-            ? "shapeResultScroll shapeResultZoomed"
-            : "shapeResultScroll shapeResultClickable"
-        }
-        onClick={() => {
-          if (!zoomed) {
-            setZoomQuestionId(
-              question.id
-            );
-          }
-        }}
-        title={
-          zoomed
-            ? undefined
-            : "Kattalashtirib ko‘rish"
-        }
-      >
+      <div className="shapeResultScroll">
         <div
           className="shapeResultStage"
           style={{
@@ -1311,38 +605,21 @@ export default function TestSolvePage() {
           }}
         >
           {shapes.map((shape) => {
-            const width = Math.max(
-              1,
-              Number(shape.width) || 1
-            );
-
-            const height = Math.max(
-              1,
-              Number(shape.height) || 1
-            );
-
-            const left =
-              (Number(shape.x) || 0) -
-              minX;
-
-            const top =
-              (Number(shape.y) || 0) -
-              minY;
+            const width = Math.max(1, Number(shape.width) || 1);
+            const height = Math.max(1, Number(shape.height) || 1);
+            const left = (Number(shape.x) || 0) - minX;
+            const top = (Number(shape.y) || 0) - minY;
 
             const commonStyle = {
               left,
               top,
               width,
               height,
-              zIndex:
-                shape.zIndex ?? 1,
-              opacity:
-                shape.opacity ?? 1,
+              zIndex: shape.zIndex ?? 1,
+              opacity: shape.opacity ?? 1,
             };
 
-            if (
-              shape.type === "image"
-            ) {
+            if (shape.type === "image") {
               return (
                 <div
                   key={shape.id}
@@ -1358,24 +635,12 @@ export default function TestSolvePage() {
                         width: "100%",
                         height: "100%",
                         display: "block",
-                        objectFit:
-                          shape.objectFit ??
-                          "contain",
-                        borderStyle:
-                          "solid",
-                        borderColor:
-                          shape.borderColor ??
-                          "transparent",
-                        borderWidth: `${
-                          shape.borderWidth ??
-                          0
-                        }px`,
-                        borderRadius: `${
-                          shape.borderRadius ??
-                          0
-                        }px`,
-                        boxSizing:
-                          "border-box",
+                        objectFit: shape.objectFit ?? "contain",
+                        borderStyle: "solid",
+                        borderColor: shape.borderColor ?? "transparent",
+                        borderWidth: `${shape.borderWidth ?? 0}px`,
+                        borderRadius: `${shape.borderRadius ?? 0}px`,
+                        boxSizing: "border-box",
                       }}
                     />
                   ) : null}
@@ -1383,9 +648,7 @@ export default function TestSolvePage() {
               );
             }
 
-            if (
-              shape.type === "venn"
-            ) {
+            if (shape.type === "venn") {
               return (
                 <div
                   key={shape.id}
@@ -1396,26 +659,17 @@ export default function TestSolvePage() {
                     <div
                       className="resultVennCircle resultVennOne"
                       style={{
-                        background:
-                          shape.backgroundColor ??
-                          "#8fc9ef",
-                        borderColor:
-                          shape.borderColor ??
-                          "#2f5975",
+                        background: shape.backgroundColor ?? "#8fc9ef",
+                        borderColor: shape.borderColor ?? "#2f5975",
                       }}
                     >
                       A
                     </div>
-
                     <div
                       className="resultVennCircle resultVennTwo"
                       style={{
-                        background:
-                          shape.backgroundColor ??
-                          "#8fc9ef",
-                        borderColor:
-                          shape.borderColor ??
-                          "#2f5975",
+                        background: shape.backgroundColor ?? "#8fc9ef",
+                        borderColor: shape.borderColor ?? "#2f5975",
                       }}
                     >
                       B
@@ -1431,71 +685,25 @@ export default function TestSolvePage() {
                 className={`resultShapeItem resultShapeBody ${shape.type}`}
                 style={{
                   ...commonStyle,
-
                   background:
-                    shape.type ===
-                    "text"
+                    shape.type === "text"
                       ? "transparent"
-                      : shape.backgroundColor ??
-                        "#8fc9ef",
-
-                  borderColor:
-                    shape.borderColor ??
-                    "#2f5975",
-
-                  borderWidth: `${
-                    shape.borderWidth ??
-                    2
-                  }px`,
-
-                  borderStyle:
-                    shape.type ===
-                    "text"
-                      ? "none"
-                      : "solid",
-
-                  borderRadius: `${
-                    shape.borderRadius ??
-                    4
-                  }px`,
-
-                  color:
-                    shape.textColor ??
-                    "#111111",
-
-                  fontFamily:
-                    shape.fontFamily ??
-                    "Bell MT",
-
-                  fontSize: `${
-                    shape.fontSize ??
-                    20
-                  }px`,
-
-                  fontWeight:
-                    shape.fontWeight ??
-                    "normal",
-
-                  fontStyle:
-                    shape.fontStyle ??
-                    "normal",
-
-                  textAlign:
-                    shape.textAlign ??
-                    "center",
-
-                  textDecoration:
-                    shape.textDecoration ??
-                    "none",
-
-                  textTransform:
-                    shape.textTransform ??
-                    "none",
+                      : shape.backgroundColor ?? "#8fc9ef",
+                  borderColor: shape.borderColor ?? "#2f5975",
+                  borderWidth: `${shape.borderWidth ?? 2}px`,
+                  borderStyle: shape.type === "text" ? "none" : "solid",
+                  borderRadius: `${shape.borderRadius ?? 4}px`,
+                  color: shape.textColor ?? "#111111",
+                  fontFamily: shape.fontFamily ?? "Bell MT",
+                  fontSize: `${shape.fontSize ?? 20}px`,
+                  fontWeight: shape.fontWeight ?? "normal",
+                  fontStyle: shape.fontStyle ?? "normal",
+                  textAlign: shape.textAlign ?? "center",
+                  textDecoration: shape.textDecoration ?? "none",
+                  textTransform: shape.textTransform ?? "none",
                 }}
               >
-                <span>
-                  {shape.text ?? ""}
-                </span>
+                <span>{shape.text ?? ""}</span>
               </div>
             );
           })}
@@ -1514,14 +722,10 @@ export default function TestSolvePage() {
         <div className="stateBox">
           <div className="loader" />
 
-          <h2>
-            Test yuklanmoqda...
-          </h2>
+          <h2>Test yuklanmoqda...</h2>
         </div>
 
-        <style jsx>
-          {stateStyles}
-        </style>
+        <style jsx>{stateStyles}</style>
       </main>
     );
   }
@@ -1534,32 +738,21 @@ export default function TestSolvePage() {
     return (
       <main className="statePage">
         <div className="stateBox">
-          <div className="errorIcon">
-            !
-          </div>
+          <div className="errorIcon">!</div>
 
-          <h1>
-            Testni ochib bo‘lmadi
-          </h1>
+          <h1>Testni ochib bo‘lmadi</h1>
 
-          <p>
-            {error ||
-              "Test topilmadi."}
-          </p>
+          <p>{error || "Test topilmadi."}</p>
 
           <button
             type="button"
-            onClick={() =>
-              router.push("/test")
-            }
+            onClick={() => router.push("/test")}
           >
             Testlar bo‘limiga qaytish
           </button>
         </div>
 
-        <style jsx>
-          {stateStyles}
-        </style>
+        <style jsx>{stateStyles}</style>
       </main>
     );
   }
@@ -1579,9 +772,7 @@ export default function TestSolvePage() {
           <button
             type="button"
             className="grayButton"
-            onClick={() =>
-              router.push("/test")
-            }
+            onClick={() => router.push("/test")}
           >
             ← Testlarga qaytish
           </button>
@@ -1597,9 +788,7 @@ export default function TestSolvePage() {
               {test.subject}
             </div>
 
-            <h1>
-              {test.title}
-            </h1>
+            <h1>{test.title}</h1>
 
             {test.description && (
               <p className="description">
@@ -1609,70 +798,33 @@ export default function TestSolvePage() {
 
             <div className="introInformation">
               <div className="info">
-                <span>
-                  Savollar
-                </span>
+                <span>Savollar</span>
 
                 <strong>
-                  {
-                    test.questions
-                      .length
-                  }
+                  {test.questions.length}
                 </strong>
               </div>
 
               <div className="info">
-                <span>
-                  Vaqt
-                </span>
+                <span>Vaqt</span>
 
                 <strong>
                   {test.duration}
-                  <small>
-                    {" "}
-                    daqiqa
-                  </small>
+                  <small> daqiqa</small>
                 </strong>
               </div>
 
               <div className="info">
-                <span>
-                  Holati
-                </span>
+                <span>Holati</span>
 
                 <strong className="green">
                   Tayyor
                 </strong>
               </div>
-
-              <div className="info">
-                <span>
-                  Urinish
-                </span>
-
-                <strong
-                  className={
-                    canAttempt
-                      ? "green"
-                      : ""
-                  }
-                >
-                  {attemptLoading
-                    ? "Tekshirilmoqda..."
-                    : attemptLimit === null
-                    ? "Cheksiz"
-                    : `${
-                        attemptsRemaining ??
-                        0
-                      } ta qoldi`}
-                </strong>
-              </div>
             </div>
 
             <div className="instruction">
-              <strong>
-                Test tartibi
-              </strong>
+              <strong>Test tartibi</strong>
 
               <p>
                 Har bir savol uchun javob variantini
@@ -1686,23 +838,13 @@ export default function TestSolvePage() {
               type="button"
               className="startButton"
               onClick={startTest}
-              disabled={
-                attemptLoading ||
-                !canAttempt
-              }
             >
-              {attemptLoading
-                ? "URINISHLAR TEKSHIRILMOQDA..."
-                : canAttempt
-                ? "TESTNI BOSHLASH"
-                : "URINISHLAR TUGAGAN"}
+              TESTNI BOSHLASH
             </button>
           </div>
         </section>
 
-        <style jsx>
-          {pageStyles}
-        </style>
+        <style jsx>{pageStyles}</style>
       </main>
     );
   }
@@ -1722,9 +864,7 @@ export default function TestSolvePage() {
           <button
             type="button"
             className="grayButton"
-            onClick={() =>
-              router.push("/test")
-            }
+            onClick={() => router.push("/test")}
           >
             Testlarga qaytish
           </button>
@@ -1741,14 +881,10 @@ export default function TestSolvePage() {
                 {result.percentage}%
               </strong>
 
-              <span>
-                Natija
-              </span>
+              <span>Natija</span>
             </div>
 
-            <h1>
-              {test.title}
-            </h1>
+            <h1>{test.title}</h1>
 
             <p className="resultSubject">
               {test.subject}
@@ -1756,9 +892,7 @@ export default function TestSolvePage() {
 
             <div className="resultGrid">
               <div className="resultItem">
-                <span>
-                  Jami savol
-                </span>
+                <span>Jami savol</span>
 
                 <strong>
                   {result.total}
@@ -1766,9 +900,7 @@ export default function TestSolvePage() {
               </div>
 
               <div className="resultItem correctResult">
-                <span>
-                  To‘g‘ri
-                </span>
+                <span>To‘g‘ri</span>
 
                 <strong>
                   {result.correct}
@@ -1776,9 +908,7 @@ export default function TestSolvePage() {
               </div>
 
               <div className="resultItem wrongResult">
-                <span>
-                  Noto‘g‘ri
-                </span>
+                <span>Noto‘g‘ri</span>
 
                 <strong>
                   {result.incorrect}
@@ -1786,9 +916,7 @@ export default function TestSolvePage() {
               </div>
 
               <div className="resultItem">
-                <span>
-                  Javobsiz
-                </span>
+                <span>Javobsiz</span>
 
                 <strong>
                   {result.unanswered}
@@ -1796,30 +924,11 @@ export default function TestSolvePage() {
               </div>
 
               <div className="resultItem">
-                <span>
-                  Ball
-                </span>
+                <span>Ball</span>
 
                 <strong>
-                  {
-                    result.earnedPoints
-                  }
-                  /
-                  {
-                    result.totalPoints
-                  }
-                </strong>
-              </div>
-
-              <div className="resultItem">
-                <span>
-                  Sarflangan vaqt
-                </span>
-
-                <strong>
-                  {formatTime(
-                    spentSeconds
-                  )}
+                  {result.earnedPoints}/
+                  {result.totalPoints}
                 </strong>
               </div>
             </div>
@@ -1838,73 +947,30 @@ export default function TestSolvePage() {
               <button
                 type="button"
                 className="reviewButton"
-                onClick={() => {
-                  if (
-                    showReview &&
-                    reviewMode === "all"
-                  ) {
-                    setShowReview(
-                      false
-                    );
-                  } else {
-                    setReviewMode(
-                      "all"
-                    );
-
-                    setShowReview(
-                      true
-                    );
-                  }
-                }}
-              >
-                {showReview &&
-                reviewMode === "all"
-                  ? "Javoblarni yopish"
-                  : "Barcha javoblarni ko‘rish"}
-              </button>
-
-              <button
-                type="button"
-                className="wrongOnlyButton"
-                onClick={() => {
-                  setReviewMode(
-                    "wrong"
-                  );
-
+                onClick={() =>
                   setShowReview(
-                    true
-                  );
-                }}
+                    (current) => !current
+                  )
+                }
               >
-                Faqat xatolarni ko‘rish
+                {showReview
+                  ? "Javoblarni yopish"
+                  : "Javoblarni ko‘rib chiqish"}
               </button>
 
               <button
                 type="button"
                 className="againButton"
                 onClick={startTest}
-                disabled={
-                  attemptLoading ||
-                  !canAttempt
-                }
               >
-                {canAttempt
-                  ? attemptLimit === null
-                    ? "Qayta ishlash"
-                    : `Qayta ishlash (${
-                        attemptsRemaining ??
-                        0
-                      } ta qoldi)`
-                  : "Urinishlar tugagan"}
+                Qayta ishlash
               </button>
 
               <button
                 type="button"
                 className="grayButton"
                 onClick={() =>
-                  router.push(
-                    "/test"
-                  )
+                  router.push("/test")
                 }
               >
                 Boshqa test tanlash
@@ -1920,262 +986,129 @@ export default function TestSolvePage() {
             </div>
 
             <div className="reviewInner">
-              {test.questions
-                .map(
-                  (
-                    question,
-                    index
-                  ) => ({
-                    question,
-                    index,
-                  })
-                )
+              {test.questions.map(
+                (question, index) => {
+                  const selectedId =
+                    answers[question.id];
 
-                .filter(
-                  ({ question }) => {
-                    if (
-                      reviewMode ===
-                      "all"
-                    ) {
-                      return true;
-                    }
-
-                    const selectedId =
-                      answers[
-                        question.id
-                      ];
-
-                    const selectedOption =
-                      question.options?.find(
-                        (option) =>
-                          String(
-                            option.id
-                          ) ===
-                          String(
-                            selectedId
-                          )
-                      );
-
-                    return (
-                      !selectedOption ||
-                      !optionIsCorrect(
-                        selectedOption
-                      )
+                  const selectedOption =
+                    question.options?.find(
+                      (option) =>
+                        String(option.id) ===
+                        String(selectedId)
                     );
-                  }
-                )
 
-                .map(
-                  ({
-                    question,
-                    index,
-                  }) => {
-                    const selectedId =
-                      answers[
-                        question.id
-                      ];
+                  const correct =
+                    !!selectedOption &&
+                    optionIsCorrect(
+                      selectedOption
+                    );
 
-                    const selectedOption =
-                      question.options?.find(
-                        (option) =>
-                          String(
-                            option.id
-                          ) ===
-                          String(
-                            selectedId
-                          )
-                      );
+                  return (
+                    <article
+                      key={question.id}
+                      className="reviewQuestion"
+                    >
+                      <div className="reviewNumber">
+                        {index + 1}-savol
+                      </div>
 
-                    const correct =
-                      !!selectedOption &&
-                      optionIsCorrect(
-                        selectedOption
-                      );
+                      <div
+                        className="questionHtml"
+                        dangerouslySetInnerHTML={{
+                          __html:
+                            getQuestionText(
+                              question
+                            ) ||
+                            "Savol matni mavjud emas.",
+                        }}
+                      />
 
-                    return (
-                      <article
-                        key={
-                          question.id
-                        }
-                        className="reviewQuestion"
-                      >
-                        <div className="reviewNumber">
-                          {index + 1}
-                          -savol
-                        </div>
+                      {renderQuestionShapes(question)}
 
-                        <div
-                          lang="uz"
-                          className="questionHtml"
-                          dangerouslySetInnerHTML={{
-                            __html:
-                              formatStructuredQuestionHtml(
-                                getQuestionText(
-                                  question
-                                ) ||
-                                  "Savol matni mavjud emas."
-                              ),
-                          }}
-                        />
-
-                        {renderQuestionShapes(
-                          question
-                        )}
-
-                        <div className="reviewOptions">
-                          {(
-                            question.options ||
-                            []
-                          ).map(
-                            (
-                              option
-                            ) => {
-                              const selected =
-                                String(
-                                  selectedId
-                                ) ===
-                                String(
-                                  option.id
-                                );
-
-                              const correctOption =
-                                optionIsCorrect(
-                                  option
-                                );
-
-                              let className =
-                                "reviewOption";
-
-                              if (
-                                correctOption
-                              ) {
-                                className +=
-                                  " correctOption";
-                              }
-
-                              if (
-                                selected &&
-                                !correctOption
-                              ) {
-                                className +=
-                                  " selectedWrong";
-                              }
-
-                              return (
-                                <div
-                                  key={
-                                    option.id
-                                  }
-                                  className={
-                                    className
-                                  }
-                                >
-                                  <span>
-                                    {correctOption
-                                      ? "✓"
-                                      : selected
-                                      ? "×"
-                                      : "○"}
-                                  </span>
-
-                                  <div
-                                    dangerouslySetInnerHTML={{
-                                      __html:
-                                        getOptionText(
-                                          option
-                                        ),
-                                    }}
-                                  />
-                                </div>
+                      <div className="reviewOptions">
+                        {(question.options || []).map(
+                          (option) => {
+                            const selected =
+                              String(
+                                selectedId
+                              ) ===
+                              String(
+                                option.id
                               );
+
+                            const correctOption =
+                              optionIsCorrect(
+                                option
+                              );
+
+                            let className =
+                              "reviewOption";
+
+                            if (correctOption) {
+                              className +=
+                                " correctOption";
                             }
-                          )}
-                        </div>
 
-                        <div className="reviewAnswerSummary">
-                          <div>
-                            <strong>
-                              Siz tanlagan:
-                            </strong>{" "}
-                            {selectedOption
-                              ? getOptionText(
-                                  selectedOption
-                                ).replace(
-                                  /<[^>]*>/g,
-                                  ""
-                                ) || "—"
-                              : "Javob berilmagan"}
-                          </div>
+                            if (
+                              selected &&
+                              !correctOption
+                            ) {
+                              className +=
+                                " selectedWrong";
+                            }
 
-                          <div>
-                            <strong>
-                              To‘g‘ri javob:
-                            </strong>{" "}
-                            {(() => {
-                              const correctOption =
-                                question.options?.find(
-                                  optionIsCorrect
-                                );
+                            return (
+                              <div
+                                key={option.id}
+                                className={
+                                  className
+                                }
+                              >
+                                <span>
+                                  {correctOption
+                                    ? "✓"
+                                    : selected
+                                    ? "×"
+                                    : "○"}
+                                </span>
 
-                              return correctOption
-                                ? getOptionText(
-                                    correctOption
-                                  ).replace(
-                                    /<[^>]*>/g,
-                                    ""
-                                  ) || "—"
-                                : "Ko‘rsatilmagan";
-                            })()}
-                          </div>
-
-                          <div>
-                            <strong>
-                              Ball:
-                            </strong>{" "}
-                            {correct
-                              ? Number(
-                                  question.points
-                                ) > 0
-                                ? Number(
-                                    question.points
-                                  )
-                                : 1
-                              : 0}
-                            /
-                            {Number(
-                              question.points
-                            ) > 0
-                              ? Number(
-                                  question.points
-                                )
-                              : 1}
-                          </div>
-                        </div>
-
-                        <div
-                          className={
-                            correct
-                              ? "answerStatus correctStatus"
-                              : "answerStatus wrongStatus"
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html:
+                                      cleanRichTextHtml(
+                                        getOptionText(option)
+                                      ),
+                                  }}
+                                />
+                              </div>
+                            );
                           }
-                        >
-                          {correct
-                            ? "✓ To‘g‘ri javob"
-                            : selectedId
-                            ? "× Noto‘g‘ri javob"
-                            : "— Javob berilmagan"}
-                        </div>
-                      </article>
-                    );
-                  }
-                )}
+                        )}
+                      </div>
+
+                      <div
+                        className={
+                          correct
+                            ? "answerStatus correctStatus"
+                            : "answerStatus wrongStatus"
+                        }
+                      >
+                        {correct
+                          ? "✓ To‘g‘ri javob"
+                          : selectedId
+                          ? "× Noto‘g‘ri javob"
+                          : "— Javob berilmagan"}
+                      </div>
+                    </article>
+                  );
+                }
+              )}
             </div>
           </section>
         )}
 
-        <style jsx>
-          {pageStyles}
-        </style>
+        <style jsx>{pageStyles}</style>
       </main>
     );
   }
@@ -2188,31 +1121,9 @@ export default function TestSolvePage() {
     <main className="page">
       <header className="testHeader">
         <div className="testHeaderLeft">
-          <span>
-            {test.subject}
-          </span>
+          <span>{test.subject}</span>
 
-          <strong>
-            {test.title}
-          </strong>
-        </div>
-
-        <div className="saveIndicatorWrap">
-          <span
-            className={
-              isOnline
-                ? "onlineDot"
-                : "offlineDot"
-            }
-          />
-
-          <span>
-            {isOnline
-              ? saveState === "saving"
-                ? "Saqlanmoqda..."
-                : "Saqlandi"
-              : "Internet yo‘q · lokal saqlandi"}
-          </span>
+          <strong>{test.title}</strong>
         </div>
 
         <div
@@ -2222,14 +1133,10 @@ export default function TestSolvePage() {
               : "timer"
           }
         >
-          <span>
-            Qolgan vaqt
-          </span>
+          <span>Qolgan vaqt</span>
 
           <strong>
-            {formatTime(
-              remainingSeconds
-            )}
+            {formatTime(remainingSeconds)}
           </strong>
         </div>
       </header>
@@ -2241,9 +1148,7 @@ export default function TestSolvePage() {
             {test.questions.length} javob
           </strong>
 
-          <span>
-            {progress}%
-          </span>
+          <span>{progress}%</span>
         </div>
 
         <div className="progressTrack">
@@ -2257,52 +1162,38 @@ export default function TestSolvePage() {
       </section>
 
       <div className="testLayout">
+        {/* =============================================
+            NAVIGATOR
+        ============================================= */}
+
         <aside className="navigator">
-          <h3>
-            Savollar
-          </h3>
+          <h3>Savollar</h3>
 
           <div className="questionNumbers">
             {test.questions.map(
-              (
-                question,
-                index
-              ) => {
+              (question, index) => {
                 const answered =
-                  !!answers[
-                    question.id
-                  ];
+                  !!answers[question.id];
 
                 return (
                   <button
-                    key={
-                      question.id
-                    }
+                    key={question.id}
                     type="button"
                     className={[
                       "numberButton",
 
-                      currentIndex ===
-                      index
+                      currentIndex === index
                         ? "currentNumber"
                         : "",
 
                       answered
                         ? "answeredNumber"
                         : "",
-
-                      flagged[
-                        question.id
-                      ]
-                        ? "flaggedNumber"
-                        : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
                     onClick={() =>
-                      setCurrentIndex(
-                        index
-                      )
+                      setCurrentIndex(index)
                     }
                   >
                     {index + 1}
@@ -2324,11 +1215,6 @@ export default function TestSolvePage() {
             </div>
 
             <div>
-              <span className="legendFlagged" />
-              Belgilangan
-            </div>
-
-            <div>
               <span className="legendEmpty" />
               Javobsiz
             </div>
@@ -2337,13 +1223,15 @@ export default function TestSolvePage() {
           <button
             type="button"
             className="finishSideButton"
-            onClick={() =>
-              finishTest(false)
-            }
+            onClick={() => finishTest(false)}
           >
             TESTNI YAKUNLASH
           </button>
         </aside>
+
+        {/* =============================================
+            QUESTION
+        ============================================= */}
 
         <section className="questionPanel">
           {currentQuestion && (
@@ -2359,38 +1247,10 @@ export default function TestSolvePage() {
                   </strong>
                 </div>
 
-                <div className="questionTopActions">
-                  <button
-                    type="button"
-                    className={
-                      flagged[
-                        currentQuestion
-                          .id
-                      ]
-                        ? "flagButton flagButtonActive"
-                        : "flagButton"
-                    }
-                    onClick={() =>
-                      toggleFlag(
-                        currentQuestion.id
-                      )
-                    }
-                    title="Bu savolga keyin qaytish uchun belgilang"
-                  >
-                    ⚑{" "}
-                    {flagged[
-                      currentQuestion
-                        .id
-                    ]
-                      ? "BELGILANGAN"
-                      : "BELGILASH"}
-                  </button>
-
-                  <p>
-                    {currentIndex + 1} /{" "}
-                    {test.questions.length}
-                  </p>
-                </div>
+                <p>
+                  {currentIndex + 1} /{" "}
+                  {test.questions.length}
+                </p>
               </div>
 
               <div className="questionContent">
@@ -2400,88 +1260,72 @@ export default function TestSolvePage() {
                   </div>
 
                   <div
-                    lang="uz"
                     className="questionHtml"
                     dangerouslySetInnerHTML={{
                       __html:
-                        formatStructuredQuestionHtml(
-                          getQuestionText(
-                            currentQuestion
-                          ) ||
-                            "Savol matni mavjud emas."
-                        ),
+                        cleanRichTextHtml(
+                          getQuestionText(currentQuestion)
+                        ) ||
+                        "Savol matni mavjud emas.",
                     }}
                   />
                 </div>
 
-                {renderQuestionShapes(
-                  currentQuestion
-                )}
+                {renderQuestionShapes(currentQuestion)}
 
                 <div className="options">
                   {(
                     currentQuestion.options ||
                     []
-                  ).map(
-                    (
-                      option,
-                      optionIndex
-                    ) => {
-                      const selected =
-                        String(
-                          answers[
-                            currentQuestion
-                              .id
-                          ] || ""
-                        ) ===
-                        String(
-                          option.id
-                        );
+                  ).map((option, optionIndex) => {
+                    const selected =
+                      String(
+                        answers[
+                          currentQuestion.id
+                        ] || ""
+                      ) ===
+                      String(option.id);
 
-                      return (
-                        <button
-                          type="button"
-                          key={
+                    return (
+                      <button
+                        type="button"
+                        key={option.id}
+                        className={
+                          selected
+                            ? "option selectedOption"
+                            : "option"
+                        }
+                        onClick={() =>
+                          selectAnswer(
+                            currentQuestion.id,
                             option.id
-                          }
-                          className={
-                            selected
-                              ? "option selectedOption"
-                              : "option"
-                          }
-                          onClick={() =>
-                            selectAnswer(
-                              currentQuestion.id,
-                              option.id
-                            )
-                          }
-                        >
-                          <span className="optionLetter">
-                            {String.fromCharCode(
-                              65 +
-                                optionIndex
-                            )}
-                          </span>
+                          )
+                        }
+                      >
+                        <span className="optionLetter">
+                          {String.fromCharCode(
+                            65 + optionIndex
+                          )}
+                        </span>
 
-                          <div
-                            className="optionText"
-                            dangerouslySetInnerHTML={{
-                              __html:
-                                getOptionText(
-                                  option
-                                ),
-                            }}
-                          />
+                        <div
+                          className="optionText"
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              cleanRichTextHtml(
+                                getOptionText(option)
+                              ),
+                          }}
+                        />
 
-                          <span className="radio">
-                            {selected
-                              ? "●"
-                              : "○"}
-                          </span>
-                        </button>
-                      );
-                    }
-                  )}
+                        <span className="radio">
+                          {selected
+                            ? "●"
+                            : "○"}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -2489,9 +1333,7 @@ export default function TestSolvePage() {
                 <button
                   type="button"
                   className="previousButton"
-                  disabled={
-                    currentIndex === 0
-                  }
+                  disabled={currentIndex === 0}
                   onClick={() =>
                     setCurrentIndex(
                       (current) =>
@@ -2540,65 +1382,7 @@ export default function TestSolvePage() {
         </section>
       </div>
 
-      {zoomQuestionId &&
-        (() => {
-          const zoomQuestion =
-            test.questions.find(
-              (q) =>
-                q.id ===
-                zoomQuestionId
-            );
-
-          if (!zoomQuestion) {
-            return null;
-          }
-
-          return (
-            <div
-              className="zoomOverlay"
-              role="dialog"
-              aria-modal="true"
-              onClick={() =>
-                setZoomQuestionId(
-                  null
-                )
-              }
-            >
-              <div
-                className="zoomPanel"
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
-              >
-                <button
-                  type="button"
-                  className="zoomClose"
-                  onClick={() =>
-                    setZoomQuestionId(
-                      null
-                    )
-                  }
-                  aria-label="Yopish"
-                >
-                  ×
-                </button>
-
-                <div className="zoomTitle">
-                  Savol tasviri · kattalashtirilgan
-                </div>
-
-                {renderQuestionShapes(
-                  zoomQuestion,
-                  true
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
-      <style jsx>
-        {pageStyles}
-      </style>
+      <style jsx>{pageStyles}</style>
     </main>
   );
 }
@@ -2691,7 +1475,6 @@ const pageStyles = `
   .page {
     min-height: 100vh;
     padding: 20px 20px 100px;
-
     background:
       linear-gradient(
         180deg,
@@ -2699,9 +1482,7 @@ const pageStyles = `
         #f7f8f9 55%,
         #e9eef1 100%
       );
-
     color: #111;
-
     font-family:
       "Bell MT",
       "Times New Roman",
@@ -2717,6 +1498,8 @@ const pageStyles = `
     opacity: .45;
     cursor: not-allowed;
   }
+
+  /* HEADER */
 
   .topHeader,
   .testHeader {
@@ -2779,11 +1562,12 @@ const pageStyles = `
     background:
       linear-gradient(#fff, #bbb);
 
-    box-shadow:
-      0 4px 0 #555;
+    box-shadow: 0 4px 0 #555;
 
     font-weight: 700;
   }
+
+  /* PANEL */
 
   .panel,
   .reviewPanel {
@@ -2834,10 +1618,7 @@ const pageStyles = `
     border-radius: 16px;
 
     background:
-      linear-gradient(
-        #abe6ff,
-        #58a8d7
-      );
+      linear-gradient(#abe6ff, #58a8d7);
 
     box-shadow:
       inset 0 6px 5px rgba(255,255,255,.7),
@@ -2851,6 +1632,8 @@ const pageStyles = `
     text-align: center;
   }
 
+  /* INTRO */
+
   .introCard,
   .resultBox,
   .reviewInner {
@@ -2860,10 +1643,7 @@ const pageStyles = `
     border-radius: 18px;
 
     background:
-      linear-gradient(
-        #f8f8f8,
-        #ccc
-      );
+      linear-gradient(#f8f8f8, #ccc);
 
     box-shadow:
       inset 0 6px 5px white,
@@ -2896,9 +1676,7 @@ const pageStyles = `
     margin: 30px 0;
 
     display: grid;
-
-    grid-template-columns:
-      repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
 
     gap: 15px;
   }
@@ -2915,8 +1693,7 @@ const pageStyles = `
     border: 1px solid #999;
     border-radius: 11px;
 
-    background:
-      rgba(255,255,255,.7);
+    background: rgba(255,255,255,.7);
   }
 
   .info span {
@@ -2964,10 +1741,7 @@ const pageStyles = `
     border-radius: 12px;
 
     background:
-      linear-gradient(
-        #b8ecff,
-        #58a8d7
-      );
+      linear-gradient(#b8ecff, #58a8d7);
 
     box-shadow:
       inset 0 5px 5px rgba(255,255,255,.7),
@@ -2978,6 +1752,8 @@ const pageStyles = `
     font-size: 18px;
     font-weight: 700;
   }
+
+  /* TEST HEADER */
 
   .testHeaderLeft {
     display: flex;
@@ -3006,13 +1782,9 @@ const pageStyles = `
     border-radius: 12px;
 
     background:
-      linear-gradient(
-        #fff,
-        #ccc
-      );
+      linear-gradient(#fff, #ccc);
 
-    box-shadow:
-      0 4px 0 #555;
+    box-shadow: 0 4px 0 #555;
   }
 
   .timer span {
@@ -3026,17 +1798,15 @@ const pageStyles = `
 
   .timerDanger {
     border-color: #a51f1f;
-
     background:
-      linear-gradient(
-        #ffe2e2,
-        #ef9b9b
-      );
+      linear-gradient(#ffe2e2, #ef9b9b);
   }
 
   .timerDanger strong {
     color: #a31212;
   }
+
+  /* PROGRESS */
 
   .progressPanel {
     width: min(1500px, 98%);
@@ -3047,13 +1817,9 @@ const pageStyles = `
     border-radius: 13px;
 
     background:
-      linear-gradient(
-        #fff,
-        #ccc
-      );
+      linear-gradient(#fff, #ccc);
 
-    box-shadow:
-      0 5px 0 #555d61;
+    box-shadow: 0 5px 0 #555d61;
   }
 
   .progressInformation {
@@ -3085,9 +1851,10 @@ const pageStyles = `
         #1788c2
       );
 
-    transition:
-      width .25s ease;
+    transition: width .25s ease;
   }
+
+  /* TEST LAYOUT */
 
   .testLayout {
     width: min(1500px, 98%);
@@ -3095,14 +1862,14 @@ const pageStyles = `
     margin: 35px auto 0;
 
     display: grid;
-
-    grid-template-columns:
-      270px minmax(0, 1fr);
+    grid-template-columns: 270px minmax(0, 1fr);
 
     gap: 25px;
 
     align-items: start;
   }
+
+  /* NAVIGATOR */
 
   .navigator {
     position: sticky;
@@ -3127,20 +1894,14 @@ const pageStyles = `
 
   .navigator h3 {
     margin: 0 0 20px;
-
     color: white;
-
     text-align: center;
-
     font-size: 22px;
   }
 
   .questionNumbers {
     display: grid;
-
-    grid-template-columns:
-      repeat(4, 1fr);
-
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
   }
 
@@ -3151,41 +1912,20 @@ const pageStyles = `
     border-radius: 8px;
 
     background:
-      linear-gradient(
-        #fff,
-        #ccc
-      );
+      linear-gradient(#fff, #ccc);
 
     font-weight: 700;
   }
 
   .answeredNumber {
     border-color: #277b49;
-
     background:
-      linear-gradient(
-        #c6f1d3,
-        #70ca8e
-      );
+      linear-gradient(#c6f1d3, #70ca8e);
   }
 
   .currentNumber {
     outline: 3px solid #43b7ee;
     outline-offset: 2px;
-  }
-
-  .flaggedNumber {
-    border-color: #a66a00;
-
-    background:
-      linear-gradient(
-        #fff0b8,
-        #e9b84f
-      );
-  }
-
-  .currentNumber.flaggedNumber {
-    outline-color: #43b7ee;
   }
 
   .legend {
@@ -3194,8 +1934,7 @@ const pageStyles = `
 
     border-radius: 10px;
 
-    background:
-      rgba(255,255,255,.9);
+    background: rgba(255,255,255,.9);
 
     font-size: 13px;
   }
@@ -3204,9 +1943,7 @@ const pageStyles = `
     margin: 7px 0;
 
     display: flex;
-
     align-items: center;
-
     gap: 8px;
   }
 
@@ -3226,17 +1963,12 @@ const pageStyles = `
     background: #70ca8e;
   }
 
-  .legendFlagged {
-    background: #e9b84f;
-  }
-
   .legendEmpty {
     background: #ddd;
   }
 
   .finishSideButton {
     width: 100%;
-
     min-height: 50px;
 
     margin-top: 20px;
@@ -3245,24 +1977,20 @@ const pageStyles = `
     border-radius: 9px;
 
     background:
-      linear-gradient(
-        #f77b7b,
-        #c62525
-      );
+      linear-gradient(#f77b7b, #c62525);
 
-    box-shadow:
-      0 4px 0 #831515;
+    box-shadow: 0 4px 0 #831515;
 
     color: white;
-
     font-weight: 700;
   }
+
+  /* QUESTION PANEL */
 
   .questionPanel {
     overflow: hidden;
 
     border: 3px solid #303538;
-
     border-radius: 22px;
 
     background:
@@ -3282,9 +2010,7 @@ const pageStyles = `
     padding: 15px 25px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
 
     background:
@@ -3293,15 +2019,12 @@ const pageStyles = `
         #58a8d7
       );
 
-    border-bottom:
-      3px solid #174461;
+    border-bottom: 3px solid #174461;
   }
 
   .questionTop div {
     display: flex;
-
     align-items: center;
-
     gap: 10px;
   }
 
@@ -3314,14 +2037,10 @@ const pageStyles = `
     height: 45px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
-    border:
-      2px solid #174461;
-
+    border: 2px solid #174461;
     border-radius: 50%;
 
     background: white;
@@ -3331,50 +2050,7 @@ const pageStyles = `
     font-size: 22px;
   }
 
-  .questionTopActions {
-    display: flex !important;
-
-    align-items: center;
-
-    gap: 12px !important;
-  }
-
-  .flagButton {
-    min-height: 38px;
-
-    padding:
-      0 14px;
-
-    border:
-      2px solid #805600;
-
-    border-radius: 9px;
-
-    background:
-      linear-gradient(
-        #fff8d8,
-        #e8c56a
-      );
-
-    box-shadow:
-      0 3px 0 #805600;
-
-    color: #624200;
-
-    font-weight: 800;
-  }
-
-  .flagButtonActive {
-    background:
-      linear-gradient(
-        #ffe68a,
-        #e4a92f
-      );
-  }
-
   .questionTop p {
-    margin: 0;
-
     font-weight: 700;
   }
 
@@ -3383,14 +2059,10 @@ const pageStyles = `
     padding: 30px;
 
     border: 2px solid #555;
-
     border-radius: 15px;
 
     background:
-      linear-gradient(
-        #fff,
-        #ddd
-      );
+      linear-gradient(#fff, #ddd);
 
     box-shadow:
       inset 0 5px 5px white,
@@ -3399,16 +2071,10 @@ const pageStyles = `
 
   .question3DCard {
     position: relative;
+    margin: 0 0 34px;
+    padding: 42px 34px 32px;
 
-    margin:
-      0 0 34px;
-
-    padding:
-      42px 34px 32px;
-
-    border:
-      2px solid #8a959d;
-
+    border: 2px solid #8a959d;
     border-radius: 22px;
 
     background:
@@ -3429,37 +2095,27 @@ const pageStyles = `
 
   .question3DCard::before {
     content: "";
-
     position: absolute;
-
     inset: 7px;
-
     pointer-events: none;
-
-    border:
-      1px solid rgba(255,255,255,.82);
-
+    border: 1px solid rgba(255,255,255,.82);
     border-radius: 16px;
   }
 
   .question3DLabel {
     position: absolute;
-
     top: -19px;
     left: 30px;
 
     min-width: 155px;
     min-height: 40px;
-
     padding: 7px 20px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    border:
-      2px solid #174461;
-
+    border: 2px solid #174461;
     border-radius: 10px;
 
     background:
@@ -3475,421 +2131,116 @@ const pageStyles = `
       0 8px 13px rgba(0,0,0,.2);
 
     color: #073b68;
-
     font-size: 14px;
-
     font-weight: 800;
-
     letter-spacing: 1.2px;
   }
 
-  /* =====================================================
-     SAVOL MATNI
-  ===================================================== */
-
   .questionHtml {
-    width: 100%;
-    max-width: 100%;
-
     margin: 0;
 
     direction: ltr;
+    text-align: left;
 
-    color:
-      #000000 !important;
+    overflow-wrap: anywhere;
 
-    -webkit-text-fill-color:
-      #000000 !important;
+    color: #111315;
+    font-size: 24px;
+    line-height: 1.55;
+    font-weight: 500;
+    text-align: justify;
+    text-justify: inter-word;
 
-    opacity:
-      1 !important;
-
-    font-family:
-      "Bell MT",
-      "Times New Roman",
-      serif;
-
-    font-weight:
-      600 !important;
-
-    font-size:
-      clamp(22px, 2vw, 30px);
-
-    line-height:
-      1.55;
-
-    text-align:
-      justify !important;
-
-    text-align-last:
-      left !important;
-
-    text-justify:
-      inter-word;
-
-    white-space:
-      normal !important;
-
-    word-break:
-      normal !important;
-
-    overflow-wrap:
-      break-word;
-
-    letter-spacing:
-      0 !important;
-
-    word-spacing:
-      normal !important;
-
-    text-shadow:
-      none !important;
-  }
-
-  .questionHtml :global(*) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    opacity:
-      1 !important;
-
-    letter-spacing:
-      0 !important;
-
-    word-spacing:
-      normal !important;
-
-    text-shadow:
-      none !important;
-  }
-
-  .questionHtml :global([style]),
-  .questionHtml :global(font) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    opacity:
-      1 !important;
+    text-shadow: 0 1px 0 rgba(255,255,255,.9);
   }
 
   .questionHtml :global(p) {
-    width: 100%;
-
-    margin:
-      0 0 14px;
-
-    padding: 0;
-
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    text-align:
-      justify !important;
-
-    text-align-last:
-      left !important;
-
-    white-space:
-      normal !important;
-
-    word-break:
-      normal !important;
-
-    overflow-wrap:
-      break-word;
+    margin: 0 0 18px;
   }
 
   .questionHtml :global(p:last-child) {
     margin-bottom: 0;
   }
 
-  .questionHtml :global(div) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    text-align:
-      justify !important;
-
-    text-align-last:
-      left !important;
-
-    white-space:
-      normal !important;
-  }
-
-  .questionHtml :global(span) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    white-space:
-      normal !important;
+  .questionHtml :global(a) {
+    color: #008b88;
+    font-weight: 700;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0,139,136,.35);
   }
 
   .questionHtml :global(strong),
   .questionHtml :global(b) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    font-weight:
-      800 !important;
-  }
-
-  .questionHtml :global(i),
-  .questionHtml :global(em) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    font-style:
-      italic !important;
-  }
-
-  .questionHtml :global(strong i),
-  .questionHtml :global(strong em),
-  .questionHtml :global(b i),
-  .questionHtml :global(b em) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    font-weight:
-      800 !important;
-
-    font-style:
-      italic !important;
-  }
-
-  .questionHtml :global(u) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    text-decoration:
-      underline;
-  }
-
-  /*
-    AVTOMATIK ANIQLANGAN
-    RIM / RAQAMLI BANDLAR
-  */
-
-  .questionHtml :global(.autoListBreak) {
-    display: block;
-
-    content: "";
-
-    height: 0;
-
-    margin: 0;
-  }
-
-  /*
-    <br> dan keyingi qator orasiga juda katta
-    bo‘shliq bermaymiz.
-  */
-
-  .questionHtml :global(br.autoListBreak) {
-    display: block;
-
-    content: "";
-
-    margin-top: 5px;
-  }
-
-  .questionHtml :global(ul),
-  .questionHtml :global(ol) {
-    width: 100%;
-
-    margin:
-      12px 0 16px;
-
-    padding-left:
-      38px;
-
-    color:
-      #000000 !important;
-  }
-
-  .questionHtml :global(li) {
-    margin:
-      7px 0;
-
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    text-align:
-      justify !important;
-
-    text-align-last:
-      left !important;
-  }
-
-  .questionHtml :global(a) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    font-weight: 700;
-
-    text-decoration:
-      underline;
+    color: #082f4d;
   }
 
   .questionHtml :global(img),
   .optionText :global(img) {
     max-width: 100%;
-
     height: auto;
   }
 
   .questionHtml :global(table),
   .optionText :global(table) {
-    width: auto;
-
     max-width: 100%;
-
-    border-collapse:
-      collapse;
-  }
-
-  .questionHtml :global(th),
-  .questionHtml :global(td),
-  .optionText :global(th),
-  .optionText :global(td) {
-    padding:
-      8px 10px;
-
-    border:
-      1px solid #555;
-
-    vertical-align:
-      top;
-  }
-
-  .questionHtml :global(th),
-  .questionHtml :global(td) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
+    border-collapse: collapse;
   }
 
   .shapeResultScroll {
     width: 100%;
-
-    margin:
-      0 0 28px;
-
+    margin: 0 0 28px;
     overflow-x: auto;
-
     overflow-y: hidden;
   }
 
   .shapeResultStage {
     position: relative;
-
     min-width: 1px;
-
     min-height: 1px;
-
     max-width: none;
   }
 
   .resultShapeItem {
     position: absolute;
-
-    box-sizing:
-      border-box;
+    box-sizing: border-box;
   }
 
   .resultImageItem {
     overflow: visible;
-
-    background:
-      transparent;
+    background: transparent;
   }
 
   .resultShapeBody {
     display: flex;
-
     align-items: center;
-
     justify-content: center;
-
     overflow: hidden;
-
     padding: 8px;
-
-    box-sizing:
-      border-box;
+    box-sizing: border-box;
   }
 
   .resultShapeBody.circle,
   .resultShapeBody.ellipse {
-    border-radius:
-      999px;
+    border-radius: 999px;
   }
 
   .resultVenn {
     position: relative;
-
     width: 100%;
-
     height: 100%;
   }
 
   .resultVennCircle {
     position: absolute;
-
     top: 8%;
-
     width: 58%;
-
     height: 84%;
-
     display: flex;
-
     align-items: center;
-
     justify-content: center;
-
     border: 2px solid;
-
     border-radius: 50%;
-
-    box-sizing:
-      border-box;
-
+    box-sizing: border-box;
     font-weight: 700;
   }
 
@@ -3903,37 +2254,26 @@ const pageStyles = `
 
   .options {
     display: grid;
-
     gap: 15px;
   }
 
   .option {
     width: 100%;
+    min-height: 82px;
 
-    min-height: 75px;
-
-    padding:
-      12px 18px;
+    padding: 12px 18px;
 
     display: grid;
-
-    grid-template-columns:
-      48px minmax(0,1fr) 35px;
+    grid-template-columns: 48px minmax(0,1fr) 35px;
 
     align-items: center;
-
     gap: 15px;
 
-    border:
-      2px solid #999;
-
+    border: 2px solid #999;
     border-radius: 12px;
 
     background:
-      linear-gradient(
-        #fff,
-        #e4e4e4
-      );
+      linear-gradient(#fff, #e4e4e4);
 
     text-align: left;
 
@@ -3944,14 +2284,11 @@ const pageStyles = `
 
   .option:hover {
     border-color: #168fc9;
-
-    transform:
-      translateY(-1px);
+    transform: translateY(-1px);
   }
 
   .selectedOption {
-    border:
-      3px solid #168fc9;
+    border: 3px solid #168fc9;
 
     background:
       linear-gradient(
@@ -3962,25 +2299,17 @@ const pageStyles = `
 
   .optionLetter {
     width: 42px;
-
     height: 42px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
-    border:
-      2px solid #174461;
-
+    border: 2px solid #174461;
     border-radius: 50%;
 
     background:
-      linear-gradient(
-        #b8ecff,
-        #58a8d7
-      );
+      linear-gradient(#b8ecff, #58a8d7);
 
     color: #073b68;
 
@@ -3991,154 +2320,60 @@ const pageStyles = `
     min-width: 0;
 
     direction: ltr;
+    text-align: justify;
+    text-justify: inter-word;
 
-    text-align: left;
-
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    opacity:
-      1 !important;
-
-    font-family:
-      "Bell MT",
-      "Times New Roman",
-      serif;
-
-    font-size: 17px;
-
+    font-size: 19px;
     line-height: 1.5;
-
-    font-weight: 600;
-
-    letter-spacing:
-      0 !important;
-
-    word-spacing:
-      normal !important;
-
-    white-space:
-      normal !important;
-
-    word-break:
-      normal !important;
-
-    overflow-wrap:
-      break-word;
-
-    text-shadow:
-      none !important;
-  }
-
-  .optionText :global(*) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    opacity:
-      1 !important;
-  }
-
-  .optionText :global([style]),
-  .optionText :global(font) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-  }
-
-  .optionText :global(strong),
-  .optionText :global(b) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    font-weight:
-      800 !important;
-  }
-
-  .optionText :global(i),
-  .optionText :global(em) {
-    color:
-      #000000 !important;
-
-    -webkit-text-fill-color:
-      #000000 !important;
-
-    font-style:
-      italic !important;
+    font-weight: 500;
   }
 
   .radio {
     color: #0879b2;
-
     text-align: center;
-
     font-size: 25px;
   }
 
+  /* QUESTION ACTIONS */
+
   .questionActions {
-    padding:
-      0 25px 28px;
+    padding: 0 25px 28px;
 
     display: flex;
-
-    justify-content:
-      space-between;
+    justify-content: space-between;
 
     gap: 15px;
   }
 
   .questionActions button {
     min-width: 180px;
-
     min-height: 55px;
 
-    padding:
-      0 20px;
+    padding: 0 20px;
 
-    border-radius:
-      10px;
+    border-radius: 10px;
 
     font-weight: 700;
   }
 
   .previousButton {
-    border:
-      2px solid #555;
+    border: 2px solid #555;
 
     background:
-      linear-gradient(
-        #fff,
-        #bbb
-      );
+      linear-gradient(#fff, #bbb);
 
-    box-shadow:
-      0 4px 0 #555;
+    box-shadow: 0 4px 0 #555;
   }
 
   .nextButton {
     margin-left: auto;
 
-    border:
-      2px solid #174461;
+    border: 2px solid #174461;
 
     background:
-      linear-gradient(
-        #b8ecff,
-        #58a8d7
-      );
+      linear-gradient(#b8ecff, #58a8d7);
 
-    box-shadow:
-      0 4px 0 #17415c;
+    box-shadow: 0 4px 0 #17415c;
 
     color: #073b68;
   }
@@ -4146,49 +2381,34 @@ const pageStyles = `
   .finishButton {
     margin-left: auto;
 
-    border:
-      2px solid #277b49;
+    border: 2px solid #277b49;
 
     background:
-      linear-gradient(
-        #c6f1d3,
-        #68c888
-      );
+      linear-gradient(#c6f1d3, #68c888);
 
-    box-shadow:
-      0 4px 0 #277144;
+    box-shadow: 0 4px 0 #277144;
 
     color: #125a32;
   }
 
+  /* RESULT */
+
   .resultCircle {
     width: 180px;
-
     height: 180px;
 
-    margin:
-      0 auto 25px;
+    margin: 0 auto 25px;
 
     display: flex;
-
-    flex-direction:
-      column;
-
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
 
-    justify-content:
-      center;
-
-    border:
-      8px solid #168fc9;
-
+    border: 8px solid #168fc9;
     border-radius: 50%;
 
     background:
-      linear-gradient(
-        #fff,
-        #d8f1fc
-      );
+      linear-gradient(#fff, #d8f1fc);
 
     box-shadow:
       0 7px 15px rgba(0,0,0,.2);
@@ -4196,7 +2416,6 @@ const pageStyles = `
 
   .resultCircle strong {
     color: #07517e;
-
     font-size: 45px;
   }
 
@@ -4205,50 +2424,37 @@ const pageStyles = `
   }
 
   .resultGrid {
-    margin:
-      30px 0;
+    margin: 30px 0;
 
     display: grid;
-
     grid-template-columns:
-      repeat(3, 1fr);
+      repeat(5, 1fr);
 
     gap: 12px;
   }
 
   .resultItem {
-    min-height: 72px;
-
-    padding: 10px;
+    min-height: 100px;
+    padding: 15px;
 
     display: flex;
-
-    flex-direction:
-      column;
-
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
 
-    justify-content:
-      center;
-
-    border:
-      1px solid #999;
-
+    border: 1px solid #999;
     border-radius: 10px;
 
-    background:
-      rgba(255,255,255,.7);
+    background: rgba(255,255,255,.7);
   }
 
   .resultItem span {
     margin-bottom: 7px;
-
     color: #555;
   }
 
   .resultItem strong {
     color: #07517e;
-
     font-size: 26px;
   }
 
@@ -4261,32 +2467,23 @@ const pageStyles = `
   }
 
   .resultMessage {
-    margin:
-      25px 0;
-
+    margin: 25px 0;
     padding: 20px;
 
-    border:
-      2px solid #168fc9;
-
+    border: 2px solid #168fc9;
     border-radius: 12px;
 
-    background:
-      #dff5ff;
+    background: #dff5ff;
 
     color: #07517e;
 
     font-size: 21px;
-
     font-weight: 700;
   }
 
   .resultActions {
     display: flex;
-
-    justify-content:
-      center;
-
+    justify-content: center;
     flex-wrap: wrap;
 
     gap: 15px;
@@ -4294,57 +2491,42 @@ const pageStyles = `
 
   .resultActions button {
     min-height: 55px;
+    padding: 0 22px;
 
-    padding:
-      0 22px;
-
-    border-radius:
-      9px;
+    border-radius: 9px;
 
     font-weight: 700;
   }
 
   .reviewButton {
-    border:
-      2px solid #174461;
+    border: 2px solid #174461;
 
     background:
-      linear-gradient(
-        #b8ecff,
-        #58a8d7
-      );
+      linear-gradient(#b8ecff, #58a8d7);
 
-    box-shadow:
-      0 4px 0 #17415c;
+    box-shadow: 0 4px 0 #17415c;
 
     color: #073b68;
   }
 
   .againButton {
-    border:
-      2px solid #277b49;
+    border: 2px solid #277b49;
 
     background:
-      linear-gradient(
-        #c6f1d3,
-        #68c888
-      );
+      linear-gradient(#c6f1d3, #68c888);
 
-    box-shadow:
-      0 4px 0 #277144;
+    box-shadow: 0 4px 0 #277144;
 
     color: #125a32;
   }
 
-  .reviewQuestion {
-    margin-bottom:
-      25px;
+  /* REVIEW */
 
+  .reviewQuestion {
+    margin-bottom: 25px;
     padding: 25px;
 
-    border:
-      2px solid #777;
-
+    border: 2px solid #777;
     border-radius: 13px;
 
     background: white;
@@ -4353,35 +2535,27 @@ const pageStyles = `
   }
 
   .reviewNumber {
-    margin-bottom:
-      15px;
+    margin-bottom: 15px;
 
     color: #07517e;
 
     font-size: 17px;
-
     font-weight: 700;
   }
 
   .reviewOptions {
     display: grid;
-
     gap: 10px;
   }
 
   .reviewOption {
-    padding:
-      13px 15px;
+    padding: 13px 15px;
 
     display: flex;
-
     align-items: center;
-
     gap: 12px;
 
-    border:
-      1px solid #aaa;
-
+    border: 1px solid #aaa;
     border-radius: 8px;
 
     background: #eee;
@@ -4389,275 +2563,58 @@ const pageStyles = `
 
   .correctOption {
     border-color: #3d9661;
-
-    background:
-      #d8f1df;
+    background: #d8f1df;
   }
 
   .selectedWrong {
     border-color: #b93333;
-
-    background:
-      #f6dada;
+    background: #f6dada;
   }
 
   .answerStatus {
-    margin-top:
-      15px;
-
+    margin-top: 15px;
     padding: 12px;
 
-    border-radius:
-      8px;
+    border-radius: 8px;
 
-    text-align:
-      center;
+    text-align: center;
 
     font-weight: 700;
   }
 
   .correctStatus {
     color: #126033;
-
-    background:
-      #d8f1df;
+    background: #d8f1df;
   }
 
   .wrongStatus {
     color: #8c1818;
-
-    background:
-      #f6dada;
+    background: #f6dada;
   }
 
-  .saveIndicatorWrap {
-    margin-left: auto;
-
-    min-height: 42px;
-
-    padding:
-      9px 14px;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    border:
-      1px solid #6f7b82;
-
-    border-radius: 11px;
-
-    background:
-      rgba(255,255,255,.78);
-
-    font-size: 13px;
-
-    font-weight: 700;
-
-    white-space: nowrap;
-  }
-
-  .onlineDot,
-  .offlineDot {
-    width: 10px;
-
-    height: 10px;
-
-    border-radius: 50%;
-
-    flex:
-      0 0 auto;
-  }
-
-  .onlineDot {
-    background: #25944d;
-  }
-
-  .offlineDot {
-    background: #b32929;
-  }
-
-  .shapeResultClickable {
-    cursor: zoom-in;
-
-    border-radius: 12px;
-
-    transition:
-      box-shadow .15s ease,
-      transform .15s ease;
-  }
-
-  .shapeResultClickable:hover {
-    box-shadow:
-      0 0 0 3px rgba(22,143,201,.18);
-  }
-
-  .zoomOverlay {
-    position: fixed;
-
-    inset: 0;
-
-    z-index: 9999;
-
-    padding: 24px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    background:
-      rgba(13,20,25,.88);
-
-    backdrop-filter:
-      blur(5px);
-  }
-
-  .zoomPanel {
-    position: relative;
-
-    width:
-      min(1200px, 96vw);
-
-    max-height: 92vh;
-
-    overflow: auto;
-
-    padding:
-      64px 28px 28px;
-
-    border:
-      2px solid #79c7ee;
-
-    border-radius: 20px;
-
-    background:
-      linear-gradient(
-        #fff,
-        #e9edf0
-      );
-
-    box-shadow:
-      0 18px 60px rgba(0,0,0,.45);
-  }
-
-  .zoomTitle {
-    position: absolute;
-
-    top: 20px;
-
-    left: 28px;
-
-    color: #073b68;
-
-    font-size: 18px;
-
-    font-weight: 800;
-  }
-
-  .zoomClose {
-    position: absolute;
-
-    top: 14px;
-
-    right: 16px;
-
-    width: 42px;
-
-    height: 42px;
-
-    border: 0;
-
-    border-radius: 50%;
-
-    background:
-      #25343d;
-
-    color: white;
-
-    font-size: 28px;
-
-    line-height: 1;
-  }
-
-  .shapeResultZoomed {
-    min-height: 100px;
-
-    overflow: auto;
-
-    margin-bottom: 0;
-  }
-
-  .wrongOnlyButton {
-    border:
-      2px solid #8e1515;
-
-    background:
-      linear-gradient(
-        #ffd7d7,
-        #ef8d8d
-      );
-
-    box-shadow:
-      0 4px 0 #831515;
-
-    color: #711313;
-  }
-
-  .reviewAnswerSummary {
-    margin-top: 15px;
-
-    padding: 14px;
-
-    display: grid;
-
-    gap: 7px;
-
-    border:
-      1px solid #9aa5ac;
-
-    border-radius: 9px;
-
-    background:
-      #f4f7f8;
-
-    line-height: 1.45;
-  }
+  /* RESPONSIVE */
 
   @media (max-width: 900px) {
-    .introInformation {
-      grid-template-columns:
-        repeat(2, 1fr);
-    }
-
     .question3DCard {
-      padding:
-        36px 22px 24px;
-
-      border-radius:
-        17px;
+      padding: 36px 22px 24px;
+      border-radius: 17px;
     }
 
     .question3DLabel {
       left: 20px;
-
       min-width: 135px;
-
       font-size: 12px;
     }
 
     .questionHtml {
-      font-size: 21px;
-
+      font-size: 24px;
       line-height: 1.55;
+      text-align: justify;
+      text-justify: inter-word;
     }
 
     .testLayout {
-      grid-template-columns:
-        1fr;
+      grid-template-columns: 1fr;
     }
 
     .navigator {
@@ -4677,522 +2634,84 @@ const pageStyles = `
 
   @media (max-width: 650px) {
     .page {
-      padding:
-        10px 6px 50px;
+      padding: 10px 6px 60px;
     }
 
     .topHeader,
     .testHeader {
-      width: 100%;
-
-      min-height: auto;
-
-      padding: 12px;
-
-      flex-direction:
-        column;
-
-      gap: 12px;
-
-      border-radius: 16px;
+      flex-direction: column;
+      padding: 15px;
     }
 
     .headerName {
       width: 100%;
-
       min-width: 0;
-
-      min-height: 50px;
-
-      padding:
-        8px 12px;
-
-      font-size: 21px;
-    }
-
-    .topHeader .grayButton {
-      width: 100%;
-
-      min-height: 46px;
-    }
-
-    .testHeaderLeft {
-      width: 100%;
-
-      text-align: center;
-    }
-
-    .testHeaderLeft strong {
-      font-size: 20px;
     }
 
     .timer {
       width: 100%;
-
-      min-width: 0;
-
-      padding:
-        8px 12px;
-    }
-
-    .timer strong {
-      font-size: 24px;
-    }
-
-    .progressPanel {
-      width: 100%;
-
-      margin-top: 18px;
-
-      padding:
-        12px 14px;
-    }
-
-    .progressTrack {
-      height: 10px;
     }
 
     .panel,
     .reviewPanel {
-      width: 100%;
-
-      margin-top: 65px;
-
-      padding:
-        55px 8px 15px;
-
-      border-radius: 18px;
+      width: 99%;
+      padding: 70px 12px 20px;
     }
 
     .floatingTitle {
-      top: -27px;
-
-      min-width: 190px;
-
-      min-height: 52px;
-
-      padding:
-        7px 18px;
-
-      font-size: 20px;
-
-      border-radius: 12px;
+      min-width: 230px;
+      font-size: 22px;
     }
 
     .introCard,
     .resultBox,
     .reviewInner {
-      padding:
-        16px 10px;
-
-      border-radius:
-        13px;
-    }
-
-    .introCard h1,
-    .resultBox h1 {
-      margin:
-        8px 0 10px;
-
-      font-size: 25px;
-    }
-
-    .subject,
-    .resultSubject {
-      font-size: 17px;
-    }
-
-    .description {
-      margin-bottom:
-        18px;
-
-      font-size: 15px;
-
-      line-height: 1.45;
+      padding: 20px 12px;
     }
 
     .introInformation {
-      margin:
-        18px 0;
-
-      grid-template-columns:
-        repeat(
-          2,
-          minmax(0, 1fr)
-        );
-
-      gap: 9px;
-    }
-
-    .info {
-      min-height: 72px;
-
-      padding: 9px;
-    }
-
-    .info strong {
-      font-size: 21px;
-    }
-
-    .instruction {
-      margin:
-        17px 0;
-
-      padding: 14px;
-    }
-
-    .instruction strong {
-      font-size: 18px;
-    }
-
-    .instruction p {
-      font-size: 14px;
-    }
-
-    .startButton {
-      min-height: 52px;
-
-      font-size: 16px;
+      grid-template-columns: 1fr;
     }
 
     .testLayout {
-      width: 100%;
-
-      margin-top: 18px;
-
-      grid-template-columns:
-        1fr;
-
-      gap: 18px;
-    }
-
-    .navigator {
-      position: static;
-
-      padding:
-        16px 12px;
-    }
-
-    .navigator h3 {
-      margin-bottom:
-        12px;
-
-      font-size: 19px;
+      width: 99%;
     }
 
     .questionNumbers {
       grid-template-columns:
         repeat(5, 1fr);
-
-      gap: 6px;
-    }
-
-    .legend {
-      margin-top:
-        15px;
-
-      padding: 10px;
-    }
-
-    .finishSideButton {
-      min-height: 46px;
-
-      margin-top:
-        14px;
-    }
-
-    .questionPanel {
-      border-radius:
-        16px;
-    }
-
-    .questionTop {
-      min-height: 65px;
-
-      padding:
-        10px 14px;
-    }
-
-    .questionTop strong {
-      width: 36px;
-
-      height: 36px;
-
-      font-size: 18px;
-    }
-
-    .questionTopActions {
-      width: auto;
-
-      flex-wrap: wrap;
-
-      justify-content:
-        flex-end;
-    }
-
-    .flagButton {
-      min-height: 34px;
-
-      padding:
-        0 10px;
-
-      font-size: 11px;
     }
 
     .questionContent {
-      margin: 9px;
-
-      padding:
-        16px 9px;
-    }
-
-    .question3DCard {
-      margin-bottom:
-        25px;
-
-      padding:
-        32px 15px 20px;
-
-      border-radius:
-        15px;
-    }
-
-    .question3DLabel {
-      top: -16px;
-
-      left: 14px;
-
-      min-width: 120px;
-
-      min-height: 34px;
-
-      padding:
-        5px 12px;
-
-      font-size: 11px;
-    }
-
-    .questionHtml {
-      font-size: 18px;
-
-      line-height: 1.5;
-    }
-
-    .options {
-      gap: 10px;
+      margin: 12px;
+      padding: 18px 12px;
     }
 
     .option {
-      min-height: 58px;
-
       grid-template-columns:
-        38px minmax(0,1fr) 24px;
+        42px minmax(0,1fr) 25px;
 
-      gap: 8px;
-
-      padding: 8px;
-    }
-
-    .optionLetter {
-      width: 34px;
-
-      height: 34px;
+      padding: 11px 10px;
+      min-height: 78px;
     }
 
     .optionText {
-      font-size: 15px;
-
-      line-height: 1.4;
-    }
-
-    .radio {
-      font-size: 21px;
+      font-size: 18px;
+      line-height: 1.5;
     }
 
     .questionActions {
-      position: sticky;
-
-      bottom: 0;
-
-      z-index: 30;
-
-      padding:
-        10px 9px 14px;
-
-      flex-direction: row;
-
-      gap: 8px;
-
-      background:
-        rgba(55,61,65,.96);
-
-      border-top:
-        1px solid rgba(255,255,255,.25);
-
-      backdrop-filter:
-        blur(10px);
+      padding: 0 12px 20px;
+      flex-direction: column;
     }
 
     .questionActions button {
-      flex: 1;
-
-      width: auto;
-
+      width: 100%;
       min-width: 0;
-
-      min-height: 48px;
-
-      padding:
-        0 8px;
-
-      font-size: 13px;
-    }
-
-    .resultCircle {
-      width: 120px;
-
-      height: 120px;
-
-      margin:
-        0 auto 15px;
-
-      border-width: 6px;
-    }
-
-    .resultCircle strong {
-      font-size: 32px;
-    }
-
-    .resultCircle span {
-      font-size: 14px;
     }
 
     .resultGrid {
-      margin:
-        18px 0;
-
-      grid-template-columns:
-        repeat(
-          2,
-          minmax(0, 1fr)
-        );
-
-      gap: 8px;
-    }
-
-    .resultItem {
-      min-height: 70px;
-
-      padding:
-        8px 6px;
-    }
-
-    .resultItem span {
-      margin-bottom:
-        4px;
-
-      font-size: 13px;
-    }
-
-    .resultItem strong {
-      font-size: 21px;
-    }
-
-    .resultMessage {
-      margin:
-        15px 0;
-
-      padding:
-        12px 10px;
-
-      font-size: 16px;
-    }
-
-    .resultActions {
-      gap: 9px;
-    }
-
-    .resultActions button {
-      width: 100%;
-
-      min-height: 48px;
-
-      padding:
-        0 12px;
-    }
-
-    .reviewQuestion {
-      margin-bottom:
-        15px;
-
-      padding:
-        14px 10px;
-    }
-
-    .reviewNumber {
-      margin-bottom:
-        10px;
-
-      font-size: 15px;
-    }
-
-    .reviewOption {
-      padding: 10px;
-
-      gap: 8px;
-
-      font-size: 14px;
-    }
-
-    .answerStatus {
-      margin-top:
-        10px;
-
-      padding: 9px;
-
-      font-size: 14px;
-    }
-
-    .shapeResultScroll {
-      margin-bottom:
-        18px;
-    }
-
-    .saveIndicatorWrap {
-      width: 100%;
-
-      margin-left: 0;
-
-      justify-content:
-        center;
-    }
-
-    .zoomOverlay {
-      padding: 8px;
-    }
-
-    .zoomPanel {
-      width: 100%;
-
-      max-height: 96vh;
-
-      padding:
-        58px 10px 16px;
-
-      border-radius:
-        14px;
-    }
-
-    .zoomTitle {
-      left: 14px;
-
-      font-size: 15px;
-    }
-
-    .reviewAnswerSummary {
-      padding: 10px;
-
-      font-size: 13px;
+      grid-template-columns: 1fr;
     }
   }
 `;
