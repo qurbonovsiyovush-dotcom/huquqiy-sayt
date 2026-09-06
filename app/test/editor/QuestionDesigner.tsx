@@ -74,23 +74,6 @@ function cleanHtml(root: HTMLElement) {
   return clone.innerHTML;
 }
 
-function normalizeQuestionMarks(root: HTMLElement) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const nodes: Text[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const text = node as Text;
-    const parent = text.parentElement;
-    if (!parent) continue;
-    const tag = parent.tagName.toLowerCase();
-    if (tag === "script" || tag === "style") continue;
-    if (/\s\?/.test(text.nodeValue || "")) nodes.push(text);
-  }
-  for (const text of nodes) {
-    text.nodeValue = (text.nodeValue || "").replace(/\s+\?/g, "?");
-  }
-}
-
 export default function QuestionDesigner({
   value,
   onChange,
@@ -467,11 +450,33 @@ export default function QuestionDesigner({
     };
   }, [selectedId]);
 
+  function normalizeQuestionContent(root: HTMLElement) {
+    // So‘roq belgisi oldidan qolib ketgan bo‘shliqlarni olib tashlaymiz.
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT
+    );
+
+    const nodes: Text[] = [];
+    let current = walker.nextNode();
+
+    while (current) {
+      nodes.push(current as Text);
+      current = walker.nextNode();
+    }
+
+    for (const node of nodes) {
+      node.nodeValue = (node.nodeValue || "").replace(/\s+\?/g, "?");
+    }
+  }
+
   function emit() {
     const root =
       editorRef.current;
 
     if (!root) return;
+
+    normalizeQuestionContent(root);
 
     onChange(
       cleanHtml(root)
@@ -1995,7 +2000,7 @@ export default function QuestionDesigner({
           disabled={disabled}
           title="Ikki chetini tekislash"
         >
-          ≡≡
+          ≡↔
         </button>
 
         <button
@@ -2020,6 +2025,19 @@ export default function QuestionDesigner({
           disabled={disabled}
         >
           1. List
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            insertHtml(
+              '<ol type="I"><li>Matn</li></ol>'
+            )
+          }
+          disabled={disabled}
+          title="Rim raqamlari"
+        >
+          I. List
         </button>
       </div>
 
@@ -2577,12 +2595,45 @@ export default function QuestionDesigner({
             "Times New Roman",
             serif;
           font-size: 24px;
-          line-height: 1.45;
-          text-align: justify;
-          line-height: 1.5;
+          line-height: 1.55;
           box-shadow:
             inset 0 0 0 1px #b4c2c9;
           overflow: hidden;
+        }
+
+        .canvas :global(ol),
+        .canvas :global(ul) {
+          margin-top: 0.35em;
+          margin-bottom: 0.35em;
+          padding-left: 1.55em;
+        }
+
+        .canvas :global(ol) {
+          list-style-position: outside;
+        }
+
+        .canvas :global(ol[type="I"]) {
+          list-style-type: upper-roman;
+        }
+
+        .canvas :global(li) {
+          padding-left: 0.18em;
+          margin: 0.12em 0;
+          line-height: 1.5;
+          text-align: justify;
+          text-justify: inter-word;
+        }
+
+        .canvas :global(li::marker) {
+          font-weight: 400;
+        }
+
+        .canvas :global(p),
+        .canvas :global(div) {
+          font-size: 24px;
+          line-height: 1.5;
+          text-align: justify;
+          text-justify: inter-word;
         }
 
         .canvas :global(.nc-object) {
