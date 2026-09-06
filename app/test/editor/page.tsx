@@ -2326,6 +2326,11 @@ function TestEditorPageContent() {
                       placeholder={`${optionLetter(
                         index
                       )}) javob variantini yozing...`}
+                      style={{
+                        fontSize: "24px",
+                        lineHeight: 1.45,
+                        textAlign: "justify",
+                      }}
                     />
 
                   </div>
@@ -3675,7 +3680,7 @@ function TestEditorPageContent() {
 
           gap: 10px;
 
-          font-size: 25px;
+          font-size: 24px;
         }
 
         .radioArea input {
@@ -3686,7 +3691,7 @@ function TestEditorPageContent() {
         .answerRow textarea {
           width: 100%;
 
-          min-height: 88px;
+          min-height: 70px;
 
           padding: 12px 15px;
 
@@ -3705,12 +3710,8 @@ function TestEditorPageContent() {
           background: white;
 
           font-size: 24px;
-          line-height: 1.5;
-          font-weight: 700;
+          line-height: 1.45;
           text-align: justify;
-          text-justify: inter-word;
-          overflow-wrap: normal;
-          word-break: normal;
         }
 
         .pointsRow {
