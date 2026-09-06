@@ -1,485 +1,771 @@
 "use client";
 
 import {
+  Suspense,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 
-type Props = {
-  value: string;
-  onChange: (html: string) => void;
-  disabled?: boolean;
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
+import QuestionDesigner from "./QuestionDesigner";
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type TestStatus =
+  | "draft"
+  | "published";
+
+type ShapeType =
+  | "rectangle"
+  | "roundedRectangle"
+  | "circle"
+  | "ellipse"
+  | "venn"
+  | "text"
+  | "image";
+
+type TestShape = {
+  id: string;
+
+  type: ShapeType;
+
+  x: number;
+  y: number;
+
+  width: number;
+  height: number;
+
+  text: string;
+
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+
+  fontSize: number;
+  fontFamily: string;
+
+  fontWeight:
+    | "normal"
+    | "bold";
+
+  fontStyle:
+    | "normal"
+    | "italic";
+
+  textAlign:
+    | "left"
+    | "center"
+    | "right";
+  textDecoration?: "none" | "underline";
+  textTransform?: "none" | "uppercase" | "lowercase";
+  borderWidth?: number;
+  borderRadius?: number;
+  opacity?: number;
+  imageSrc?: string;
+  objectFit?: "contain" | "cover" | "fill";
+  zIndex?: number;
 };
 
-type Handle =
-  | "nw"
-  | "n"
-  | "ne"
-  | "e"
-  | "se"
-  | "s"
-  | "sw"
-  | "w";
+type TestOption = {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+};
 
-const HANDLES: Handle[] = [
-  "nw",
-  "n",
-  "ne",
-  "e",
-  "se",
-  "s",
-  "sw",
-  "w",
-];
+type TestQuestion = {
+  id: string;
 
-function uid() {
-  return `nc-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  questionHtml: string;
+
+  options: TestOption[];
+
+  shapes: TestShape[];
+
+  points: number;
+};
+
+type TestData = {
+  id?: string;
+
+  title: string;
+  subject: string;
+
+  duration: number;
+
+  description: string;
+
+  questions: TestQuestion[];
+
+  status: TestStatus;
+
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function makeId() {
+  return crypto.randomUUID();
 }
 
-function cleanHtml(root: HTMLElement) {
-  const clone =
-    root.cloneNode(true) as HTMLElement;
-
-  clone
-    .querySelectorAll(
-      ".nc-selected,[data-nc-ui]"
-    )
-    .forEach((node) => {
-      node.classList.remove(
-        "nc-selected"
-      );
-
-      node.removeAttribute(
-        "data-nc-cell-selected"
-      );
-
-      if (
-        node instanceof HTMLElement
-      ) {
-        node.style.boxShadow = "";
-      }
-
-      if (
-        node.hasAttribute(
-          "data-nc-ui"
-        )
-      ) {
-        node.remove();
-      }
-    });
-
-  return clone.innerHTML;
+function makeOptions(): TestOption[] {
+  return [
+    {
+      id: makeId(),
+      text: "",
+      isCorrect: true,
+    },
+    {
+      id: makeId(),
+      text: "",
+      isCorrect: false,
+    },
+    {
+      id: makeId(),
+      text: "",
+      isCorrect: false,
+    },
+    {
+      id: makeId(),
+      text: "",
+      isCorrect: false,
+    },
+  ];
 }
 
-export default function QuestionDesigner({
-  value,
-  onChange,
-  disabled = false,
-}: Props) {
+function makeQuestion(): TestQuestion {
+  return {
+    id: makeId(),
+
+    questionHtml: "",
+
+    options:
+      makeOptions(),
+
+    shapes: [],
+
+    points: 1,
+  };
+}
+
+function optionLetter(
+  index: number
+) {
+  return [
+    "A",
+    "B",
+    "C",
+    "D",
+  ][index] ?? "?";
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+function TestEditorPageContent() {
+  const router =
+    useRouter();
+
+  const searchParams =
+    useSearchParams();
+
+  const editingId =
+    searchParams.get("id");
+
   const editorRef =
     useRef<HTMLDivElement | null>(
       null
     );
 
-  const fileRef =
-    useRef<HTMLInputElement | null>(
+  const canvasRef =
+    useRef<HTMLDivElement | null>(
       null
     );
 
-  const selectedTableCellRef =
-    useRef<HTMLTableCellElement | null>(
-      null
+  const imageInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  /*
+    Katta testni tahrirlashda 780/840 ta savolning hammasini
+    qayta yubormaslik uchun serverdan dastlab yuklangan holatni saqlaymiz.
+  */
+  const originalQuestionsRef =
+    useRef<TestQuestion[]>([]);
+
+  /* =======================================================
+     STATES
+  ======================================================= */
+
+  const [
+    adminChecked,
+    setAdminChecked,
+  ] = useState(false);
+
+  const [
+    loadingTest,
+    setLoadingTest,
+  ] = useState(
+    Boolean(editingId)
+  );
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    title,
+    setTitle,
+  ] = useState("");
+
+  const [
+    subject,
+    setSubject,
+  ] = useState("");
+
+  const [
+    duration,
+    setDuration,
+  ] = useState(30);
+
+  const [
+    description,
+    setDescription,
+  ] = useState("");
+
+  const [
+    questions,
+    setQuestions,
+  ] = useState<
+    TestQuestion[]
+  >([
+    makeQuestion(),
+  ]);
+
+  const [
+    activeQuestionId,
+    setActiveQuestionId,
+  ] = useState(
+    questions[0].id
+  );
+
+  const [
+    selectedShapeId,
+    setSelectedShapeId,
+  ] = useState<
+    string | null
+  >(null);
+
+  const [
+    fontFamily,
+    setFontFamily,
+  ] = useState(
+    "Bell MT"
+  );
+
+  const [
+    fontSize,
+    setFontSize,
+  ] = useState("18");
+
+
+  /* =======================================================
+     30 TADAN SAVOL YUKLASH
+  ======================================================= */
+
+  const PAGE_SIZE = 30;
+
+  const [
+    questionPage,
+    setQuestionPage,
+  ] = useState(1);
+
+  const [
+    totalQuestions,
+    setTotalQuestions,
+  ] = useState(0);
+
+  const [
+    totalQuestionPages,
+    setTotalQuestionPages,
+  ] = useState(1);
+
+  const [
+    pageStartIndex,
+    setPageStartIndex,
+  ] = useState(0);
+
+  const [
+    pageLoading,
+    setPageLoading,
+  ] = useState(false);
+
+  const loadedTestStatusRef =
+    useRef<TestStatus>("draft");
+
+  /* =======================================================
+     ACTIVE QUESTION
+  ======================================================= */
+
+  const activeQuestion =
+    useMemo(
+      () =>
+        questions.find(
+          (item) =>
+            item.id ===
+            activeQuestionId
+        ) ??
+        questions[0],
+      [
+        questions,
+        activeQuestionId,
+      ]
     );
 
-  const [selectedId, setSelectedId] =
-    useState<string>("");
+  const selectedShape =
+    useMemo(
+      () =>
+        activeQuestion
+          ?.shapes
+          .find(
+            (shape) =>
+              shape.id ===
+              selectedShapeId
+          ) ?? null,
+      [
+        activeQuestion,
+        selectedShapeId,
+      ]
+    );
 
-  const [selectionBox, setSelectionBox] =
-    useState<{
-      left: number;
-      top: number;
-      width: number;
-      height: number;
-    } | null>(null);
-
-  const [fill, setFill] =
-    useState("#ffffff");
-
-  const [stroke, setStroke] =
-    useState("#263b46");
-
-  const [strokeWidth, setStrokeWidth] =
-    useState(2);
-
-  const dragRef = useRef<{
-    id: string;
-    startX: number;
-    startY: number;
-    left: number;
-    top: number;
-  } | null>(null);
-
-  const resizeRef = useRef<{
-    id: string;
-    handle: Handle;
-    startX: number;
-    startY: number;
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    ratio: number;
-    lockRatio: boolean;
-  } | null>(null);
+  /* =======================================================
+     ADMIN CHECK
+  ======================================================= */
 
   useEffect(() => {
-    const root =
-      editorRef.current;
-
-    if (!root) return;
-
-    if (
-      cleanHtml(root) !==
-      (value || "")
-    ) {
-      root.innerHTML =
-        value || "";
-    }
-  }, [value]);
-
-  useEffect(() => {
-    function move(
-      event: PointerEvent
-    ) {
-      const root =
-        editorRef.current;
-
-      if (!root) return;
-
-      if (dragRef.current) {
-        const data =
-          dragRef.current;
-
-        const node =
-          root.querySelector(
-            `[data-object-id="${data.id}"]`
-          ) as HTMLElement | null;
-
-        if (!node) return;
-
-        const dx =
-          event.clientX -
-          data.startX;
-
-        const dy =
-          event.clientY -
-          data.startY;
-
-        node.style.left = `${Math.max(
-          0,
-          data.left + dx
-        )}px`;
-
-        node.style.top = `${Math.max(
-          0,
-          data.top + dy
-        )}px`;
-
-        emit();
-        syncSelectionSoon(data.id);
-      }
-
-      if (resizeRef.current) {
-        const data =
-          resizeRef.current;
-
-        const node =
-          root.querySelector(
-            `[data-object-id="${data.id}"]`
-          ) as HTMLElement | null;
-
-        if (!node) return;
-
-        const dx =
-          event.clientX -
-          data.startX;
-
-        const dy =
-          event.clientY -
-          data.startY;
-
-        let left = data.left;
-        let top = data.top;
-        let width = data.width;
-        let height = data.height;
-
-        if (
-          data.handle.includes(
-            "e"
-          )
-        ) {
-          width =
-            data.width + dx;
-        }
-
-        if (
-          data.handle.includes(
-            "s"
-          )
-        ) {
-          height =
-            data.height + dy;
-        }
-
-        if (
-          data.handle.includes(
-            "w"
-          )
-        ) {
-          width =
-            data.width - dx;
-          left =
-            data.left + dx;
-        }
-
-        if (
-          data.handle.includes(
-            "n"
-          )
-        ) {
-          height =
-            data.height - dy;
-          top =
-            data.top + dy;
-        }
-
-        /*
-          Venn diagrammalarida proporsiyani QAT'IY saqlaymiz.
-          Shunda parent kichrayganda ichidagi matn va doiralar
-          alohida-alohida siqilib, ustma-ust tushmaydi.
-        */
-        if (data.lockRatio) {
-          const ratio =
-            data.ratio || 1;
-
-          const horizontalHandle =
-            data.handle === "e" ||
-            data.handle === "w";
-
-          const verticalHandle =
-            data.handle === "n" ||
-            data.handle === "s";
-
-          if (horizontalHandle) {
-            width = Math.max(
-              180,
-              width
-            );
-
-            height =
-              width / ratio;
-          } else if (verticalHandle) {
-            height = Math.max(
-              110,
-              height
-            );
-
-            width =
-              height * ratio;
-          } else {
-            const widthScale =
-              Math.abs(
-                width /
-                  Math.max(
-                    data.width,
-                    1
-                  )
-              );
-
-            const heightScale =
-              Math.abs(
-                height /
-                  Math.max(
-                    data.height,
-                    1
-                  )
-              );
-
-            const scale =
-              Math.max(
-                widthScale,
-                heightScale
-              );
-
-            width = Math.max(
-              180,
-              data.width * scale
-            );
-
-            height =
-              width / ratio;
-          }
-
-          /*
-            G'arb / shimol tutqichlarida qarama-qarshi chet
-            joyida qolishi uchun left/top ni qayta hisoblaymiz.
-          */
-          if (
-            data.handle.includes(
-              "w"
-            )
-          ) {
-            left =
-              data.left +
-              data.width -
-              width;
-          }
-
-          if (
-            data.handle.includes(
-              "n"
-            )
-          ) {
-            top =
-              data.top +
-              data.height -
-              height;
-          }
-        } else {
-          width = Math.max(
-            40,
-            width
+    async function checkAdmin() {
+      try {
+        const response =
+          await fetch(
+            "/api/me",
+            {
+              cache:
+                "no-store",
+              credentials:
+                "include",
+            }
           );
 
-          height = Math.max(
-            30,
-            height
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          data?.role !== "admin"
+        ) {
+          router.replace(
+            "/admin/tests"
           );
+
+          return;
         }
 
-        node.style.left = `${Math.max(
-          0,
-          left
-        )}px`;
-
-        node.style.top = `${Math.max(
-          0,
-          top
-        )}px`;
-
-        node.style.width = `${width}px`;
-        node.style.height = `${height}px`;
-
-        emit();
-        syncSelectionSoon(data.id);
+        setAdminChecked(
+          true
+        );
+      } catch {
+        router.replace(
+          "/test"
+        );
       }
     }
 
-    function up() {
-      dragRef.current = null;
-      resizeRef.current = null;
+    checkAdmin();
+  }, [router]);
+
+  /* =======================================================
+     EXISTING TEST LOAD — FAQAT 30 TA SAVOL
+  ======================================================= */
+
+  async function loadQuestionPage(
+    page: number,
+    options?: {
+      skipPersist?: boolean;
     }
-
-    window.addEventListener(
-      "pointermove",
-      move
-    );
-
-    window.addEventListener(
-      "pointerup",
-      up
-    );
-
-    return () => {
-      window.removeEventListener(
-        "pointermove",
-        move
-      );
-
-      window.removeEventListener(
-        "pointerup",
-        up
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    const root =
-      editorRef.current;
-
-    const wrap =
-      root?.parentElement as HTMLElement | null;
-
-    if (!selectedId) {
-      setSelectionBox(null);
+  ) {
+    if (!editingId) {
       return;
     }
 
-    syncSelectionSoon(
-      selectedId
-    );
+    setPageLoading(true);
 
-    const handle = () =>
-      updateSelectionBox(
-        selectedId
+    try {
+      /*
+        Boshqa 30 talikka o‘tishdan oldin hozirgi sahifadagi
+        o‘zgarishlarni serverga kichik patch sifatida saqlaymiz.
+      */
+      if (
+        !options?.skipPersist &&
+        originalQuestionsRef.current.length >
+          0
+      ) {
+        const currentHtml =
+          editorRef.current
+            ?.innerHTML ??
+          activeQuestion
+            ?.questionHtml ??
+          "";
+
+        const currentPageQuestions =
+          questions.map(
+            (question) =>
+              question.id ===
+              activeQuestion?.id
+                ? {
+                    ...question,
+                    questionHtml:
+                      currentHtml,
+                  }
+                : question
+          );
+
+        const originalMap =
+          new Map(
+            originalQuestionsRef.current.map(
+              (question) => [
+                String(
+                  question.id
+                ),
+                question,
+              ]
+            )
+          );
+
+        const changedQuestions =
+          currentPageQuestions.filter(
+            (question) => {
+              const before =
+                originalMap.get(
+                  String(
+                    question.id
+                  )
+                );
+
+              return (
+                !before ||
+                JSON.stringify(
+                  before
+                ) !==
+                  JSON.stringify(
+                    question
+                  )
+              );
+            }
+          );
+
+        if (
+          changedQuestions.length >
+          0
+        ) {
+          const saveResponse =
+            await fetch(
+              "/api/tests/legacy-neon",
+              {
+                method: "POST",
+                credentials:
+                  "include",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    action:
+                      "patch-test",
+
+                    testId:
+                      editingId,
+
+                    changedQuestions,
+                  }),
+              }
+            );
+
+          const saveData =
+            await saveResponse.json();
+
+          if (
+            !saveResponse.ok ||
+            !saveData.success
+          ) {
+            throw new Error(
+              saveData.message ||
+                "Joriy sahifadagi o‘zgarishlarni saqlab bo‘lmadi."
+            );
+          }
+        }
+      }
+
+      const response =
+        await fetch(
+          "/api/tests/legacy-neon",
+          {
+            method: "POST",
+            credentials:
+              "include",
+            cache: "no-store",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "load-editor-page",
+                testId:
+                  editingId,
+                page,
+                pageSize:
+                  PAGE_SIZE,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.test
+      ) {
+        throw new Error(
+          data.message ||
+            "Test topilmadi."
+        );
+      }
+
+      const test =
+        data.test as TestData;
+
+      setTitle(
+        test.title || ""
       );
 
-    window.addEventListener(
-      "resize",
-      handle
-    );
-
-    wrap?.addEventListener(
-      "scroll",
-      handle
-    );
-
-    return () => {
-      window.removeEventListener(
-        "resize",
-        handle
+      setSubject(
+        test.subject || ""
       );
 
-      wrap?.removeEventListener(
-        "scroll",
-        handle
+      setDuration(
+        Number(
+          test.duration
+        ) || 30
       );
-    };
-  }, [selectedId]);
 
-  function normalizeQuestionContent(root: HTMLElement) {
-    // So‘roq belgisi oldidan qolib ketgan bo‘shliqlarni olib tashlaymiz.
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_TEXT
-    );
+      setDescription(
+        test.description ||
+          ""
+      );
 
-    const nodes: Text[] = [];
-    let current = walker.nextNode();
+      loadedTestStatusRef.current =
+        test.status ===
+        "published"
+          ? "published"
+          : "draft";
 
-    while (current) {
-      nodes.push(current as Text);
-      current = walker.nextNode();
-    }
+      const loadedQuestions:
+        TestQuestion[] =
+        Array.isArray(
+          data.questions
+        ) &&
+        data.questions.length >
+          0
+          ? data.questions
+          : [
+              makeQuestion(),
+            ];
 
-    for (const node of nodes) {
-      node.nodeValue = (node.nodeValue || "").replace(/\s+\?/g, "?");
+      setQuestions(
+        loadedQuestions
+      );
+
+      originalQuestionsRef.current =
+        loadedQuestions.map(
+          (question) =>
+            JSON.parse(
+              JSON.stringify(
+                question
+              )
+            )
+        );
+
+      setActiveQuestionId(
+        loadedQuestions[0].id
+      );
+
+      setSelectedShapeId(
+        null
+      );
+
+      const pagination =
+        data.pagination || {};
+
+      setQuestionPage(
+        Number(
+          pagination.page
+        ) || page
+      );
+
+      setTotalQuestions(
+        Number(
+          pagination.totalQuestions
+        ) || 0
+      );
+
+      setTotalQuestionPages(
+        Math.max(
+          1,
+          Number(
+            pagination.totalPages
+          ) || 1
+        )
+      );
+
+      setPageStartIndex(
+        Number(
+          pagination.startIndex
+        ) || 0
+      );
+    } finally {
+      setPageLoading(false);
     }
   }
 
-  function emit() {
-    const root =
-      editorRef.current;
+  useEffect(() => {
+    if (
+      !adminChecked ||
+      !editingId
+    ) {
+      return;
+    }
 
-    if (!root) return;
+    setLoadingTest(true);
 
-    normalizeQuestionContent(root);
+    loadQuestionPage(
+      1,
+      {
+        skipPersist: true,
+      }
+    )
+      .catch(
+        (error) => {
+          alert(
+            error instanceof Error
+              ? error.message
+              : "Testni yuklashda server xatosi."
+          );
 
-    onChange(
-      cleanHtml(root)
+          router.replace(
+            "/admin/tests"
+          );
+        }
+      )
+      .finally(() => {
+        setLoadingTest(false);
+      });
+  }, [
+    adminChecked,
+    editingId,
+    router,
+  ]);
+
+  async function goToQuestionPage(
+    nextPage: number
+  ) {
+    if (
+      pageLoading ||
+      nextPage < 1 ||
+      nextPage >
+        totalQuestionPages ||
+      nextPage ===
+        questionPage
+    ) {
+      return;
+    }
+
+    try {
+      await loadQuestionPage(
+        nextPage
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Savollarni yuklashda xato."
+      );
+    }
+  }
+
+  /* =======================================================
+     QUESTION UPDATE
+  ======================================================= */
+
+  function updateQuestion(
+    id: string,
+    patch:
+      Partial<TestQuestion>
+  ) {
+    setQuestions(
+      (current) =>
+        current.map(
+          (question) =>
+            question.id === id
+              ? {
+                  ...question,
+                  ...patch,
+                }
+              : question
+        )
+    );
+  }
+
+  /* =======================================================
+     EDITOR SYNC
+  ======================================================= */
+
+  function saveEditorHtml() {
+    if (
+      !editorRef.current ||
+      !activeQuestion
+    ) {
+      return;
+    }
+
+    const html =
+      editorRef.current.innerHTML;
+
+    updateQuestion(
+      activeQuestion.id,
+      {
+        questionHtml:
+          html,
+      }
     );
   }
 
@@ -487,2298 +773,3213 @@ export default function QuestionDesigner({
     editorRef.current?.focus();
   }
 
+  /* =======================================================
+     WORD COMMANDS
+  ======================================================= */
+
   function command(
     name: string,
-    argument?: string
+    value?: string
   ) {
-    if (disabled) return;
-
     focusEditor();
 
     document.execCommand(
       name,
       false,
-      argument
+      value
     );
 
-    emit();
+    saveEditorHtml();
   }
 
-  function insertHtml(
-    html: string
+  function changeFont(
+    value: string
   ) {
-    if (disabled) return;
+    setFontFamily(
+      value
+    );
+
+    command(
+      "fontName",
+      value
+    );
+  }
+
+  function changeFontSize(
+    value: string
+  ) {
+    setFontSize(
+      value
+    );
 
     focusEditor();
 
     document.execCommand(
-      "insertHTML",
+      "fontSize",
       false,
-      html
+      "7"
     );
-
-    emit();
-  }
-
-  function selectedObject() {
-    if (!selectedId) {
-      return null;
-    }
-
-    return editorRef.current?.querySelector(
-      `[data-object-id="${selectedId}"]`
-    ) as HTMLElement | null;
-  }
-
-
-  function updateSelectionBox(
-    id = selectedId
-  ) {
-    const root =
-      editorRef.current;
-
-    const wrap =
-      root?.parentElement as HTMLElement | null;
 
     if (
-      !root ||
-      !wrap ||
-      !id
+      editorRef.current
     ) {
-      setSelectionBox(null);
-      return;
-    }
-
-    const node =
-      root.querySelector(
-        `[data-object-id="${id}"]`
-      ) as HTMLElement | null;
-
-    if (!node) {
-      setSelectionBox(null);
-      return;
-    }
-
-    const nodeRect =
-      node.getBoundingClientRect();
-
-    const wrapRect =
-      wrap.getBoundingClientRect();
-
-    setSelectionBox({
-      left:
-        nodeRect.left -
-        wrapRect.left +
-        wrap.scrollLeft,
-      top:
-        nodeRect.top -
-        wrapRect.top +
-        wrap.scrollTop,
-      width:
-        nodeRect.width,
-      height:
-        nodeRect.height,
-    });
-  }
-
-  function syncSelectionSoon(
-    id = selectedId
-  ) {
-    requestAnimationFrame(() =>
-      updateSelectionBox(id)
-    );
-  }
-
-  function applyObjectStyleValues(
-    nextFill: string,
-    nextStroke: string,
-    nextStrokeWidth: number
-  ) {
-    const node =
-      selectedObject();
-
-    if (!node) return;
-
-    const kind =
-      node.getAttribute(
-        "data-kind"
-      ) || "";
-
-    node.style.borderColor =
-      nextStroke;
-
-    node.style.borderWidth = `${nextStrokeWidth}px`;
-
-    node.style.borderStyle =
-      "solid";
-
-    if (
-      kind === "line"
-    ) {
-      node.style.background =
-        nextStroke;
-
-      node.style.boxShadow =
-        "0 2px 2px rgba(0,0,0,.25)";
-    } else if (
-      node.classList.contains(
-        "nc-3d-object"
-      )
-    ) {
-      node.style.background =
-        threeDBackground(
-          nextFill
-        );
-
-      node.style.boxShadow =
-        threeDShadow(
-          nextStroke
-        );
-    } else {
-      node.style.background =
-        nextFill;
-    }
-
-    emit();
-    syncSelectionSoon();
-  }
-
-  function applyObjectStyle() {
-    applyObjectStyleValues(
-      fill,
-      stroke,
-      strokeWidth
-    );
-  }
-
-  function threeDBackground(
-    base: string
-  ) {
-    return `linear-gradient(180deg,
-      color-mix(in srgb, ${base} 58%, white) 0%,
-      color-mix(in srgb, ${base} 82%, white) 18%,
-      ${base} 58%,
-      color-mix(in srgb, ${base} 82%, black) 100%)`;
-  }
-
-  function threeDShadow(
-    borderColor: string
-  ) {
-    return `inset 0 4px 3px rgba(255,255,255,.72),
-      inset 0 -3px 3px rgba(0,0,0,.12),
-      0 7px 0 color-mix(in srgb, ${borderColor} 72%, black),
-      0 10px 14px rgba(0,0,0,.22)`;
-  }
-
-  function insertObject(
-    kind:
-      | "rectangle"
-      | "rounded"
-      | "circle"
-      | "ellipse"
-      | "line"
-  ) {
-    const id = uid();
-
-    const radius =
-      kind === "circle" ||
-      kind === "ellipse"
-        ? "50%"
-        : kind === "rounded"
-        ? "24px"
-        : "4px";
-
-    const width =
-      kind === "circle"
-        ? 180
-        : kind === "ellipse"
-        ? 300
-        : kind === "line"
-        ? 320
-        : 280;
-
-    const height =
-      kind === "circle"
-        ? 180
-        : kind === "ellipse"
-        ? 160
-        : kind === "line"
-        ? 6
-        : 120;
-
-    const text =
-      kind === "line"
-        ? ""
-        : "Matn";
-
-    const background =
-      kind === "line"
-        ? stroke
-        : threeDBackground(
-            fill
+      const items =
+        editorRef.current
+          .querySelectorAll(
+            'font[size="7"]'
           );
 
-    const shadow =
-      kind === "line"
-        ? "0 2px 2px rgba(0,0,0,.25)"
-        : threeDShadow(
-            stroke
+      items.forEach(
+        (item) => {
+          const element =
+            item as HTMLElement;
+
+          element.removeAttribute(
+            "size"
           );
 
-    insertHtml(
-      `<div class="nc-object nc-3d-object" data-object-id="${id}" data-kind="${kind}" contenteditable="${
-        kind === "line"
-          ? "false"
-          : "true"
-      }" style="position:relative;display:flex;align-items:center;justify-content:center;width:${width}px;height:${height}px;min-width:40px;min-height:${
-        kind === "line"
-          ? 4
-          : 30
-      }px;margin:18px auto;padding:${
-        kind === "line"
-          ? 0
-          : 12
-      }px;border:${strokeWidth}px solid ${stroke};border-radius:${radius};background:${background};box-shadow:${shadow};font-weight:800;text-align:center;box-sizing:border-box;">${text}</div><p><br></p>`
-    );
-  }
-
-  function insertVenn2() {
-    const id = uid();
-    const clipId = `clip-${id}`;
-
-    insertHtml(
-      `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" data-lock-ratio="true" contenteditable="false"
-        style="position:relative;width:760px;max-width:96%;height:420px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
-        <svg viewBox="0 0 760 420" width="100%" height="100%"
-          preserveAspectRatio="xMidYMid meet"
-          style="display:block;width:100%;height:100%;overflow:visible;">
-          <defs>
-            <clipPath id="${clipId}">
-              <ellipse cx="300" cy="220" rx="205" ry="125"></ellipse>
-            </clipPath>
-          </defs>
-
-          <foreignObject x="30" y="8" width="300" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
-              I — Unitar davlatga xos
-            </div>
-          </foreignObject>
-
-          <foreignObject x="430" y="8" width="300" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
-              II — Federativ davlatga xos
-            </div>
-          </foreignObject>
-
-          <ellipse cx="460" cy="220" rx="205" ry="125"
-            fill="#bca7e8" fill-opacity="0.72"
-            clip-path="url(#${clipId})"></ellipse>
-
-          <ellipse cx="300" cy="220" rx="205" ry="125"
-            fill="white" fill-opacity="0.01"
-            stroke="#263b46" stroke-width="3"></ellipse>
-
-          <ellipse cx="460" cy="220" rx="205" ry="125"
-            fill="white" fill-opacity="0.01"
-            stroke="#263b46" stroke-width="3"></ellipse>
-
-          <foreignObject x="175" y="196" width="100" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">I</div>
-          </foreignObject>
-
-          <foreignObject x="485" y="196" width="100" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">II</div>
-          </foreignObject>
-
-          <foreignObject x="330" y="196" width="100" height="48">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:900;outline:none;overflow:hidden;">III</div>
-          </foreignObject>
-
-          <foreignObject x="190" y="372" width="380" height="42">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
-              III — har ikkalasiga xos
-            </div>
-          </foreignObject>
-        </svg>
-      </div><p><br></p>`
-    );
-  }
-
-  function insertVenn3() {
-    const id = uid();
-
-    insertHtml(
-      `<div class="nc-object nc-venn3" data-object-id="${id}" data-kind="venn3" data-lock-ratio="true" contenteditable="false"
-        style="position:relative;width:720px;max-width:96%;height:470px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
-        <svg viewBox="0 0 720 470" width="100%" height="100%"
-          preserveAspectRatio="xMidYMid meet"
-          style="display:block;width:100%;height:100%;overflow:visible;">
-
-          <ellipse cx="285" cy="195" rx="170" ry="125"
-            fill="rgba(77,176,225,.12)" stroke="#263b46" stroke-width="3"></ellipse>
-          <ellipse cx="435" cy="195" rx="170" ry="125"
-            fill="rgba(85,204,155,.12)" stroke="#263b46" stroke-width="3"></ellipse>
-          <ellipse cx="360" cy="310" rx="170" ry="125"
-            fill="rgba(241,187,74,.12)" stroke="#263b46" stroke-width="3"></ellipse>
-
-          <foreignObject x="70" y="8" width="220" height="42">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">A to‘plam</div>
-          </foreignObject>
-          <foreignObject x="430" y="8" width="220" height="42">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">B to‘plam</div>
-          </foreignObject>
-          <foreignObject x="250" y="425" width="220" height="42">
-            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">C to‘plam</div>
-          </foreignObject>
-
-          <foreignObject x="155" y="157" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">I</div></foreignObject>
-          <foreignObject x="465" y="157" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">II</div></foreignObject>
-          <foreignObject x="310" y="362" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">III</div></foreignObject>
-          <foreignObject x="310" y="127" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">IV</div></foreignObject>
-          <foreignObject x="230" y="257" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">V</div></foreignObject>
-          <foreignObject x="390" y="257" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">VI</div></foreignObject>
-          <foreignObject x="310" y="217" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:900;outline:none;overflow:hidden;">VII</div></foreignObject>
-        </svg>
-      </div><p><br></p>`
-    );
-  }
-
-  function insertTable() {
-    const id = uid();
-
-    const rows =
-      Math.max(
-        1,
-        Math.min(
-          15,
-          Number(
-            window.prompt(
-              "Qatorlar soni:",
-              "3"
-            ) || 3
-          )
-        )
-      );
-
-    const cols =
-      Math.max(
-        1,
-        Math.min(
-          12,
-          Number(
-            window.prompt(
-              "Ustunlar soni:",
-              "3"
-            ) || 3
-          )
-        )
-      );
-
-    const body =
-      Array.from(
-        { length: rows },
-        (_, r) =>
-          `<tr>${Array.from(
-            { length: cols },
-            (_, c) =>
-              `<td style="border:2px solid #263b46;padding:10px;min-width:80px;height:44px;">${
-                r === 0
-                  ? `Sarlavha ${
-                      c + 1
-                    }`
-                  : ""
-              }</td>`
-          ).join("")}</tr>`
-      ).join("");
-
-    insertHtml(
-      `<div class="nc-table-wrap nc-object" data-object-id="${id}" data-kind="table" contenteditable="false" style="position:relative;overflow-x:auto;margin:16px 0;width:100%;box-sizing:border-box;border:2px solid #536a75;border-radius:10px;background:#fff;box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 6px 0 #617782,0 9px 12px rgba(0,0,0,.18);"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
-    );
-  }
-
-  function insertManualTable() {
-    const id = uid();
-
-    insertHtml(
-      `<div class="nc-table-object nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="false" style="position:relative;width:620px;max-width:96%;margin:18px auto;background:#fff;padding:4px;box-sizing:border-box;border:2px solid #536a75;border-radius:10px;box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 6px 0 #617782,0 9px 12px rgba(0,0,0,.18);">
-        <table data-manual-table="true" contenteditable="false" style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;">
-          <tbody>
-            <tr>
-              <td contenteditable="true" style="border:2px solid #263b46;height:58px;padding:8px;vertical-align:middle;"></td>
-            </tr>
-          </tbody>
-        </table>
-      </div><p><br></p>`
-    );
-  }
-
-  function currentTableCell() {
-    return selectedTableCellRef.current;
-  }
-
-  function currentTable() {
-    const cell = currentTableCell();
-    return cell?.closest("table") as HTMLTableElement | null;
-  }
-
-  function selectTableCell(
-    cell: HTMLTableCellElement | null
-  ) {
-    editorRef.current
-      ?.querySelectorAll("[data-nc-cell-selected='true']")
-      .forEach((node) => {
-        node.removeAttribute("data-nc-cell-selected");
-        (node as HTMLElement).style.boxShadow = "";
-      });
-
-    selectedTableCellRef.current = cell;
-
-    if (cell) {
-      cell.setAttribute("data-nc-cell-selected", "true");
-      cell.style.boxShadow = "inset 0 0 0 3px #0a9ee8";
-    }
-  }
-
-  function addTableRow() {
-    const table = currentTable();
-    const cell = currentTableCell();
-
-    if (!table || !cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    const row = cell.parentElement as HTMLTableRowElement;
-    const newRow = table.insertRow(row.rowIndex + 1);
-
-    const columns = Math.max(
-      1,
-      row.cells.length
-    );
-
-    for (let i = 0; i < columns; i++) {
-      const td = newRow.insertCell();
-      td.contentEditable = "true";
-      td.style.border = "2px solid #263b46";
-      td.style.height = "58px";
-      td.style.padding = "8px";
-      td.style.verticalAlign = "middle";
-    }
-
-    emit();
-  }
-
-  function addTableColumn() {
-    const table = currentTable();
-    const cell = currentTableCell();
-
-    if (!table || !cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    const colIndex =
-      cell.cellIndex + 1;
-
-    Array.from(table.rows).forEach((row) => {
-      const td = row.insertCell(
-        Math.min(
-          colIndex,
-          row.cells.length
-        )
-      );
-
-      td.contentEditable = "true";
-      td.style.border = "2px solid #263b46";
-      td.style.height = "58px";
-      td.style.padding = "8px";
-      td.style.verticalAlign = "middle";
-    });
-
-    emit();
-  }
-
-  function deleteTableRow() {
-    const table = currentTable();
-    const cell = currentTableCell();
-
-    if (!table || !cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    if (table.rows.length <= 1) {
-      window.alert("Jadvalda kamida 1 qator qolishi kerak.");
-      return;
-    }
-
-    const row = cell.parentElement as HTMLTableRowElement;
-    table.deleteRow(row.rowIndex);
-    selectTableCell(null);
-    emit();
-  }
-
-  function deleteTableColumn() {
-    const table = currentTable();
-    const cell = currentTableCell();
-
-    if (!table || !cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    if (cell.parentElement && (cell.parentElement as HTMLTableRowElement).cells.length <= 1) {
-      window.alert("Jadvalda kamida 1 ustun qolishi kerak.");
-      return;
-    }
-
-    const index = cell.cellIndex;
-
-    Array.from(table.rows).forEach((row) => {
-      if (row.cells[index]) {
-        row.deleteCell(index);
-      }
-    });
-
-    selectTableCell(null);
-    emit();
-  }
-
-  function mergeCellRight() {
-    const cell = currentTableCell();
-
-    if (!cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    const row =
-      cell.parentElement as HTMLTableRowElement;
-
-    const next =
-      row.cells[cell.cellIndex + 1];
-
-    if (!next) {
-      window.alert("O‘ng tomonda qo‘shiladigan katak yo‘q.");
-      return;
-    }
-
-    cell.colSpan =
-      (cell.colSpan || 1) +
-      (next.colSpan || 1);
-
-    if (next.innerHTML.trim()) {
-      cell.innerHTML +=
-        (cell.innerHTML.trim() ? "<br>" : "") +
-        next.innerHTML;
-    }
-
-    next.remove();
-    emit();
-  }
-
-  function mergeCellDown() {
-    const table = currentTable();
-    const cell = currentTableCell();
-
-    if (!table || !cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    const row =
-      cell.parentElement as HTMLTableRowElement;
-
-    const nextRow =
-      table.rows[row.rowIndex + 1];
-
-    if (!nextRow) {
-      window.alert("Pastda qo‘shiladigan katak yo‘q.");
-      return;
-    }
-
-    const below =
-      nextRow.cells[
-        Math.min(
-          cell.cellIndex,
-          nextRow.cells.length - 1
-        )
-      ];
-
-    if (!below) return;
-
-    cell.rowSpan =
-      (cell.rowSpan || 1) +
-      (below.rowSpan || 1);
-
-    if (below.innerHTML.trim()) {
-      cell.innerHTML +=
-        (cell.innerHTML.trim() ? "<br>" : "") +
-        below.innerHTML;
-    }
-
-    below.remove();
-    emit();
-  }
-
-  function splitCell() {
-    const cell = currentTableCell();
-
-    if (!cell) {
-      window.alert("Avval jadval katagini bosing.");
-      return;
-    }
-
-    const row =
-      cell.parentElement as HTMLTableRowElement;
-
-    if (cell.colSpan > 1) {
-      const count = cell.colSpan;
-      cell.colSpan = 1;
-
-      for (let i = 1; i < count; i++) {
-        const td = row.insertCell(
-          cell.cellIndex + i
-        );
-
-        td.contentEditable = "true";
-        td.style.border = "2px solid #263b46";
-        td.style.height = "58px";
-        td.style.padding = "8px";
-      }
-
-      emit();
-      return;
-    }
-
-    if (cell.rowSpan > 1) {
-      const table = currentTable();
-      if (!table) return;
-
-      const startRow =
-        row.rowIndex;
-
-      const count =
-        cell.rowSpan;
-
-      cell.rowSpan = 1;
-
-      for (let i = 1; i < count; i++) {
-        const targetRow =
-          table.rows[
-            startRow + i
-          ];
-
-        if (!targetRow) continue;
-
-        const td =
-          targetRow.insertCell(
-            Math.min(
-              cell.cellIndex,
-              targetRow.cells.length
-            )
-          );
-
-        td.contentEditable = "true";
-        td.style.border = "2px solid #263b46";
-        td.style.height = "58px";
-        td.style.padding = "8px";
-      }
-
-      emit();
-      return;
-    }
-
-    window.alert("Bu katak birlashtirilmagan.");
-  }
-
-  async function copySelected() {
-    const node =
-      selectedObject();
-
-    if (!node) return;
-
-    try {
-      await navigator.clipboard.writeText(
-        node.outerHTML
-      );
-    } catch {
-      // Browser clipboard permission may be unavailable.
-    }
-  }
-
-  async function pasteObject() {
-    try {
-      const html =
-        await navigator.clipboard.readText();
-
-      if (
-        html.includes(
-          "data-object-id"
-        )
-      ) {
-        insertHtml(
-          html.replace(
-            /data-object-id="[^"]+"/,
-            `data-object-id="${uid()}"`
-          ) + "<p><br></p>"
-        );
-      }
-    } catch {
-      window.alert(
-        "Brauzer clipboard ruxsatini bermadi. Ctrl+V dan foydalaning."
+          element.style.fontSize =
+            `${value}px`;
+        }
       );
     }
+
+    saveEditorHtml();
   }
 
-  function duplicateSelected() {
-    const node =
-      selectedObject();
+  /* =======================================================
+     QUESTION CRUD
+  ======================================================= */
 
-    if (!node) return;
+  function addQuestion() {
+    saveEditorHtml();
 
-    const clone =
-      node.cloneNode(
-        true
-      ) as HTMLElement;
+    const newQuestion =
+      makeQuestion();
 
-    clone.setAttribute(
-      "data-object-id",
-      uid()
+    setQuestions(
+      (current) => [
+        ...current,
+        newQuestion,
+      ]
     );
 
-    node.insertAdjacentElement(
-      "afterend",
-      clone
+    setActiveQuestionId(
+      newQuestion.id
     );
 
-    emit();
+    setSelectedShapeId(
+      null
+    );
   }
 
-  function deleteSelected() {
-    const node =
-      selectedObject();
-
-    if (!node) return;
-
-    node.remove();
-    setSelectedId("");
-    emit();
-  }
-
-  function layer(
-    direction:
-      | "front"
-      | "back"
-  ) {
-    const node =
-      selectedObject();
-
-    if (!node) return;
-
-    const current =
-      Number(
-        node.style.zIndex || 1
-      );
-
-    node.style.zIndex =
-      String(
-        direction ===
-          "front"
-          ? current + 1
-          : Math.max(
-              0,
-              current - 1
-            )
-      );
-
-    emit();
-  }
-
-  function ensureObjectForTarget(
-    target: HTMLElement
-  ) {
-    const existing =
-      target.closest(
-        "[data-object-id]"
-      ) as HTMLElement | null;
-
-    if (existing) {
-      return existing;
-    }
-
+  function duplicateQuestion() {
     if (
-      target.tagName !== "IMG"
-    ) {
-      return null;
-    }
-
-    const img =
-      target as HTMLImageElement;
-
-    const id = uid();
-
-    const rect =
-      img.getBoundingClientRect();
-
-    const width =
-      Math.max(
-        80,
-        Math.round(
-          rect.width ||
-            img.width ||
-            img.naturalWidth ||
-            320
-        )
-      );
-
-    const height =
-      Math.max(
-        60,
-        Math.round(
-          rect.height ||
-            img.height ||
-            img.naturalHeight ||
-            220
-        )
-      );
-
-    const wrapper =
-      document.createElement(
-        "div"
-      );
-
-    wrapper.className =
-      "nc-object nc-image-object nc-3d-object";
-
-    wrapper.setAttribute(
-      "data-object-id",
-      id
-    );
-
-    wrapper.setAttribute(
-      "data-kind",
-      "image"
-    );
-
-    wrapper.setAttribute(
-      "contenteditable",
-      "false"
-    );
-
-    wrapper.style.position =
-      "relative";
-
-    wrapper.style.display =
-      "inline-block";
-
-    wrapper.style.width = `${width}px`;
-    wrapper.style.height = `${height}px`;
-    wrapper.style.maxWidth =
-      "96%";
-    wrapper.style.margin =
-      "18px auto";
-    wrapper.style.border =
-      "2px solid #263b46";
-    wrapper.style.borderRadius =
-      "10px";
-    wrapper.style.background =
-      "linear-gradient(180deg,#ffffff,#e8eef2)";
-    wrapper.style.boxShadow =
-      "inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22)";
-    wrapper.style.overflow =
-      "visible";
-    wrapper.style.boxSizing =
-      "border-box";
-
-    img.parentNode?.insertBefore(
-      wrapper,
-      img
-    );
-
-    wrapper.appendChild(img);
-
-    img.style.display =
-      "block";
-    img.style.width =
-      "100%";
-    img.style.height =
-      "100%";
-    img.style.maxWidth =
-      "none";
-    img.style.objectFit =
-      "contain";
-    img.style.userSelect =
-      "none";
-    img.style.pointerEvents =
-      "none";
-
-    emit();
-
-    return wrapper;
-  }
-
-  function onEditorClick(
-    event: React.MouseEvent<HTMLDivElement>
-  ) {
-    const target =
-      event.target as HTMLElement;
-
-    const clickedCell =
-      target.closest(
-        "td,th"
-      ) as HTMLTableCellElement | null;
-
-    selectTableCell(
-      clickedCell
-    );
-
-    const object =
-      ensureObjectForTarget(
-        target
-      );
-
-    editorRef.current
-      ?.querySelectorAll(
-        ".nc-selected"
-      )
-      .forEach((node) =>
-        node.classList.remove(
-          "nc-selected"
-        )
-      );
-
-    if (!object) {
-      setSelectedId("");
-      setSelectionBox(null);
-      return;
-    }
-
-    object.classList.add(
-      "nc-selected"
-    );
-
-    const id =
-      object.getAttribute(
-        "data-object-id"
-      ) || "";
-
-    setSelectedId(id);
-
-    syncSelectionSoon(id);
-
-    const computed =
-      getComputedStyle(object);
-
-    setFill(
-      computed.backgroundColor ||
-        "#ffffff"
-    );
-
-    setStroke(
-      computed.borderColor ||
-        "#263b46"
-    );
-
-    setStrokeWidth(
-      parseInt(
-        computed.borderWidth
-      ) || 2
-    );
-  }
-
-  function onEditorPointerDown(
-    event: React.PointerEvent<HTMLDivElement>
-  ) {
-    if (
-      disabled ||
-      event.button !== 0
+      !activeQuestion
     ) {
       return;
     }
 
-    const target =
-      event.target as HTMLElement;
+    saveEditorHtml();
 
-    /*
-      Venn ichidagi yozuv yoki jadval katagi tahrirlanayotgan bo‘lsa,
-      obyektni sudrashni boshlamaymiz. Shunda kursor bilan matnni
-      bemalol belgilash va o‘zgartirish mumkin.
-    */
-    if (
-      target.closest(
-        '[data-nc-editable="true"]'
-      ) ||
-      target.closest(
-        'td[contenteditable="true"],th[contenteditable="true"]'
-      )
-    ) {
-      return;
-    }
+    const copy:
+      TestQuestion = {
+      ...activeQuestion,
 
-    const object =
-      ensureObjectForTarget(
-        target
-      );
+      id: makeId(),
 
-    if (!object) {
-      return;
-    }
+      options:
+        activeQuestion
+          .options
+          .map(
+            (option) => ({
+              ...option,
+              id: makeId(),
+            })
+          ),
 
-    const id =
-      object.getAttribute(
-        "data-object-id"
-      ) || "";
+      shapes:
+        activeQuestion
+          .shapes
+          .map(
+            (shape) => ({
+              ...shape,
 
-    if (!id) {
-      return;
-    }
+              id: makeId(),
 
-    const rect =
-      object.getBoundingClientRect();
+              x:
+                shape.x +
+                20,
 
-    const edge = 14;
-
-    const nearEdge =
-      event.clientX -
-        rect.left <= edge ||
-      rect.right -
-        event.clientX <= edge ||
-      event.clientY -
-        rect.top <= edge ||
-      rect.bottom -
-        event.clientY <= edge;
-
-    const kind =
-      object.getAttribute(
-        "data-kind"
-      ) || "";
-
-    const dragAnywhere =
-      kind === "image";
-
-    if (
-      !nearEdge &&
-      !dragAnywhere
-    ) {
-      return;
-    }
-
-    setSelectedId(id);
-    syncSelectionSoon(id);
-
-    const root =
-      editorRef.current;
-
-    if (!root) return;
-
-    if (
-      object.style.position !==
-      "absolute"
-    ) {
-      const rootRect =
-        root.getBoundingClientRect();
-
-      const objectRect =
-        object.getBoundingClientRect();
-
-      object.style.position =
-        "absolute";
-
-      object.style.left = `${Math.max(
-        0,
-        objectRect.left -
-          rootRect.left +
-          root.scrollLeft
-      )}px`;
-
-      object.style.top = `${Math.max(
-        0,
-        objectRect.top -
-          rootRect.top +
-          root.scrollTop
-      )}px`;
-
-      object.style.margin = "0";
-    }
-
-    dragRef.current = {
-      id,
-      startX:
-        event.clientX,
-      startY:
-        event.clientY,
-      left:
-        parseFloat(
-          object.style.left
-        ) || object.offsetLeft,
-      top:
-        parseFloat(
-          object.style.top
-        ) || object.offsetTop,
+              y:
+                shape.y +
+                20,
+            })
+          ),
     };
 
-    event.preventDefault();
-    event.stopPropagation();
+    setQuestions(
+      (current) => [
+        ...current,
+        copy,
+      ]
+    );
+
+    setActiveQuestionId(
+      copy.id
+    );
+
+    setSelectedShapeId(
+      null
+    );
   }
+
+  function deleteQuestion() {
+    if (
+      !activeQuestion
+    ) {
+      return;
+    }
+
+    if (
+      questions.length ===
+      1
+    ) {
+      alert(
+        "Kamida bitta savol bo‘lishi kerak."
+      );
+
+      return;
+    }
+
+    if (
+      !confirm(
+        "Ushbu savol o‘chirilsinmi?"
+      )
+    ) {
+      return;
+    }
+
+    const remaining =
+      questions.filter(
+        (item) =>
+          item.id !==
+          activeQuestion.id
+      );
+
+    setQuestions(
+      remaining
+    );
+
+    setActiveQuestionId(
+      remaining[0].id
+    );
+
+    setSelectedShapeId(
+      null
+    );
+  }
+
+  /* =======================================================
+     OPTION UPDATE
+  ======================================================= */
+
+  function updateOption(
+    optionId: string,
+    text: string
+  ) {
+    if (
+      !activeQuestion
+    ) {
+      return;
+    }
+
+    updateQuestion(
+      activeQuestion.id,
+      {
+        options:
+          activeQuestion
+            .options
+            .map(
+              (option) =>
+                option.id ===
+                optionId
+                  ? {
+                      ...option,
+                      text,
+                    }
+                  : option
+            ),
+      }
+    );
+  }
+
+  function setCorrectOption(
+    optionId: string
+  ) {
+    if (
+      !activeQuestion
+    ) {
+      return;
+    }
+
+    updateQuestion(
+      activeQuestion.id,
+      {
+        options:
+          activeQuestion
+            .options
+            .map(
+              (option) => ({
+                ...option,
+
+                isCorrect:
+                  option.id ===
+                  optionId,
+              })
+            ),
+      }
+    );
+  }
+
+  /* =======================================================
+     SHAPES
+  ======================================================= */
+
+  function addShape(
+    type: ShapeType
+  ) {
+    if (
+      !activeQuestion
+    ) {
+      return;
+    }
+
+    const shape:
+      TestShape = {
+      id: makeId(),
+
+      type,
+
+      x: 80,
+      y: 70,
+
+      width:
+        type === "circle"
+          ? 180
+          : type ===
+              "ellipse"
+            ? 260
+            : type ===
+                "venn"
+              ? 420
+              : 260,
+
+      height:
+        type === "circle"
+          ? 180
+          : type ===
+              "ellipse"
+            ? 150
+            : type ===
+                "venn"
+              ? 220
+              : 130,
+
+      text:
+        type === "venn"
+          ? ""
+          : "Matn",
+
+      backgroundColor:
+        "#8fc9ef",
+
+      borderColor:
+        "#2f5975",
+
+      textColor:
+        "#111111",
+
+      fontSize: 20,
+
+      fontFamily:
+        "Bell MT",
+
+      fontWeight:
+        "normal",
+
+      fontStyle:
+        "normal",
+
+      textAlign: "center",
+      textDecoration: "none",
+      textTransform: "none",
+      borderWidth: 2,
+      borderRadius:
+        type === "roundedRectangle" ? 28 :
+        type === "circle" || type === "ellipse" ? 999 : 4,
+      opacity: 1,
+      imageSrc: "",
+      objectFit: "contain",
+      zIndex: activeQuestion.shapes.length + 1,
+    };
+
+    updateQuestion(
+      activeQuestion.id,
+      {
+        shapes: [
+          ...activeQuestion
+            .shapes,
+          shape,
+        ],
+      }
+    );
+
+    setSelectedShapeId(
+      shape.id
+    );
+  }
+
+  function updateShape(
+    id: string,
+    patch:
+      Partial<TestShape>
+  ) {
+    if (
+      !activeQuestion
+    ) {
+      return;
+    }
+
+    updateQuestion(
+      activeQuestion.id,
+      {
+        shapes:
+          activeQuestion
+            .shapes
+            .map(
+              (shape) =>
+                shape.id === id
+                  ? {
+                      ...shape,
+                      ...patch,
+                    }
+                  : shape
+            ),
+      }
+    );
+  }
+
+  function deleteShape() {
+    if (
+      !activeQuestion ||
+      !selectedShapeId
+    ) {
+      return;
+    }
+
+    updateQuestion(
+      activeQuestion.id,
+      {
+        shapes:
+          activeQuestion
+            .shapes
+            .filter(
+              (shape) =>
+                shape.id !==
+                selectedShapeId
+            ),
+      }
+    );
+
+    setSelectedShapeId(
+      null
+    );
+  }
+
+  function duplicateShape() {
+    if (!activeQuestion || !selectedShape) return;
+    const copy: TestShape = {
+      ...selectedShape,
+      id: makeId(),
+      x: selectedShape.x + 24,
+      y: selectedShape.y + 24,
+      zIndex: Math.max(1, ...activeQuestion.shapes.map(s => s.zIndex ?? 1)) + 1,
+    };
+    updateQuestion(activeQuestion.id, { shapes: [...activeQuestion.shapes, copy] });
+    setSelectedShapeId(copy.id);
+  }
+
+  function bringShapeForward() {
+    if (!activeQuestion || !selectedShape) return;
+    const maxZ = Math.max(1, ...activeQuestion.shapes.map(s => s.zIndex ?? 1));
+    updateShape(selectedShape.id, { zIndex: maxZ + 1 });
+  }
+
+  function sendShapeBackward() {
+    if (!activeQuestion || !selectedShape) return;
+    const minZ = Math.min(1, ...activeQuestion.shapes.map(s => s.zIndex ?? 1));
+    updateShape(selectedShape.id, { zIndex: minZ - 1 });
+  }
+
+  function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !activeQuestion) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Faqat rasm faylini tanlang.");
+      event.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      const shape: TestShape = {
+        id: makeId(), type: "image", x: 80, y: 70, width: 360, height: 240,
+        text: "", backgroundColor: "#ffffff", borderColor: "#2f5975",
+        textColor: "#111111", fontSize: 20, fontFamily: "Bell MT",
+        fontWeight: "normal", fontStyle: "normal", textAlign: "center",
+        textDecoration: "none", textTransform: "none", borderWidth: 2,
+        borderRadius: 8, opacity: 1, imageSrc: reader.result,
+        objectFit: "contain",
+        zIndex: Math.max(1, ...activeQuestion.shapes.map(s => s.zIndex ?? 1)) + 1,
+      };
+      updateQuestion(activeQuestion.id, { shapes: [...activeQuestion.shapes, shape] });
+      setSelectedShapeId(shape.id);
+      event.target.value = "";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* =======================================================
+     DRAG
+  ======================================================= */
 
   function startDrag(
-    event: React.PointerEvent
+    event:
+      ReactMouseEvent,
+    shape: TestShape
   ) {
-    if (
-      disabled ||
-      !selectedId
-    ) {
-      return;
-    }
-
-    const node =
-      selectedObject();
-
-    if (!node) return;
-
-    const root =
-      editorRef.current;
-
-    if (!root) return;
+    const target =
+      event.target as HTMLElement;
 
     if (
-      node.style.position !==
-        "absolute"
-    ) {
-      const rootRect =
-        root.getBoundingClientRect();
-
-      const nodeRect =
-        node.getBoundingClientRect();
-
-      node.style.position =
-        "absolute";
-
-      node.style.left = `${Math.max(
-        0,
-        nodeRect.left -
-          rootRect.left +
-          root.scrollLeft
-      )}px`;
-
-      node.style.top = `${Math.max(
-        0,
-        nodeRect.top -
-          rootRect.top +
-          root.scrollTop
-      )}px`;
-
-      node.style.margin = "0";
-    }
-
-    dragRef.current = {
-      id: selectedId,
-      startX:
-        event.clientX,
-      startY:
-        event.clientY,
-      left:
-        parseFloat(
-          node.style.left
-        ) || node.offsetLeft,
-      top:
-        parseFloat(
-          node.style.top
-        ) || node.offsetTop,
-    };
-
-    event.preventDefault();
-  }
-
-  function startResize(
-    event: React.PointerEvent,
-    handle: Handle
-  ) {
-    if (
-      disabled ||
-      !selectedId
-    ) {
-      return;
-    }
-
-    const node =
-      selectedObject();
-
-    if (!node) return;
-
-    const root =
-      editorRef.current;
-
-    if (!root) return;
-
-    if (
-      node.style.position !==
-        "absolute"
-    ) {
-      const rootRect =
-        root.getBoundingClientRect();
-
-      const nodeRect =
-        node.getBoundingClientRect();
-
-      node.style.position =
-        "absolute";
-
-      node.style.left = `${Math.max(
-        0,
-        nodeRect.left -
-          rootRect.left +
-          root.scrollLeft
-      )}px`;
-
-      node.style.top = `${Math.max(
-        0,
-        nodeRect.top -
-          rootRect.top +
-          root.scrollTop
-      )}px`;
-
-      node.style.margin = "0";
-    }
-
-    resizeRef.current = {
-      id: selectedId,
-      handle,
-      startX:
-        event.clientX,
-      startY:
-        event.clientY,
-      left:
-        parseFloat(
-          node.style.left
-        ) || node.offsetLeft,
-      top:
-        parseFloat(
-          node.style.top
-        ) || node.offsetTop,
-      width:
-        node.offsetWidth,
-      height:
-        node.offsetHeight,
-      ratio:
-        node.offsetWidth /
-        Math.max(
-          node.offsetHeight,
-          1
-        ),
-      lockRatio:
-        node.getAttribute(
-          "data-lock-ratio"
-        ) === "true",
-    };
-
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  function addImage(
-    file: File
-  ) {
-    if (
-      !file.type.startsWith(
-        "image/"
+      target.closest(
+        ".resizeHandle"
+      ) ||
+      target.closest(
+        ".shapeInput"
       )
     ) {
       return;
     }
 
-    const reader =
-      new FileReader();
+    event.preventDefault();
+    event.stopPropagation();
 
-    reader.onload = () => {
-      const id = uid();
+    setSelectedShapeId(
+      shape.id
+    );
 
-      insertHtml(
-        `<div class="nc-object nc-image-object nc-3d-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;border-radius:10px;background:linear-gradient(180deg,#ffffff,#e8eef2);box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22);overflow:visible;"><img src="${String(
-          reader.result || ""
-        )}" alt="Savol rasmi" style="width:100%;height:100%;object-fit:contain;display:block;" /></div><p><br></p>`
+    const startMouseX =
+      event.clientX;
+
+    const startMouseY =
+      event.clientY;
+
+    const startX =
+      shape.x;
+
+    const startY =
+      shape.y;
+
+    function move(
+      e: MouseEvent
+    ) {
+      updateShape(
+        shape.id,
+        {
+          x: Math.max(
+            0,
+            startX +
+              e.clientX -
+              startMouseX
+          ),
+
+          y: Math.max(
+            0,
+            startY +
+              e.clientY -
+              startMouseY
+          ),
+        }
       );
-    };
+    }
 
-    reader.readAsDataURL(
-      file
+    function stop() {
+      window.removeEventListener(
+        "mousemove",
+        move
+      );
+
+      window.removeEventListener(
+        "mouseup",
+        stop
+      );
+    }
+
+    window.addEventListener(
+      "mousemove",
+      move
+    );
+
+    window.addEventListener(
+      "mouseup",
+      stop
     );
   }
 
-  return (
-    <section className="designer">
-      <div className="toolbar">
-        <button
-          type="button"
-          onClick={() =>
-            command("undo")
-          }
-          disabled={disabled}
-          title="Undo"
-        >
-          ↶
-        </button>
+  /* =======================================================
+     RESIZE
+  ======================================================= */
 
-        <button
-          type="button"
-          onClick={() =>
-            command("redo")
-          }
-          disabled={disabled}
-          title="Redo"
-        >
-          ↷
-        </button>
+  function startResize(
+    event:
+      ReactMouseEvent,
+    shape: TestShape,
+    direction:
+      | "n"
+      | "s"
+      | "e"
+      | "w"
+      | "ne"
+      | "nw"
+      | "se"
+      | "sw"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
 
-        <select
-          defaultValue="Bell MT"
-          onChange={(e) =>
-            command(
-              "fontName",
-              e.target.value
+    const startMouseX =
+      event.clientX;
+
+    const startMouseY =
+      event.clientY;
+
+    const startX =
+      shape.x;
+
+    const startY =
+      shape.y;
+
+    const startWidth =
+      shape.width;
+
+    const startHeight =
+      shape.height;
+
+    const minWidth = 60;
+    const minHeight = 50;
+
+    function move(
+      e: MouseEvent
+    ) {
+      const dx =
+        e.clientX -
+        startMouseX;
+
+      const dy =
+        e.clientY -
+        startMouseY;
+
+      let x =
+        startX;
+
+      let y =
+        startY;
+
+      let width =
+        startWidth;
+
+      let height =
+        startHeight;
+
+      if (
+        direction.includes(
+          "e"
+        )
+      ) {
+        width =
+          Math.max(
+            minWidth,
+            startWidth + dx
+          );
+      }
+
+      if (
+        direction.includes(
+          "s"
+        )
+      ) {
+        height =
+          Math.max(
+            minHeight,
+            startHeight + dy
+          );
+      }
+
+      if (
+        direction.includes(
+          "w"
+        )
+      ) {
+        const nextWidth =
+          startWidth - dx;
+
+        if (
+          nextWidth >=
+          minWidth
+        ) {
+          width =
+            nextWidth;
+
+          x =
+            startX + dx;
+        }
+      }
+
+      if (
+        direction.includes(
+          "n"
+        )
+      ) {
+        const nextHeight =
+          startHeight - dy;
+
+        if (
+          nextHeight >=
+          minHeight
+        ) {
+          height =
+            nextHeight;
+
+          y =
+            startY + dy;
+        }
+      }
+
+      updateShape(
+        shape.id,
+        {
+          x,
+          y,
+          width,
+          height,
+        }
+      );
+    }
+
+    function stop() {
+      window.removeEventListener(
+        "mousemove",
+        move
+      );
+
+      window.removeEventListener(
+        "mouseup",
+        stop
+      );
+    }
+
+    window.addEventListener(
+      "mousemove",
+      move
+    );
+
+    window.addEventListener(
+      "mouseup",
+      stop
+    );
+  }
+
+  /* =======================================================
+     SAVE
+  ======================================================= */
+
+  async function saveTest(
+    status: TestStatus
+  ) {
+    saveEditorHtml();
+
+    if (!title.trim()) {
+      alert(
+        "Test nomini kiriting."
+      );
+      return;
+    }
+
+    if (
+      questions.length === 0
+    ) {
+      alert(
+        "Kamida bitta savol bo‘lishi kerak."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      /*
+        React state yangilanishi async bo‘lgani uchun
+        ayni paytda ochiq turgan editor HTMLini payloadga
+        qo‘lda qo‘shamiz.
+      */
+      const currentHtml =
+        editorRef.current
+          ?.innerHTML ??
+        activeQuestion
+          ?.questionHtml ??
+        "";
+
+      const payloadQuestions =
+        questions.map(
+          (question) =>
+            question.id ===
+            activeQuestion?.id
+              ? {
+                  ...question,
+                  questionHtml:
+                    currentHtml,
+                }
+              : question
+        );
+
+      /*
+        E’lon qilishda har bir savolda aynan bitta
+        to‘g‘ri javob borligini tekshiramiz.
+      */
+      const invalid =
+        payloadQuestions.some(
+          (question) =>
+            question.options
+              .filter(
+                (option) =>
+                  option.isCorrect
+              ).length !== 1
+        );
+
+      if (invalid) {
+        alert(
+          "Har bir savolda aynan bitta to‘g‘ri javob belgilang."
+        );
+        return;
+      }
+
+      /*
+        =====================================================
+        MAVJUD KATTA TESTni TAHRIRLASH
+
+        Oldingi usul:
+          780 ta savolning hammasini PUT orqali yuborardi.
+
+        Yangi usul:
+          - faqat o‘zgargan savollar;
+          - yangi savollar;
+          - o‘chirilgan savol IDlari;
+          - kerak bo‘lsa savollar tartibi;
+          - test metadata
+
+        yuboriladi.
+        =====================================================
+      */
+      if (editingId) {
+        const original =
+          originalQuestionsRef.current;
+
+        const originalMap =
+          new Map(
+            original.map(
+              (question) => [
+                String(
+                  question.id
+                ),
+                question,
+              ]
             )
-          }
-          disabled={disabled}
-        >
-          <option>
-            Bell MT
-          </option>
-          <option>
-            Georgia
-          </option>
-          <option>
-            Arial
-          </option>
-          <option>
-            Times New Roman
-          </option>
-        </select>
+          );
 
-        <select
-          defaultValue="5"
-          onChange={(e) =>
-            command(
-              "fontSize",
-              e.target.value
+        const currentIdSet =
+          new Set(
+            payloadQuestions.map(
+              (question) =>
+                String(
+                  question.id
+                )
             )
-          }
-          disabled={disabled}
-        >
-          <option value="2">
-            14
-          </option>
-          <option value="3">
-            16
-          </option>
-          <option value="4">
-            18
-          </option>
-          <option value="5">
-            24
-          </option>
-          <option value="6">
-            32
-          </option>
-        </select>
+          );
 
-        <button
-          type="button"
-          onClick={() =>
-            command("bold")
-          }
-          disabled={disabled}
-        >
-          <b>B</b>
-        </button>
+        const changedQuestions =
+          payloadQuestions.filter(
+            (question) => {
+              const before =
+                originalMap.get(
+                  String(
+                    question.id
+                  )
+                );
 
-        <button
-          type="button"
-          onClick={() =>
-            command("italic")
-          }
-          disabled={disabled}
-        >
-          <i>I</i>
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "underline"
-            )
-          }
-          disabled={disabled}
-        >
-          <u>U</u>
-        </button>
-
-        <label
-          className="colorTool"
-          title="Matn rangi"
-        >
-          A
-          <input
-            type="color"
-            onChange={(e) =>
-              command(
-                "foreColor",
-                e.target.value
-              )
-            }
-            disabled={disabled}
-          />
-        </label>
-
-        <label
-          className="colorTool"
-          title="Marker/fon"
-        >
-          ▰
-          <input
-            type="color"
-            onChange={(e) =>
-              command(
-                "hiliteColor",
-                e.target.value
-              )
-            }
-            disabled={disabled}
-          />
-        </label>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "justifyLeft"
-            )
-          }
-          disabled={disabled}
-        >
-          ≡←
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "justifyCenter"
-            )
-          }
-          disabled={disabled}
-        >
-          ≡
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "justifyRight"
-            )
-          }
-          disabled={disabled}
-        >
-          →≡
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "justifyFull"
-            )
-          }
-          disabled={disabled}
-          title="Ikki chetini tekislash"
-        >
-          ≡↔
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "insertUnorderedList"
-            )
-          }
-          disabled={disabled}
-        >
-          • List
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            command(
-              "insertOrderedList"
-            )
-          }
-          disabled={disabled}
-        >
-          1. List
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            insertHtml(
-              '<ol type="I"><li>Matn</li></ol>'
-            )
-          }
-          disabled={disabled}
-          title="Rim raqamlari"
-        >
-          I. List
-        </button>
-      </div>
-
-      <div className="toolbar second">
-        <button
-          type="button"
-          onClick={() =>
-            fileRef.current?.click()
-          }
-          disabled={disabled}
-        >
-          🖼 Rasm
-        </button>
-
-        <button
-          type="button"
-          onClick={insertTable}
-          disabled={disabled}
-        >
-          ▦ Jadval
-        </button>
-
-        <button
-          type="button"
-          onClick={
-            insertManualTable
-          }
-          disabled={disabled}
-        >
-          ✎ Qo‘lda jadval
-        </button>
-
-        <button
-          type="button"
-          onClick={addTableRow}
-          disabled={disabled}
-        >
-          + Qator
-        </button>
-
-        <button
-          type="button"
-          onClick={addTableColumn}
-          disabled={disabled}
-        >
-          + Ustun
-        </button>
-
-        <button
-          type="button"
-          onClick={deleteTableRow}
-          disabled={disabled}
-        >
-          − Qator
-        </button>
-
-        <button
-          type="button"
-          onClick={deleteTableColumn}
-          disabled={disabled}
-        >
-          − Ustun
-        </button>
-
-        <button
-          type="button"
-          onClick={mergeCellRight}
-          disabled={disabled}
-        >
-          Birlashtir →
-        </button>
-
-        <button
-          type="button"
-          onClick={mergeCellDown}
-          disabled={disabled}
-        >
-          Birlashtir ↓
-        </button>
-
-        <button
-          type="button"
-          onClick={splitCell}
-          disabled={disabled}
-        >
-          Katakni ajrat
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            insertObject(
-              "line"
-            )
-          }
-          disabled={disabled}
-        >
-          ━ Chiziq
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            insertObject(
-              "rectangle"
-            )
-          }
-          disabled={disabled}
-        >
-          ▭ To‘rtburchak
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            insertObject(
-              "rounded"
-            )
-          }
-          disabled={disabled}
-        >
-          ▢ Yumaloq
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            insertObject(
-              "circle"
-            )
-          }
-          disabled={disabled}
-        >
-          ○ Aylana
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            insertObject(
-              "ellipse"
-            )
-          }
-          disabled={disabled}
-        >
-          ⬭ Ellips
-        </button>
-
-        <button
-          type="button"
-          onClick={insertVenn2}
-          disabled={disabled}
-        >
-          ◯◯ Venn 2
-        </button>
-
-        <button
-          type="button"
-          onClick={insertVenn3}
-          disabled={disabled}
-        >
-          ◯◯◯ Venn 3
-        </button>
-      </div>
-
-      <div className="toolbar objectTools">
-        <strong>
-          Tanlangan obyekt:
-        </strong>
-
-        <button
-          type="button"
-          onClick={
-            copySelected
-          }
-          disabled={
-            disabled ||
-            !selectedId
-          }
-        >
-          Copy
-        </button>
-
-        <button
-          type="button"
-          onClick={
-            pasteObject
-          }
-          disabled={disabled}
-        >
-          Paste
-        </button>
-
-        <button
-          type="button"
-          onClick={
-            duplicateSelected
-          }
-          disabled={
-            disabled ||
-            !selectedId
-          }
-        >
-          Duplicate
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            layer("front")
-          }
-          disabled={
-            disabled ||
-            !selectedId
-          }
-        >
-          Oldinga
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            layer("back")
-          }
-          disabled={
-            disabled ||
-            !selectedId
-          }
-        >
-          Orqaga
-        </button>
-
-        <label>
-          Fon
-          <input
-            type="color"
-            value={
-              /^#[0-9a-f]{6}$/i.test(
-                fill
-              )
-                ? fill
-                : "#ffffff"
-            }
-            onChange={(e) => {
-              const value =
-                e.target.value;
-
-              setFill(value);
-
-              applyObjectStyleValues(
-                value,
-                stroke,
-                strokeWidth
-              );
-            }}
-            disabled={
-              disabled ||
-              !selectedId
-            }
-          />
-        </label>
-
-        <label>
-          Chegara
-          <input
-            type="color"
-            value={
-              /^#[0-9a-f]{6}$/i.test(
-                stroke
-              )
-                ? stroke
-                : "#263b46"
-            }
-            onChange={(e) => {
-              const value =
-                e.target.value;
-
-              setStroke(value);
-
-              applyObjectStyleValues(
-                fill,
-                value,
-                strokeWidth
-              );
-            }}
-            disabled={
-              disabled ||
-              !selectedId
-            }
-          />
-        </label>
-
-        <label>
-          px
-          <input
-            className="strokeNumber"
-            type="number"
-            min="0"
-            max="12"
-            value={
-              strokeWidth
-            }
-            onChange={(e) => {
-              const value =
-                Number(
-                  e.target.value
-                ) || 0;
-
-              setStrokeWidth(
-                value
-              );
-
-              applyObjectStyleValues(
-                fill,
-                stroke,
-                value
-              );
-            }}
-            disabled={
-              disabled ||
-              !selectedId
-            }
-          />
-        </label>
-
-        <button
-          type="button"
-          onClick={
-            applyObjectStyle
-          }
-          disabled={
-            disabled ||
-            !selectedId
-          }
-        >
-          Rangni qo‘llash
-        </button>
-
-        <button
-          type="button"
-          className="danger"
-          onClick={
-            deleteSelected
-          }
-          disabled={
-            disabled ||
-            !selectedId
-          }
-        >
-          O‘chirish
-        </button>
-      </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(event) => {
-          const file =
-            event.target
-              .files?.[0];
-
-          if (file) {
-            addImage(file);
-          }
-
-          event.target.value =
-            "";
-        }}
-      />
-
-      <div className="canvasWrap">
-        <div
-          ref={editorRef}
-          className="canvas"
-          contentEditable={
-            !disabled
-          }
-          suppressContentEditableWarning
-          onInput={emit}
-          onClick={
-            onEditorClick
-          }
-          onPointerDown={
-            onEditorPointerDown
-          }
-          onPaste={() =>
-            setTimeout(
-              emit,
-              0
-            )
-          }
-        />
-
-        {selectedId &&
-          selectionBox && (
-          <div
-            className="selectionUi"
-            data-nc-ui="true"
-            style={{
-              left:
-                selectionBox.left,
-              top:
-                selectionBox.top,
-              width:
-                selectionBox.width,
-              height:
-                selectionBox.height,
-            }}
-          >
-            <button
-              type="button"
-              className="deleteBubble"
-              onClick={
-                deleteSelected
+              if (!before) {
+                return true;
               }
-              title="O‘chirish"
-            >
-              ×
-            </button>
 
-            {HANDLES.map(
-              (handle) => (
-                <button
-                  key={
-                    handle
-                  }
-                  type="button"
-                  className={`resizeHandle ${handle}`}
-                  onPointerDown={(
-                    event
-                  ) =>
-                    startResize(
-                      event,
-                      handle
-                    )
-                  }
-                  title={`${handle} resize`}
-                />
+              return (
+                JSON.stringify(
+                  before
+                ) !==
+                JSON.stringify(
+                  question
+                )
+              );
+            }
+          );
+
+        const deletedQuestionIds =
+          original
+            .filter(
+              (question) =>
+                !currentIdSet.has(
+                  String(
+                    question.id
+                  )
+                )
+            )
+            .map(
+              (question) =>
+                String(
+                  question.id
+                )
+            );
+
+        /*
+          Pagination rejimida brauzerda faqat 30 ta savol bor.
+          Shu sabab 30 ta IDni global 780 ta savol tartibi deb
+          serverga yubormaymiz.
+        */
+
+        const response =
+          await fetch(
+            "/api/tests/legacy-neon",
+            {
+              method: "POST",
+              credentials:
+                "include",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  action:
+                    "patch-test",
+
+                  testId:
+                    editingId,
+
+                  title:
+                    title.trim(),
+
+                  subject:
+                    subject.trim(),
+
+                  duration:
+                    Math.max(
+                      1,
+                      Number(
+                        duration
+                      ) || 30
+                    ),
+
+                  description,
+
+                  status,
+
+                  changedQuestions,
+
+                  deletedQuestionIds,
+
+                  questionOrder:
+                    undefined,
+                }),
+            }
+          );
+
+        const responseText =
+          await response.text();
+
+        let data: any = {};
+
+        if (
+          responseText.trim()
+        ) {
+          try {
+            data =
+              JSON.parse(
+                responseText
+              );
+          } catch {
+            data = {
+              success: false,
+              message:
+                `Server JSON bo‘lmagan javob qaytardi. Status: ${response.status}. ${responseText.slice(0, 180)}`,
+            };
+          }
+        }
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          alert(
+            data.message ||
+              `Test saqlanmadi. Status: ${response.status}`
+          );
+          return;
+        }
+
+        alert(
+          status ===
+            "published"
+            ? "O‘zgarishlar saqlandi va test e’lon qilindi."
+            : "O‘zgarishlar saqlandi."
+        );
+
+        router.push(
+          "/admin/tests"
+        );
+
+        router.refresh();
+
+        return;
+      }
+
+      /*
+        =====================================================
+        YANGI TEST
+
+        Yangi kichik testni editor ichidan yaratishda
+        eski POST usuli ishlashda davom etadi.
+        =====================================================
+      */
+      const payload = {
+        title:
+          title.trim(),
+
+        subject:
+          subject.trim(),
+
+        duration:
+          Math.max(
+            1,
+            Number(duration) ||
+              30
+          ),
+
+        description,
+
+        questions:
+          payloadQuestions,
+
+        status,
+      };
+
+      const response =
+        await fetch(
+          "/api/tests/legacy-neon",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                payload
+              ),
+          }
+        );
+
+      const responseText =
+        await response.text();
+
+      let data: any = {};
+
+      if (
+        responseText.trim()
+      ) {
+        try {
+          data =
+            JSON.parse(
+              responseText
+            );
+        } catch {
+          data = {
+            success: false,
+            message:
+              `Server JSON bo‘lmagan javob qaytardi. Status: ${response.status}. ${responseText.slice(0, 180)}`,
+          };
+        }
+      }
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        alert(
+          data.message ||
+            "Test saqlanmadi."
+        );
+        return;
+      }
+
+      alert(
+        status ===
+          "published"
+          ? "Test yaratildi va e’lon qilindi."
+          : "Test qoralama sifatida saqlandi."
+      );
+
+      router.push(
+        "/admin/tests"
+      );
+
+      router.refresh();
+    } catch (error) {
+      console.error(
+        "TEST SAVE ERROR:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? `Testni saqlashda xato: ${error.message}`
+          : "Testni saqlashda server xatosi yuz berdi."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
+  /* =======================================================
+     KOMPYUTERGA SAQLASH
+  ======================================================= */
+
+  function downloadTestToComputer() {
+    saveEditorHtml();
+
+    const currentHtml =
+      editorRef.current?.innerHTML ??
+      activeQuestion?.questionHtml ??
+      "";
+
+    const exportQuestions =
+      questions.map((question) =>
+        question.id === activeQuestion?.id
+          ? {
+              ...question,
+              questionHtml: currentHtml,
+            }
+          : question
+      );
+
+    const exportData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      test: {
+        id: editingId || undefined,
+        title: title.trim(),
+        subject: subject.trim(),
+        duration: Math.max(1, Number(duration) || 30),
+        description,
+        questions: exportQuestions,
+        status: "draft" as TestStatus,
+      },
+    };
+
+    const blob = new Blob(
+      [JSON.stringify(exportData, null, 2)],
+      { type: "application/json;charset=utf-8" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    const safeTitle =
+      (title.trim() || "test")
+        .replace(/[^a-zA-Z0-9\u0400-\u04FF\u2018\u2019\u02BB\u02BC_-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "") || "test";
+
+    link.href = url;
+    link.download = `${safeTitle}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  /* =======================================================
+     LOADING
+  ======================================================= */
+
+  if (
+    !adminChecked ||
+    loadingTest
+  ) {
+    return (
+      <main className="loading">
+        Test muharriri
+        yuklanmoqda...
+      </main>
+    );
+  }
+
+  /* =========================================================
+     UI
+  ========================================================= */
+
+  return (
+    <main
+      className="page"
+      onMouseDown={() =>
+        setSelectedShapeId(
+          null
+        )
+      }
+    >
+
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
+      <header className="topPanel">
+
+        <div className="namePlate">
+          Test muharriri
+        </div>
+
+        <div className="headerButtons">
+
+          <button
+            onClick={() =>
+              router.push(
+                "/admin/tests"
               )
-            )}
+            }
+          >
+            Testlar
+          </button>
+
+          <button
+            onClick={() =>
+              router.push("/")
+            }
+          >
+            Asosiy sahifa
+          </button>
+
+        </div>
+
+      </header>
+
+
+      {/* =================================================
+          TEST INFO
+      ================================================= */}
+
+      <section className="sectionBox">
+
+        <div className="sectionTitle">
+          {editingId
+            ? "Testni tahrirlash"
+            : "Yangi test yaratish"}
+        </div>
+
+        <div className="infoPanel">
+
+          <label>
+            <span>
+              Test nomi
+            </span>
+
+            <input
+              value={title}
+              onChange={(e) =>
+                setTitle(
+                  e.target.value
+                )
+              }
+              dir="ltr"
+              placeholder="Masalan: Jinoyat huquqi — 1"
+            />
+          </label>
+
+          <label>
+            <span>
+              Fan
+            </span>
+
+            <input
+              value={subject}
+              onChange={(e) =>
+                setSubject(
+                  e.target.value
+                )
+              }
+              dir="ltr"
+              placeholder="Masalan: Jinoyat huquqi"
+            />
+          </label>
+
+          <label>
+            <span>
+              Vaqt
+            </span>
+
+            <div className="durationRow">
+
+              <input
+                type="number"
+                min={1}
+                value={duration}
+                onChange={(e) =>
+                  setDuration(
+                    Math.max(
+                      1,
+                      Number(
+                        e.target
+                          .value
+                      ) || 1
+                    )
+                  )
+                }
+              />
+
+              <strong>
+                daqiqa
+              </strong>
+
+            </div>
+          </label>
+
+          <label className="descriptionField">
+
+            <span>
+              Test haqida
+            </span>
+
+            <textarea
+              value={
+                description
+              }
+              onChange={(e) =>
+                setDescription(
+                  e.target.value
+                )
+              }
+              placeholder="Test haqida qisqacha izoh..."
+            />
+
+          </label>
+
+        </div>
+
+      </section>
+
+
+      {/* =================================================
+          QUESTION NAV
+      ================================================= */}
+
+      <section className="questionBar">
+
+        <div className="questionPageControls">
+
+          <button
+            className="pageArrow"
+            disabled={
+              pageLoading ||
+              questionPage <= 1
+            }
+            onClick={() =>
+              goToQuestionPage(
+                questionPage - 1
+              )
+            }
+          >
+            ← Oldingi 30 ta
+          </button>
+
+          <div className="questionPageInfo">
+            <strong>
+              Jami: {totalQuestions} ta savol
+            </strong>
+
+            <span>
+              Hozir:{" "}
+              {totalQuestions === 0
+                ? 0
+                : pageStartIndex + 1}
+              –
+              {Math.min(
+                pageStartIndex +
+                  questions.length,
+                totalQuestions
+              )}
+            </span>
           </div>
-        )}
+
+          <button
+            className="pageArrow"
+            disabled={
+              pageLoading ||
+              questionPage >=
+                totalQuestionPages
+            }
+            onClick={() =>
+              goToQuestionPage(
+                questionPage + 1
+              )
+            }
+          >
+            Keyingi 30 ta →
+          </button>
+
+        </div>
+
+        <div className="questionTabs">
+
+          {questions.map(
+            (
+              question,
+              index
+            ) => (
+              <button
+                key={
+                  question.id
+                }
+                className={
+                  question.id ===
+                  activeQuestionId
+                    ? "activeTab"
+                    : ""
+                }
+                onClick={() => {
+                  saveEditorHtml();
+
+                  setActiveQuestionId(
+                    question.id
+                  );
+
+                  setSelectedShapeId(
+                    null
+                  );
+                }}
+              >
+                {pageStartIndex +
+                  index +
+                  1}
+              </button>
+            )
+          )}
+
+        </div>
+
+        <button
+          className="addQuestion"
+          onClick={
+            addQuestion
+          }
+        >
+          + Yangi savol
+        </button>
+
+      </section>
+
+
+      {/* =================================================
+          QUESTION — MILLIY SERTIFIKATDAGI TO‘LIQ MUHARRIR
+      ================================================= */}
+
+      {activeQuestion && (
+        <section className="editorSection">
+
+          <div className="questionHeader">
+            <h2>
+              Savol {pageStartIndex + questions.findIndex(
+                (item) => item.id === activeQuestion.id
+              ) + 1}
+            </h2>
+
+            <div>
+              <button onClick={duplicateQuestion}>
+                Nusxalash
+              </button>
+
+              <button
+                className="dangerButton"
+                onClick={deleteQuestion}
+              >
+                Savolni o‘chirish
+              </button>
+            </div>
+          </div>
+
+          <div className="fullDesignerBlock">
+            <div className="fullDesignerTitle">
+              SAVOL MATNI — TO‘LIQ MUHARRIR
+            </div>
+
+            <p className="fullDesignerHint">
+              Matn, rasm, jadval, Venn va shakllar shu maydonning o‘zida tahrirlanadi.
+              Obyektni sudrash va 8 nuqtadan o‘lchamini o‘zgartirish mumkin.
+            </p>
+
+            <QuestionDesigner
+              key={activeQuestion.id}
+              value={activeQuestion.questionHtml || ""}
+              onChange={(html) =>
+                updateQuestion(activeQuestion.id, {
+                  questionHtml: html,
+                })
+              }
+            />
+          </div>
+
+          {/* =================================================
+              OPTIONS
+          ================================================= */}
+
+          <div className="answersTitle">
+            Javob variantlari
+          </div>
+
+          <div className="answers">
+
+            {activeQuestion
+              .options
+              .map(
+                (
+                  option,
+                  index
+                ) => (
+                  <div
+                    className={
+                      option.isCorrect
+                        ? "answerRow correctAnswer"
+                        : "answerRow"
+                    }
+                    key={
+                      option.id
+                    }
+                  >
+
+                    <label className="radioArea">
+
+                      <input
+                        type="radio"
+                        name={`correct-${activeQuestion.id}`}
+                        checked={
+                          option.isCorrect
+                        }
+                        onChange={() =>
+                          setCorrectOption(
+                            option.id
+                          )
+                        }
+                      />
+
+                      <strong>
+                        {optionLetter(
+                          index
+                        )}
+                      </strong>
+
+                    </label>
+
+                    <textarea
+                      value={
+                        option.text
+                      }
+                      onChange={(e) =>
+                        updateOption(
+                          option.id,
+                          e.target.value
+                        )
+                      }
+                      placeholder={`${optionLetter(
+                        index
+                      )}) javob variantini yozing...`}
+                    />
+
+                  </div>
+                )
+              )}
+
+          </div>
+
+
+          <div className="pointsRow">
+
+            <label>
+              Savol balli
+
+              <input
+                type="number"
+                min={1}
+                value={
+                  activeQuestion
+                    .points
+                }
+                onChange={(e) =>
+                  updateQuestion(
+                    activeQuestion.id,
+                    {
+                      points:
+                        Math.max(
+                          1,
+                          Number(
+                            e
+                              .target
+                              .value
+                          ) || 1
+                        ),
+                    }
+                  )
+                }
+              />
+
+            </label>
+
+          </div>
+
+        </section>
+      )}
+
+
+      {/* =================================================
+          SAVE
+      ================================================= */}
+
+      <div className="bottomButtons">
+
+        <button
+          className="draftButton"
+          disabled={saving}
+          onClick={() =>
+            saveTest(
+              "draft"
+            )
+          }
+        >
+          {saving
+            ? "Saqlanmoqda..."
+            : editingId
+              ? "O‘zgarishlarni saqlash"
+              : "Qoralama saqlash"}
+        </button>
+
+        <button
+          className="downloadButton"
+          disabled={saving}
+          onClick={downloadTestToComputer}
+        >
+          Kompyuterga saqlash
+        </button>
+
+        <button
+          className="publishButton"
+          disabled={saving}
+          onClick={() =>
+            saveTest(
+              "published"
+            )
+          }
+        >
+          Testni e’lon qilish
+        </button>
+
       </div>
 
-      <p className="hint">
-        Obyektni tanlang.
-        8 ta nuqtadan tortib
-        o‘lchamini o‘zgartiring.
-        Shakl chegarasidan
-        ushlab sudrashingiz mumkin.
-        Rasm, Venn, jadval va
-        boshqa obyektlar ham
-        bir xil ishlaydi.
-      </p>
+
+      {/* =================================================
+          CSS
+      ================================================= */}
 
       <style jsx>{`
-        .designer {
-          margin-top: 10px;
+
+        * {
+          box-sizing: border-box;
         }
 
-        .toolbar {
+        .loading {
+          min-height: 100vh;
+
           display: flex;
-          flex-wrap: wrap;
-          gap: 7px;
           align-items: center;
-          padding: 9px;
-          border: 2px solid #526974;
-          border-radius: 11px 11px 0 0;
-          background: linear-gradient(
-            180deg,
-            #f8fafb,
-            #cbd6dc
-          );
-          box-shadow:
-            inset 0 3px 2px #fff;
+          justify-content: center;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+
+          font-size: 27px;
         }
 
-        .toolbar.second,
-        .toolbar.objectTools {
-          border-top: 0;
-          border-radius: 0;
+        .page {
+          min-height: 100vh;
+
+          padding:
+            18px
+            18px
+            100px;
+
+          direction: ltr;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #edf1f4
+            );
+
+          color: #111;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
         }
 
-        .toolbar button,
-        .toolbar select,
-        .toolbar label {
-          min-height: 38px;
-          border: 1.5px solid #4b626d;
-          border-radius: 7px;
-          background: linear-gradient(
-            180deg,
-            #fff,
-            #d4dde2
-          );
-          padding: 0 10px;
-          font-weight: 800;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
+        button,
+        input,
+        textarea,
+        select {
+          font-family: inherit;
         }
 
-        .toolbar button {
+        button {
           cursor: pointer;
         }
 
-        .toolbar button:disabled {
+        button:disabled {
+          opacity: .55;
+          cursor: wait;
+        }
+
+
+        /* HEADER */
+
+        .topPanel {
+          width: 100%;
+
+          min-height: 115px;
+
+          padding:
+            22px 28px;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 20px;
+
+          border:
+            3px solid #173e58;
+
+          border-radius: 25px;
+
+          background:
+            linear-gradient(
+              #9bdcff,
+              #54a4d5
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(255,255,255,.8),
+
+            0 7px 0 #173c55,
+
+            0 13px 20px
+              rgba(0,0,0,.2);
+        }
+
+        .namePlate {
+          min-width: 320px;
+
+          padding:
+            18px 30px;
+
+          text-align: center;
+
+          border:
+            3px solid #444;
+
+          border-radius: 15px;
+
+          background:
+            linear-gradient(
+              #fff,
+              #bdbdbd
+            );
+
+          box-shadow:
+            inset 0 5px 5px white,
+
+            0 5px 0 #555;
+
+          font-size: 27px;
+          font-weight: 700;
+        }
+
+        .headerButtons {
+          display: flex;
+          gap: 12px;
+        }
+
+        .headerButtons button {
+          min-width: 145px;
+          height: 52px;
+
+          border:
+            2px solid #555;
+
+          border-radius: 10px;
+
+          background:
+            linear-gradient(
+              #fff,
+              #bbb
+            );
+
+          font-weight: 700;
+        }
+
+
+        /* GENERAL SECTION */
+
+        .sectionBox,
+        .editorSection {
+          position: relative;
+
+          width:
+            min(1400px, 96%);
+
+          margin:
+            90px auto 65px;
+
+          padding:
+            75px 35px 40px;
+
+          border:
+            3px solid #303538;
+
+          border-radius: 27px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #686c6f,
+              #505457 45%,
+              #363a3d
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(255,255,255,.23),
+
+            inset 0 -8px 8px
+              rgba(0,0,0,.32),
+
+            0 7px 0 #272b2e,
+
+            0 15px 24px
+              rgba(0,0,0,.25);
+        }
+
+        .sectionTitle {
+          position: absolute;
+
+          top: -34px;
+          left: 50%;
+
+          transform:
+            translateX(-50%);
+
+          min-width: 340px;
+          min-height: 68px;
+
+          padding:
+            10px 28px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          text-align: center;
+
+          color: #073b68;
+
+          border:
+            3px solid #174461;
+
+          border-radius: 16px;
+
+          background:
+            linear-gradient(
+              #a7e2ff,
+              #58a8d7
+            );
+
+          box-shadow:
+            inset 0 6px 5px
+              rgba(255,255,255,.7),
+
+            0 5px 0 #17415c;
+
+          font-size: 27px;
+          font-weight: 700;
+
+          z-index: 20;
+        }
+
+
+        /* INFO — CHETLARI TEKIS */
+
+        .infoPanel {
+          width: 100%;
+
+          min-height: 230px;
+
+          padding:
+            30px;
+
+          display: grid;
+
+          grid-template-columns:
+            minmax(0, 2fr)
+            minmax(0, 1.6fr)
+            minmax(220px, .8fr);
+
+          align-items: center;
+
+          gap: 22px;
+
+          border:
+            2px solid #555d61;
+
+          border-radius: 18px;
+
+          background:
+            linear-gradient(
+              #f4f4f4,
+              #c5c5c5
+            );
+
+          box-shadow:
+            inset 0 6px 5px white,
+
+            0 6px 0 #555d61;
+        }
+
+        .infoPanel label {
+          min-width: 0;
+
+          display: flex;
+          flex-direction: column;
+
+          justify-content: center;
+
+          gap: 10px;
+
+          font-size: 18px;
+          font-weight: 700;
+        }
+
+        .infoPanel label > span {
+          width: 100%;
+          text-align: center;
+          font-size: 22px;
+          font-weight: 700;
+        }
+
+        .infoPanel input,
+        .infoPanel textarea {
+          width: 100%;
+
+          border:
+            2px solid #666;
+
+          border-radius: 10px;
+
+          outline: none;
+
+          background: white;
+
+          direction: ltr;
+          text-align: center;
+
+          color: #111;
+
+          font-size: 17px;
+        }
+
+        .infoPanel input {
+          height: 58px;
+
+          padding:
+            0 16px;
+        }
+
+        .infoPanel textarea {
+          min-height: 95px;
+
+          padding: 14px;
+
+          resize: vertical;
+
+          text-align: left;
+        }
+
+        .descriptionField {
+          grid-column:
+            1 / -1;
+        }
+
+        .durationRow {
+          width: 100%;
+
+          display: flex;
+          align-items: center;
+
+          gap: 12px;
+        }
+
+        .durationRow input {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .durationRow strong {
+          white-space: nowrap;
+        }
+
+
+        .fullDesignerBlock {
+          width: 100%;
+          padding: 0;
+          border-radius: 14px;
+          overflow: visible;
+        }
+
+        .fullDesignerTitle {
+          display: inline-flex;
+          align-items: center;
+          min-height: 42px;
+          margin-bottom: 8px;
+          padding: 7px 18px;
+          border: 2px solid #1c5677;
+          border-radius: 10px;
+          background: linear-gradient(#36b9f2, #047eae);
+          box-shadow: inset 0 3px 2px rgba(255,255,255,.58), 0 4px 0 #315868;
+          color: #fff;
+          font-size: 19px;
+          font-weight: 900;
+        }
+
+        .fullDesignerHint {
+          margin: 0 0 10px;
+          color: #f4f7f8;
+          font-size: 15px;
+          font-weight: 700;
+          line-height: 1.45;
+        }
+
+        /* QUESTION BAR */
+
+        .questionBar {
+          width:
+            min(1400px, 96%);
+
+          margin:
+            35px auto;
+
+          padding: 14px;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 20px;
+
+          border:
+            2px solid #555;
+
+          border-radius: 12px;
+
+          background:
+            linear-gradient(
+              #eee,
+              #bbb
+            );
+        }
+
+        .questionPageControls {
+          width: 100%;
+          display: grid;
+          grid-template-columns:
+            minmax(160px, 1fr)
+            auto
+            minmax(160px, 1fr);
+          align-items: center;
+          gap: 14px;
+          margin-bottom: 16px;
+        }
+
+        .questionPageInfo {
+          min-width: 210px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          padding: 10px 18px;
+          border: 2px solid #777;
+          border-radius: 10px;
+          background: #f1f1f1;
+          color: #1b1b1b;
+        }
+
+        .questionPageInfo strong {
+          font-size: 17px;
+        }
+
+        .questionPageInfo span {
+          font-size: 14px;
+          font-weight: 700;
+          color: #555;
+        }
+
+        .pageArrow {
+          min-height: 46px;
+          padding: 8px 18px;
+          border: 2px solid #555;
+          border-radius: 9px;
+          background:
+            linear-gradient(
+              #ffffff,
+              #cfcfcf
+            );
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .pageArrow:disabled {
           opacity: .45;
           cursor: not-allowed;
         }
 
-        .toolbar .danger {
-          color: #fff;
-          background: linear-gradient(
-            180deg,
-            #ef7777,
-            #b62626
-          );
+        .questionTabs {
+          display: flex;
+          gap: 8px;
+
+          flex-wrap: wrap;
         }
 
-        .colorTool input,
-        .objectTools input[type="color"] {
-          width: 28px;
-          height: 26px;
-          padding: 0;
-          border: 0;
-          background: transparent;
+        .questionTabs button {
+          width: 46px;
+          height: 46px;
+
+          border:
+            2px solid #555;
+
+          border-radius: 8px;
+
+          background:
+            linear-gradient(
+              #fff,
+              #bbb
+            );
+
+          font-weight: 700;
         }
 
-        .strokeNumber {
-          width: 55px;
+        .questionTabs .activeTab {
+          color: #073b68;
+
+          border-color: #174461;
+
+          background:
+            linear-gradient(
+              #a8e5ff,
+              #58a8d7
+            );
         }
 
-        .canvasWrap {
-          position: relative;
-          border: 2px solid #526974;
-          border-radius: 0 0 12px 12px;
-          background: #dbe4e9;
-          padding: 14px;
-          overflow: auto;
+        .addQuestion {
+          min-width: 170px;
+
+          height: 48px;
+
+          border:
+            2px solid #176a38;
+
+          border-radius: 9px;
+
+          background:
+            linear-gradient(
+              #9ce6b5,
+              #4bbd72
+            );
+
+          font-weight: 700;
         }
 
-        .canvas {
-          position: relative;
-          min-height: 560px;
-          width: 100%;
-          padding: 24px;
-          outline: none;
-          background: #fff;
-          color: #111;
-          font-family:
-            "Bell MT",
-            Georgia,
-            "Times New Roman",
-            serif;
-          font-size: 24px;
-          line-height: 1.55;
-          box-shadow:
-            inset 0 0 0 1px #b4c2c9;
+
+        /* WORD */
+
+        .wordRibbon {
+          position: sticky;
+
+          top: 5px;
+
+          z-index: 200;
+
+          width:
+            min(1400px, 96%);
+
+          margin:
+            0 auto 25px;
+
           overflow: hidden;
+
+          border:
+            2px solid #777;
+
+          border-radius: 12px;
+
+          background: #e4e4e4;
+
+          box-shadow:
+            0 5px 14px
+              rgba(0,0,0,.22);
         }
 
-        .canvas :global(ol),
-        .canvas :global(ul) {
-          margin-top: 0.35em;
-          margin-bottom: 0.35em;
-          padding-left: 1.55em;
+        .ribbonTitle {
+          padding:
+            8px 16px;
+
+          border-bottom:
+            1px solid #aaa;
+
+          background:
+            #f5f5f5;
+
+          color: #07507a;
+
+          font-weight: 700;
         }
 
-        .canvas :global(ol) {
-          list-style-position: outside;
+        .toolbar {
+          display: flex;
+          align-items: center;
+
+          gap: 7px;
+
+          flex-wrap: wrap;
+
+          padding: 10px;
         }
 
-        .canvas :global(ol[type="I"]) {
-          list-style-type: upper-roman;
+        .toolGroup {
+          display: flex;
+          align-items: center;
+
+          gap: 4px;
+
+          padding-right: 9px;
+
+          border-right:
+            1px solid #aaa;
         }
 
-        .canvas :global(li) {
-          padding-left: 0.18em;
-          margin: 0.12em 0;
-          line-height: 1.5;
-          text-align: justify;
-          text-justify: inter-word;
+        .toolGroup button,
+        .toolGroup select,
+        .colorButton {
+          min-height: 38px;
+
+          border:
+            1px solid #888;
+
+          border-radius: 5px;
+
+          background:
+            linear-gradient(
+              #fff,
+              #d6d6d6
+            );
         }
 
-        .canvas :global(li::marker) {
-          font-weight: 400;
+        .toolGroup button {
+          min-width: 40px;
+
+          padding:
+            0 9px;
         }
 
-        .canvas :global(p),
-        .canvas :global(div) {
-          font-size: 24px;
-          line-height: 1.5;
-          text-align: justify;
-          text-justify: inter-word;
+        .toolGroup select {
+          padding:
+            0 8px;
         }
 
-        .canvas :global(.nc-object) {
+        .bold {
+          font-weight: 900;
+        }
+
+        .italic {
+          font-style: italic;
+        }
+
+        .underline {
+          text-decoration: underline;
+        }
+
+        .colorButton {
+          position: relative;
+
+          width: 42px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          font-weight: 700;
+        }
+
+        .colorButton input {
+          position: absolute;
+
+          width: 100%;
+          height: 100%;
+
+          opacity: 0;
+
           cursor: pointer;
         }
 
-        .canvas :global(.nc-image-object) {
-          cursor: grab;
-          touch-action: none;
+
+        /* EDITOR */
+
+        .questionHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 20px;
+
+          margin-bottom: 20px;
+
+          color: white;
         }
 
-        .canvas :global(.nc-image-object:active) {
-          cursor: grabbing;
+        .questionHeader div {
+          display: flex;
+          gap: 10px;
         }
 
-        .canvas :global(.nc-selected) {
-          outline: none !important;
+        .questionHeader button {
+          min-height: 42px;
+
+          padding:
+            0 15px;
+
+          border:
+            2px solid #555;
+
+          border-radius: 8px;
+
+          background:
+            linear-gradient(
+              #fff,
+              #bbb
+            );
+
+          font-weight: 700;
         }
 
-        .selectionUi {
-          position: absolute;
-          z-index: 999;
-          border: 2px dashed #078bcf;
-          box-sizing: border-box;
+        .questionHeader .dangerButton {
+          color: white;
+
+          border-color: #8a1010;
+
+          background:
+            linear-gradient(
+              #f76b6b,
+              #ae1111
+            );
+        }
+
+        .paperOuter {
+          width: 100%;
+
+          padding: 30px;
+
+          border-radius:
+            13px 13px 0 0;
+
+          background: #929292;
+        }
+
+        .wordPage {
+          width: 100%;
+
+          min-height: 340px;
+
+          padding:
+            40px;
+
+          border:
+            1px solid #777;
+
+          outline: none;
+
+          background: white;
+
+          direction: ltr;
+          text-align: left;
+          unicode-bidi: plaintext;
+
+          white-space: pre-wrap;
+
+          overflow-wrap:
+            break-word;
+
+          box-shadow:
+            0 5px 15px
+              rgba(0,0,0,.25);
+
+          /* SAVOL MATNI RAZMERI 24px VA QALIN */
+          font-size: 24px;
+          font-weight: bold;
+
+          line-height: 1.6;
+        }
+
+        /* Raqamlar va rim raqamlari (I., II., III. / 1., 2. va h.k.) matnga yopishib qolmasligi va yangi qatordan chiqishi uchun */
+        .wordPage :global(span), 
+        .wordPage :global(p), 
+        .wordPage :global(div) {
+          word-break: normal;
+        }
+
+        .wordPage :global(b), 
+        .wordPage :global(strong) {
+          font-weight: bold;
+        }
+
+        .wordPage:empty:before {
+          content:
+            attr(
+              data-placeholder
+            );
+
+          color: #999;
+
           pointer-events: none;
         }
 
-        .deleteBubble {
-          position: absolute;
-          right: -19px;
-          top: -21px;
-          z-index: 1002;
-          width: 36px;
-          height: 36px;
-          padding: 0;
-          border: 2px solid #8b0f12;
-          border-radius: 50%;
-          background: linear-gradient(
-            180deg,
-            #f44343,
-            #b71218
-          );
-          color: #fff;
-          box-shadow:
-            inset 0 2px 2px rgba(255,255,255,.55),
-            0 2px 3px rgba(0,0,0,.35);
-          font-size: 28px;
-          line-height: 30px;
-          font-weight: 400;
-          pointer-events: auto;
-          cursor: pointer;
+
+        /* SHAPE TOOLBAR */
+
+        .shapesToolbar {
+          width: 100%;
+
+          padding: 16px;
+
+          display: flex;
+          align-items: center;
+
+          gap: 10px;
+
+          flex-wrap: wrap;
+
+          border:
+            2px solid #555;
+
+          background:
+            linear-gradient(
+              #eee,
+              #bbb
+            );
         }
+
+        .shapesToolbar button {
+          min-height: 42px;
+
+          padding:
+            0 15px;
+
+          border:
+            2px solid #666;
+
+          border-radius: 7px;
+
+          background:
+            linear-gradient(
+              #fff,
+              #c9c9c9
+            );
+
+          font-weight: 700;
+        }
+
+
+        /* CANVAS */
+
+        .shapeCanvas {
+          position: relative;
+
+          width: 100%;
+
+          height: 650px;
+
+          overflow: hidden;
+
+          border:
+            3px solid #666;
+
+          border-top: none;
+
+          border-radius:
+            0 0 14px 14px;
+
+          background-color:
+            white;
+
+          background-image:
+            linear-gradient(
+              #ededed 1px,
+              transparent 1px
+            ),
+
+            linear-gradient(
+              90deg,
+              #ededed 1px,
+              transparent 1px
+            );
+
+          background-size:
+            25px 25px;
+        }
+
+        .canvasHint {
+          position: absolute;
+
+          top: 15px;
+          left: 20px;
+
+          color: #aaa;
+
+          pointer-events: none;
+        }
+
+        .shapeItem {
+          position: absolute;
+
+          cursor: move;
+
+          user-select: none;
+        }
+
+        .selectedShape {
+          outline:
+            2px dashed #087eb9;
+
+          outline-offset: 5px;
+        }
+
+        .shapeBody {
+          width: 100%;
+          height: 100%;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          overflow: hidden;
+
+          border:
+            2px solid;
+
+          box-shadow:
+            5px 6px 0
+              rgba(0,0,0,.23);
+        }
+
+        .shapeBody.rectangle {
+          border-radius: 2px;
+        }
+
+        .shapeBody.roundedRectangle {
+          border-radius: 22px;
+        }
+
+        .shapeBody.circle {
+          border-radius: 50%;
+        }
+
+        .shapeBody.ellipse {
+          border-radius: 50%;
+        }
+
+        .shapeBody.text {
+          border: none;
+
+          box-shadow: none;
+        }
+
+        .shapeInput {
+          width: 90%;
+
+          border: none;
+          outline: none;
+
+          background:
+            transparent;
+
+          color: inherit;
+
+          text-align: inherit;
+
+          font: inherit;
+        }
+
+
+        /* VENN */
+
+        .venn {
+          position: relative;
+
+          width: 100%;
+          height: 100%;
+        }
+
+        .vennCircle {
+          position: absolute;
+
+          top: 0;
+
+          width: 62%;
+          height: 100%;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border:
+            2px solid;
+
+          border-radius: 50%;
+
+          opacity: .68;
+
+          font-size: 25px;
+
+          font-weight: 700;
+        }
+
+        .vennOne {
+          left: 0;
+        }
+
+        .vennTwo {
+          right: 0;
+        }
+
+
+        .hiddenImageInput { display: none; }
+        .imageButton { min-width: 150px; }
+        .imageShapeBody { width:100%; height:100%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#fff; border-style:solid; }
+        .imageShapeBody img { width:100%; height:100%; display:block; user-select:none; pointer-events:none; }
+        .settingsHeading { width:100%; font-size:20px; color:#073b68; padding-bottom:8px; border-bottom:1px solid #888; }
+        .shapeSettings .activeSetting { color:#fff; background:linear-gradient(#3197d0,#17628d); }
+        .shapeSettings .dangerSetting { color:#fff; background:linear-gradient(#ef6666,#a71919); }
+        .settingsDivider { width:2px; height:34px; background:#777; margin:0 4px; }
+        .rangeInput { width:120px; }
+
+        /* SHAPE DELETE */
+
+        .shapeDelete {
+          position: absolute;
+
+          top: -23px;
+          right: -23px;
+
+          width: 32px;
+          height: 32px;
+
+          z-index: 40;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border:
+            2px solid #790000;
+
+          border-radius: 50%;
+
+          color: white;
+
+          background:
+            linear-gradient(
+              #ff6666,
+              #a70000
+            );
+
+          font-size: 22px;
+
+          font-weight: 700;
+        }
+
+
+        /* RESIZE — 8 TOMON */
 
         .resizeHandle {
           position: absolute;
-          z-index: 1001;
-          width: 18px;
-          height: 18px;
-          padding: 0;
-          border: 2px solid #006eaa;
-          border-radius: 4px;
-          background: #fff;
+
+          width: 15px;
+          height: 15px;
+
+          z-index: 35;
+
+          border:
+            2px solid white;
+
+          border-radius: 3px;
+
+          background: #087eb9;
+
           box-shadow:
-            inset 0 0 0 2px #e8f7ff;
-          pointer-events: auto;
+            0 0 0 1px #064d73;
         }
 
-        .resizeHandle.nw {
-          left: -10px;
-          top: -10px;
-          cursor: nwse-resize;
-        }
-
-        .resizeHandle.n {
+        .resize-n {
+          top: -9px;
           left: 50%;
-          top: -10px;
-          transform: translateX(-50%);
+
+          transform:
+            translateX(-50%);
+
           cursor: ns-resize;
         }
 
-        .resizeHandle.ne {
-          right: -10px;
-          top: -10px;
-          cursor: nesw-resize;
-        }
-
-        .resizeHandle.e {
-          right: -10px;
-          top: 50%;
-          transform: translateY(-50%);
-          cursor: ew-resize;
-        }
-
-        .resizeHandle.se {
-          right: -10px;
-          bottom: -10px;
-          cursor: nwse-resize;
-        }
-
-        .resizeHandle.s {
+        .resize-s {
+          bottom: -9px;
           left: 50%;
-          bottom: -10px;
-          transform: translateX(-50%);
+
+          transform:
+            translateX(-50%);
+
           cursor: ns-resize;
         }
 
-        .resizeHandle.sw {
-          left: -10px;
-          bottom: -10px;
-          cursor: nesw-resize;
-        }
-
-        .resizeHandle.w {
-          left: -10px;
+        .resize-e {
+          right: -9px;
           top: 50%;
-          transform: translateY(-50%);
+
+          transform:
+            translateY(-50%);
+
           cursor: ew-resize;
         }
 
+        .resize-w {
+          left: -9px;
+          top: 50%;
 
-        .canvas :global(.nc-3d-object) {
-          transition:
-            box-shadow .08s ease,
-            filter .08s ease;
+          transform:
+            translateY(-50%);
+
+          cursor: ew-resize;
         }
 
-        .canvas :global(.nc-3d-object:hover) {
-          filter: brightness(1.02);
+        .resize-ne {
+          top: -9px;
+          right: -9px;
+
+          cursor:
+            nesw-resize;
         }
 
-        .selectionUi::after {
-          content: "";
-          position: absolute;
-          inset: -4px;
-          border: 1px solid rgba(255,255,255,.8);
-          pointer-events: none;
+        .resize-nw {
+          top: -9px;
+          left: -9px;
+
+          cursor:
+            nwse-resize;
         }
 
-        .hint {
-          margin: 8px 0 0;
-          color: #53656f;
-          font-size: 12px;
+        .resize-se {
+          right: -9px;
+          bottom: -9px;
+
+          cursor:
+            nwse-resize;
+        }
+
+        .resize-sw {
+          left: -9px;
+          bottom: -9px;
+
+          cursor:
+            nesw-resize;
+        }
+
+
+        /* SHAPE SETTINGS */
+
+        .shapeSettings {
+          width: 100%;
+
+          margin-top: 20px;
+
+          padding: 18px;
+
+          display: flex;
+          align-items: center;
+
+          gap: 15px;
+
+          flex-wrap: wrap;
+
+          border:
+            2px solid #555;
+
+          border-radius: 12px;
+
+          background:
+            linear-gradient(
+              #eee,
+              #bbb
+            );
+        }
+
+        .shapeSettings label {
+          display: flex;
+          align-items: center;
+
+          gap: 7px;
+
           font-weight: 700;
         }
+
+        .shapeSettings input[type="color"] {
+          width: 42px;
+          height: 36px;
+        }
+
+        .shapeSettings select,
+        .shapeSettings button,
+        .smallNumber {
+          min-height: 38px;
+
+          border:
+            1px solid #777;
+
+          border-radius: 6px;
+
+          background: white;
+        }
+
+        .shapeSettings button {
+          min-width: 40px;
+
+          font-weight: 700;
+        }
+
+        .smallNumber {
+          width: 75px;
+
+          padding:
+            0 7px;
+        }
+
+
+        /* ANSWERS */
+
+        .answersTitle {
+          margin-top: 30px;
+
+          padding: 14px;
+
+          text-align: center;
+
+          color: white;
+
+          font-size: 25px;
+
+          font-weight: 700;
+        }
+
+        .answers {
+          display: grid;
+
+          gap: 13px;
+        }
+
+        .answerRow {
+          width: 100%;
+
+          display: grid;
+
+          grid-template-columns:
+            80px minmax(0, 1fr);
+
+          align-items: center;
+
+          gap: 15px;
+
+          padding: 15px;
+
+          border:
+            2px solid #666;
+
+          border-radius: 11px;
+
+          background:
+            linear-gradient(
+              #f3f3f3,
+              #c7c7c7
+            );
+        }
+
+        .correctAnswer {
+          border-color: #258b51;
+
+          background:
+            linear-gradient(
+              #e1f8e8,
+              #a9dfbb
+            );
+        }
+
+        .radioArea {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          gap: 10px;
+
+          font-size: 25px;
+        }
+
+        .radioArea input {
+          width: 21px;
+          height: 21px;
+        }
+
+        .answerRow textarea {
+          width: 100%;
+
+          min-height: 70px;
+
+          padding: 12px 15px;
+
+          resize: vertical;
+
+          direction: ltr;
+          text-align: left;
+
+          border:
+            2px solid #777;
+
+          border-radius: 8px;
+
+          outline: none;
+
+          background: white;
+
+          /* JAVOB VARIANTLARI RAZMERI 18px VA QALIN */
+          font-size: 18px;
+          font-weight: bold;
+
+          line-height: 1.45;
+          text-align: justify;
+          text-justify: inter-word;
+        }
+
+        .pointsRow {
+          margin-top: 20px;
+
+          padding: 15px;
+
+          border-radius: 10px;
+
+          background:
+            #d7d7d7;
+        }
+
+        .pointsRow label {
+          display: flex;
+          align-items: center;
+
+          justify-content:
+            center;
+
+          gap: 12px;
+
+          font-size: 18px;
+
+          font-weight: 700;
+        }
+
+        .pointsRow input {
+          width: 90px;
+
+          height: 42px;
+
+          padding:
+            0 10px;
+
+          border:
+            2px solid #777;
+
+          border-radius: 7px;
+
+          font-size: 17px;
+        }
+
+
+        /* SAVE */
+
+        .bottomButtons {
+          width:
+            min(1400px, 96%);
+
+          margin:
+            40px auto;
+
+          display: flex;
+
+          justify-content: center;
+
+          gap: 24px;
+        }
+
+        .bottomButtons button {
+          min-width: 260px;
+
+          min-height: 62px;
+
+          border-radius: 13px;
+
+          font-size: 18px;
+
+          font-weight: 700;
+        }
+
+        .draftButton {
+          border:
+            3px solid #555;
+
+          background:
+            linear-gradient(
+              #fff,
+              #bcbcbc
+            );
+
+          box-shadow:
+            0 5px 0 #555;
+        }
+
+        .downloadButton {
+          color: #125a32;
+
+          border:
+            3px solid #2d6c47;
+
+          background:
+            linear-gradient(
+              #d8f1df,
+              #86c99d
+            );
+
+          box-shadow:
+            0 5px 0 #2d6c47;
+        }
+
+
+        .publishButton {
+          color: #073b68;
+
+          border:
+            3px solid #174461;
+
+          background:
+            linear-gradient(
+              #a8e5ff,
+              #58a8d7
+            );
+
+          box-shadow:
+            0 5px 0 #17415c;
+        }
+
+
+        /* RESPONSIVE */
+
+        @media (
+          max-width: 950px
+        ) {
+
+          .questionPageControls {
+            grid-template-columns: 1fr;
+          }
+
+
+
+          .infoPanel {
+            grid-template-columns:
+              1fr;
+          }
+
+          .descriptionField {
+            grid-column: auto;
+          }
+
+          .topPanel,
+          .questionHeader {
+            flex-direction: column;
+          }
+
+          .questionBar {
+            flex-direction: column;
+
+            align-items: stretch;
+          }
+
+          .addQuestion {
+            width: 100%;
+          }
+
+        }
+
+        @media (
+          max-width: 650px
+        ) {
+
+          .page {
+            padding:
+              10px 8px 60px;
+          }
+
+          .topPanel {
+            padding:
+              20px 14px;
+          }
+
+          .namePlate {
+            width: 100%;
+
+            min-width: 0;
+          }
+
+          .headerButtons {
+            width: 100%;
+
+            flex-direction: column;
+          }
+
+          .headerButtons button {
+            width: 100%;
+          }
+
+          .sectionBox,
+          .editorSection {
+            width: 99%;
+
+            padding:
+              65px 14px 25px;
+          }
+
+          .sectionTitle {
+            min-width: 230px;
+
+            max-width: 90%;
+
+            font-size: 21px;
+          }
+
+          .infoPanel {
+            padding: 16px;
+          }
+
+          .paperOuter {
+            padding: 12px;
+          }
+
+          .wordPage {
+            padding: 20px;
+
+            min-height: 280px;
+          }
+
+          .shapeCanvas {
+            height: 500px;
+          }
+
+          .answerRow {
+            grid-template-columns:
+              1fr;
+          }
+
+          .bottomButtons {
+            flex-direction: column;
+          }
+
+          .bottomButtons button {
+            width: 100%;
+          }
+
+        }
+
       `}</style>
-    </section>
+
+    </main>
+  );
+}
+
+/* =========================================================
+   NEXT.JS 16 — useSearchParams() UCHUN SUSPENSE WRAPPER
+========================================================= */
+
+export default function TestEditorPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="loading">
+          Test muharriri yuklanmoqda...
+        </main>
+      }
+    >
+      <TestEditorPageContent />
+    </Suspense>
   );
 }
