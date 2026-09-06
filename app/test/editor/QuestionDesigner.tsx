@@ -90,8 +90,10 @@ function normalizeQuestionText(root: HTMLElement) {
   for (const textNode of nodes) {
     let text = textNode.nodeValue || "";
 
-    // "savol ?" -> "savol?"
-    text = text.replace(/\\s+\\?/g, "?");
+    // Savol oxiridagi "?" belgisi oldingi so‘zga yopishmaydi:
+    // "savol?" -> "savol ?". Nuqtalarga tegilmaydi.
+    // Faqat text node oxiridagi savol belgisi tuzatiladi.
+    text = text.replace(/\s*\?(?=\s*$)/, " ?");
 
     // Keep structured Roman/Arabic numbered statements on separate lines.
     // This only affects markers followed by a space, e.g. " I. ", " II. ", " 1. ".
