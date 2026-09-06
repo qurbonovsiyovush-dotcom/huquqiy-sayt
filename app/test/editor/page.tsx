@@ -3704,7 +3704,7 @@ function TestEditorPageContent() {
 
           background: white;
 
-          font-size: 18px;
+          font-size: 19px;
           line-height: 1.5;
         }
 
