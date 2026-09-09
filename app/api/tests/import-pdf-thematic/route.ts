@@ -466,6 +466,264 @@ async function loadCanonicalGrade8Import() {
   };
 }
 
+
+
+/* =========================================================
+   10-SINF KANONIK IMPORT
+   - 31 bo'lim
+   - 1609 savol
+   - 29 ta dars/mavzu
+   - 1 ta nazorat ishi
+   - 1 ta yuridik atamalar lug'ati
+   - to'g'ri javoblar PDF ichidagi +A/+B/+C/+D belgilaridan olingan
+========================================================= */
+
+async function loadCanonicalGrade10Import() {
+  const dataFile = path.join(
+    process.cwd(),
+    "data-storage",
+    "grade10-thematic-extracted.json"
+  );
+
+  const rawText = await fs.readFile(
+    dataFile,
+    "utf8"
+  );
+
+  const raw = JSON.parse(rawText);
+
+  const sections = Array.isArray(raw?.sections)
+    ? raw.sections
+    : [];
+
+  const declaredTotal = Number(
+    raw?.totalQuestions ?? 0
+  );
+
+  const countedTotal = sections.reduce(
+    (sum: number, section: any) =>
+      sum + (
+        Array.isArray(section?.questions)
+          ? section.questions.length
+          : 0
+      ),
+    0
+  );
+
+  const lessonCount = sections.filter(
+    (section: any) =>
+      String(section?.kind || "lesson") === "lesson"
+  ).length;
+
+  const controlCount = sections.filter(
+    (section: any) =>
+      String(section?.kind || "") === "control"
+  ).length;
+
+  const glossaryCount = sections.filter(
+    (section: any) =>
+      String(section?.kind || "") === "glossary"
+  ).length;
+
+  if (
+    Number(raw?.grade) !== 10 ||
+    sections.length !== 31 ||
+    declaredTotal !== 1609 ||
+    countedTotal !== 1609 ||
+    lessonCount !== 29 ||
+    controlCount !== 1 ||
+    glossaryCount !== 1
+  ) {
+    throw new Error(
+      "10-sinf kanonik JSON tekshiruvidan o'tmadi: 31 bo'lim, 29 mavzu, 1 nazorat, 1 lug'at va 1609 savol kutilgan."
+    );
+  }
+
+  const allQuestions: ImportedQuestion[] = [];
+  const topics: TopicGroup[] = [];
+  const specialSections: TopicGroup[] = [];
+
+  let globalNumber = 0;
+
+  for (
+    let sectionIndex = 0;
+    sectionIndex < sections.length;
+    sectionIndex++
+  ) {
+    const section = sections[sectionIndex];
+    const title = normalizeOneLine(
+      String(section?.title || `Mavzu ${sectionIndex + 1}`)
+    );
+
+    const rawQuestions =
+      Array.isArray(section?.questions)
+        ? section.questions
+        : [];
+
+    const globalNumbers: number[] = [];
+    const localQuestions: ImportedQuestion[] = [];
+
+    for (
+      let questionIndex = 0;
+      questionIndex < rawQuestions.length;
+      questionIndex++
+    ) {
+      const question = rawQuestions[questionIndex];
+      globalNumber += 1;
+      globalNumbers.push(globalNumber);
+
+      const rawOptions =
+        Array.isArray(question?.options)
+          ? question.options
+          : [];
+
+      const options: ImportedOption[] =
+        (["A", "B", "C", "D"] as OptionLabel[]).map(
+          (label) => {
+            const found = rawOptions.find(
+              (option: any) =>
+                String(option?.id || "").toUpperCase() === label
+            );
+
+            return {
+              id: `${String(question?.id || `g10-q-${globalNumber}`)}-${label}`,
+              label,
+              text: String(found?.text || "").trim(),
+              isCorrect: found?.isCorrect === true,
+            };
+          }
+        );
+
+      const correctCount = options.filter(
+        (option) => option.isCorrect
+      ).length;
+
+      const emptyOptions = options.filter(
+        (option) => !option.text
+      ).length;
+
+      const questionId = String(
+        question?.id ||
+          `grade10-q-${globalNumber}`
+      );
+
+      const baseQuestion: ImportedQuestion = {
+        id: questionId,
+        number: globalNumber,
+        questionText:
+          String(
+            question?.questionHtml ||
+              question?.questionText ||
+              ""
+          ).trim(),
+        options,
+        shapes: [],
+        warning:
+          correctCount === 1 &&
+          emptyOptions === 0
+            ? undefined
+            : "10-sinf kanonik JSONdagi savol/variantni tekshiring.",
+      };
+
+      allQuestions.push(baseQuestion);
+
+      localQuestions.push({
+        ...baseQuestion,
+        number: questionIndex + 1,
+      });
+    }
+
+    const lessonMatch = title.match(
+      /^(\d+)\s*(?:[–—-]\s*(\d+))?\s*-\s*DARS\./i
+    );
+
+    const lessonStart = lessonMatch
+      ? Number(lessonMatch[1])
+      : undefined;
+
+    const lessonEnd = lessonMatch?.[2]
+      ? Number(lessonMatch[2])
+      : lessonStart;
+
+    const rawKind = String(
+      section?.kind || "lesson"
+    );
+
+    const kind: "lesson" | "control" | "glossary" =
+      rawKind === "control"
+        ? "control"
+        : rawKind === "glossary"
+        ? "glossary"
+        : "lesson";
+
+    const group: TopicGroup = {
+      id: String(
+        section?.id ||
+          `grade10-section-${sectionIndex + 1}`
+      ),
+      title,
+      questionNumbers: globalNumbers,
+      questions: localQuestions,
+      lessonNumber: lessonStart,
+      sourceSectionKey: String(
+        section?.id ||
+          `grade10-section-${sectionIndex + 1}`
+      ),
+      sourceSectionTitle: title,
+      sharedSource: Boolean(
+        lessonStart &&
+          lessonEnd &&
+          lessonEnd > lessonStart
+      ),
+      kind,
+    };
+
+    if (kind === "lesson") {
+      topics.push(group);
+    } else {
+      specialSections.push(group);
+    }
+  }
+
+  if (globalNumber !== 1609) {
+    throw new Error(
+      `10-sinf kanonik JSONdan ${globalNumber} ta savol olindi; 1609 ta kutilgan.`
+    );
+  }
+
+  return {
+    success: true,
+    canonicalGrade10: true,
+    questions: allQuestions,
+    topics,
+    topicCount: topics.length,
+    topicSummary: topics.map((topic) => ({
+      id: topic.id,
+      title: topic.title,
+      questionCount: topic.questions.length,
+      lessonNumber: topic.lessonNumber,
+      sharedSource: topic.sharedSource,
+      sourceSectionTitle: topic.sourceSectionTitle,
+    })),
+    specialSections,
+    specialSectionCount: specialSections.length,
+    sectionCount:
+      topics.length + specialSections.length,
+    mappedQuestionCount: 1609,
+    mappingComplete: true,
+    answerKeyApplied: true,
+    answerKeyCount: 1609,
+    answerKeyTopicCount: 31,
+    expectedQuestionCount: 1609,
+    questionCountMatchesAnswerKey: true,
+    visualQuestionCount: 0,
+    pdfCropCount: 0,
+    editableShapeQuestionCount: 0,
+    editableShapeCount: 0,
+    total: 1609,
+  };
+}
+
 /* =========================================================
    BASIC HELPERS
 ========================================================= */
@@ -3735,6 +3993,43 @@ export async function POST(
     const isCanonicalGrade8Pdf =
       normalizedFileName.includes("8-sinf") &&
       normalizedFileName.includes("mavzulashtirilgan");
+
+    const isCanonicalGrade10Pdf =
+      normalizedFileName.includes("10-sinf") &&
+      normalizedFileName.includes("mavzulashtirilgan");
+
+    if (isCanonicalGrade10Pdf) {
+      try {
+        const canonical =
+          await loadCanonicalGrade10Import();
+
+        return NextResponse.json(
+          canonical,
+          {
+            headers: {
+              "Cache-Control":
+                "no-store, no-cache, must-revalidate",
+            },
+          }
+        );
+      } catch (canonicalError) {
+        console.error(
+          "GRADE 10 CANONICAL IMPORT ERROR:",
+          canonicalError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              canonicalError instanceof Error
+                ? canonicalError.message
+                : "10-sinf kanonik JSONni o'qib bo'lmadi.",
+          },
+          { status: 500 }
+        );
+      }
+    }
 
     if (isCanonicalGrade8Pdf) {
       try {
