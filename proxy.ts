@@ -21,6 +21,9 @@ export function proxy(
   const { pathname } =
     request.nextUrl;
 
+  const method =
+    request.method.toUpperCase();
+
   const session =
     request.cookies.get(
       "qurbonov_session"
@@ -72,8 +75,7 @@ export function proxy(
   }
 
   /* =======================================================
-     ESKI /login SAHIFASINI OLIB TASHLAYMIZ
-     Kim /login ga kirsa gerbli login turgan "/" ga boradi.
+     ESKI /login SAHIFASI
   ======================================================= */
 
   if (pathname === "/login") {
@@ -109,8 +111,7 @@ export function proxy(
   if (
     pathname ===
       "/api/vocabulary" &&
-    request.method.toUpperCase() ===
-      "GET"
+    method === "GET"
   ) {
     return NextResponse.next();
   }
@@ -120,12 +121,6 @@ export function proxy(
   ======================================================= */
 
   if (!isLoggedIn) {
-    /*
-      Himoyalangan sahifaga kirishga
-      urinsa, eski /login ga emas,
-      gerbli login turgan "/" ga
-      qaytaramiz.
-    */
     if (
       !pathname.startsWith(
         "/api/"
@@ -203,8 +198,9 @@ export function proxy(
   ======================================================= */
 
   if (
+    pathname === "/api/admin" ||
     pathname.startsWith(
-      "/api/admin"
+      "/api/admin/"
     )
   ) {
     if (!isAdmin) {
@@ -240,9 +236,6 @@ export function proxy(
       "/api/vocabulary/"
     )
   ) {
-    const method =
-      request.method.toUpperCase();
-
     if (method === "GET") {
       return NextResponse.next();
     }
@@ -264,13 +257,36 @@ export function proxy(
   }
 
   /* =======================================================
+     MAVZULASHTIRILGAN TEST NATIJASINI YUBORISH
+
+     FAQAT:
+     POST /api/tests/thematic/{id}/submit
+
+     Oddiy LOGIN QILGAN foydalanuvchiga ruxsat.
+
+     Bu test yaratish yoki tahrirlash huquqini BERMAYDI.
+  ======================================================= */
+
+  const isThematicSubmit =
+    method === "POST" &&
+    /^\/api\/tests\/thematic\/[^/]+\/submit\/?$/.test(
+      pathname
+    );
+
+  if (isThematicSubmit) {
+    return NextResponse.next();
+  }
+
+  /* =======================================================
      TEST API
 
      GET:
-     oddiy foydalanuvchi ham testni ochadi.
+     oddiy login qilgan foydalanuvchi ham testni o‘qiydi.
 
      POST / PUT / PATCH / DELETE:
-     faqat administrator.
+     FAQAT ADMIN.
+
+     Yuqoridagi thematic/{id}/submit bundan mustasno.
   ======================================================= */
 
   if (
@@ -280,9 +296,6 @@ export function proxy(
       "/api/tests/"
     )
   ) {
-    const method =
-      request.method.toUpperCase();
-
     if (method === "GET") {
       return NextResponse.next();
     }
