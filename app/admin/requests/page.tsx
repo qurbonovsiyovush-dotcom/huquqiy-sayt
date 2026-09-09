@@ -15,52 +15,25 @@ import { useRouter } from "next/navigation";
 
 type AccessCode = {
   id: string;
-  name: string;
   code: string;
-
-  createdAt?: string;
-
-  active?: boolean;
-  approved?: boolean;
-
-  requestedAt?: string | null;
-  approvedAt?: string | null;
-  rejectedAt?: string | null;
-};
-
-type AccessRequest = {
-  id: string;
   name: string;
-  code: string;
 
-  createdAt?: string;
-  requestedAt?: string | null;
+  active: boolean;
+  approved: boolean;
 
-  approved?: boolean;
-  active?: boolean;
-};
-
-type HistoryItem = {
-  id?: string;
-
-  name?: string;
-  code?: string;
-
-  action?: string;
-  message?: string;
-
-  createdAt?: string;
-  date?: string;
+  requestedAt: string | null;
+  createdAt: string | null;
+  approvedAt: string | null;
+  rejectedAt: string | null;
 };
 
 type ActiveSection =
-  | "search"
+  | "dashboard"
   | "new-code"
-  | "codes"
-  | "requests"
+  | "pending"
   | "approved"
-  | "rejected"
-  | null;
+  | "all"
+  | "blocked";
 
 /* =========================================================
    PAGE
@@ -69,23 +42,14 @@ type ActiveSection =
 export default function AdminRequestsPage() {
   const router = useRouter();
 
-  const [codes, setCodes] =
+  const [users, setUsers] =
     useState<AccessCode[]>([]);
-
-  const [requests, setRequests] =
-    useState<AccessRequest[]>([]);
-
-  const [history, setHistory] =
-    useState<HistoryItem[]>([]);
-
-  const [name, setName] =
-    useState("");
-
-  const [search, setSearch] =
-    useState("");
 
   const [loading, setLoading] =
     useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
 
   const [creating, setCreating] =
     useState(false);
@@ -93,13 +57,48 @@ export default function AdminRequestsPage() {
   const [workingId, setWorkingId] =
     useState<string | null>(null);
 
+  const [name, setName] =
+    useState("");
+
+  const [search, setSearch] =
+    useState("");
+
   const [
     activeSection,
     setActiveSection,
   ] =
     useState<ActiveSection>(
-      null
+      "dashboard"
     );
+
+  const [
+    lastCreatedCode,
+    setLastCreatedCode,
+  ] =
+    useState("");
+
+  const [
+    lastCreatedName,
+    setLastCreatedName,
+  ] =
+    useState("");
+
+  const [
+    copiedCode,
+    setCopiedCode,
+  ] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [
+    messageType,
+    setMessageType,
+  ] =
+    useState<
+      "success" | "error" | ""
+    >("");
 
   /* =========================================================
      JSON
@@ -116,177 +115,97 @@ export default function AdminRequestsPage() {
   }
 
   /* =========================================================
-     KODLARNI YUKLASH
+     MESSAGE
   ========================================================= */
 
-  const loadCodes =
-    useCallback(async () => {
-      try {
-        const response =
-          await fetch(
-            "/api/admin/codes",
-            {
-              method: "GET",
-              cache: "no-store",
-            }
-          );
+  function showMessage(
+    text: string,
+    type:
+      | "success"
+      | "error" = "success"
+  ) {
+    setMessage(text);
+    setMessageType(type);
 
-        if (!response.ok) {
-          return;
-        }
-
-        const data =
-          await readJson(
-            response
-          );
-
-        if (
-          Array.isArray(
-            data.codes
-          )
-        ) {
-          setCodes(
-            data.codes
-          );
-        } else if (
-          Array.isArray(data)
-        ) {
-          setCodes(data);
-        } else {
-          setCodes([]);
-        }
-      } catch (error) {
-        console.error(
-          "Kodlarni yuklash xatosi:",
-          error
-        );
-      }
-    }, []);
+    window.setTimeout(() => {
+      setMessage("");
+      setMessageType("");
+    }, 4000);
+  }
 
   /* =========================================================
-     SO‘ROVLARNI YUKLASH
+     FOYDALANUVCHILARNI YUKLASH
   ========================================================= */
 
-  const loadRequests =
-    useCallback(async () => {
-      try {
-        const response =
-          await fetch(
-            "/api/admin/requests",
-            {
-              method: "GET",
-              cache: "no-store",
-            }
-          );
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data =
-          await readJson(
-            response
-          );
-
-        if (
-          Array.isArray(
-            data.requests
-          )
-        ) {
-          setRequests(
-            data.requests
-          );
-        } else if (
-          Array.isArray(data)
-        ) {
-          setRequests(data);
+  const loadUsers =
+    useCallback(
+      async (
+        silent = false
+      ) => {
+        if (!silent) {
+          setLoading(true);
         } else {
-          setRequests([]);
-        }
-      } catch (error) {
-        console.error(
-          "So‘rovlarni yuklash xatosi:",
-          error
-        );
-      }
-    }, []);
-
-  /* =========================================================
-     TARIXNI YUKLASH
-  ========================================================= */
-
-  const loadHistory =
-    useCallback(async () => {
-      try {
-        const response =
-          await fetch(
-            "/api/admin/history",
-            {
-              method: "GET",
-              cache: "no-store",
-            }
-          );
-
-        if (!response.ok) {
-          setHistory([]);
-          return;
+          setRefreshing(true);
         }
 
-        const data =
-          await readJson(
-            response
+        try {
+          const response =
+            await fetch(
+              "/api/admin/access-codes",
+              {
+                method: "GET",
+                cache: "no-store",
+              }
+            );
+
+          const data =
+            await readJson(
+              response
+            );
+
+          if (
+            !response.ok ||
+            data?.success !== true
+          ) {
+            setUsers([]);
+
+            showMessage(
+              data?.message ||
+                "Foydalanuvchilarni yuklab bo‘lmadi.",
+              "error"
+            );
+
+            return;
+          }
+
+          setUsers(
+            Array.isArray(
+              data.users
+            )
+              ? data.users
+              : []
+          );
+        } catch (error) {
+          console.error(
+            "ACCESS USERS LOAD ERROR:",
+            error
           );
 
-        if (
-          Array.isArray(
-            data.history
-          )
-        ) {
-          setHistory(
-            data.history
+          showMessage(
+            "Server bilan bog‘lanishda xatolik yuz berdi.",
+            "error"
           );
-        } else if (
-          Array.isArray(data)
-        ) {
-          setHistory(data);
-        } else {
-          setHistory([]);
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
         }
-      } catch {
-        setHistory([]);
-      }
-    }, []);
-
-  /* =========================================================
-     HAMMASINI YANGILASH
-  ========================================================= */
-
-  const refreshAll =
-    useCallback(async () => {
-      await Promise.all([
-        loadCodes(),
-        loadRequests(),
-        loadHistory(),
-      ]);
-    }, [
-      loadCodes,
-      loadRequests,
-      loadHistory,
-    ]);
+      },
+      []
+    );
 
   useEffect(() => {
-    async function start() {
-      setLoading(true);
-
-      await refreshAll();
-
-      setLoading(false);
-    }
-
-    start();
-  }, [
-    refreshAll,
-  ]);
+    loadUsers();
+  }, [loadUsers]);
 
   /* =========================================================
      YANGI KOD YARATISH
@@ -294,11 +213,14 @@ export default function AdminRequestsPage() {
 
   async function createCode() {
     const cleanName =
-      name.trim();
+      name
+        .replace(/\s+/g, " ")
+        .trim();
 
     if (!cleanName) {
-      window.alert(
-        "Foydalanuvchi ismini kiriting."
+      showMessage(
+        "Foydalanuvchi ism-familiyasini kiriting.",
+        "error"
       );
 
       return;
@@ -309,10 +231,9 @@ export default function AdminRequestsPage() {
     try {
       const response =
         await fetch(
-          "/api/admin/codes",
+          "/api/admin/access-codes",
           {
-            method:
-              "POST",
+            method: "POST",
 
             headers: {
               "Content-Type":
@@ -321,6 +242,7 @@ export default function AdminRequestsPage() {
 
             body:
               JSON.stringify({
+                action: "create",
                 name: cleanName,
               }),
           }
@@ -333,31 +255,48 @@ export default function AdminRequestsPage() {
 
       if (
         !response.ok ||
-        data.success === false
+        data?.success !== true
       ) {
-        window.alert(
-          data.message ||
-            "Maxsus kod yaratilmadi."
+        showMessage(
+          data?.message ||
+            "Maxsus kirish kodi yaratilmadi.",
+          "error"
         );
 
         return;
       }
 
+      const newCode =
+        String(
+          data?.code ||
+            data?.user?.code ||
+            ""
+        );
+
+      setLastCreatedCode(
+        newCode
+      );
+
+      setLastCreatedName(
+        cleanName
+      );
+
       setName("");
 
-      await refreshAll();
+      await loadUsers(true);
 
-      window.alert(
-        "Maxsus kirish kodi yaratildi."
+      showMessage(
+        "Yangi kirish kodi yaratildi."
       );
     } catch (error) {
       console.error(
-        "Kod yaratish xatosi:",
+        "CREATE ACCESS CODE ERROR:",
         error
       );
 
-      window.alert(
-        "Kod yaratishda server xatosi."
+      showMessage(
+        "Kod yaratishda server xatosi yuz berdi.",
+        "error"
       );
     } finally {
       setCreating(false);
@@ -365,26 +304,73 @@ export default function AdminRequestsPage() {
   }
 
   /* =========================================================
-     QABUL / RAD
+     ACTION
   ========================================================= */
 
-  async function requestAction(
+  async function runAction(
     id: string,
     action:
       | "approve"
       | "reject"
+      | "restore"
+      | "deactivate"
+      | "delete"
   ) {
-    setWorkingId(
-      id
-    );
+    let confirmation = "";
+
+    if (
+      action === "approve"
+    ) {
+      confirmation =
+        "Ushbu foydalanuvchiga saytga kirish ruxsatini berasizmi?";
+    }
+
+    if (
+      action === "reject"
+    ) {
+      confirmation =
+        "Ushbu kirish so‘rovini rad etasizmi?";
+    }
+
+    if (
+      action === "restore"
+    ) {
+      confirmation =
+        "Ushbu kodni qayta faollashtirasizmi?\n\nFoydalanuvchi kodni qayta ishlatganda yana ruxsat so‘rovi yuboradi.";
+    }
+
+    if (
+      action ===
+      "deactivate"
+    ) {
+      confirmation =
+        "Ushbu foydalanuvchining kirish huquqini bloklaysizmi?";
+    }
+
+    if (
+      action === "delete"
+    ) {
+      confirmation =
+        "DIQQAT!\n\nUshbu foydalanuvchi va kirish kodi butunlay o‘chiriladi.\n\nEski kod bilan boshqa kirib bo‘lmaydi.\n\nDavom etasizmi?";
+    }
+
+    if (
+      confirmation &&
+      !window.confirm(
+        confirmation
+      )
+    ) {
+      return;
+    }
+
+    setWorkingId(id);
 
     try {
       const response =
         await fetch(
-          "/api/admin/requests",
+          "/api/admin/access-codes",
           {
-            method:
-              "POST",
+            method: "POST",
 
             headers: {
               "Content-Type":
@@ -406,188 +392,62 @@ export default function AdminRequestsPage() {
 
       if (
         !response.ok ||
-        data.success === false
+        data?.success !== true
       ) {
-        window.alert(
-          data.message ||
-            "Amal bajarilmadi."
+        showMessage(
+          data?.message ||
+            "Amal bajarilmadi.",
+          "error"
         );
 
         return;
       }
 
-      await refreshAll();
+      await loadUsers(true);
+
+      showMessage(
+        data?.message ||
+          "Amal muvaffaqiyatli bajarildi."
+      );
     } catch (error) {
       console.error(
-        "Request action error:",
+        "ACCESS CODE ACTION ERROR:",
         error
       );
-    } finally {
-      setWorkingId(
-        null
+
+      showMessage(
+        "Server bilan bog‘lanishda xatolik yuz berdi.",
+        "error"
       );
+    } finally {
+      setWorkingId(null);
     }
   }
 
   /* =========================================================
-     RUXSATNI BEKOR QILISH
+     COPY
   ========================================================= */
 
-  async function revokeAccess(
-    id: string
+  async function copyCode(
+    code: string
   ) {
-    const confirmed =
-      window.confirm(
-        "Ushbu foydalanuvchining kirish ruxsatini bekor qilasizmi?"
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setWorkingId(
-      id
-    );
-
     try {
-      const response =
-        await fetch(
-          "/api/admin/requests",
-          {
-            method:
-              "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                id,
-                action:
-                  "revoke",
-              }),
-          }
-        );
-
-      const data =
-        await readJson(
-          response
-        );
-
-      if (
-        !response.ok ||
-        data.success === false
-      ) {
-        window.alert(
-          data.message ||
-            "Ruxsatni bekor qilib bo‘lmadi."
-        );
-
-        return;
-      }
-
-      await refreshAll();
-    } catch (error) {
-      console.error(
-        "Revoke error:",
-        error
-      );
-    } finally {
-      setWorkingId(
-        null
-      );
-    }
-  }
-
-  /* =========================================================
-     BUTUNLAY O‘CHIRISH
-  ========================================================= */
-
-  async function deleteUser(
-    id: string
-  ) {
-    const confirmed =
-      window.confirm(
-        "Bu foydalanuvchi va unga berilgan maxsus kod BUTUNLAY o‘chiriladi.\n\n" +
-          "Eski kod bilan boshqa kira olmaydi.\n\n" +
-          "Davom etasizmi?"
+      await navigator.clipboard.writeText(
+        code
       );
 
-    if (!confirmed) {
-      return;
-    }
+      setCopiedCode(code);
 
-    setWorkingId(
-      id
-    );
-
-    try {
-      const response =
-        await fetch(
-          `/api/admin/codes?id=${encodeURIComponent(id)}`,
-          {
-            method:
-              "DELETE",
-
-            cache:
-              "no-store",
-          }
-        );
-
-      const data =
-        await readJson(
-          response
-        );
-
-      if (
-        !response.ok ||
-        data.success !== true
-      ) {
-        window.alert(
-          data.message ||
-            "O‘chirish amalga oshmadi."
-        );
-
-        return;
-      }
-
-      setCodes(
-        (
-          current
-        ) =>
-          current.filter(
-            (
-              item
-            ) =>
-              item.id !==
-              id
-          )
+      window.setTimeout(
+        () => {
+          setCopiedCode("");
+        },
+        1800
       );
-
-      setRequests(
-        (
-          current
-        ) =>
-          current.filter(
-            (
-              item
-            ) =>
-              item.id !==
-              id
-          )
-      );
-
-      await refreshAll();
-    } catch (error) {
-      console.error(
-        "Delete error:",
-        error
-      );
-    } finally {
-      setWorkingId(
-        null
+    } catch {
+      window.prompt(
+        "Kodni nusxalang:",
+        code
       );
     }
   }
@@ -601,18 +461,112 @@ export default function AdminRequestsPage() {
       await fetch(
         "/api/logout",
         {
-          method:
-            "POST",
+          method: "POST",
         }
       );
+    } catch (error) {
+      console.error(
+        "LOGOUT ERROR:",
+        error
+      );
     } finally {
-      router.replace(
-        "/login"
+      sessionStorage.removeItem(
+        "qurbonov-session"
       );
 
+      sessionStorage.removeItem(
+        "qurbonov-role"
+      );
+
+      router.replace("/");
       router.refresh();
     }
   }
+
+  /* =========================================================
+     STATUS
+  ========================================================= */
+
+  function getStatus(
+    user: AccessCode
+  ) {
+    if (!user.active) {
+      return {
+        key: "blocked",
+        text:
+          "Bloklangan / rad etilgan",
+      };
+    }
+
+    if (user.approved) {
+      return {
+        key: "approved",
+        text:
+          "Ruxsat berilgan",
+      };
+    }
+
+    if (user.requestedAt) {
+      return {
+        key: "pending",
+        text:
+          "Ruxsat kutilmoqda",
+      };
+    }
+
+    return {
+      key: "unused",
+      text:
+        "Kod hali ishlatilmagan",
+    };
+  }
+
+  /* =========================================================
+     STATISTICS
+  ========================================================= */
+
+  const statistics =
+    useMemo(() => {
+      const pending =
+        users.filter(
+          (item) =>
+            item.active &&
+            !item.approved &&
+            Boolean(
+              item.requestedAt
+            )
+        ).length;
+
+      const approved =
+        users.filter(
+          (item) =>
+            item.active &&
+            item.approved
+        ).length;
+
+      const blocked =
+        users.filter(
+          (item) =>
+            !item.active
+        ).length;
+
+      const unused =
+        users.filter(
+          (item) =>
+            item.active &&
+            !item.approved &&
+            !item.requestedAt
+        ).length;
+
+      return {
+        total:
+          users.length,
+        pending,
+        approved,
+        blocked,
+        unused,
+      };
+    }, [users]);
 
   /* =========================================================
      SEARCH
@@ -623,98 +577,63 @@ export default function AdminRequestsPage() {
       .trim()
       .toLowerCase();
 
-  function matchesSearch(
-    item: {
-      name?: string;
-      code?: string;
-    }
-  ) {
-    if (
-      !searchText
-    ) {
-      return true;
-    }
+  const searchedUsers =
+    useMemo(() => {
+      if (!searchText) {
+        return users;
+      }
 
-    return (
-      String(
-        item.name || ""
-      )
-        .toLowerCase()
-        .includes(
-          searchText
-        ) ||
+      return users.filter(
+        (item) =>
+          item.name
+            .toLowerCase()
+            .includes(
+              searchText
+            ) ||
+          item.code
+            .toLowerCase()
+            .includes(
+              searchText
+            )
+      );
+    }, [
+      users,
+      searchText,
+    ]);
 
-      String(
-        item.code || ""
-      )
-        .toLowerCase()
-        .includes(
-          searchText
-        )
-    );
-  }
-
-  const filteredCodes =
+  const pendingUsers =
     useMemo(
       () =>
-        codes.filter(
-          matchesSearch
-        ),
-      [
-        codes,
-        searchText,
-      ]
-    );
-
-  const pendingRequests =
-    useMemo(
-      () =>
-        requests.filter(
-          (
-            item
-          ) =>
+        searchedUsers.filter(
+          (item) =>
+            item.active &&
             !item.approved &&
-            matchesSearch(
-              item
-            )
-        ),
-      [
-        requests,
-        searchText,
-      ]
-    );
-
-  const approvedCodes =
-    useMemo(
-      () =>
-        filteredCodes.filter(
-          (
-            item
-          ) =>
-            item.approved ===
-              true &&
-            item.active !==
-              false
-        ),
-      [
-        filteredCodes,
-      ]
-    );
-
-  const rejectedCodes =
-    useMemo(
-      () =>
-        filteredCodes.filter(
-          (
-            item
-          ) =>
             Boolean(
-              item.rejectedAt
+              item.requestedAt
             )
         ),
-      [
-        filteredCodes,
-      ]
+      [searchedUsers]
+    );
+
+  const approvedUsers =
+    useMemo(
+      () =>
+        searchedUsers.filter(
+          (item) =>
+            item.active &&
+            item.approved
+        ),
+      [searchedUsers]
+    );
+
+  const blockedUsers =
+    useMemo(
+      () =>
+        searchedUsers.filter(
+          (item) =>
+            !item.active
+        ),
+      [searchedUsers]
     );
 
   /* =========================================================
@@ -722,18 +641,17 @@ export default function AdminRequestsPage() {
   ========================================================= */
 
   function formatDate(
-    value?:
+    value:
       | string
       | null
+      | undefined
   ) {
     if (!value) {
       return "—";
     }
 
     const date =
-      new Date(
-        value
-      );
+      new Date(value);
 
     if (
       Number.isNaN(
@@ -744,60 +662,262 @@ export default function AdminRequestsPage() {
     }
 
     return date.toLocaleString(
-      "uz-UZ"
+      "uz-UZ",
+      {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
     );
   }
 
   /* =========================================================
-     BO‘LIMNI OCHISH
+     CARD
   ========================================================= */
 
-  function openSection(
-    section:
-      ActiveSection
+  function renderUserCard(
+    user: AccessCode
   ) {
-    setActiveSection(
-      section
-    );
+    const status =
+      getStatus(user);
 
-    window.setTimeout(
-      () => {
-        document
-          .getElementById(
-            "active-content"
-          )
-          ?.scrollIntoView({
-            behavior:
-              "smooth",
+    const working =
+      workingId ===
+      user.id;
 
-            block:
-              "start",
-          });
-      },
-      80
+    return (
+      <article
+        className="userCard"
+        key={user.id}
+      >
+        <div className="userTop">
+          <div>
+            <h3>
+              {user.name}
+            </h3>
+
+            <div
+              className={`statusBadge ${status.key}`}
+            >
+              {status.text}
+            </div>
+          </div>
+        </div>
+
+        <div className="codeBox">
+          <span>
+            Maxsus kod
+          </span>
+
+          <strong>
+            {user.code}
+          </strong>
+
+          <button
+            type="button"
+            className="copyButton"
+            onClick={() =>
+              copyCode(
+                user.code
+              )
+            }
+          >
+            {copiedCode ===
+            user.code
+              ? "Nusxalandi ✓"
+              : "Nusxalash"}
+          </button>
+        </div>
+
+        <div className="dateGrid">
+          <div>
+            <span>
+              Yaratilgan
+            </span>
+
+            <strong>
+              {formatDate(
+                user.createdAt
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              So‘rov
+            </span>
+
+            <strong>
+              {formatDate(
+                user.requestedAt
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Tasdiqlangan
+            </span>
+
+            <strong>
+              {formatDate(
+                user.approvedAt
+              )}
+            </strong>
+          </div>
+        </div>
+
+        <div className="userActions">
+          {status.key ===
+            "pending" && (
+            <>
+              <button
+                type="button"
+                className="approveButton"
+                disabled={
+                  working
+                }
+                onClick={() =>
+                  runAction(
+                    user.id,
+                    "approve"
+                  )
+                }
+              >
+                {working
+                  ? "Kutilmoqda..."
+                  : "Ruxsat berish"}
+              </button>
+
+              <button
+                type="button"
+                className="rejectButton"
+                disabled={
+                  working
+                }
+                onClick={() =>
+                  runAction(
+                    user.id,
+                    "reject"
+                  )
+                }
+              >
+                Rad etish
+              </button>
+            </>
+          )}
+
+          {status.key ===
+            "approved" && (
+            <button
+              type="button"
+              className="blockButton"
+              disabled={
+                working
+              }
+              onClick={() =>
+                runAction(
+                  user.id,
+                  "deactivate"
+                )
+              }
+            >
+              Kirishni bloklash
+            </button>
+          )}
+
+          {status.key ===
+            "unused" && (
+            <button
+              type="button"
+              className="blockButton"
+              disabled={
+                working
+              }
+              onClick={() =>
+                runAction(
+                  user.id,
+                  "deactivate"
+                )
+              }
+            >
+              Kodni bloklash
+            </button>
+          )}
+
+          {status.key ===
+            "blocked" && (
+            <button
+              type="button"
+              className="restoreButton"
+              disabled={
+                working
+              }
+              onClick={() =>
+                runAction(
+                  user.id,
+                  "restore"
+                )
+              }
+            >
+              Qayta faollashtirish
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="deleteButton"
+            disabled={
+              working
+            }
+            onClick={() =>
+              runAction(
+                user.id,
+                "delete"
+              )
+            }
+          >
+            Butunlay o‘chirish
+          </button>
+        </div>
+      </article>
     );
   }
 
-  function closeSection() {
-    setActiveSection(
-      null
-    );
+  /* =========================================================
+     USER LIST
+  ========================================================= */
 
-    window.setTimeout(
-      () => {
-        document
-          .getElementById(
-            "management"
-          )
-          ?.scrollIntoView({
-            behavior:
-              "smooth",
+  function renderUserList(
+    list: AccessCode[],
+    emptyText: string
+  ) {
+    if (loading) {
+      return (
+        <div className="emptyBox">
+          Yuklanmoqda...
+        </div>
+      );
+    }
 
-            block:
-              "start",
-          });
-      },
-      50
+    if (
+      list.length === 0
+    ) {
+      return (
+        <div className="emptyBox">
+          {emptyText}
+        </div>
+      );
+    }
+
+    return (
+      <div className="usersGrid">
+        {list.map(
+          renderUserCard
+        )}
+      </div>
     );
   }
 
@@ -807,13 +927,11 @@ export default function AdminRequestsPage() {
 
   return (
     <main className="page">
-
-      {/* =====================================================
-          TOP HEADER
-      ===================================================== */}
+      {/* ================================================
+          HEADER
+      ================================================= */}
 
       <header className="topPanel">
-
         <button
           type="button"
           className="namePlate"
@@ -825,7 +943,6 @@ export default function AdminRequestsPage() {
         </button>
 
         <div className="topButtons">
-
           <button
             type="button"
             className="topButton"
@@ -842,10 +959,27 @@ export default function AdminRequestsPage() {
             type="button"
             className="topButton"
             onClick={() =>
-              router.push("/")
+              router.push(
+                "/admin/tests"
+              )
             }
           >
-            Asosiy sahifa
+            Testlar
+          </button>
+
+          <button
+            type="button"
+            className="topButton"
+            disabled={
+              refreshing
+            }
+            onClick={() =>
+              loadUsers(true)
+            }
+          >
+            {refreshing
+              ? "Yangilanmoqda..."
+              : "Yangilash"}
           </button>
 
           <button
@@ -857,930 +991,546 @@ export default function AdminRequestsPage() {
           >
             Chiqish
           </button>
-
         </div>
-
       </header>
 
-      {/* =====================================================
-          PAGE TITLE
-      ===================================================== */}
+      {/* ================================================
+          MESSAGE
+      ================================================= */}
+
+      {message && (
+        <div
+          className={`messageBox ${
+            messageType ===
+            "error"
+              ? "messageError"
+              : "messageSuccess"
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      {/* ================================================
+          HERO
+      ================================================= */}
 
       <section className="heroPanel">
-
         <div className="floatingTitle">
           Foydalanuvchilar
         </div>
 
         <h1>
-          Foydalanuvchilar va kirish
-          ruxsatlarini boshqarish
+          Kirish kodlari va
+          foydalanuvchilarni
+          boshqarish
         </h1>
 
         <p>
-          Kerakli boshqaruv bo‘limini
-          tanlang.
+          Kod yaratish, ruxsat
+          berish, bloklash va
+          o‘chirish Neon bazasi
+          orqali boshqariladi.
         </p>
-
       </section>
 
-      {/* =====================================================
-          6 TA BOSHQARUV KARTASI
-      ===================================================== */}
+      {/* ================================================
+          STATISTICS
+      ================================================= */}
 
-      <section
-        className="managementPanel"
-        id="management"
-      >
+      <section className="statistics">
+        <button
+          type="button"
+          className="statCard"
+          onClick={() =>
+            setActiveSection(
+              "all"
+            )
+          }
+        >
+          <strong>
+            {statistics.total}
+          </strong>
 
+          <span>
+            Jami kodlar
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="statCard pendingStat"
+          onClick={() =>
+            setActiveSection(
+              "pending"
+            )
+          }
+        >
+          <strong>
+            {statistics.pending}
+          </strong>
+
+          <span>
+            So‘rov kutmoqda
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="statCard approvedStat"
+          onClick={() =>
+            setActiveSection(
+              "approved"
+            )
+          }
+        >
+          <strong>
+            {statistics.approved}
+          </strong>
+
+          <span>
+            Ruxsat berilgan
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="statCard unusedStat"
+          onClick={() =>
+            setActiveSection(
+              "all"
+            )
+          }
+        >
+          <strong>
+            {statistics.unused}
+          </strong>
+
+          <span>
+            Ishlatilmagan kod
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="statCard blockedStat"
+          onClick={() =>
+            setActiveSection(
+              "blocked"
+            )
+          }
+        >
+          <strong>
+            {statistics.blocked}
+          </strong>
+
+          <span>
+            Bloklangan
+          </span>
+        </button>
+      </section>
+
+      {/* ================================================
+          MANAGEMENT
+      ================================================= */}
+
+      <section className="managementPanel">
         <div className="floatingTitle">
-          Boshqaruv bo‘limlari
+          Boshqaruv
         </div>
 
         <div className="managementGrid">
+          <button
+            type="button"
+            className="managementCard createManagement"
+            onClick={() =>
+              setActiveSection(
+                "new-code"
+              )
+            }
+          >
+            <span className="managementIcon">
+              +
+            </span>
 
-          <div className="managementCard">
-
-            <h2>
-              Qidiruv
-            </h2>
-
-            <p>
-              Ism yoki maxsus kod orqali
-              foydalanuvchini topish.
-            </p>
-
-            <button
-              type="button"
-              className="openButton"
-              onClick={() =>
-                openSection(
-                  "search"
-                )
-              }
-            >
-              Ochish
-            </button>
-
-          </div>
-
-          <div className="managementCard">
-
-            <h2>
+            <strong>
               Yangi kirish kodi
-            </h2>
+            </strong>
 
-            <p>
-              Yangi foydalanuvchi uchun
-              maxsus kirish kodi yaratish.
-            </p>
-
-            <button
-              type="button"
-              className="openButton"
-              onClick={() =>
-                openSection(
-                  "new-code"
-                )
-              }
-            >
-              Ochish
-            </button>
-
-          </div>
-
-          <div className="managementCard">
-
-            <h2>
-              Yaratilgan kodlar
-            </h2>
-
-            <p>
-              Oldin yaratilgan barcha
-              kirish kodlarini ko‘rish.
-            </p>
-
-            <button
-              type="button"
-              className="openButton"
-              onClick={() =>
-                openSection(
-                  "codes"
-                )
-              }
-            >
-              Ochish
-            </button>
-
-          </div>
-
-          <div className="managementCard">
-
-            <h2>
-              Kirish so‘rovlari
-            </h2>
-
-            <p>
-              Kutilayotgan kirish
-              so‘rovlarini boshqarish.
-            </p>
-
-            <button
-              type="button"
-              className="openButton"
-              onClick={() =>
-                openSection(
-                  "requests"
-                )
-              }
-            >
-              Ochish
-            </button>
-
-          </div>
-
-          <div className="managementCard">
-
-            <h2>
-              Ruxsat berilganlar
-            </h2>
-
-            <p>
-              Saytga kirish ruxsati
-              berilgan foydalanuvchilar.
-            </p>
-
-            <button
-              type="button"
-              className="openButton"
-              onClick={() =>
-                openSection(
-                  "approved"
-                )
-              }
-            >
-              Ochish
-            </button>
-
-          </div>
-
-          <div className="managementCard">
-
-            <h2>
-              Rad etilganlar
-            </h2>
-
-            <p>
-              Kirish so‘rovi rad etilgan
-              foydalanuvchilar.
-            </p>
-
-            <button
-              type="button"
-              className="openButton"
-              onClick={() =>
-                openSection(
-                  "rejected"
-                )
-              }
-            >
-              Ochish
-            </button>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* =====================================================
-          ACTIVE CONTENT
-      ===================================================== */}
-
-      {activeSection && (
-
-        <section
-          className="contentPanel"
-          id="active-content"
-        >
+            <small>
+              Yangi foydalanuvchi
+              uchun maxsus kod
+              yarating.
+            </small>
+          </button>
 
           <button
             type="button"
-            className="backButton"
-            onClick={
-              closeSection
+            className="managementCard"
+            onClick={() =>
+              setActiveSection(
+                "pending"
+              )
             }
           >
-            ← Boshqaruv bo‘limlariga qaytish
+            <span className="managementNumber">
+              {statistics.pending}
+            </span>
+
+            <strong>
+              Kirish so‘rovlari
+            </strong>
+
+            <small>
+              Ruxsat kutayotgan
+              foydalanuvchilar.
+            </small>
           </button>
 
-          {/* =================================================
-              QIDIRUV
-          ================================================= */}
+          <button
+            type="button"
+            className="managementCard"
+            onClick={() =>
+              setActiveSection(
+                "approved"
+              )
+            }
+          >
+            <span className="managementNumber">
+              {statistics.approved}
+            </span>
 
-          {activeSection ===
-            "search" && (
+            <strong>
+              Ruxsat berilganlar
+            </strong>
 
-            <>
+            <small>
+              Saytga kirishi
+              tasdiqlangan
+              foydalanuvchilar.
+            </small>
+          </button>
 
-              <div className="contentTitle">
-                Qidiruv
+          <button
+            type="button"
+            className="managementCard"
+            onClick={() =>
+              setActiveSection(
+                "all"
+              )
+            }
+          >
+            <span className="managementNumber">
+              {statistics.total}
+            </span>
+
+            <strong>
+              Barcha kodlar
+            </strong>
+
+            <small>
+              Barcha yaratilgan
+              kodlarni boshqaring.
+            </small>
+          </button>
+
+          <button
+            type="button"
+            className="managementCard"
+            onClick={() =>
+              setActiveSection(
+                "blocked"
+              )
+            }
+          >
+            <span className="managementNumber">
+              {statistics.blocked}
+            </span>
+
+            <strong>
+              Bloklanganlar
+            </strong>
+
+            <small>
+              Rad etilgan yoki
+              bloklangan kodlar.
+            </small>
+          </button>
+        </div>
+      </section>
+
+      {/* ================================================
+          CONTENT
+      ================================================= */}
+
+      <section className="contentPanel">
+        {/* ==============================================
+            DASHBOARD
+        =============================================== */}
+
+        {activeSection ===
+          "dashboard" && (
+          <>
+            <div className="contentTitle">
+              Boshqaruv
+            </div>
+
+            <div className="innerPanel">
+              <div className="dashboardWelcome">
+                <h2>
+                  Foydalanuvchilar
+                  boshqaruvi
+                </h2>
+
+                <p>
+                  Yuqoridagi
+                  bo‘limlardan birini
+                  tanlang.
+                </p>
               </div>
+            </div>
+          </>
+        )}
 
-              <div className="innerPanel">
+        {/* ==============================================
+            NEW CODE
+        =============================================== */}
 
-                <div className="searchWrapper">
+        {activeSection ===
+          "new-code" && (
+          <>
+            <div className="contentTitle">
+              Yangi kirish kodi
+            </div>
 
-                  <input
-                    type="text"
-                    className="searchInput"
-                    value={
-                      search
+            <div className="innerPanel">
+              <div className="createArea">
+                <label
+                  htmlFor="new-user-name"
+                >
+                  Foydalanuvchi
+                  ism-familiyasi
+                </label>
+
+                <input
+                  id="new-user-name"
+                  type="text"
+                  value={name}
+                  disabled={
+                    creating
+                  }
+                  placeholder="Masalan: Ali Valiyev"
+                  onChange={(e) =>
+                    setName(
+                      e.target.value
+                    )
+                  }
+                  onKeyDown={(
+                    e
+                  ) => {
+                    if (
+                      e.key ===
+                      "Enter"
+                    ) {
+                      createCode();
                     }
-                    onChange={(
-                      e
-                    ) =>
-                      setSearch(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Ism yoki maxsus kod bo‘yicha qidirish..."
-                  />
+                  }}
+                />
 
-                  {search && (
+                <button
+                  type="button"
+                  className="createButton"
+                  disabled={
+                    creating
+                  }
+                  onClick={
+                    createCode
+                  }
+                >
+                  {creating
+                    ? "KOD YARATILMOQDA..."
+                    : "KOD YARATISH"}
+                </button>
+
+                {lastCreatedCode && (
+                  <div className="createdResult">
+                    <span>
+                      Yangi kod
+                    </span>
+
+                    <h3>
+                      {
+                        lastCreatedName
+                      }
+                    </h3>
+
+                    <strong>
+                      {
+                        lastCreatedCode
+                      }
+                    </strong>
 
                     <button
                       type="button"
-                      className="clearButton"
                       onClick={() =>
-                        setSearch("")
+                        copyCode(
+                          lastCreatedCode
+                        )
                       }
                     >
-                      ×
+                      {copiedCode ===
+                      lastCreatedCode
+                        ? "Nusxalandi ✓"
+                        : "KODNI NUSXALASH"}
                     </button>
 
-                  )}
-
-                </div>
-
-                {!search.trim() ? (
-
-                  <div className="empty">
-                    Qidirish uchun ism yoki
-                    maxsus kod kiriting.
+                    <small>
+                      Ushbu kodni
+                      foydalanuvchiga
+                      yuboring. U kodni
+                      birinchi marta
+                      ishlatganda kirish
+                      so‘rovi sizga keladi.
+                    </small>
                   </div>
-
-                ) : filteredCodes.length ===
-                  0 ? (
-
-                  <div className="empty">
-                    Natija topilmadi.
-                  </div>
-
-                ) : (
-
-                  <div className="userGrid">
-
-                    {filteredCodes.map(
-                      (
-                        item
-                      ) => (
-
-                        <article
-                          className="userCard"
-                          key={
-                            item.id
-                          }
-                        >
-
-                          <button
-                            type="button"
-                            className="deleteButton"
-                            disabled={
-                              workingId ===
-                              item.id
-                            }
-                            onClick={() =>
-                              deleteUser(
-                                item.id
-                              )
-                            }
-                          >
-                            ×
-                          </button>
-
-                          <h3>
-                            {
-                              item.name
-                            }
-                          </h3>
-
-                          <div className="codeText">
-                            {
-                              item.code
-                            }
-                          </div>
-
-                          <div className="statusText">
-
-                            {item.approved &&
-                            item.active !==
-                              false
-                              ? "Ruxsat berilgan"
-                              : item.rejectedAt
-                              ? "Rad etilgan"
-                              : item.requestedAt
-                              ? "Ruxsat kutilmoqda"
-                              : "So‘rov yuborilmagan"}
-
-                          </div>
-
-                          <small>
-                            Yaratilgan:{" "}
-                            {formatDate(
-                              item.createdAt
-                            )}
-                          </small>
-
-                        </article>
-
-                      )
-                    )}
-
-                  </div>
-
                 )}
-
               </div>
-
-            </>
-
-          )}
-
-          {/* =================================================
-              YANGI KOD
-          ================================================= */}
-
-          {activeSection ===
-            "new-code" && (
-
-            <>
-
-              <div className="contentTitle">
-                Yangi kirish kodi
-              </div>
-
-              <div className="innerPanel">
-
-                <div className="createArea">
-
-                  <label>
-                    Foydalanuvchi ismi
-                  </label>
-
-                  <input
-                    type="text"
-                    value={
-                      name
-                    }
-                    onChange={(
-                      e
-                    ) =>
-                      setName(
-                        e.target.value
-                      )
-                    }
-                    placeholder="Masalan: Ali Valiyev"
-                  />
-
-                  <button
-                    type="button"
-                    className="actionButton"
-                    onClick={
-                      createCode
-                    }
-                    disabled={
-                      creating
-                    }
-                  >
-                    {creating
-                      ? "Yaratilmoqda..."
-                      : "Maxsus kod yaratish"}
-                  </button>
-
-                </div>
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* =================================================
-              YARATILGAN KODLAR
-          ================================================= */}
-
-          {activeSection ===
-            "codes" && (
-
-            <>
-
-              <div className="contentTitle">
-                Yaratilgan kodlar
-              </div>
-
-              <div className="innerPanel">
-
-                {loading ? (
-
-                  <div className="empty">
-                    Yuklanmoqda...
-                  </div>
-
-                ) : codes.length ===
-                  0 ? (
-
-                  <div className="empty">
-                    Yaratilgan kod mavjud emas.
-                  </div>
-
-                ) : (
-
-                  <div className="userGrid">
-
-                    {codes.map(
-                      (
-                        item
-                      ) => (
-
-                        <article
-                          className="userCard"
-                          key={
-                            item.id
-                          }
-                        >
-
-                          <button
-                            type="button"
-                            className="deleteButton"
-                            disabled={
-                              workingId ===
-                              item.id
-                            }
-                            onClick={() =>
-                              deleteUser(
-                                item.id
-                              )
-                            }
-                          >
-                            ×
-                          </button>
-
-                          <h3>
-                            {
-                              item.name
-                            }
-                          </h3>
-
-                          <div className="codeText">
-                            {
-                              item.code
-                            }
-                          </div>
-
-                          <small>
-                            Yaratilgan:{" "}
-                            {formatDate(
-                              item.createdAt
-                            )}
-                          </small>
-
-                        </article>
-
-                      )
-                    )}
-
-                  </div>
-
-                )}
-
-                {/* TARIX */}
-
-                <div className="historyBox">
-
-                  <h3>
-                    So‘nggi tarix
-                  </h3>
-
-                  {history.length ===
-                    0 ? (
-
-                    <div className="empty">
-                      Hozircha tarix mavjud emas.
-                    </div>
-
-                  ) : (
-
-                    <div className="historyList">
-
-                      {history.map(
-                        (
-                          item,
-                          index
-                        ) => (
-
-                          <div
-                            className="historyItem"
-                            key={
-                              item.id ||
-                              index
-                            }
-                          >
-
-                            <div>
-
-                              <strong>
-                                {item.name ||
-                                  "Foydalanuvchi"}
-                              </strong>
-
-                              <p>
-                                {item.message ||
-                                  item.action ||
-                                  "Amal bajarildi"}
-                              </p>
-
-                            </div>
-
-                            <small>
-                              {formatDate(
-                                item.createdAt ||
-                                  item.date
-                              )}
-                            </small>
-
-                          </div>
-
-                        )
-                      )}
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* =================================================
-              KIRISH SO‘ROVLARI
-          ================================================= */}
-
-          {activeSection ===
-            "requests" && (
-
-            <>
-
-              <div className="contentTitle">
-                Kirish so‘rovlari
-              </div>
-
-              <div className="innerPanel">
-
-                {pendingRequests.length ===
-                  0 ? (
-
-                  <div className="empty">
-                    Hozircha yangi kirish
-                    so‘rovi yo‘q.
-                  </div>
-
-                ) : (
-
-                  <div className="requestList">
-
-                    {pendingRequests.map(
-                      (
-                        item
-                      ) => (
-
-                        <article
-                          className="requestCard"
-                          key={
-                            item.id
-                          }
-                        >
-
-                          <div>
-
-                            <h3>
-                              {
-                                item.name
-                              }
-                            </h3>
-
-                            <div className="codeText">
-                              {
-                                item.code
-                              }
-                            </div>
-
-                            <small>
-                              So‘rov:{" "}
-                              {formatDate(
-                                item.requestedAt
-                              )}
-                            </small>
-
-                          </div>
-
-                          <div className="requestButtons">
-
-                            <button
-                              type="button"
-                              className="approveButton"
-                              disabled={
-                                workingId ===
-                                item.id
-                              }
-                              onClick={() =>
-                                requestAction(
-                                  item.id,
-                                  "approve"
-                                )
-                              }
-                            >
-                              Qabul qilish
-                            </button>
-
-                            <button
-                              type="button"
-                              className="rejectButton"
-                              disabled={
-                                workingId ===
-                                item.id
-                              }
-                              onClick={() =>
-                                requestAction(
-                                  item.id,
-                                  "reject"
-                                )
-                              }
-                            >
-                              Rad etish
-                            </button>
-
-                          </div>
-
-                        </article>
-
-                      )
-                    )}
-
-                  </div>
-
-                )}
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* =================================================
-              RUXSAT BERILGANLAR
-          ================================================= */}
-
-          {activeSection ===
-            "approved" && (
-
-            <>
-
-              <div className="contentTitle">
-                Ruxsat berilganlar
-              </div>
-
-              <div className="innerPanel">
-
-                {approvedCodes.length ===
-                  0 ? (
-
-                  <div className="empty">
-                    Ruxsat berilgan
-                    foydalanuvchi yo‘q.
-                  </div>
-
-                ) : (
-
-                  <div className="requestList">
-
-                    {approvedCodes.map(
-                      (
-                        item
-                      ) => (
-
-                        <article
-                          className="requestCard"
-                          key={
-                            item.id
-                          }
-                        >
-
-                          <div>
-
-                            <h3>
-                              {
-                                item.name
-                              }
-                            </h3>
-
-                            <div className="codeText">
-                              {
-                                item.code
-                              }
-                            </div>
-
-                            <div className="approvedStatus">
-                              Ruxsat berilgan
-                            </div>
-
-                          </div>
-
-                          <div className="requestButtons">
-
-                            <button
-                              type="button"
-                              className="revokeButton"
-                              disabled={
-                                workingId ===
-                                item.id
-                              }
-                              onClick={() =>
-                                revokeAccess(
-                                  item.id
-                                )
-                              }
-                            >
-                              Ruxsatni bekor qilish
-                            </button>
-
-                            <button
-                              type="button"
-                              className="deleteSecondary"
-                              disabled={
-                                workingId ===
-                                item.id
-                              }
-                              onClick={() =>
-                                deleteUser(
-                                  item.id
-                                )
-                              }
-                            >
-                              Butunlay o‘chirish
-                            </button>
-
-                          </div>
-
-                        </article>
-
-                      )
-                    )}
-
-                  </div>
-
-                )}
-
-              </div>
-
-            </>
-
-          )}
-
-          {/* =================================================
-              RAD ETILGANLAR
-          ================================================= */}
-
-          {activeSection ===
-            "rejected" && (
-
-            <>
-
-              <div className="contentTitle">
-                Rad etilganlar
-              </div>
-
-              <div className="innerPanel">
-
-                {rejectedCodes.length ===
-                  0 ? (
-
-                  <div className="empty">
-                    Rad etilgan
-                    foydalanuvchi yo‘q.
-                  </div>
-
-                ) : (
-
-                  <div className="userGrid">
-
-                    {rejectedCodes.map(
-                      (
-                        item
-                      ) => (
-
-                        <article
-                          className="userCard"
-                          key={
-                            item.id
-                          }
-                        >
-
-                          <button
-                            type="button"
-                            className="deleteButton"
-                            disabled={
-                              workingId ===
-                              item.id
-                            }
-                            onClick={() =>
-                              deleteUser(
-                                item.id
-                              )
-                            }
-                          >
-                            ×
-                          </button>
-
-                          <h3>
-                            {
-                              item.name
-                            }
-                          </h3>
-
-                          <div className="codeText">
-                            {
-                              item.code
-                            }
-                          </div>
-
-                          <div className="rejectedStatus">
-                            Rad etilgan
-                          </div>
-
-                        </article>
-
-                      )
-                    )}
-
-                  </div>
-
-                )}
-
-              </div>
-
-            </>
-
-          )}
-
-        </section>
-
-      )}
-
-      {/* =====================================================
-          CSS
-      ===================================================== */}
+            </div>
+          </>
+        )}
+
+        {/* ==============================================
+            PENDING
+        =============================================== */}
+
+        {activeSection ===
+          "pending" && (
+          <>
+            <div className="contentTitle">
+              Kirish so‘rovlari
+            </div>
+
+            <div className="innerPanel">
+              <SearchBox
+                search={search}
+                setSearch={
+                  setSearch
+                }
+              />
+
+              {renderUserList(
+                pendingUsers,
+                "Hozircha yangi kirish so‘rovi yo‘q."
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ==============================================
+            APPROVED
+        =============================================== */}
+
+        {activeSection ===
+          "approved" && (
+          <>
+            <div className="contentTitle">
+              Ruxsat berilganlar
+            </div>
+
+            <div className="innerPanel">
+              <SearchBox
+                search={search}
+                setSearch={
+                  setSearch
+                }
+              />
+
+              {renderUserList(
+                approvedUsers,
+                "Ruxsat berilgan foydalanuvchi yo‘q."
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ==============================================
+            ALL
+        =============================================== */}
+
+        {activeSection ===
+          "all" && (
+          <>
+            <div className="contentTitle">
+              Barcha kirish kodlari
+            </div>
+
+            <div className="innerPanel">
+              <SearchBox
+                search={search}
+                setSearch={
+                  setSearch
+                }
+              />
+
+              {renderUserList(
+                searchedUsers,
+                "Kirish kodi mavjud emas."
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ==============================================
+            BLOCKED
+        =============================================== */}
+
+        {activeSection ===
+          "blocked" && (
+          <>
+            <div className="contentTitle">
+              Bloklanganlar
+            </div>
+
+            <div className="innerPanel">
+              <SearchBox
+                search={search}
+                setSearch={
+                  setSearch
+                }
+              />
+
+              {renderUserList(
+                blockedUsers,
+                "Bloklangan foydalanuvchi yo‘q."
+              )}
+            </div>
+          </>
+        )}
+      </section>
 
       <style jsx>{`
-
         * {
           box-sizing: border-box;
         }
 
         .page {
           min-height: 100vh;
-
-          padding:
-            16px 16px 80px;
+          padding: 16px 16px 80px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #f4f6f7 55%,
+              #f5f7f8 55%,
               #edf1f3 100%
             );
+
+          color: #111;
 
           font-family:
             "Bell MT",
             "Times New Roman",
             serif;
-
-          color: #111;
         }
 
         button,
@@ -1788,9 +1538,18 @@ export default function AdminRequestsPage() {
           font-family: inherit;
         }
 
-        /* =====================================================
+        button {
+          cursor: pointer;
+        }
+
+        button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        /* ===========================================
            HEADER
-        ===================================================== */
+        =========================================== */
 
         .topPanel {
           width: min(
@@ -1810,7 +1569,7 @@ export default function AdminRequestsPage() {
             space-between;
           align-items: center;
 
-          gap: 25px;
+          gap: 22px;
 
           border:
             3px solid #173e58;
@@ -1831,26 +1590,22 @@ export default function AdminRequestsPage() {
                 255,
                 255,
                 255,
-                .6
+                0.6
               ),
-
-            0 7px 0
-              #173c55,
-
+            0 7px 0 #173c55,
             0 13px 20px
               rgba(
                 0,
                 0,
                 0,
-                .18
+                0.18
               );
         }
 
         .namePlate {
           min-height: 58px;
 
-          padding:
-            0 25px;
+          padding: 0 25px;
 
           border:
             3px solid #50585d;
@@ -1861,7 +1616,6 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              180deg,
               #ffffff,
               #c8c8c8
             );
@@ -1869,41 +1623,39 @@ export default function AdminRequestsPage() {
           box-shadow:
             inset 0 4px 4px
               white,
-
             0 5px 0
               #60686c;
 
           font-size: 21px;
           font-weight: 700;
-
-          cursor: pointer;
         }
 
         .topButtons {
           display: flex;
 
-          gap: 15px;
+          flex-wrap: wrap;
+
+          justify-content:
+            flex-end;
+
+          gap: 12px;
         }
 
         .topButton,
         .exitButton {
-          min-width: 130px;
-
-          min-height: 52px;
+          min-height: 50px;
 
           padding:
-            8px 20px;
+            8px 18px;
 
-          border-radius: 11px;
+          border-radius: 10px;
 
           font-weight: 700;
-
-          cursor: pointer;
         }
 
         .topButton {
           border:
-            2px solid #777;
+            2px solid #666;
 
           background:
             linear-gradient(
@@ -1916,74 +1668,130 @@ export default function AdminRequestsPage() {
         }
 
         .exitButton {
-          border:
-            2px solid #174461;
+          min-width: 110px;
 
-          color: #ffffff;
+          border:
+            2px solid #8a1717;
+
+          color: white;
 
           background:
             linear-gradient(
-              #74c7ed,
-              #348ab8
+              #ef6666,
+              #b42121
             );
 
           box-shadow:
-            0 4px 0
-              #174461;
+            0 4px 0 #7d1717;
         }
 
-        /* =====================================================
-           HERO
-        ===================================================== */
+        /* ===========================================
+           MESSAGE
+        =========================================== */
 
-        .heroPanel {
-          position: relative;
+        .messageBox {
+          position: fixed;
+
+          z-index: 1000;
+
+          top: 25px;
+          left: 50%;
+
+          transform:
+            translateX(-50%);
 
           width:
             min(
-              1030px,
-              90%
+              650px,
+              92%
             );
 
-          min-height:
-            180px;
-
-          margin:
-            85px auto 70px;
-
           padding:
-            65px 35px 30px;
+            15px 20px;
 
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
+          border-radius: 12px;
 
           text-align: center;
 
-          border:
-            3px solid #303538;
-
-          border-radius: 24px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #666b6e,
-              #3b4043
-            );
+          font-size: 17px;
+          font-weight: 700;
 
           box-shadow:
-            0 7px 0
-              #272c2f,
-
-            0 15px 24px
+            0 7px 20px
               rgba(
                 0,
                 0,
                 0,
-                .22
+                0.25
               );
+        }
+
+        .messageSuccess {
+          border:
+            2px solid #277447;
+
+          color: #14552f;
+
+          background: #d9f1df;
+        }
+
+        .messageError {
+          border:
+            2px solid #922020;
+
+          color: #801919;
+
+          background: #f5dada;
+        }
+
+        /* ===========================================
+           HERO
+        =========================================== */
+
+        .heroPanel,
+        .managementPanel,
+        .contentPanel {
+          position: relative;
+
+          border:
+            3px solid #303538;
+
+          background:
+            linear-gradient(
+              145deg,
+              #686d70,
+              #3d4245
+            );
+
+          box-shadow:
+            0 8px 0 #292e31,
+            0 17px 28px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
+        }
+
+        .heroPanel {
+          width:
+            min(
+              1050px,
+              92%
+            );
+
+          min-height: 185px;
+
+          margin:
+            85px auto 50px;
+
+          padding:
+            65px 35px 30px;
+
+          border-radius: 24px;
+
+          text-align: center;
         }
 
         .heroPanel h1 {
@@ -1995,306 +1803,26 @@ export default function AdminRequestsPage() {
             clamp(
               28px,
               3vw,
-              38px
+              39px
             );
 
-          text-shadow:
-            0 2px 2px
-              rgba(
-                0,
-                0,
-                0,
-                .4
-              );
+          line-height: 1.2;
         }
 
         .heroPanel p {
+          max-width: 720px;
+
           margin:
-            14px 0 0;
+            15px auto 0;
 
           color: #e9eef1;
 
           font-size: 17px;
+
+          line-height: 1.5;
         }
 
-        .floatingTitle {
-          position: absolute;
-
-          top: -31px;
-          left: 50%;
-
-          transform:
-            translateX(-50%);
-
-          min-width: 260px;
-
-          min-height: 62px;
-
-          padding:
-            10px 25px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border:
-            3px solid #174461;
-
-          border-radius: 14px;
-
-          color: #073b68;
-
-          background:
-            linear-gradient(
-              #9edcff,
-              #4c9bc9
-            );
-
-          box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .55
-              ),
-
-            0 5px 0
-              #17415c;
-
-          font-size: 26px;
-
-          font-weight: 700;
-
-          white-space: nowrap;
-        }
-
-        /* =====================================================
-           MANAGEMENT
-        ===================================================== */
-
-        .managementPanel {
-          position: relative;
-
-          width:
-            min(
-              1100px,
-              92%
-            );
-
-          margin:
-            0 auto;
-
-          padding:
-            65px 28px 32px;
-
-          scroll-margin-top: 30px;
-
-          border:
-            3px solid #303538;
-
-          border-radius: 25px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #686d70,
-              #3d4245
-            );
-
-          box-shadow:
-            0 8px 0
-              #292e31,
-
-            0 17px 28px
-              rgba(
-                0,
-                0,
-                0,
-                .22
-              );
-        }
-
-        .managementGrid {
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              3,
-              minmax(
-                0,
-                1fr
-              )
-            );
-
-          gap: 24px;
-        }
-
-        .managementCard {
-          min-height: 220px;
-
-          padding:
-            25px 20px;
-
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-
-          text-align: center;
-
-          border:
-            3px solid
-              #565e62;
-
-          border-radius: 17px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #f7f7f7 0%,
-              #e0e0e0 45%,
-              #bdbdbd 100%
-            );
-
-          box-shadow:
-            inset 0 7px 7px
-              rgba(
-                255,
-                255,
-                255,
-                .95
-              ),
-
-            0 7px 0
-              #555d61,
-
-            0 12px 17px
-              rgba(
-                0,
-                0,
-                0,
-                .22
-              );
-
-          transition:
-            transform .15s ease;
-        }
-
-        .managementCard:hover {
-          transform:
-            translateY(-4px);
-        }
-
-        .managementCard h2 {
-          margin:
-            0 0 12px;
-
-          font-size: 24px;
-        }
-
-        .managementCard p {
-          flex: 1;
-
-          margin:
-            0 0 20px;
-
-          max-width: 270px;
-
-          color: #4b4b4b;
-
-          font-size: 15px;
-
-          line-height: 1.45;
-        }
-
-        .openButton,
-        .actionButton {
-          min-width: 145px;
-
-          min-height: 50px;
-
-          padding:
-            8px 20px;
-
-          border:
-            3px solid #174461;
-
-          border-radius: 10px;
-
-          color: #073b68;
-
-          background:
-            linear-gradient(
-              #9edcff,
-              #55a8d8
-            );
-
-          box-shadow:
-            inset 0 4px 4px
-              rgba(
-                255,
-                255,
-                255,
-                .55
-              ),
-
-            0 4px 0
-              #17415c;
-
-          font-size: 16px;
-
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        /* =====================================================
-           ACTIVE SECTION
-        ===================================================== */
-
-        .contentPanel {
-          position: relative;
-
-          width:
-            min(
-              1100px,
-              92%
-            );
-
-          margin:
-            75px auto 0;
-
-          padding:
-            80px 35px 40px;
-
-          scroll-margin-top: 25px;
-
-          border:
-            3px solid #303538;
-
-          border-radius: 25px;
-
-          background:
-            linear-gradient(
-              145deg,
-              #686d70,
-              #3d4245
-            );
-
-          box-shadow:
-            0 8px 0
-              #292e31,
-
-            0 17px 28px
-              rgba(
-                0,
-                0,
-                0,
-                .22
-              );
-        }
-
+        .floatingTitle,
         .contentTitle {
           position: absolute;
 
@@ -2304,20 +1832,17 @@ export default function AdminRequestsPage() {
           transform:
             translateX(-50%);
 
-          min-width: 280px;
-
           min-height: 62px;
 
           padding:
-            10px 25px;
+            10px 28px;
 
           display: flex;
           align-items: center;
           justify-content: center;
 
           border:
-            3px solid
-              #174461;
+            3px solid #174461;
 
           border-radius: 14px;
 
@@ -2325,59 +1850,276 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #9edcff,
-              #4c9bc9
+              #a5e1ff,
+              #51a2d0
             );
 
           box-shadow:
-            0 5px 0
-              #17415c;
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.6
+              ),
+            0 5px 0 #17415c;
 
           font-size: 25px;
 
           font-weight: 700;
 
-          text-align: center;
+          white-space: nowrap;
         }
 
-        .backButton {
-          display: block;
+        /* ===========================================
+           STATISTICS
+        =========================================== */
+
+        .statistics {
+          width:
+            min(
+              1150px,
+              94%
+            );
 
           margin:
-            0 auto 30px;
+            0 auto 65px;
 
-          min-height: 48px;
+          display: grid;
 
-          padding:
-            9px 22px;
+          grid-template-columns:
+            repeat(
+              5,
+              minmax(0, 1fr)
+            );
+
+          gap: 14px;
+        }
+
+        .statCard {
+          min-height: 115px;
+
+          padding: 14px 8px;
 
           border:
             2px solid #60686c;
 
-          border-radius: 10px;
-
-          color: #173d55;
+          border-radius: 14px;
 
           background:
             linear-gradient(
               #ffffff,
-              #c9c9c9
+              #d0d0d0
             );
 
           box-shadow:
-            0 4px 0 #596166;
+            0 5px 0 #555d61;
+
+          text-align: center;
+        }
+
+        .statCard strong {
+          display: block;
+
+          margin-bottom: 5px;
+
+          color: #07517e;
+
+          font-size: 35px;
+        }
+
+        .statCard span {
+          font-size: 14px;
 
           font-weight: 700;
+        }
 
-          cursor: pointer;
+        .pendingStat strong {
+          color: #9a7412;
+        }
+
+        .approvedStat strong {
+          color: #20783d;
+        }
+
+        .blockedStat strong {
+          color: #a52222;
+        }
+
+        .unusedStat strong {
+          color: #555;
+        }
+
+        /* ===========================================
+           MANAGEMENT
+        =========================================== */
+
+        .managementPanel {
+          width:
+            min(
+              1150px,
+              94%
+            );
+
+          margin: 0 auto;
+
+          padding:
+            68px 28px 32px;
+
+          border-radius: 25px;
+        }
+
+        .managementGrid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              5,
+              minmax(0, 1fr)
+            );
+
+          gap: 17px;
+        }
+
+        .managementCard {
+          min-height: 205px;
+
+          padding:
+            22px 15px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          gap: 10px;
+
+          border:
+            3px solid #565e62;
+
+          border-radius: 16px;
+
+          color: #111;
+
+          background:
+            linear-gradient(
+              145deg,
+              #fafafa,
+              #d8d8d8
+            );
+
+          box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.9
+              ),
+            0 6px 0 #555d61;
+
+          text-align: center;
+
+          transition:
+            transform 0.15s ease;
+        }
+
+        .managementCard:hover {
+          transform:
+            translateY(-4px);
+        }
+
+        .managementCard strong {
+          font-size: 20px;
+        }
+
+        .managementCard small {
+          color: #555;
+
+          font-size: 13px;
+
+          line-height: 1.35;
+        }
+
+        .managementNumber,
+        .managementIcon {
+          min-width: 58px;
+          height: 58px;
+
+          padding: 0 10px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border:
+            2px solid #174461;
+
+          border-radius: 50%;
+
+          color: #07517e;
+
+          background: #bcecff;
+
+          font-size: 27px;
+
+          font-weight: 700;
+        }
+
+        .createManagement {
+          border-color: #317746;
+
+          background:
+            linear-gradient(
+              #edfff1,
+              #bfe6c9
+            );
+        }
+
+        .createManagement
+          .managementIcon {
+          border-color: #277447;
+
+          color: #176535;
+
+          background: #c9f4d4;
+        }
+
+        /* ===========================================
+           CONTENT
+        =========================================== */
+
+        .contentPanel {
+          width:
+            min(
+              1200px,
+              95%
+            );
+
+          min-height: 280px;
+
+          margin:
+            85px auto 0;
+
+          padding:
+            80px 30px 35px;
+
+          border-radius: 25px;
+        }
+
+        .contentTitle {
+          min-width: 300px;
+
+          max-width: 90%;
+
+          text-align: center;
         }
 
         .innerPanel {
           padding: 28px;
 
           border:
-            3px solid
-              #5a6266;
+            3px solid #5a6266;
 
           border-radius: 18px;
 
@@ -2385,7 +2127,7 @@ export default function AdminRequestsPage() {
             linear-gradient(
               145deg,
               #f4f4f4,
-              #c3c3c3
+              #c9c9c9
             );
 
           box-shadow:
@@ -2394,26 +2136,225 @@ export default function AdminRequestsPage() {
                 255,
                 255,
                 255,
-                .85
+                0.85
               ),
-
-            0 6px 0
-              #555d61;
+            0 6px 0 #555d61;
         }
 
-        /* =====================================================
+        .dashboardWelcome {
+          min-height: 200px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          text-align: center;
+        }
+
+        .dashboardWelcome h2 {
+          margin:
+            0 0 12px;
+
+          font-size: 29px;
+        }
+
+        .dashboardWelcome p {
+          margin: 0;
+
+          color: #555;
+
+          font-size: 18px;
+        }
+
+        /* ===========================================
+           CREATE
+        =========================================== */
+
+        .createArea {
+          width:
+            min(
+              720px,
+              100%
+            );
+
+          margin: 0 auto;
+
+          display: flex;
+          flex-direction: column;
+
+          gap: 15px;
+        }
+
+        .createArea label {
+          font-size: 19px;
+
+          font-weight: 700;
+        }
+
+        .createArea input {
+          width: 100%;
+
+          min-height: 60px;
+
+          padding:
+            0 18px;
+
+          border:
+            2px solid #666;
+
+          border-radius: 11px;
+
+          outline: none;
+
+          background: white;
+
+          font-size: 19px;
+        }
+
+        .createArea input:focus {
+          border-color: #168fc9;
+
+          box-shadow:
+            0 0 0 3px
+              rgba(
+                22,
+                143,
+                201,
+                0.15
+              );
+        }
+
+        .createButton {
+          min-height: 58px;
+
+          margin:
+            7px auto 0;
+
+          padding:
+            0 35px;
+
+          border:
+            3px solid #277447;
+
+          border-radius: 11px;
+
+          color: #14552f;
+
+          background:
+            linear-gradient(
+              #c9f4d4,
+              #77cc90
+            );
+
+          box-shadow:
+            0 5px 0 #286a3f;
+
+          font-size: 18px;
+
+          font-weight: 700;
+        }
+
+        .createdResult {
+          margin-top: 20px;
+
+          padding: 25px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          gap: 10px;
+
+          border:
+            3px solid #168fc9;
+
+          border-radius: 15px;
+
+          background: #e6f8ff;
+
+          text-align: center;
+        }
+
+        .createdResult > span {
+          color: #555;
+
+          font-weight: 700;
+        }
+
+        .createdResult h3 {
+          margin: 0;
+
+          font-size: 23px;
+        }
+
+        .createdResult strong {
+          padding:
+            12px 18px;
+
+          border:
+            2px dashed #168fc9;
+
+          border-radius: 9px;
+
+          color: #07517e;
+
+          background: white;
+
+          font-family:
+            Consolas,
+            monospace;
+
+          font-size: 25px;
+
+          letter-spacing: 1px;
+        }
+
+        .createdResult button {
+          min-height: 48px;
+
+          padding:
+            0 20px;
+
+          border:
+            2px solid #174461;
+
+          border-radius: 9px;
+
+          color: #073b68;
+
+          background:
+            linear-gradient(
+              #bcecff,
+              #64b6df
+            );
+
+          font-weight: 700;
+        }
+
+        .createdResult small {
+          max-width: 550px;
+
+          color: #555;
+
+          line-height: 1.4;
+        }
+
+        /* ===========================================
            SEARCH
-        ===================================================== */
+        =========================================== */
 
         .searchWrapper {
-          min-height: 65px;
+          min-height: 62px;
+
+          margin-bottom: 25px;
 
           display: flex;
 
           border:
             2px solid #328dbb;
 
-          border-radius: 12px;
+          border-radius: 11px;
 
           overflow: hidden;
 
@@ -2426,13 +2367,13 @@ export default function AdminRequestsPage() {
           min-width: 0;
 
           padding:
-            0 20px;
+            0 18px;
 
           border: none;
 
           outline: none;
 
-          font-size: 19px;
+          font-size: 18px;
         }
 
         .clearButton {
@@ -2442,393 +2383,350 @@ export default function AdminRequestsPage() {
 
           color: #a41414;
 
-          background:
-            transparent;
+          background: transparent;
 
-          font-size: 29px;
-
-          cursor: pointer;
-        }
-
-        /* =====================================================
-           CREATE
-        ===================================================== */
-
-        .createArea {
-          max-width: 700px;
-
-          margin: 0 auto;
-
-          display: flex;
-          flex-direction: column;
-
-          gap: 16px;
-        }
-
-        .createArea label {
-          font-size: 19px;
+          font-size: 28px;
 
           font-weight: 700;
         }
 
-        .createArea input {
-          width: 100%;
+        /* ===========================================
+           USERS
+        =========================================== */
 
-          min-height: 58px;
-
-          padding:
-            0 18px;
-
-          border:
-            2px solid #676f73;
-
-          border-radius: 10px;
-
-          font-size: 18px;
-        }
-
-        .createArea .actionButton {
-          align-self: center;
-
-          min-width: 220px;
-        }
-
-        /* =====================================================
-           USER CARDS
-        ===================================================== */
-
-        .userGrid {
-          margin-top: 25px;
-
+        .usersGrid {
           display: grid;
 
           grid-template-columns:
             repeat(
-              3,
-              minmax(
-                0,
-                1fr
-              )
+              2,
+              minmax(0, 1fr)
             );
 
           gap: 20px;
         }
 
         .userCard {
-          position: relative;
-
-          min-height: 180px;
-
-          padding:
-            28px 20px;
-
-          text-align: center;
+          padding: 23px;
 
           border:
-            2px solid #51595d;
+            2px solid #555d61;
 
           border-radius: 15px;
 
           background:
             linear-gradient(
-              #f7f7f7,
-              #c3c3c3
+              #ffffff,
+              #dedede
             );
 
           box-shadow:
             0 5px 0 #555d61;
         }
 
-        .userCard h3,
-        .requestCard h3 {
-          margin:
-            0 0 10px;
+        .userTop {
+          margin-bottom: 15px;
 
-          font-size: 22px;
+          display: flex;
+
+          justify-content:
+            space-between;
+
+          gap: 15px;
         }
 
-        .codeText {
+        .userCard h3 {
           margin:
-            7px 0;
+            0 0 8px;
+
+          font-size: 23px;
+        }
+
+        .statusBadge {
+          display: inline-block;
+
+          padding:
+            6px 10px;
+
+          border-radius: 30px;
+
+          font-size: 13px;
+
+          font-weight: 700;
+        }
+
+        .statusBadge.approved {
+          color: #176438;
+
+          background: #d4f1dc;
+        }
+
+        .statusBadge.pending {
+          color: #795c0b;
+
+          background: #fff1b6;
+        }
+
+        .statusBadge.blocked {
+          color: #8b1919;
+
+          background: #f3d2d2;
+        }
+
+        .statusBadge.unused {
+          color: #555;
+
+          background: #e4e4e4;
+        }
+
+        .codeBox {
+          margin:
+            15px 0;
+
+          padding: 14px;
+
+          display: grid;
+
+          grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+
+          gap: 7px 12px;
+
+          align-items: center;
+
+          border:
+            2px solid #80aabb;
+
+          border-radius: 10px;
+
+          background: #f3fbff;
+        }
+
+        .codeBox > span {
+          grid-column:
+            1 / -1;
+
+          color: #555;
+
+          font-size: 12px;
+
+          font-weight: 700;
+
+          text-transform:
+            uppercase;
+        }
+
+        .codeBox > strong {
+          overflow-wrap:
+            anywhere;
 
           color: #07517e;
 
-          font-size: 20px;
+          font-family:
+            Consolas,
+            monospace;
 
-          font-weight: 700;
+          font-size: 18px;
         }
 
-        .statusText {
-          margin:
-            12px 0;
-
-          font-weight: 700;
-        }
-
-        .deleteButton {
-          position: absolute;
-
-          top: 9px;
-          right: 9px;
-
-          width: 34px;
-          height: 34px;
-
-          border:
-            2px solid #8f1616;
-
-          border-radius: 50%;
-
-          color: white;
-
-          background:
-            linear-gradient(
-              #f26565,
-              #ad1111
-            );
-
-          font-size: 23px;
-
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        /* =====================================================
-           REQUEST LIST
-        ===================================================== */
-
-        .requestList {
-          display: grid;
-
-          gap: 20px;
-        }
-
-        .requestCard {
-          min-height: 145px;
-
-          padding: 24px;
-
-          display: flex;
-
-          align-items: center;
-          justify-content:
-            space-between;
-
-          gap: 25px;
-
-          border:
-            2px solid #51595d;
-
-          border-radius: 15px;
-
-          background:
-            linear-gradient(
-              #f7f7f7,
-              #c3c3c3
-            );
-
-          box-shadow:
-            0 5px 0 #555d61;
-        }
-
-        .requestButtons {
-          display: flex;
-
-          flex-wrap: wrap;
-
-          gap: 12px;
-        }
-
-        .approveButton,
-        .rejectButton,
-        .revokeButton,
-        .deleteSecondary {
-          min-height: 48px;
+        .copyButton {
+          min-height: 39px;
 
           padding:
-            8px 18px;
+            0 12px;
 
-          border-radius: 9px;
-
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-
-        .approveButton {
           border:
-            2px solid #307544;
+            1px solid #168fc9;
 
-          background:
-            linear-gradient(
-              #a9e9ba,
-              #73c58b
-            );
-        }
+          border-radius: 7px;
 
-        .rejectButton,
-        .deleteSecondary {
-          border:
-            2px solid #902020;
+          color: #07517e;
 
-          color: white;
-
-          background:
-            linear-gradient(
-              #ef6666,
-              #b41f1f
-            );
-        }
-
-        .revokeButton {
-          border:
-            2px solid #8d701d;
-
-          background:
-            linear-gradient(
-              #f3d779,
-              #d5ac32
-            );
-        }
-
-        .approvedStatus {
-          margin:
-            10px 0;
-
-          color: #167237;
+          background: #dff5ff;
 
           font-weight: 700;
         }
 
-        .rejectedStatus {
-          margin:
-            10px 0;
-
-          color: #a41717;
-
-          font-weight: 700;
-        }
-
-        /* =====================================================
-           HISTORY
-        ===================================================== */
-
-        .historyBox {
-          margin-top: 35px;
-
-          padding-top: 25px;
-
-          border-top:
-            2px solid #858585;
-        }
-
-        .historyBox > h3 {
-          margin:
-            0 0 18px;
-
-          text-align: center;
-
-          color: #173d55;
-
-          font-size: 23px;
-        }
-
-        .historyList {
-          max-height: 330px;
-
-          overflow-y: auto;
-
+        .dateGrid {
           display: grid;
 
-          gap: 12px;
+          grid-template-columns:
+            repeat(
+              3,
+              minmax(0, 1fr)
+            );
+
+          gap: 8px;
         }
 
-        .historyItem {
-          padding: 15px;
+        .dateGrid > div {
+          min-height: 68px;
 
-          display: flex;
-
-          justify-content:
-            space-between;
-
-          gap: 20px;
+          padding: 8px;
 
           border:
-            1px solid #838383;
+            1px solid #aaa;
 
-          border-radius: 10px;
+          border-radius: 8px;
 
           background:
             rgba(
               255,
               255,
               255,
-              .55
+              0.6
             );
+
+          text-align: center;
         }
 
-        .historyItem p {
-          margin:
-            5px 0 0;
+        .dateGrid span {
+          display: block;
+
+          margin-bottom: 5px;
+
+          color: #666;
+
+          font-size: 11px;
         }
 
-        /* =====================================================
-           EMPTY
-        ===================================================== */
+        .dateGrid strong {
+          font-size: 12px;
 
-        .empty {
-          min-height: 110px;
+          line-height: 1.3;
+        }
 
-          padding: 20px;
+        .userActions {
+          margin-top: 17px;
 
           display: flex;
 
+          flex-wrap: wrap;
+
+          gap: 9px;
+        }
+
+        .userActions button {
+          flex: 1;
+
+          min-width: 135px;
+
+          min-height: 47px;
+
+          padding:
+            7px 12px;
+
+          border-radius: 9px;
+
+          font-weight: 700;
+        }
+
+        .approveButton {
+          border:
+            2px solid #277447;
+
+          color: #14552f;
+
+          background:
+            linear-gradient(
+              #c8f0d3,
+              #78cb90
+            );
+        }
+
+        .rejectButton,
+        .deleteButton {
+          border:
+            2px solid #922020;
+
+          color: white;
+
+          background:
+            linear-gradient(
+              #ef6666,
+              #b52020
+            );
+        }
+
+        .blockButton {
+          border:
+            2px solid #8b6c18;
+
+          color: #5f4908;
+
+          background:
+            linear-gradient(
+              #ffe590,
+              #dab443
+            );
+        }
+
+        .restoreButton {
+          border:
+            2px solid #266f76;
+
+          color: #15565c;
+
+          background:
+            linear-gradient(
+              #b9eff1,
+              #6bc5ca
+            );
+        }
+
+        .emptyBox {
+          min-height: 150px;
+
+          padding: 25px;
+
+          display: flex;
           align-items: center;
           justify-content: center;
 
-          text-align: center;
-
           color: #555;
+
+          text-align: center;
 
           font-size: 18px;
         }
 
-        /* =====================================================
+        /* ===========================================
            RESPONSIVE
-        ===================================================== */
+        =========================================== */
 
         @media (
-          max-width: 950px
+          max-width: 1050px
         ) {
-
-          .managementGrid,
-          .userGrid {
+          .statistics {
             grid-template-columns:
               repeat(
-                2,
-                1fr
+                3,
+                minmax(
+                  0,
+                  1fr
+                )
               );
           }
 
-          .topPanel {
-            flex-direction:
-              column;
+          .managementGrid {
+            grid-template-columns:
+              repeat(
+                3,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
           }
-
         }
 
         @media (
-          max-width: 650px
+          max-width: 850px
         ) {
-
-          .page {
-            padding:
-              10px 8px 50px;
-          }
-
           .topPanel {
-            width: 100%;
+            flex-direction:
+              column;
           }
 
           .namePlate {
@@ -2838,8 +2736,46 @@ export default function AdminRequestsPage() {
           .topButtons {
             width: 100%;
 
-            flex-direction:
-              column;
+            display: grid;
+
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+          }
+
+          .usersGrid {
+            grid-template-columns:
+              1fr;
+          }
+
+          .dateGrid {
+            grid-template-columns:
+              1fr;
+          }
+        }
+
+        @media (
+          max-width: 650px
+        ) {
+          .page {
+            padding:
+              10px 7px 50px;
+          }
+
+          .topPanel {
+            width: 100%;
+
+            padding: 13px;
+          }
+
+          .topButtons {
+            grid-template-columns:
+              1fr;
           }
 
           .topButton,
@@ -2849,42 +2785,213 @@ export default function AdminRequestsPage() {
 
           .heroPanel,
           .managementPanel,
-          .contentPanel {
+          .contentPanel,
+          .statistics {
             width: 100%;
           }
 
-          .managementGrid,
-          .userGrid {
+          .heroPanel {
+            margin-top: 70px;
+
+            padding:
+              55px 15px 25px;
+          }
+
+          .statistics {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+
+            gap: 8px;
+          }
+
+          .statCard {
+            min-height: 95px;
+          }
+
+          .statCard strong {
+            font-size: 29px;
+          }
+
+          .managementPanel {
+            padding:
+              60px 12px 18px;
+          }
+
+          .managementGrid {
             grid-template-columns:
               1fr;
           }
 
-          .requestCard {
-            flex-direction:
-              column;
-
-            align-items:
-              stretch;
+          .managementCard {
+            min-height: 155px;
           }
 
-          .requestButtons {
-            flex-direction:
-              column;
+          .contentPanel {
+            padding:
+              65px 8px 15px;
+          }
+
+          .innerPanel {
+            padding: 12px;
           }
 
           .floatingTitle,
           .contentTitle {
-            min-width: 210px;
+            min-width: 200px;
 
-            max-width: 90%;
+            max-width: 92%;
+
+            min-height: 55px;
+
+            padding:
+              8px 15px;
+
+            font-size: 20px;
 
             white-space: normal;
           }
 
+          .createArea input {
+            font-size: 16px;
+          }
+
+          .createdResult {
+            padding: 16px 8px;
+          }
+
+          .createdResult strong {
+            font-size: 19px;
+          }
+
+          .codeBox {
+            grid-template-columns:
+              1fr;
+          }
+
+          .copyButton {
+            width: 100%;
+          }
+
+          .userCard {
+            padding: 15px 10px;
+          }
+
+          .userActions {
+            flex-direction:
+              column;
+          }
+
+          .userActions button {
+            width: 100%;
+
+            min-width: 0;
+          }
+        }
+      `}</style>
+    </main>
+  );
+}
+
+/* =========================================================
+   SEARCH COMPONENT
+========================================================= */
+
+function SearchBox({
+  search,
+  setSearch,
+}: {
+  search: string;
+  setSearch:
+    React.Dispatch<
+      React.SetStateAction<string>
+    >;
+}) {
+  return (
+    <div className="searchWrapper">
+      <input
+        type="text"
+        className="searchInput"
+        value={search}
+        placeholder="Ism yoki maxsus kod bo‘yicha qidirish..."
+        onChange={(e) =>
+          setSearch(
+            e.target.value
+          )
+        }
+      />
+
+      {search && (
+        <button
+          type="button"
+          className="clearButton"
+          onClick={() =>
+            setSearch("")
+          }
+        >
+          ×
+        </button>
+      )}
+
+      <style jsx>{`
+        .searchWrapper {
+          min-height: 62px;
+
+          margin-bottom: 25px;
+
+          display: flex;
+
+          border:
+            2px solid #328dbb;
+
+          border-radius: 11px;
+
+          overflow: hidden;
+
+          background: white;
         }
 
-      `}</style>
+        .searchInput {
+          flex: 1;
 
-    </main>
+          min-width: 0;
+
+          padding:
+            0 18px;
+
+          border: none;
+
+          outline: none;
+
+          font-family:
+            "Bell MT",
+            "Times New Roman",
+            serif;
+
+          font-size: 18px;
+        }
+
+        .clearButton {
+          width: 60px;
+
+          border: none;
+
+          color: #a41414;
+
+          background: transparent;
+
+          font-size: 28px;
+
+          font-weight: 700;
+
+          cursor: pointer;
+        }
+      `}</style>
+    </div>
   );
 }
