@@ -1625,7 +1625,15 @@ export default function ImportPdfTestPage() {
               Array.isArray(data?.specialSections)
                 ? data.specialSections.length
                 : 0
-            } ta qo‘shimcha bo‘lim ajratildi. | Vizual: ${Number(
+            } ta qo‘shimcha bo‘lim ajratildi. | Javob kaliti: ${Number(
+              data?.answerKeyCount ?? 0
+            )} ta | Moslik: ${
+              data?.questionCountMatchesAnswerKey === true
+                ? "to‘liq"
+                : data?.questionCountMatchesAnswerKey === false
+                ? "mos emas"
+                : "aniqlanmadi"
+            } | Vizual: ${Number(
               data?.visualQuestionCount ?? 0
             )} ta | PDF crop: ${Number(
               data?.pdfCropCount ?? 0
@@ -4256,7 +4264,7 @@ export default function ImportPdfTestPage() {
           </h2>
 
           <p>
-            Eng ishonchli usul: to‘g‘ri variantga + belgisi qo‘ying.
+            To‘g‘ri javob + belgisi yoki PDF oxiridagi javoblar jadvalidan avtomatik olinadi.
           </p>
 
           <label className="fileButton">
@@ -4329,7 +4337,7 @@ export default function ImportPdfTestPage() {
 
             <div className="topicsHeader">
               <strong>
-                33 ta dars aniqlandi
+                {importedTopics.length} ta mavzu aniqlandi
               </strong>
 
               <span>
