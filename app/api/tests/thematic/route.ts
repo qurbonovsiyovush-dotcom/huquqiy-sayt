@@ -498,8 +498,7 @@ export async function POST(request: NextRequest) {
             question_number = ${questionIndex + 1},
             question_text = ${questionText},
             question_html = ${questionHtml},
-            points = ${points},
-            updated_at = NOW()
+            points = ${points}
           WHERE id = ${questionId}
             AND test_id = ${testId}
         `;
@@ -536,8 +535,7 @@ export async function POST(request: NextRequest) {
               option_key = ${optionKey},
               option_text = ${optionText},
               option_html = ${optionHtml},
-              is_correct = ${option?.isCorrect === true},
-              updated_at = NOW()
+              is_correct = ${option?.isCorrect === true}
             WHERE id = ${optionId}
               AND question_id = ${questionId}
           `;
