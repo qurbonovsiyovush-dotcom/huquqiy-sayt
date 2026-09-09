@@ -572,6 +572,7 @@ export default function AdminTestsPage() {
               "/api/tests/thematic",
               {
                 method: "POST",
+                credentials: "include",
                 headers: {
                   "Content-Type": "application/json",
                 },
@@ -622,6 +623,8 @@ export default function AdminTestsPage() {
           ? "Test muvaffaqiyatli e’lon qilindi."
           : "Test qoralama holatiga qaytarildi."
       );
+
+      await loadTests();
     } catch (error) {
       console.error(error);
 
@@ -2502,8 +2505,10 @@ margin: 10px auto 12px;
                         disabled={busy}
                         onClick={() => {
                           if (isNeonThematicTest(test)) {
-                            window.alert(
-                              "Neon mavzulashtirilgan testini tahrirlash oynasi keyingi bosqichda ulanadi. Hozir e’lon qilish, qoralamaga qaytarish va o‘chirish ishlaydi."
+                            router.push(
+                              `/admin/tests/thematic/${encodeURIComponent(
+                                thematicRawId(test)
+                              )}/edit`
                             );
                             return;
                           }
@@ -2542,8 +2547,10 @@ margin: 10px auto 12px;
                             disabled={busy}
                             onClick={() => {
                               if (isNeonThematicTest(test)) {
-                                window.alert(
-                                  "Neon mavzulashtirilgan testining foydalanuvchi yechish sahifasi keyingi bosqichda ulanadi."
+                                router.push(
+                                  `/test/thematic/solve/${encodeURIComponent(
+                                    thematicRawId(test)
+                                  )}`
                                 );
                                 return;
                               }
