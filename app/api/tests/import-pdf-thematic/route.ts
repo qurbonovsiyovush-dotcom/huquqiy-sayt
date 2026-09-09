@@ -109,6 +109,31 @@ type ImportedQuestion = {
   pdfCrop?: PdfCrop;
   warning?: string;
 };
+function formatGrade10QuestionHtml(value: unknown): string {
+  let html = String(value ?? "").trim();
+
+  if (!html) return "";
+
+  const numericMarkers = html.match(/(?:^|\s)(?:\d{1,2})\.\s/g) || [];
+  const romanMarkers = html.match(/(?:^|\s)(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s/g) || [];
+
+  if (numericMarkers.length >= 2) {
+    html = html.replace(
+      /\s+(?=(?:\d{1,2})\.\s)/g,
+      "<br>"
+    );
+  }
+
+  if (romanMarkers.length >= 2) {
+    html = html.replace(
+      /\s+(?=(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s)/g,
+      "<br>"
+    );
+  }
+
+  return html;
+}
+
 
 type PdfTextItem = {
   str: string;
@@ -610,12 +635,11 @@ async function loadCanonicalGrade10Import() {
       const baseQuestion: ImportedQuestion = {
         id: questionId,
         number: globalNumber,
-        questionText:
-          String(
-            question?.questionHtml ||
-              question?.questionText ||
-              ""
-          ).trim(),
+        questionText: formatGrade10QuestionHtml(
+          question?.questionHtml ||
+            question?.questionText ||
+            ""
+        ),
         options,
         shapes: [],
         warning:
