@@ -6,34 +6,35 @@ export async function POST() {
       success: true,
     });
 
+  const cookieOptions = {
+    httpOnly: true,
+    path: "/",
+    expires: new Date(0),
+    maxAge: 0,
+  };
+
   response.cookies.set(
     "qurbonov_session",
     "",
-    {
-      httpOnly: true,
-      path: "/",
-      expires: new Date(0),
-    }
+    cookieOptions
   );
 
   response.cookies.set(
     "qurbonov_role",
     "",
-    {
-      httpOnly: true,
-      path: "/",
-      expires: new Date(0),
-    }
+    cookieOptions
   );
 
   response.cookies.set(
     "qurbonov_name",
     "",
-    {
-      httpOnly: true,
-      path: "/",
-      expires: new Date(0),
-    }
+    cookieOptions
+  );
+
+  response.cookies.set(
+    "qurbonov_pending",
+    "",
+    cookieOptions
   );
 
   return response;
