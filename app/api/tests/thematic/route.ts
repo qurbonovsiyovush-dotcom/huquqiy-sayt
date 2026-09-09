@@ -82,6 +82,8 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      const testId = Number(idParam);
+
       const testRows = await sql`
         SELECT
           t.id,
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest) {
           b.edition
         FROM thematic_tests t
         JOIN thematic_books b ON b.id = t.book_id
-        WHERE t.id = ${idParam}
+        WHERE t.id = ${testId}
         LIMIT 1
       `;
 
@@ -133,31 +135,35 @@ export async function GET(request: NextRequest) {
           shapes_json,
           extra_json
         FROM thematic_questions
-        WHERE test_id = ${idParam}
+        WHERE test_id = ${testId}
         ORDER BY question_number ASC, id ASC
       `;
 
-      const questionIds = questionRows
-        .map((row: any) => String(row.id))
-        .filter((value: string) => /^\d+$/.test(value));
-
-      let optionRows: any[] = [];
-
-      if (questionIds.length > 0) {
-        optionRows = await sql`
-          SELECT
-            id,
-            question_id,
-            option_key,
-            option_text,
-            option_html,
-            is_correct,
-            extra_json
-          FROM thematic_options
-          WHERE question_id = ANY(${questionIds}::bigint[])
-          ORDER BY question_id ASC, option_key ASC, id ASC
-        `;
-      }
+      /*
+        Variantlarni JS array -> PostgreSQL bigint[] orqali uzatmaymiz.
+        Neon/Vercel muhitida array parametrining serializatsiyasi turlicha
+        bo‘lishi mumkin. Shu sabab variantlarni test_id bo‘yicha JOIN bilan
+        bevosita bazadan olamiz.
+      */
+      const optionRows: any[] = await sql`
+        SELECT
+          o.id,
+          o.question_id,
+          o.option_key,
+          o.option_text,
+          o.option_html,
+          o.is_correct,
+          o.extra_json
+        FROM thematic_options o
+        JOIN thematic_questions q
+          ON q.id = o.question_id
+        WHERE q.test_id = ${testId}
+        ORDER BY
+          q.question_number ASC,
+          q.id ASC,
+          o.option_key ASC,
+          o.id ASC
+      `;
 
       const optionsByQuestion = new Map<string, any[]>();
 
