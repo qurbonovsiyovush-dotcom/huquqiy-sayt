@@ -2127,17 +2127,17 @@ const pageStyles = `
     margin: 0;
 
     direction: ltr;
-    text-align: justify;
-    text-justify: inter-word;
+    text-align: left;
 
-    overflow-wrap: normal;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
     word-break: normal;
     hyphens: none;
 
     color: #111315;
     font-size: 24px;
-    line-height: 1.55;
-    font-weight: 900;
+    line-height: 1.48;
+    font-weight: 400;
 
     text-shadow: 0 1px 0 rgba(255,255,255,.9);
   }
@@ -2148,9 +2148,21 @@ const pageStyles = `
   .questionHtml :global(span) {
     font-size: inherit;
     line-height: inherit;
-    font-weight: inherit;
-    text-align: justify;
-    text-justify: inter-word;
+  }
+
+  .questionHtml :global(.legacyPrompt) {
+    margin: 0 0 10px;
+    font-weight: 900;
+    font-style: normal;
+    text-align: left;
+  }
+
+  .questionHtml :global(.legacyItem) {
+    margin: 2px 0;
+    padding-left: 12px;
+    font-weight: 400;
+    font-style: italic;
+    text-align: left;
   }
 
   .questionHtml :global(ol),
@@ -2326,16 +2338,17 @@ const pageStyles = `
     min-width: 0;
 
     direction: ltr;
-    text-align: justify;
-    text-justify: inter-word;
+    text-align: left;
 
-    overflow-wrap: normal;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
     word-break: normal;
     hyphens: none;
 
     font-size: 18px;
     line-height: 1.5;
-    font-weight: 900;
+    font-weight: 400;
+    font-style: italic;
   }
 
   .optionText :global(p),
