@@ -33,29 +33,152 @@ export default function Home() {
   const [loginLoading, setLoginLoading] =
     useState(false);
 
+  const [waitingApproval, setWaitingApproval] =
+    useState(false);
+
+  const [loginMessage, setLoginMessage] =
+    useState("");
+
+  function completeLogin(
+    role: "admin" | "user" = "user"
+  ) {
+    sessionStorage.setItem(
+      "qurbonov-session",
+      "approved"
+    );
+
+    sessionStorage.setItem(
+      "qurbonov-role",
+      role
+    );
+
+    setIsAdmin(role === "admin");
+    setAuthenticated(true);
+    setWaitingApproval(false);
+    setLoginMessage("");
+    setLoginError("");
+    setCode("");
+  }
+
+  async function checkLoginStatus() {
+    try {
+      const response = await fetch(
+        "/api/login",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        data?.success &&
+        (
+          data?.status === "approved" ||
+          data?.status === "authenticated"
+        )
+      ) {
+        completeLogin(
+          data?.role === "admin"
+            ? "admin"
+            : "user"
+        );
+
+        return;
+      }
+
+      if (data?.status === "pending") {
+        setWaitingApproval(true);
+
+        setLoginMessage(
+          data?.message ||
+            "Administrator ruxsati kutilmoqda..."
+        );
+
+        setLoginError("");
+
+        return;
+      }
+
+      if (data?.status === "rejected") {
+        setWaitingApproval(false);
+        setLoginMessage("");
+
+        sessionStorage.removeItem(
+          "qurbonov-session"
+        );
+
+        sessionStorage.removeItem(
+          "qurbonov-role"
+        );
+
+        setAuthenticated(false);
+        setIsAdmin(false);
+
+        setLoginError(
+          data?.error ||
+            "Kirish so‘rovingiz rad etilgan."
+        );
+
+        return;
+      }
+
+      if (
+        data?.status === "none" ||
+        data?.status === "not-found"
+      ) {
+        sessionStorage.removeItem(
+          "qurbonov-session"
+        );
+
+        sessionStorage.removeItem(
+          "qurbonov-role"
+        );
+
+        setAuthenticated(false);
+        setIsAdmin(false);
+        setWaitingApproval(false);
+        setLoginMessage("");
+      }
+    } catch (error) {
+      console.error(
+        "LOGIN STATUS ERROR:",
+        error
+      );
+    }
+  }
+
   useEffect(() => {
-    /*
-      Faqat shu brauzer oynasida
-      avval kod kiritilganmi — tekshiramiz.
-    */
+    async function initializeLogin() {
+      await checkLoginStatus();
 
-    const session =
-      sessionStorage.getItem(
-        "qurbonov-session"
-      );
-
-    const role =
-      sessionStorage.getItem(
-        "qurbonov-role"
-      );
-
-    if (session === "approved") {
-      setAuthenticated(true);
-      setIsAdmin(role === "admin");
+      setChecking(false);
     }
 
-    setChecking(false);
+    initializeLogin();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!waitingApproval) {
+      return;
+    }
+
+    const timer = window.setInterval(
+      () => {
+        checkLoginStatus();
+      },
+      3000
+    );
+
+    return () => {
+      window.clearInterval(timer);
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingApproval]);
 
   /* =====================================================
      LOGIN SUBMIT
@@ -67,9 +190,10 @@ export default function Home() {
     e.preventDefault();
 
     setLoginError("");
+    setLoginMessage("");
 
     const cleanCode =
-      code.trim();
+      code.trim().toUpperCase();
 
     if (!cleanCode) {
       setLoginError(
@@ -99,13 +223,25 @@ export default function Home() {
       const data =
         await response.json();
 
-      /*
-        Oddiy foydalanuvchi kodi to‘g‘ri,
-        lekin admin hali ruxsat bermagan bo‘lsa,
-        /api/login 403 qaytaradi.
-      */
+      if (data?.status === "pending") {
+        setWaitingApproval(true);
 
-      if (!response.ok) {
+        setLoginMessage(
+          data?.message ||
+            data?.error ||
+            "Kirish so‘rovingiz yuborildi. Administrator ruxsatini kuting."
+        );
+
+        setLoginError("");
+        setCode("");
+
+        return;
+      }
+
+      if (
+        !response.ok ||
+        !data?.success
+      ) {
         setLoginError(
           data?.error ||
             data?.message ||
@@ -115,29 +251,11 @@ export default function Home() {
         return;
       }
 
-      /*
-        Faqat server haqiqiy ruxsat bergandan
-        keyin asosiy sahifa ochiladi.
-      */
-
-      sessionStorage.setItem(
-        "qurbonov-session",
-        "approved"
+      completeLogin(
+        data?.role === "admin"
+          ? "admin"
+          : "user"
       );
-
-      sessionStorage.setItem(
-        "qurbonov-role",
-        data.role || "user"
-      );
-
-      setIsAdmin(
-        data.role === "admin"
-      );
-
-      setAuthenticated(true);
-
-      setCode("");
-
     } catch {
       setLoginError(
         "Server bilan bog‘lanishda xatolik yuz berdi."
@@ -162,7 +280,9 @@ export default function Home() {
 
     setAuthenticated(false);
     setIsAdmin(false);
+    setWaitingApproval(false);
     setCode("");
+    setLoginMessage("");
     setLoginError("");
   }
 
@@ -212,17 +332,35 @@ export default function Home() {
                     className="loginInput"
                     type="text"
                     value={code}
-                    disabled={loginLoading}
+                    disabled={
+                      loginLoading ||
+                      waitingApproval
+                    }
                     autoComplete="off"
-                    placeholder="Kirish kodini kiriting"
+                    placeholder={
+                      waitingApproval
+                        ? "Administrator ruxsati kutilmoqda..."
+                        : "Kirish kodini kiriting"
+                    }
                     onChange={(e) => {
                       setCode(
                         e.target.value.toUpperCase()
                       );
+
                       setLoginError("");
+                      setLoginMessage("");
                     }}
                   />
                 </div>
+
+                {loginMessage && (
+                  <div
+                    className="loginPending"
+                    role="status"
+                  >
+                    {loginMessage}
+                  </div>
+                )}
 
                 {loginError && (
                   <div
@@ -236,10 +374,15 @@ export default function Home() {
                 <button
                   type="submit"
                   className="loginButton"
-                  disabled={loginLoading}
+                  disabled={
+                    loginLoading ||
+                    waitingApproval
+                  }
                 >
                   {loginLoading
                     ? "Tekshirilmoqda..."
+                    : waitingApproval
+                    ? "Ruxsat kutilmoqda..."
                     : "Kirish"}
                 </button>
               </form>
@@ -506,6 +649,30 @@ export default function Home() {
           .loginInput::placeholder {
             color: #858585;
             opacity: 1;
+          }
+
+          .loginPending {
+            margin:
+              -12px
+              0
+              -8px;
+
+            padding:
+              11px
+              14px;
+
+            border:
+              1px solid #4d6877;
+
+            border-radius: 9px;
+
+            background: #eef7fb;
+
+            color: #244c66;
+
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
           }
 
           .loginError {
