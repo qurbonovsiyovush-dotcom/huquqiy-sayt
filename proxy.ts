@@ -6,6 +6,13 @@ import {
 /* =========================================================
    PROXY
    FOYDALANUVCHI VA ADMIN HUQUQLARINI AJRATISH
+
+   MUHIM:
+   "/" sahifa ochiq qoladi, chunki aynan shu sahifada
+   gerbli kirish oynasi bor.
+
+   Eski "/login" sahifasi endi ishlatilmaydi.
+   U avtomatik "/" ga yuboriladi.
 ========================================================= */
 
 export function proxy(
@@ -32,7 +39,7 @@ export function proxy(
     role === "admin";
 
   /* =======================================================
-     NEXT.JS ICHKI FAYLLARI
+     NEXT.JS ICHKI FAYLLARI VA OCHIQ ASSETLAR
   ======================================================= */
 
   if (
@@ -46,7 +53,8 @@ export function proxy(
     pathname.startsWith(
       "/images"
     ) ||
-    pathname === "/gerb.png" ||
+    pathname ===
+      "/gerb.png" ||
     pathname.startsWith(
       "/icons"
     )
@@ -55,28 +63,26 @@ export function proxy(
   }
 
   /* =======================================================
-     LOGIN SAHIFASI
+     ASOSIY SAHIFA
+     GERBLI LOGIN SHU YERDA
   ======================================================= */
 
-  if (
-    pathname === "/login"
-  ) {
-    /*
-      Login qilgan odam yana
-      /login ga kirsa asosiy
-      sahifaga qaytaramiz.
-    */
-
-    if (isLoggedIn) {
-      return NextResponse.redirect(
-        new URL(
-          "/",
-          request.url
-        )
-      );
-    }
-
+  if (pathname === "/") {
     return NextResponse.next();
+  }
+
+  /* =======================================================
+     ESKI /login SAHIFASINI OLIB TASHLAYMIZ
+     Kim /login ga kirsa gerbli login turgan "/" ga boradi.
+  ======================================================= */
+
+  if (pathname === "/login") {
+    return NextResponse.redirect(
+      new URL(
+        "/",
+        request.url
+      )
+    );
   }
 
   /* =======================================================
@@ -115,43 +121,27 @@ export function proxy(
 
   if (!isLoggedIn) {
     /*
-      Login qilmagan odam:
-      /
-      /test
-      /test/[id]
-      /admin
-      va boshqa himoyalangan
-      sahifalarga kira olmaydi.
-
-      Faqat yuqorida alohida
-      ochilgan API lar ishlaydi.
+      Himoyalangan sahifaga kirishga
+      urinsa, eski /login ga emas,
+      gerbli login turgan "/" ga
+      qaytaramiz.
     */
-
     if (
       !pathname.startsWith(
         "/api/"
       )
     ) {
-      const loginUrl =
-        new URL(
-          "/login",
-          request.url
-        );
-
-      loginUrl.searchParams.set(
-        "next",
-        pathname
-      );
-
       return NextResponse.redirect(
-        loginUrl
+        new URL(
+          "/",
+          request.url
+        )
       );
     }
 
     return NextResponse.json(
       {
         success: false,
-
         message:
           "Avval tizimga kiring.",
       },
@@ -221,7 +211,6 @@ export function proxy(
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Administrator huquqi talab qilinadi.",
         },
@@ -236,6 +225,12 @@ export function proxy(
 
   /* =======================================================
      VOCABULARY API
+
+     GET:
+     oddiy foydalanuvchi ham o‘qiydi.
+
+     POST / PUT / PATCH / DELETE:
+     faqat administrator.
   ======================================================= */
 
   if (
@@ -245,23 +240,10 @@ export function proxy(
       "/api/vocabulary/"
     )
   ) {
-    /*
-      GET:
-      hamma foydalanuvchi
-      vocabulary ma'lumotlarini
-      o‘qishi mumkin.
-
-      POST / PUT / PATCH /
-      DELETE:
-      faqat administrator.
-    */
-
     const method =
       request.method.toUpperCase();
 
-    if (
-      method === "GET"
-    ) {
+    if (method === "GET") {
       return NextResponse.next();
     }
 
@@ -269,7 +251,6 @@ export function proxy(
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Vocabulary ma’lumotlarini faqat administrator o‘zgartira oladi.",
         },
@@ -284,6 +265,12 @@ export function proxy(
 
   /* =======================================================
      TEST API
+
+     GET:
+     oddiy foydalanuvchi ham testni ochadi.
+
+     POST / PUT / PATCH / DELETE:
+     faqat administrator.
   ======================================================= */
 
   if (
@@ -293,22 +280,10 @@ export function proxy(
       "/api/tests/"
     )
   ) {
-    /*
-      Oddiy foydalanuvchi ham
-      testni ochishi uchun
-      test API ga kira olishi
-      shart.
-
-      POST / PUT / PATCH /
-      DELETE esa faqat admin.
-    */
-
     const method =
       request.method.toUpperCase();
 
-    if (
-      method === "GET"
-    ) {
+    if (method === "GET") {
       return NextResponse.next();
     }
 
@@ -316,7 +291,6 @@ export function proxy(
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Testlarni faqat administrator o‘zgartira oladi.",
         },
@@ -339,19 +313,6 @@ export function proxy(
       "/test/"
     )
   ) {
-    /*
-      Bu yerga:
-      /test
-      /test/ABC-ID
-
-      oddiy foydalanuvchi
-      ham kira oladi.
-
-      /test/editor esa
-      yuqorida alohida
-      bloklangan.
-    */
-
     return NextResponse.next();
   }
 
@@ -368,12 +329,6 @@ export function proxy(
 
 export const config = {
   matcher: [
-    /*
-      Static Next.js fayllaridan
-      tashqari barcha requestlarni
-      proxy tekshiradi.
-    */
-
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
