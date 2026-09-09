@@ -1141,67 +1141,114 @@ async function renderPdfCropInBrowser(
 }
 
 function cleanVennQuestionText(value: string) {
-  const text = String(value || "").replace(/\r\n/g, "\n").trim();
+  const raw = String(value || "").replace(/\r\n/g, "\n").trim();
 
   /*
-    Eyler–Venn savollarida PDF text qatlami diagramma ichidagi
-    I / II / III sarlavhalarni ham savol matniga qo‘shib yuboradi.
-    Rasm crop ichida bu sarlavhalar allaqachon bor, shuning uchun
-    matndagi takroriy blokni olib tashlaymiz.
+    PDF text qatlami Eyler–Venn diagrammasining ichidagi I / II / III
+    yozuvlarini ham questionText ichiga qo‘shib yuborishi mumkin.
 
-    Misol:
-      ... javobni aniqlang.
-      I — Tijorat ... II — Notijorat ... III — har ikkala ...
-      a) ...
+    Muhim farq: questionText ba'zan oddiy matn, ba'zan esa <div>, <br>,
+    <p> kabi HTML bilan keladi. Eski tozalash faqat oddiy matnda " a)"
+    ko‘rinishini topardi. HTMLda esa marker ko‘pincha "</div><div>a)"
+    bo‘lgani uchun blok qolib ketardi.
 
-    Natija:
-      ... javobni aniqlang.
-      a) ...
+    Endi avval ko‘rinadigan matnni ajratamiz, takroriy diagramma blokini
+    o‘sha matnda olib tashlaymiz va Venn savoli uchun xavfsiz HTML qaytaramiz.
   */
-  if (!/Eyler\s*[–—-]?\s*Venn/i.test(text)) {
-    return text;
+
+  const visibleText = raw
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(?:div|p|li|h[1-6])\s*>/gi, "\n")
+    .replace(/<(?:div|p|li|h[1-6])(?:\s[^>]*)?>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;/gi, "'")
+    .replace(/\u00a0/g, " ")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+
+  if (!/Eyler\s*[–—-]?\s*Venn/i.test(visibleText)) {
+    return raw;
   }
 
-  const lower = text.toLowerCase();
+  const lower = visibleText.toLowerCase();
   const eylerIndex = lower.indexOf("eyler");
+  const searchBase = eylerIndex >= 0 ? eylerIndex : 0;
+  const afterEyler = visibleText.slice(searchBase);
 
-  const tailStartMatch = /(?:^|\s)a\s*[\)\.]/i.exec(
-    eylerIndex >= 0 ? text.slice(eylerIndex) : text
-  );
+  /*
+    Diagrammadan keyingi matn odatda a), b), c)... bilan boshlanadi.
+    a) markerini topib, diagramma sarlavhalari qayerda tugashini bilamiz.
+  */
+  const tailStartMatch = /(?:^|\s)a\s*[\)\.]/i.exec(afterEyler);
 
   if (!tailStartMatch) {
-    return text;
+    return raw;
   }
 
-  const searchBase = eylerIndex >= 0 ? eylerIndex : 0;
+  const leadingWhitespace = /^\s/.test(tailStartMatch[0]) ? 1 : 0;
   const tailStart =
-    searchBase +
-    tailStartMatch.index +
-    (tailStartMatch[0].startsWith(" ") ? 1 : 0);
+    searchBase + tailStartMatch.index + leadingWhitespace;
 
-  const between = text.slice(searchBase, tailStart);
+  const between = visibleText.slice(searchBase, tailStart);
+
+  /*
+    Savol gapidagi oddiy "I" harfini emas, aynan "I — ..." diagramma
+    sarlavhasini topamiz. Keyin blok ichida II — ham borligini tekshiramiz.
+  */
   const labelMatch = /(?:^|[\s.;:!?])I\s*[–—-]\s*/.exec(between);
 
   if (!labelMatch) {
-    return text;
+    return raw;
   }
 
+  const labelLeadingWhitespace = /^\s/.test(labelMatch[0]) ? 1 : 0;
   const labelStart =
-    searchBase +
-    labelMatch.index +
-    (labelMatch[0].length - labelMatch[0].trimStart().length);
+    searchBase + labelMatch.index + labelLeadingWhitespace;
 
   if (labelStart <= searchBase || tailStart <= labelStart) {
-    return text;
+    return raw;
   }
 
-  const before = text.slice(0, labelStart).trimEnd();
-  const after = text.slice(tailStart).trimStart();
+  const duplicatedDiagramText = visibleText.slice(
+    labelStart,
+    tailStart
+  );
 
-  return `${before}\n${after}`
+  if (!/\bII\s*[–—-]/.test(duplicatedDiagramText)) {
+    return raw;
+  }
+
+  const before = visibleText.slice(0, labelStart).trimEnd();
+  const after = visibleText.slice(tailStart).trimStart();
+
+  let cleaned = `${before}\n${after}`
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+  /* a)–e) bandlar bir qatorda yopishib qolgan bo‘lsa, alohida qator qilamiz. */
+  cleaned = cleaned.replace(
+    /[ \t]+([a-e])\s*\)/gi,
+    "\n$1)"
+  );
+
+  const escapeHtml = (text: string) =>
+    text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  return escapeHtml(cleaned).replace(/\n/g, "<br />");
 }
 
 async function attachBrowserPdfImages(
