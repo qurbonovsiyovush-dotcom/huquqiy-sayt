@@ -235,9 +235,7 @@ export default function TestSolvePage() {
   ===================================================== */
 
   function cleanPunctuation(value: string) {
-    return String(value || "")
-      .replace(/[ \t]+\?/g, " ?")
-      .replace(/\s+([,.;:!])/g, "$1");
+    return String(value || "").replace(/\s+\?/g, "?");
   }
 
   function getQuestionText(question: TestQuestion) {
@@ -460,19 +458,18 @@ export default function TestSolvePage() {
       return;
     }
 
-    const currentTest = test;
-
     resultSavedRef.current = true;
 
     const totalSeconds =
-      Math.max(1, Number(currentTest.duration)) * 60;
+      Math.max(1, Number(test.duration)) * 60;
 
     const spentSeconds = Math.max(
       0,
       totalSeconds - Math.max(0, remainingSeconds)
     );
 
-    async function saveResult() {
+async function saveResult() {
+  if (!test) return;
       try {
         const response = await fetch("/api/results", {
           method: "POST",
@@ -480,9 +477,9 @@ export default function TestSolvePage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            testId: currentTest.id,
-            testTitle: currentTest.title,
-            subject: currentTest.subject,
+            testId: test.id,
+            testTitle: test.title,
+            subject: test.subject,
             total: result.total,
             correct: result.correct,
             incorrect: result.incorrect,
@@ -2129,16 +2126,16 @@ const pageStyles = `
     margin: 0;
 
     direction: ltr;
-    text-align: left;
+    text-align: justify;
+    text-justify: inter-word;
 
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
+    overflow-wrap: normal;
     word-break: normal;
     hyphens: none;
 
-    color: #000000;
+    color: #111315;
     font-size: 24px;
-    line-height: 1.48;
+    line-height: 1.55;
     font-weight: 900;
 
     text-shadow: 0 1px 0 rgba(255,255,255,.9);
@@ -2147,35 +2144,12 @@ const pageStyles = `
   .questionHtml :global(p),
   .questionHtml :global(div),
   .questionHtml :global(li),
-  .questionHtml :global(span),
-  .questionHtml :global(i),
-  .questionHtml :global(em),
-  .questionHtml :global(strong),
-  .questionHtml :global(b) {
-    color: #000000 !important;
-    font-size: inherit !important;
+  .questionHtml :global(span) {
+    font-size: inherit;
     line-height: inherit;
-    font-weight: 900 !important;
-    font-style: normal !important;
-  }
-
-  .questionHtml :global(.legacyPrompt) {
-    margin: 0 0 10px;
-    font-weight: 900;
-    font-style: normal;
-    text-align: left;
-  }
-
-  .questionHtml :global(.legacyItem) {
-    display: block;
-    margin: 4px 0;
-    padding-left: 12px;
-    color: #000000;
-    font-size: 24px;
-    line-height: 1.48;
-    font-weight: 900;
-    font-style: normal;
-    text-align: left;
+    font-weight: inherit;
+    text-align: justify;
+    text-justify: inter-word;
   }
 
   .questionHtml :global(ol),
@@ -2198,6 +2172,11 @@ const pageStyles = `
     font-weight: 700;
     text-decoration: none;
     border-bottom: 1px solid rgba(0,139,136,.35);
+  }
+
+  .questionHtml :global(strong),
+  .questionHtml :global(b) {
+    color: #082f4d;
   }
 
   .questionHtml :global(img),
@@ -2346,34 +2325,28 @@ const pageStyles = `
     min-width: 0;
 
     direction: ltr;
-    text-align: left;
+    text-align: justify;
+    text-justify: inter-word;
 
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
+    overflow-wrap: normal;
     word-break: normal;
     hyphens: none;
 
-    color: #000000;
+    color: #111315;
     font-size: 19px;
     line-height: 1.5;
     font-weight: 900;
-    font-style: normal;
   }
 
   .optionText :global(p),
   .optionText :global(div),
   .optionText :global(li),
-  .optionText :global(span),
-  .optionText :global(i),
-  .optionText :global(em),
-  .optionText :global(strong),
-  .optionText :global(b) {
-    color: #000000 !important;
-    font-size: inherit !important;
+  .optionText :global(span) {
+    font-size: inherit;
     line-height: inherit;
-    font-weight: 900 !important;
-    font-style: normal !important;
-    text-align: left;
+    font-weight: inherit;
+    text-align: justify;
+    text-justify: inter-word;
   }
 
   .radio {
@@ -2656,7 +2629,8 @@ const pageStyles = `
 
     .questionHtml {
       font-size: 24px;
-      line-height: 1.5;
+      line-height: 1.6;
+      font-weight: 900;
     }
 
     .testLayout {
@@ -2879,6 +2853,7 @@ const pageStyles = `
   .questionHtml {
     font-size: 24px;
     line-height: 1.5;
+    font-weight: 900;
   }
 
   .options {
@@ -2898,10 +2873,10 @@ const pageStyles = `
   }
 
   .optionText {
+    color: #111315;
     font-size: 19px;
     line-height: 1.5;
     font-weight: 900;
-    font-style: normal;
   }
 
   .radio {
