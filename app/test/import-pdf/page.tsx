@@ -751,7 +751,7 @@ function RichTextEditor({
           color: #111;
           background: #fff;
           font-family: "Bell MT", "Times New Roman", serif;
-          font-size: 21px;
+          font-size: 24px;
           line-height: 1.65;
           text-align: justify;
           text-justify: inter-word;
@@ -780,10 +780,12 @@ function RichTextEditor({
         }
 
         .richEditorCompact .richEditorArea {
-          padding: 13px 15px;
-          font-size: 19px;
-          line-height: 1.5;
-        }
+         padding: 13px 15px;
+  font-size: 19px;
+  font-weight: 700;
+  color: #111111;
+  line-height: 1.5;
+}
 
         @media(max-width:700px) {
           .richToolbar {
