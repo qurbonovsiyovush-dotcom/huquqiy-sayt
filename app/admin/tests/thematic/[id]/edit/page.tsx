@@ -52,6 +52,34 @@ function plainToHtml(value: string) {
   return escapeHtml(value).replace(/\n/g, "<br />");
 }
 
+function htmlToPlain(value: unknown) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) return "";
+
+  const prepared = raw
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(?:p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '\"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&#39;/gi, "'")
+    .replace(/\u00a0/g, " ");
+
+  return prepared
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter((line, index, lines) => line || (index > 0 && lines[index - 1]))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function ThematicAdminEditorPage() {
   const router = useRouter();
   const params = useParams();
@@ -126,7 +154,7 @@ export default function ThematicAdminEditorPage() {
           ? raw.questions.map((question: any, questionIndex: number) => ({
               id: String(question?.id || ""),
               number: Number(question?.number) || questionIndex + 1,
-              questionText: String(
+              questionText: htmlToPlain(
                 question?.questionText || question?.questionHtml || ""
               ),
               questionHtml: String(
@@ -140,7 +168,7 @@ export default function ThematicAdminEditorPage() {
                     label: String(
                       option?.label || String.fromCharCode(65 + optionIndex)
                     ),
-                    text: String(option?.text || option?.html || ""),
+                    text: htmlToPlain(option?.text || option?.html || ""),
                     html: String(option?.html || option?.text || ""),
                     isCorrect: option?.isCorrect === true,
                   }))
