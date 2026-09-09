@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
@@ -22,6 +23,29 @@ function normalizeIds(value: unknown): string[] {
   );
 }
 
+async function isAdmin() {
+  const cookieStore = await cookies();
+
+  return Boolean(
+    cookieStore.get("qurbonov_session")?.value &&
+      cookieStore.get("qurbonov_role")?.value === "admin"
+  );
+}
+
+function normalizePositiveInt(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.floor(parsed));
+}
+
+function normalizeNullablePositiveInt(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.max(1, Math.floor(parsed));
+}
+
+
 /* =========================================================
    GET
    Mavzulashtirilgan kitoblar va testlarni Neon'dan olish
@@ -31,6 +55,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
+    const idParam = searchParams.get("id");
     const gradeParam = searchParams.get("grade");
     const statusParam = searchParams.get("status");
 
@@ -43,6 +68,161 @@ export async function GET(request: NextRequest) {
       statusParam === "draft" || statusParam === "published"
         ? statusParam
         : null;
+
+    /* ---------------------------------------------
+       BITTA TESTNI SAVOLLARI BILAN OLISH
+       /api/tests/thematic?id=123
+    --------------------------------------------- */
+
+    if (idParam !== null) {
+      if (!/^\d+$/.test(idParam)) {
+        return NextResponse.json(
+          { success: false, message: "Test ID noto‘g‘ri." },
+          { status: 400 }
+        );
+      }
+
+      const testRows = await sql`
+        SELECT
+          t.id,
+          t.book_id,
+          t.section_order,
+          t.section_type,
+          t.title,
+          t.description,
+          t.duration_minutes,
+          t.attempt_limit,
+          t.status,
+          t.question_count,
+          t.created_at,
+          t.updated_at,
+          b.grade,
+          b.title AS book_title,
+          b.subject,
+          b.edition
+        FROM thematic_tests t
+        JOIN thematic_books b ON b.id = t.book_id
+        WHERE t.id = ${idParam}
+        LIMIT 1
+      `;
+
+      if (testRows.length === 0) {
+        return NextResponse.json(
+          { success: false, message: "Mavzulashtirilgan test topilmadi." },
+          { status: 404 }
+        );
+      }
+
+      const testRow: any = testRows[0];
+      const admin = await isAdmin();
+
+      if (testRow.status !== "published" && !admin) {
+        return NextResponse.json(
+          { success: false, message: "Bu test hali e’lon qilinmagan." },
+          { status: 403 }
+        );
+      }
+
+      const questionRows = await sql`
+        SELECT
+          id,
+          question_number,
+          question_text,
+          question_html,
+          points,
+          shapes_json,
+          extra_json
+        FROM thematic_questions
+        WHERE test_id = ${idParam}
+        ORDER BY question_number ASC, id ASC
+      `;
+
+      const questionIds = questionRows
+        .map((row: any) => String(row.id))
+        .filter((value: string) => /^\d+$/.test(value));
+
+      let optionRows: any[] = [];
+
+      if (questionIds.length > 0) {
+        optionRows = await sql`
+          SELECT
+            id,
+            question_id,
+            option_key,
+            option_text,
+            option_html,
+            is_correct,
+            extra_json
+          FROM thematic_options
+          WHERE question_id = ANY(${questionIds}::bigint[])
+          ORDER BY question_id ASC, option_key ASC, id ASC
+        `;
+      }
+
+      const optionsByQuestion = new Map<string, any[]>();
+
+      for (const row of optionRows) {
+        const key = String(row.question_id);
+        const current = optionsByQuestion.get(key) || [];
+
+        current.push({
+          id: String(row.id),
+          label: String(row.option_key || ""),
+          text: String(row.option_text || row.option_html || ""),
+          html: String(row.option_html || row.option_text || ""),
+          isCorrect: row.is_correct === true,
+        });
+
+        optionsByQuestion.set(key, current);
+      }
+
+      const questions = questionRows.map((row: any) => ({
+        id: String(row.id),
+        number: Number(row.question_number) || 0,
+        questionText: String(row.question_text || ""),
+        questionHtml: String(row.question_html || row.question_text || ""),
+        points: Number(row.points) || 1,
+        shapes: Array.isArray(row.shapes_json) ? row.shapes_json : [],
+        options: optionsByQuestion.get(String(row.id)) || [],
+      }));
+
+      return NextResponse.json(
+        {
+          success: true,
+          test: {
+            id: String(testRow.id),
+            bookId: String(testRow.book_id),
+            bookTitle: String(testRow.book_title || ""),
+            grade: Number(testRow.grade) || undefined,
+            subject: String(testRow.subject || ""),
+            edition: String(testRow.edition || ""),
+            sectionOrder: Number(testRow.section_order) || 0,
+            sectionType: String(testRow.section_type || "lesson"),
+            title: String(testRow.title || ""),
+            description: String(testRow.description || ""),
+            duration: Number(testRow.duration_minutes) || 60,
+            attemptLimit:
+              testRow.attempt_limit == null
+                ? null
+                : Number(testRow.attempt_limit),
+            status: testRow.status === "published" ? "published" : "draft",
+            questionCount: questions.length,
+            questions,
+            createdAt: testRow.created_at
+              ? new Date(testRow.created_at).toISOString()
+              : undefined,
+            updatedAt: testRow.updated_at
+              ? new Date(testRow.updated_at).toISOString()
+              : undefined,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+          },
+        }
+      );
+    }
 
     /* ---------------------------------------------
        1. KITOBLAR
@@ -199,6 +379,7 @@ export async function GET(request: NextRequest) {
    Neon thematic testlarni boshqarish
 
    action:
+   - update-test
    - set-status
    - bulk-publish-tests
    - bulk-delete-tests
@@ -206,9 +387,204 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        { success: false, message: "Faqat administrator uchun." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
 
     const action = String(body?.action || "").trim();
+
+
+    /* =====================================================
+       TEST MA'LUMOTLARI, VAQTI, SAVOL VA VARIANTLARINI TAHRIRLASH
+    ===================================================== */
+
+    if (action === "update-test") {
+      const testId = String(body?.testId ?? "").trim();
+
+      if (!/^\d+$/.test(testId)) {
+        return NextResponse.json(
+          { success: false, message: "Test ID noto‘g‘ri." },
+          { status: 400 }
+        );
+      }
+
+      const existing = await sql`
+        SELECT id, book_id, status
+        FROM thematic_tests
+        WHERE id = ${testId}
+        LIMIT 1
+      `;
+
+      if (existing.length === 0) {
+        return NextResponse.json(
+          { success: false, message: "Mavzulashtirilgan test topilmadi." },
+          { status: 404 }
+        );
+      }
+
+      const title = String(body?.title || "").trim();
+      if (!title) {
+        return NextResponse.json(
+          { success: false, message: "Test nomi bo‘sh bo‘lishi mumkin emas." },
+          { status: 400 }
+        );
+      }
+
+      const status = isStatus(body?.status)
+        ? body.status
+        : (existing[0].status === "published" ? "published" : "draft");
+
+      const durationMinutes = normalizePositiveInt(body?.durationMinutes, 60);
+      const attemptLimit = normalizeNullablePositiveInt(body?.attemptLimit);
+      const questions = Array.isArray(body?.questions) ? body.questions : [];
+
+      if (status === "published" && questions.length === 0) {
+        return NextResponse.json(
+          { success: false, message: "Savolsiz testni e’lon qilib bo‘lmaydi." },
+          { status: 400 }
+        );
+      }
+
+      await sql`
+        UPDATE thematic_tests
+        SET
+          title = ${title},
+          description = ${String(body?.description || "")},
+          duration_minutes = ${durationMinutes},
+          attempt_limit = ${attemptLimit},
+          status = ${status},
+          updated_at = NOW()
+        WHERE id = ${testId}
+      `;
+
+      let updatedQuestionCount = 0;
+
+      for (let questionIndex = 0; questionIndex < questions.length; questionIndex++) {
+        const question = questions[questionIndex] || {};
+        const questionId = String(question?.id ?? "").trim();
+
+        if (!/^\d+$/.test(questionId)) continue;
+
+        const belongs = await sql`
+          SELECT id
+          FROM thematic_questions
+          WHERE id = ${questionId}
+            AND test_id = ${testId}
+          LIMIT 1
+        `;
+
+        if (belongs.length === 0) continue;
+
+        const questionText = String(
+          question?.questionText ?? question?.questionHtml ?? ""
+        ).trim();
+        const questionHtml = String(
+          question?.questionHtml ?? questionText
+        );
+        const points = normalizePositiveInt(question?.points, 1);
+
+        await sql`
+          UPDATE thematic_questions
+          SET
+            question_number = ${questionIndex + 1},
+            question_text = ${questionText},
+            question_html = ${questionHtml},
+            points = ${points},
+            updated_at = NOW()
+          WHERE id = ${questionId}
+            AND test_id = ${testId}
+        `;
+
+        const options = Array.isArray(question?.options) ? question.options : [];
+        const correctCount = options.filter((option: any) => option?.isCorrect === true).length;
+
+        if (options.length > 0 && correctCount !== 1) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `${questionIndex + 1}-savolda aynan 1 ta to‘g‘ri javob bo‘lishi kerak.`,
+            },
+            { status: 400 }
+          );
+        }
+
+        for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
+          const option = options[optionIndex] || {};
+          const optionId = String(option?.id ?? "").trim();
+          if (!/^\d+$/.test(optionId)) continue;
+
+          const optionText = String(option?.text ?? option?.html ?? "");
+          const optionHtml = String(option?.html ?? optionText);
+          const optionKey = String(
+            option?.label || String.fromCharCode(65 + optionIndex)
+          )
+            .trim()
+            .toUpperCase();
+
+          await sql`
+            UPDATE thematic_options
+            SET
+              option_key = ${optionKey},
+              option_text = ${optionText},
+              option_html = ${optionHtml},
+              is_correct = ${option?.isCorrect === true},
+              updated_at = NOW()
+            WHERE id = ${optionId}
+              AND question_id = ${questionId}
+          `;
+        }
+
+        updatedQuestionCount++;
+      }
+
+      const countRows = await sql`
+        SELECT COUNT(*)::int AS count
+        FROM thematic_questions
+        WHERE test_id = ${testId}
+      `;
+
+      const realQuestionCount = Number(countRows[0]?.count || 0);
+
+      await sql`
+        UPDATE thematic_tests
+        SET
+          question_count = ${realQuestionCount},
+          updated_at = NOW()
+        WHERE id = ${testId}
+      `;
+
+      await sql`
+        UPDATE thematic_books
+        SET
+          status = CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM thematic_tests
+              WHERE book_id = ${existing[0].book_id}
+                AND status = 'published'
+            )
+            THEN 'published'
+            ELSE 'draft'
+          END,
+          updated_at = NOW()
+        WHERE id = ${existing[0].book_id}
+      `;
+
+      return NextResponse.json({
+        success: true,
+        message: "Mavzulashtirilgan test Neon bazasida yangilandi.",
+        testId,
+        status,
+        durationMinutes,
+        questionCount: realQuestionCount,
+        updatedQuestionCount,
+      });
+    }
 
     /* =====================================================
        1. BITTA TEST STATUSINI O'ZGARTIRISH
@@ -560,6 +936,13 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    if (!(await isAdmin())) {
+      return NextResponse.json(
+        { success: false, message: "Faqat administrator uchun." },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     const testId = String(
