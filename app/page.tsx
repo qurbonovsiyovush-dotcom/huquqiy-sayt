@@ -269,7 +269,21 @@ export default function Home() {
      CHIQISH
   ===================================================== */
 
-  function logout() {
+  async function logout() {
+    try {
+      await fetch(
+        "/api/logout",
+        {
+          method: "POST",
+        }
+      );
+    } catch (error) {
+      console.error(
+        "LOGOUT ERROR:",
+        error
+      );
+    }
+
     sessionStorage.removeItem(
       "qurbonov-session"
     );
@@ -284,6 +298,8 @@ export default function Home() {
     setCode("");
     setLoginMessage("");
     setLoginError("");
+
+    window.location.replace("/");
   }
 
   /* =====================================================
