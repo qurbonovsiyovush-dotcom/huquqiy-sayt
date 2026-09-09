@@ -299,7 +299,6 @@ export default function Home() {
     setLoginMessage("");
     setLoginError("");
 
-    window.location.replace("/");
   }
 
   /* =====================================================
@@ -311,7 +310,7 @@ export default function Home() {
       <main
         style={{
           minHeight: "100vh",
-          background: "#05283e",
+          background: "#f7f7f5",
         }}
       />
     );
