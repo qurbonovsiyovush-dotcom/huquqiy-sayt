@@ -386,6 +386,7 @@ export async function GET(request: NextRequest) {
    - update-test
    - set-status
    - bulk-publish-tests
+   - bulk-draft-tests
    - bulk-delete-tests
 ========================================================= */
 
@@ -782,7 +783,81 @@ export async function POST(request: NextRequest) {
     }
 
     /* =====================================================
-       3. QORALAMALARNI BIRTA SQL BILAN O'CHIRISH
+       3. KO'P TESTNI BIRTA SQL BILAN QORALAMAGA QAYTARISH
+    ===================================================== */
+
+    if (action === "bulk-draft-tests") {
+      const testIds = normalizeIds(body?.testIds);
+
+      if (testIds.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Qoralamaga qaytariladigan testlar tanlanmagan.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const updated = await sql`
+        UPDATE thematic_tests
+        SET
+          status = 'draft',
+          updated_at = NOW()
+        WHERE id = ANY(${testIds}::bigint[])
+        RETURNING
+          id,
+          book_id,
+          status
+      `;
+
+      const bookIds = Array.from(
+        new Set(
+          updated
+            .map((row) => String(row.book_id))
+            .filter((value) => /^\d+$/.test(value))
+        )
+      );
+
+      /*
+        Kitob statusini qolgan testlarga qarab qayta hisoblaymiz.
+        Kitobda kamida bitta published test qolsa published,
+        aks holda draft bo‘ladi.
+      */
+      if (bookIds.length > 0) {
+        await sql`
+          UPDATE thematic_books b
+          SET
+            status = CASE
+              WHEN EXISTS (
+                SELECT 1
+                FROM thematic_tests t
+                WHERE t.book_id = b.id
+                  AND t.status = 'published'
+              )
+              THEN 'published'
+              ELSE 'draft'
+            END,
+            updated_at = NOW()
+          WHERE b.id = ANY(${bookIds}::bigint[])
+        `;
+      }
+
+      const draftIds = updated.map((row) =>
+        String(row.id)
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: `${draftIds.length} ta mavzulashtirilgan test qoralamaga qaytarildi.`,
+        draftCount: draftIds.length,
+        draftIds,
+      });
+    }
+
+    /* =====================================================
+       4. QORALAMALARNI BIRTA SQL BILAN O'CHIRISH
     ===================================================== */
 
     if (action === "bulk-delete-tests") {
