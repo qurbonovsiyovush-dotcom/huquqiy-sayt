@@ -178,6 +178,50 @@ type TopicGroup = {
    ADMIN
 ========================================================= */
 
+
+/* =========================================================
+   8-SINF EYLER–VENN CROPLARI
+
+   Bu koordinatalar aynan kanonik 8-sinf PDF uchun tekshirilgan.
+   Crop faqat diagrammaning o'zini oladi:
+   - savol prompti kirmaydi;
+   - I / II sarlavhalar + Venn chizmasi kiradi;
+   - a), b), c)... va A/B/C/D variantlari kirmaydi.
+
+   Frontend original PDFni brauzerda render qilib, shu koordinatani
+   real PNG image-shape'ga aylantiradi.
+========================================================= */
+
+const GRADE8_VENN_CROPS: Record<string, PdfCrop> = {
+  "g8-s02-q051": { pageNumber: 11, x: 34.0, y: 401.4, width: 247.93, height: 127.9 },
+  "g8-s05-q032": { pageNumber: 26, x: 313.3, y: 403.68, width: 247.93, height: 125.62 },
+  "g8-s06-q063": { pageNumber: 36, x: 313.3, y: 540.5, width: 247.93, height: 125.63 },
+  "g8-s06-q094": { pageNumber: 40, x: 34.0, y: 318.17, width: 247.93, height: 125.57 },
+  "g8-s08-q043": { pageNumber: 49, x: 313.3, y: 424.21, width: 247.93, height: 122.13 },
+  "g8-s09-q064": { pageNumber: 59, x: 34.0, y: 409.38, width: 247.93, height: 119.92 },
+  "g8-s09-q065": { pageNumber: 59, x: 313.3, y: 626.01, width: 248.0, height: 125.56 },
+  "g8-s10-q042": { pageNumber: 66, x: 34.0, y: 546.2, width: 247.93, height: 119.93 },
+  "g8-s10-q043": { pageNumber: 66, x: 34.0, y: 134.56, width: 248.0, height: 119.89 },
+  "g8-s11-q032": { pageNumber: 75, x: 34.0, y: 101.55, width: 247.93, height: 119.78 },
+  "g8-s12-q008": { pageNumber: 79, x: 313.3, y: 238.36, width: 247.93, height: 119.92 },
+  "g8-s12-q048": { pageNumber: 84, x: 34.0, y: 574.7, width: 247.93, height: 125.63 },
+  "g8-s14-q052": { pageNumber: 95, x: 34.0, y: 221.26, width: 247.93, height: 137.02 },
+  "g8-s14-q053": { pageNumber: 95, x: 313.3, y: 529.1, width: 248.0, height: 137.03 },
+  "g8-s15-q037": { pageNumber: 103, x: 34.0, y: 169.96, width: 247.93, height: 119.8 },
+  "g8-s15-q067": { pageNumber: 106, x: 313.3, y: 255.47, width: 247.93, height: 119.85 },
+  "g8-s15-q074": { pageNumber: 107, x: 313.3, y: 318.17, width: 247.93, height: 125.57 },
+  "g8-s15-q091": { pageNumber: 110, x: 34.0, y: 494.89, width: 247.93, height: 119.88 },
+  "g8-s16-q039": { pageNumber: 116, x: 34.0, y: 454.99, width: 247.93, height: 125.55 },
+  "g8-s16-q041": { pageNumber: 116, x: 313.3, y: 580.41, width: 248.0, height: 119.92 },
+  "g8-s17-q042": { pageNumber: 126, x: 34.0, y: 93.25, width: 247.93, height: 126.76 },
+  "g8-s17-q074": { pageNumber: 130, x: 34.0, y: 419.58, width: 247.93, height: 126.76 },
+  "g8-s19-q046": { pageNumber: 142, x: 34.0, y: 477.79, width: 247.93, height: 136.98 },
+  "g8-s19-q063": { pageNumber: 144, x: 34.0, y: 340.98, width: 247.93, height: 136.96 },
+  "g8-s21-q067": { pageNumber: 158, x: 313.3, y: 529.1, width: 248.0, height: 137.03 },
+  "g8-s23-q048": { pageNumber: 172, x: 34.0, y: 363.78, width: 247.93, height: 114.16 },
+  "g8-s23-q049": { pageNumber: 172, x: 313.3, y: 620.31, width: 247.93, height: 114.22 },
+};
+
 async function isAdmin() {
   const cookieStore = await cookies();
 
@@ -304,11 +348,13 @@ async function loadCanonicalGrade8Import() {
         (option) => !option.text
       ).length;
 
+      const questionId = String(
+        question?.id ||
+          `grade8-q-${globalNumber}`
+      );
+
       const baseQuestion: ImportedQuestion = {
-        id: String(
-          question?.id ||
-            `grade8-q-${globalNumber}`
-        ),
+        id: questionId,
         number: globalNumber,
         questionText:
           String(
@@ -318,6 +364,7 @@ async function loadCanonicalGrade8Import() {
           ).trim(),
         options,
         shapes: [],
+        pdfCrop: GRADE8_VENN_CROPS[questionId],
         warning:
           correctCount === 1 &&
           emptyOptions === 0
@@ -411,6 +458,8 @@ async function loadCanonicalGrade8Import() {
     answerKeyTopicCount: 25,
     expectedQuestionCount: 1532,
     questionCountMatchesAnswerKey: true,
+    visualQuestionCount: Object.keys(GRADE8_VENN_CROPS).length,
+    pdfCropCount: Object.keys(GRADE8_VENN_CROPS).length,
     editableShapeQuestionCount: 0,
     editableShapeCount: 0,
     total: 1532,
