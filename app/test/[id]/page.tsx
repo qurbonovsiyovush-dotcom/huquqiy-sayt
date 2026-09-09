@@ -235,7 +235,9 @@ export default function TestSolvePage() {
   ===================================================== */
 
   function cleanPunctuation(value: string) {
-    return String(value || "").replace(/\s+\?/g, "?");
+    return String(value || "")
+      .replace(/[ \t]+\?/g, " ?")
+      .replace(/\s+([,.;:!])/g, "$1");
   }
 
   function getQuestionText(question: TestQuestion) {
@@ -2134,10 +2136,10 @@ const pageStyles = `
     word-break: normal;
     hyphens: none;
 
-    color: #111315;
+    color: #000000;
     font-size: 24px;
     line-height: 1.48;
-    font-weight: 400;
+    font-weight: 900;
 
     text-shadow: 0 1px 0 rgba(255,255,255,.9);
   }
@@ -2145,9 +2147,16 @@ const pageStyles = `
   .questionHtml :global(p),
   .questionHtml :global(div),
   .questionHtml :global(li),
-  .questionHtml :global(span) {
-    font-size: inherit;
+  .questionHtml :global(span),
+  .questionHtml :global(i),
+  .questionHtml :global(em),
+  .questionHtml :global(strong),
+  .questionHtml :global(b) {
+    color: #000000 !important;
+    font-size: inherit !important;
     line-height: inherit;
+    font-weight: 900 !important;
+    font-style: normal !important;
   }
 
   .questionHtml :global(.legacyPrompt) {
@@ -2158,10 +2167,14 @@ const pageStyles = `
   }
 
   .questionHtml :global(.legacyItem) {
-    margin: 2px 0;
+    display: block;
+    margin: 4px 0;
     padding-left: 12px;
-    font-weight: 400;
-    font-style: italic;
+    color: #000000;
+    font-size: 24px;
+    line-height: 1.48;
+    font-weight: 900;
+    font-style: normal;
     text-align: left;
   }
 
@@ -2185,11 +2198,6 @@ const pageStyles = `
     font-weight: 700;
     text-decoration: none;
     border-bottom: 1px solid rgba(0,139,136,.35);
-  }
-
-  .questionHtml :global(strong),
-  .questionHtml :global(b) {
-    color: #082f4d;
   }
 
   .questionHtml :global(img),
@@ -2345,21 +2353,27 @@ const pageStyles = `
     word-break: normal;
     hyphens: none;
 
-    font-size: 18px;
+    color: #000000;
+    font-size: 19px;
     line-height: 1.5;
-    font-weight: 400;
-    font-style: italic;
+    font-weight: 900;
+    font-style: normal;
   }
 
   .optionText :global(p),
   .optionText :global(div),
   .optionText :global(li),
-  .optionText :global(span) {
-    font-size: inherit;
+  .optionText :global(span),
+  .optionText :global(i),
+  .optionText :global(em),
+  .optionText :global(strong),
+  .optionText :global(b) {
+    color: #000000 !important;
+    font-size: inherit !important;
     line-height: inherit;
-    font-weight: inherit;
-    text-align: justify;
-    text-justify: inter-word;
+    font-weight: 900 !important;
+    font-style: normal !important;
+    text-align: left;
   }
 
   .radio {
@@ -2642,7 +2656,7 @@ const pageStyles = `
 
     .questionHtml {
       font-size: 24px;
-      line-height: 1.6;
+      line-height: 1.5;
     }
 
     .testLayout {
@@ -2887,6 +2901,7 @@ const pageStyles = `
     font-size: 19px;
     line-height: 1.5;
     font-weight: 900;
+    font-style: normal;
   }
 
   .radio {
