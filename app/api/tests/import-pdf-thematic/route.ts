@@ -114,8 +114,21 @@ function formatGrade10QuestionHtml(value: unknown): string {
 
   if (!html) return "";
 
-  const numericMarkers = html.match(/(?:^|\s)(?:\d{1,2})\.\s/g) || [];
-  const romanMarkers = html.match(/(?:^|\s)(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s/g) || [];
+  /*
+    10-sinf savol matnidagi ichki ro'yxatlar:
+    1. 2. 3. ...
+    I. II. III. ...
+    a) b) c) d) e) ...
+    har biri alohida qatorda turadi.
+  */
+  const numericMarkers =
+    html.match(/(?:^|\s)(?:\d{1,2})\.\s/g) || [];
+
+  const romanMarkers =
+    html.match(/(?:^|\s)(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s/g) || [];
+
+  const letterMarkers =
+    html.match(/(?:^|\s)(?:a|b|c|d|e)\)\s/gi) || [];
 
   if (numericMarkers.length >= 2) {
     html = html.replace(
@@ -130,6 +143,19 @@ function formatGrade10QuestionHtml(value: unknown): string {
       "<br>"
     );
   }
+
+  if (letterMarkers.length >= 2) {
+    html = html.replace(
+      /\s+(?=(?:a|b|c|d|e)\)\s)/gi,
+      "<br>"
+    );
+  }
+
+  /*
+    Saytdagi ko'rinish: savol oxiridagi ? belgisi
+    oldingi so'zga yopishib qolmaydi: "... aniqlang ?"
+  */
+  html = html.replace(/\s*\?/g, " ?");
 
   return html;
 }
