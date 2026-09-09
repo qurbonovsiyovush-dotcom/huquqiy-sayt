@@ -132,8 +132,7 @@ export async function GET(request: NextRequest) {
           question_text,
           question_html,
           points,
-          shapes_json,
-          extra_json
+          shapes_json
         FROM thematic_questions
         WHERE test_id = ${testId}
         ORDER BY question_number ASC, id ASC
@@ -152,8 +151,7 @@ export async function GET(request: NextRequest) {
           o.option_key,
           o.option_text,
           o.option_html,
-          o.is_correct,
-          o.extra_json
+          o.is_correct
         FROM thematic_options o
         JOIN thematic_questions q
           ON q.id = o.question_id
