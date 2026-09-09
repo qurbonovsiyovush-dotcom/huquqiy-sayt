@@ -2641,7 +2641,7 @@ const pageStyles = `
     }
 
     .questionHtml {
-      font-size: 21px;
+      font-size: 24px;
       line-height: 1.6;
     }
 
@@ -2884,7 +2884,7 @@ const pageStyles = `
   }
 
   .optionText {
-    font-size: 18px;
+    font-size: 19px;
     line-height: 1.5;
     font-weight: 900;
   }
