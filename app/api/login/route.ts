@@ -2,68 +2,29 @@ import {
   NextRequest,
   NextResponse,
 } from "next/server";
-import fs from "fs/promises";
-import path from "path";
+
 import crypto from "crypto";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-type AccessCode = {
-  id: string;
-  code: string;
-  name: string;
-  active: boolean;
-  approved: boolean;
-  requestedAt: string | null;
-  createdAt: string;
-  approvedAt?: string | null;
-  rejectedAt?: string | null;
-};
-
-const DATA_FILE = path.join(
-  process.cwd(),
-  "data-storage",
-  "access-codes.json"
-);
+/* =====================================================
+   ADMIN
+===================================================== */
 
 const ADMIN_CODE =
   "QURBONOV-ADMIN-2026";
 
+const ADMIN_NAME =
+  "Qurbonov Siyovush Jamaliddinzoda";
+
+/* =====================================================
+   COOKIE
+===================================================== */
+
 const COOKIE_MAX_AGE =
   60 * 60 * 12;
-
-async function readCodes(): Promise<
-  AccessCode[]
-> {
-  try {
-    const text = await fs.readFile(
-      DATA_FILE,
-      "utf8"
-    );
-
-    const data = JSON.parse(text);
-
-    return Array.isArray(data)
-      ? data
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeCodes(
-  codes: AccessCode[]
-) {
-  await fs.writeFile(
-    DATA_FILE,
-    JSON.stringify(
-      codes,
-      null,
-      2
-    ),
-    "utf8"
-  );
-}
 
 function sessionToken() {
   return crypto
@@ -139,7 +100,7 @@ function setPendingCookie(
 
 /* =====================================================
    POST
-   KODNI BIR MARTA KIRITISH
+   KIRISH KODINI TEKSHIRISH
 ===================================================== */
 
 export async function POST(
@@ -158,6 +119,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+          status: "error",
           error:
             "Maxsus kirish kodini kiriting.",
         },
@@ -167,9 +129,9 @@ export async function POST(
       );
     }
 
-    /* ===============================
-       ADMIN
-    =============================== */
+    /* =================================================
+       ADMIN KODI
+    ================================================= */
 
     if (
       enteredCode === ADMIN_CODE
@@ -177,8 +139,7 @@ export async function POST(
       const response =
         NextResponse.json({
           success: true,
-          status:
-            "authenticated",
+          status: "authenticated",
           role: "admin",
           redirect: "/",
         });
@@ -186,32 +147,39 @@ export async function POST(
       setSessionCookies(
         response,
         "admin",
-        "Qurbonov Siyovush Jamaliddinzoda"
+        ADMIN_NAME
       );
 
       return response;
     }
 
-    /* ===============================
+    /* =================================================
        ODDIY FOYDALANUVCHI
-    =============================== */
+       NEON BAZADAN QIDIRAMIZ
+    ================================================= */
 
-    const codes =
-      await readCodes();
+    const users =
+      await sql`
+        SELECT
+          id,
+          code,
+          name,
+          active,
+          approved,
+          requested_at,
+          created_at,
+          approved_at,
+          rejected_at
+        FROM access_codes
+        WHERE UPPER(code) = ${enteredCode}
+        LIMIT 1
+      `;
 
-    const index =
-      codes.findIndex(
-        (item) =>
-          item.code
-            .trim()
-            .toUpperCase() ===
-          enteredCode
-      );
-
-    if (index === -1) {
+    if (users.length === 0) {
       return NextResponse.json(
         {
           success: false,
+          status: "not-found",
           error:
             "Kirish kodi noto‘g‘ri.",
         },
@@ -221,14 +189,23 @@ export async function POST(
       );
     }
 
-    const user =
-      codes[index];
+    const user: any =
+      users[0];
 
-    /* ===============================
-       RAD ETILGAN
-    =============================== */
+    const userId =
+      String(user.id);
 
-    if (!user.active) {
+    const userName =
+      String(
+        user.name ||
+          "Foydalanuvchi"
+      );
+
+    /* =================================================
+       BLOKLANGAN / RAD ETILGAN
+    ================================================= */
+
+    if (user.active !== true) {
       const response =
         NextResponse.json(
           {
@@ -250,19 +227,23 @@ export async function POST(
       return response;
     }
 
-    /* ===============================
+    /* =================================================
        ADMIN HALI TASDIQLAMAGAN
-    =============================== */
+    ================================================= */
 
-    if (!user.approved) {
-      if (!user.requestedAt) {
-        codes[index] = {
-          ...user,
-          requestedAt:
-            new Date().toISOString(),
-        };
+    if (user.approved !== true) {
+      /*
+        Birinchi marta kod ishlatilganda
+        requested_at vaqtini yozamiz.
+      */
 
-        await writeCodes(codes);
+      if (!user.requested_at) {
+        await sql`
+          UPDATE access_codes
+          SET
+            requested_at = NOW()
+          WHERE id = ${userId}
+        `;
       }
 
       const response =
@@ -274,28 +255,26 @@ export async function POST(
         });
 
       /*
-        Foydalanuvchi kodni ikkinchi
-        marta kiritmasligi uchun uning
-        ID sini vaqtincha cookie da
-        eslab qolamiz.
+        Foydalanuvchidan kodni qayta
+        so‘ramaslik uchun vaqtincha ID cookie.
       */
+
       setPendingCookie(
         response,
-        user.id
+        userId
       );
 
       return response;
     }
 
-    /* ===============================
-       OLDINDAN TASDIQLANGAN
-    =============================== */
+    /* =================================================
+       OLDINDAN TASDIQLANGAN FOYDALANUVCHI
+    ================================================= */
 
     const response =
       NextResponse.json({
         success: true,
-        status:
-          "authenticated",
+        status: "authenticated",
         role: "user",
         redirect: "/",
       });
@@ -303,7 +282,7 @@ export async function POST(
     setSessionCookies(
       response,
       "user",
-      user.name
+      userName
     );
 
     return response;
@@ -316,6 +295,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+        status: "error",
         error:
           "Serverda xatolik yuz berdi.",
       },
@@ -328,18 +308,17 @@ export async function POST(
 
 /* =====================================================
    GET
-   ADMIN TASDIQLAGANINI AVTOMATIK TEKSHIRISH
+   KIRISH HOLATINI TEKSHIRISH
 ===================================================== */
 
 export async function GET(
   request: NextRequest
 ) {
   try {
-    /*
-      Agar session allaqachon mavjud
-      bo‘lsa, sahifa refresh yoki yangi
-      tabda ham qayta parol so‘ramaydi.
-    */
+    /* =================================================
+       ALLAQACHON LOGIN QILINGAN
+    ================================================= */
+
     const session =
       request.cookies.get(
         "qurbonov_session"
@@ -353,14 +332,17 @@ export async function GET(
     if (session) {
       return NextResponse.json({
         success: true,
-        status:
-          "authenticated",
+        status: "authenticated",
         role:
           role === "admin"
             ? "admin"
             : "user",
       });
     }
+
+    /* =================================================
+       TASDIQ KUTAYOTGAN FOYDALANUVCHI
+    ================================================= */
 
     const pendingUserId =
       request.cookies.get(
@@ -374,17 +356,28 @@ export async function GET(
       });
     }
 
-    const codes =
-      await readCodes();
+    /* =================================================
+       NEON BAZADAN FOYDALANUVCHINI OLAMIZ
+    ================================================= */
 
-    const user =
-      codes.find(
-        (item) =>
-          item.id ===
-          pendingUserId
-      );
+    const users =
+      await sql`
+        SELECT
+          id,
+          code,
+          name,
+          active,
+          approved,
+          requested_at,
+          created_at,
+          approved_at,
+          rejected_at
+        FROM access_codes
+        WHERE id = ${pendingUserId}
+        LIMIT 1
+      `;
 
-    if (!user) {
+    if (users.length === 0) {
       const response =
         NextResponse.json({
           success: false,
@@ -399,7 +392,20 @@ export async function GET(
       return response;
     }
 
-    if (!user.active) {
+    const user: any =
+      users[0];
+
+    const userName =
+      String(
+        user.name ||
+          "Foydalanuvchi"
+      );
+
+    /* =================================================
+       RAD ETILGAN
+    ================================================= */
+
+    if (user.active !== true) {
       const response =
         NextResponse.json({
           success: false,
@@ -416,7 +422,11 @@ export async function GET(
       return response;
     }
 
-    if (!user.approved) {
+    /* =================================================
+       HALI KUTILMOQDA
+    ================================================= */
+
+    if (user.approved !== true) {
       return NextResponse.json({
         success: false,
         status: "pending",
@@ -425,11 +435,13 @@ export async function GET(
       });
     }
 
-    /*
-      Admin tasdiqladi.
-      Foydalanuvchidan kodni yana
-      so‘ramasdan session yaratamiz.
-    */
+    /* =================================================
+       ADMIN TASDIQLADI
+
+       Endi kodni yana kiritmasdan
+       foydalanuvchiga session beramiz.
+    ================================================= */
+
     const response =
       NextResponse.json({
         success: true,
@@ -441,7 +453,7 @@ export async function GET(
     setSessionCookies(
       response,
       "user",
-      user.name
+      userName
     );
 
     return response;
