@@ -10,7 +10,11 @@
   - sahifa oxirida bo'linib qolgan savolni keyingi sahifadan davom ettiradi;
   - savol ichidagi 1., 2., 3. bandlarni yangi savol deb olmaydi;
   - +A / +B / +C / +D orqali to'g'ri javobni taniydi;
-  - "Javoblar:" bo'limini savollarga qo'shib yubormaydi.
+  - PDF oxiridagi "Javoblar", "Javoblar kaliti" yoki
+    "... javoblar jadvali ..." bo'limidan ham answer-key o'qiydi;
+  - answer-key bo'lsa Kirish / DARS guruhlari / Yuridik atamalarni
+    haqiqiy bo'lim sifatida ajratadi;
+  - javoblar jadvalini savollarga qo'shib yubormaydi.
 */
 
 import { cookies } from "next/headers";
@@ -393,6 +397,94 @@ function optionMarkerHasLeadingOrTrailingPlus(value: string) {
     /^\s*\+\s*[ABCD]\)/.test(value) ||
     /^\s*[ABCD]\)\s*\+/.test(value)
   );
+}
+
+
+/*
+  =========================================================
+  JAVOBLAR BO'LIMI BOSHLANISHINI ANIQLASH
+
+  8-sinf PDFda sarlavha:
+    "8-sinf Davlat va huquq asoslari — javoblar jadvali !"
+
+  Eski parser faqat:
+    "Javoblar"
+    "Javoblar kaliti"
+  ni tanirdi. Shu sabab yangi PDFdagi answer-key umuman
+  ishga tushmas edi.
+  =========================================================
+*/
+function isAnswerKeyStartLine(value: string) {
+  const text = normalizeOneLine(value);
+
+  return (
+    /^umumiy\s+javoblar\s*:?\s*$/i.test(text) ||
+    /^javoblar\s*:?\s*$/i.test(text) ||
+    /^javoblar\s+kaliti\s*:?\s*$/i.test(text) ||
+    /\bjavoblar\s+jadvali\b/i.test(text)
+  );
+}
+
+function answerTopicTitleFromLine(
+  value: string
+): string | null {
+  const text = normalizeOneLine(value);
+
+  if (/^kirish$/i.test(text)) {
+    return "Kirish";
+  }
+
+  if (
+    /^yuridik\s+atamalar$/i.test(text) ||
+    /ayrim\s+yuridik\s+atamalarning\s+izohli\s+lug/i.test(text)
+  ) {
+    return "Yuridik atamalar";
+  }
+
+  return topicTitleFromLine(text);
+}
+
+/*
+  PDF text-layer ba'zan keyingi savol raqamini option prefiksi bilan
+  bitta satrga yopishtirib yuborishi mumkin:
+    A) 16. Savol matni...
+
+  Faqat oldingi savol A/B/C/D bilan tugaganidan KEYIN va
+  raqam kutilayotgan navbatdagi raqamga teng bo'lsa ishlatiladi.
+*/
+function embeddedQuestionAfterOptionPrefix(
+  line: TextLine,
+  expectedNumber: number
+): {
+  number: number;
+  line: TextLine;
+} | null {
+  const text = normalizeOneLine(line.text);
+
+  const match = text.match(
+    /^\s*\+?\s*[ABCD]\)\s*\+?\s*(\d{1,4})\.\s+(.+)$/i
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const number = Number(match[1]);
+
+  if (
+    !Number.isFinite(number) ||
+    number !== expectedNumber
+  ) {
+    return null;
+  }
+
+  return {
+    number,
+    line: {
+      ...line,
+      text: `${number}. ${match[2]}`.trim(),
+    },
+  };
 }
 
 /* =========================================================
@@ -896,10 +988,7 @@ function isPdfDecorationLine(value: string) {
   }
 
   /* Javoblar bo'limi sarlavhalari */
-  if (
-    /^umumiy\s+javoblar$/i.test(text) ||
-    /^javoblar(?:\s+kaliti)?$/i.test(text)
-  ) {
+  if (isAnswerKeyStartLine(text)) {
     return true;
   }
 
@@ -983,16 +1072,8 @@ function buildQuestionBlocks(
   let currentLines: TextLine[] = [];
 
   /*
-    Global raqam endi PDFdagi lokal raqamga bog'liq emas.
-
-    Mavzulashtirilgan PDFlarda har bir yangi mavzuda savollar:
-      1, 2, 3 ... 52
-    keyingi mavzuda yana:
-      1, 2, 3 ...
-
-    Saytda esa ular:
-      1, 2, 3 ... N
-    ko'rinishida ketma-ket saqlanadi.
+    Global raqam PDFdagi lokal raqamdan mustaqil.
+    Har bir haqiqiy savol ketma-ket 1..N bo'lib chiqadi.
   */
   let nextGlobalNumber = 1;
 
@@ -1022,15 +1103,6 @@ function buildQuestionBlocks(
     expectedLocalNumber = localNumber + 1;
   }
 
-  function isAnswerKeyHeading(value: string) {
-    const text = normalizeOneLine(value);
-
-    return (
-      /^javoblar\s*:?\s*$/i.test(text) ||
-      /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
-    );
-  }
-
   function isVariantTitle(value: string) {
     const text = normalizeOneLine(value);
 
@@ -1045,30 +1117,29 @@ function buildQuestionBlocks(
     }
 
     /*
-      Mavzulashtirilgan testlarda ichki ro'yxatlar ko'p:
-        1. ...
-        2. ...
-        3. ...
-
-      Shuning uchun faqat A/B/C/D variantlari tugagandan keyingina
-      yangi raqamni haqiqiy yangi savol deb olamiz.
+      Ichki 1./2./3. bandlarni savol deb olmaslikning asosiy himoyasi:
+      oldingi savolda A/B/C/D to'liq tugamaguncha yangi savol ochilmaydi.
     */
     return blockHasAllOptions(currentLines);
   }
 
-  for (const line of lines) {
+  for (
+    let lineIndex = 0;
+    lineIndex < lines.length;
+    lineIndex++
+  ) {
+    const line = lines[lineIndex];
+
     /*
-      Javoblar bo'limiga kelganda savol o'qishni TO'XTATAMIZ.
-      Aks holda "Savol 1 2 3..." jadvallari oxirgi savolga qo'shilib ketadi.
+      Yangi 8-sinf PDFda:
+        "8-sinf ... — javoblar jadvali !"
+      deb yozilgan. Shu yerda savol parsingini qat'iy to'xtatamiz.
     */
-    if (isAnswerKeyHeading(line.text)) {
+    if (isAnswerKeyStartLine(line.text)) {
       flushCurrent();
       break;
     }
 
-    /*
-      Blok testdagi alohida variantlar ham qaytadan 1 dan boshlashi mumkin.
-    */
     if (isVariantTitle(line.text)) {
       if (currentGlobalNumber !== null) {
         flushCurrent();
@@ -1087,6 +1158,8 @@ function buildQuestionBlocks(
 
     /*
       Birinchi haqiqiy savol.
+      Odatda 1 dan boshlanadi. Kirish matnidagi ichki raqamlarni
+      tasodifan savol qilib olmaslik uchun bu himoya saqlanadi.
     */
     if (currentGlobalNumber === null) {
       if (candidate === 1) {
@@ -1096,57 +1169,60 @@ function buildQuestionBlocks(
       continue;
     }
 
-    if (candidate !== null) {
-      /*
-        ODDIY DAVOM:
-          31 -> 32 -> 33 ...
+    const currentComplete =
+      canCloseCurrentQuestion();
 
-        MUHIM:
-        current savolda A/B/C/D hali tugamagan bo'lsa,
-        "2.", "3.", "4." kabi ichki bandlarni yangi savol deb olmaymiz.
-      */
-      if (
-        candidate === expectedLocalNumber &&
-        canCloseCurrentQuestion()
-      ) {
+    /*
+      MUHIM TUZATISH:
+      Oldingi kod faqat:
+        expected
+        expected+1
+        expected+2
+      gacha sakrashga ruxsat berardi.
+
+      PDF text-layer 3 yoki undan ko'p savol raqamini vaqtincha
+      noto'g'ri ajratsa parser butun mavzu bo'ylab "qotib" qolardi.
+
+      A/B/C/D tugaganidan keyin keyingi top-level "N. ..." qator
+      yangi savol bo'lishi mumkin. Shuning uchun endi raqamdagi katta
+      sakrash ham parserni to'xtatmaydi.
+
+      Ichki 1./2./3. bandlar esa A/B/C/D tugashidan OLDIN kelgani uchun
+      currentComplete=false bo'ladi va yangi savolga aylanmaydi.
+    */
+    if (
+      candidate !== null &&
+      currentComplete
+    ) {
+      flushCurrent();
+      startQuestion(
+        candidate,
+        line
+      );
+      continue;
+    }
+
+    /*
+      PDF text-layer buzilishidan:
+        A) 16. Savol matni...
+      ko'rinishida kelgan savolni tiklash.
+    */
+    if (
+      candidate === null &&
+      currentComplete
+    ) {
+      const embedded =
+        embeddedQuestionAfterOptionPrefix(
+          line,
+          expectedLocalNumber
+        );
+
+      if (embedded) {
         flushCurrent();
-        startQuestion(candidate, line);
-        continue;
-      }
-
-      /*
-        YANGI MAVZU / YANGI BO'LIM:
-          ... 52-savol tugadi
-          keyingi mavzu yana 1-savoldan boshlanadi.
-
-        Shu joy eski parserning asosiy muammosi edi.
-      */
-      if (
-        candidate === 1 &&
-        currentLocalNumber !== null &&
-        currentLocalNumber !== 1 &&
-        canCloseCurrentQuestion()
-      ) {
-        flushCurrent();
-        startQuestion(1, line);
-        continue;
-      }
-
-      /*
-        PDF text-layer ba'zan bitta savol raqamini yo'qotib yuboradi.
-        Masalan expected=37, keyingi aniq o'qilgan savol=38.
-
-        Parser butun PDF bo'ylab 36-savolda qotib qolmasligi uchun,
-        oldingi savol A/B/C/D bilan tugagan bo'lsa, 1-2 raqamlik kichik
-        sakrashdan tiklanamiz.
-      */
-      if (
-        candidate > expectedLocalNumber &&
-        candidate <= expectedLocalNumber + 2 &&
-        canCloseCurrentQuestion()
-      ) {
-        flushCurrent();
-        startQuestion(candidate, line);
+        startQuestion(
+          embedded.number,
+          embedded.line
+        );
         continue;
       }
     }
@@ -1163,13 +1239,8 @@ function buildQuestionBlocks(
 
   flushCurrent();
 
-  /*
-    Global raqamlar startQuestion() da allaqachon 1..N qilib berilgan.
-    PDF bo'yicha tabiiy tartibni saqlaymiz.
-  */
   return blocks;
 }
-
 
 /* =========================================================
    MAVZU (DARS) SARLAVHALARINI ANIQLASH
@@ -1236,13 +1307,68 @@ function extractAnswerKeyTopics(
   let inAnswerSection = false;
 
   const topics: AnswerKeyTopic[] = [];
+
   let current:
     AnswerKeyTopic | null = null;
 
   let pendingNumbers: number[] = [];
+  let pendingAnswers: OptionLabel[] = [];
+
+  let rowMode:
+    | "numbers"
+    | "answers"
+    | null = null;
+
   let pendingTitleContinuation = false;
 
+  function commitPendingRow() {
+    if (!current) {
+      pendingNumbers = [];
+      pendingAnswers = [];
+      rowMode = null;
+      return;
+    }
+
+    if (
+      pendingNumbers.length === 0 ||
+      pendingAnswers.length === 0
+    ) {
+      return;
+    }
+
+    const count =
+      Math.min(
+        pendingNumbers.length,
+        pendingAnswers.length
+      );
+
+    for (
+      let index = 0;
+      index < count;
+      index++
+    ) {
+      current.answers.push(
+        pendingAnswers[index]
+      );
+    }
+
+    pendingNumbers =
+      pendingNumbers.slice(count);
+
+    pendingAnswers =
+      pendingAnswers.slice(count);
+
+    if (
+      pendingNumbers.length === 0 &&
+      pendingAnswers.length === 0
+    ) {
+      rowMode = null;
+    }
+  }
+
   function flushCurrent() {
+    commitPendingRow();
+
     if (
       current &&
       current.answers.length > 0
@@ -1255,6 +1381,8 @@ function extractAnswerKeyTopics(
 
     current = null;
     pendingNumbers = [];
+    pendingAnswers = [];
+    rowMode = null;
     pendingTitleContinuation = false;
   }
 
@@ -1264,8 +1392,7 @@ function extractAnswerKeyTopics(
 
     if (!inAnswerSection) {
       if (
-        /^javoblar\s*:?\s*$/i.test(text) ||
-        /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+        isAnswerKeyStartLine(text)
       ) {
         inAnswerSection = true;
       }
@@ -1274,7 +1401,7 @@ function extractAnswerKeyTopics(
     }
 
     const topicTitle =
-      topicTitleFromLine(text);
+      answerTopicTitleFromLine(text);
 
     if (topicTitle) {
       flushCurrent();
@@ -1286,12 +1413,9 @@ function extractAnswerKeyTopics(
         answers: [],
       };
 
-      /*
-        Sarlavha keyingi qatorda davom etishi mumkin:
-        "13-DARS. ... huquqiy"
-        "maqomi"
-      */
-      pendingTitleContinuation = true;
+      pendingTitleContinuation =
+        /\bDARS\./i.test(topicTitle);
+
       continue;
     }
 
@@ -1300,9 +1424,9 @@ function extractAnswerKeyTopics(
     }
 
     /*
-      Mavzu nomining ikkinchi qatori.
-      Savol/Javob jadvali boshlanmaguncha faqat sarlavha
-      davomiga o‘xshagan qisqa matnni qo‘shamiz.
+      Uzun DARS sarlavhasi keyingi qatorda davom etishi mumkin:
+        "28-DARS. ... HUQUQ VA"
+        "MAJBURIYATLARI"
     */
     if (
       pendingTitleContinuation &&
@@ -1310,8 +1434,9 @@ function extractAnswerKeyTopics(
       !text.startsWith("№") &&
       !/^savol\b/i.test(text) &&
       !/^javob\b/i.test(text) &&
-      !/^javoblar\b/i.test(text) &&
-      !/^\d+$/.test(text) &&
+      !isAnswerKeyStartLine(text) &&
+      !/^\d+(?:\s+\d+)*$/.test(text) &&
+      !/^[ABCD](?:\s+[ABCD])*$/.test(text) &&
       !/Davlat va huquq asoslari/i.test(text)
     ) {
       current.title =
@@ -1327,46 +1452,76 @@ function extractAnswerKeyTopics(
       text.startsWith("№") ||
       /^savol\b/i.test(text)
     ) {
-      pendingTitleContinuation = false;
+      commitPendingRow();
 
-      pendingNumbers =
-        (text.match(/\b\d{1,4}\b/g) || [])
+      pendingTitleContinuation = false;
+      pendingNumbers = [];
+      pendingAnswers = [];
+      rowMode = "numbers";
+
+      pendingNumbers.push(
+        ...(text.match(/\b\d{1,4}\b/g) || [])
           .map(Number)
-          .filter(Number.isFinite);
+          .filter(Number.isFinite)
+      );
 
       continue;
     }
 
     if (/^javob\b/i.test(text)) {
       pendingTitleContinuation = false;
+      rowMode = "answers";
 
-      const rowAnswers =
-        (text.match(/\b[ABCD]\b/gi) || [])
+      pendingAnswers.push(
+        ...(text.match(/\b[ABCD]\b/gi) || [])
           .map(
             (value) =>
               value.toUpperCase() as OptionLabel
-          );
+          )
+      );
 
-      const count =
-        pendingNumbers.length > 0
-          ? Math.min(
-              pendingNumbers.length,
-              rowAnswers.length
-            )
-          : rowAnswers.length;
-
-      for (
-        let index = 0;
-        index < count;
-        index++
-      ) {
-        current.answers.push(
-          rowAnswers[index]
-        );
-      }
-
-      pendingNumbers = [];
+      commitPendingRow();
+      continue;
     }
+
+    /*
+      Ba'zi PDF text-layerlarda jadvalning har bir katagi alohida
+      TextLine bo'lib keladi. Shu holatda "Savol 1 2 ..." yoki
+      "Javob A B ..." bitta qatorda bo'lishi shart emas.
+    */
+    if (
+      rowMode === "numbers" &&
+      /^\d+(?:\s+\d+)*$/.test(text)
+    ) {
+      pendingNumbers.push(
+        ...(text.match(/\b\d{1,4}\b/g) || [])
+          .map(Number)
+          .filter(Number.isFinite)
+      );
+      continue;
+    }
+
+    if (
+      rowMode === "answers" &&
+      /^[ABCD](?:\s+[ABCD])*$/.test(text)
+    ) {
+      pendingAnswers.push(
+        ...(text.match(/\b[ABCD]\b/gi) || [])
+          .map(
+            (value) =>
+              value.toUpperCase() as OptionLabel
+          )
+      );
+
+      commitPendingRow();
+      continue;
+    }
+
+    /*
+      Jadval satri tugab, boshqa matn boshlangan bo'lsa mavjud
+      pending qiymatlarni xavfsiz commit qilamiz.
+    */
+    commitPendingRow();
   }
 
   flushCurrent();
@@ -1395,6 +1550,7 @@ function buildTopicsFromAnswerKey(
       questionNumbers:
         questions.map((q) => q.number),
       questions,
+      kind: "lesson",
     }];
   }
 
@@ -1411,17 +1567,25 @@ function buildTopicsFromAnswerKey(
         offset + count
       );
 
-    /*
-      Har mavzu alohida test bo‘lishi uchun savollarni
-      mavzu ichida 1..N qilib qayta raqamlaymiz.
-      Original global questions[] esa o‘zgarmaydi.
-    */
     const localQuestions =
       topicQuestions.map(
         (question, index) => ({
           ...question,
           number: index + 1,
         })
+      );
+
+    const lessonMatch =
+      answerTopic.title.match(
+        /^(\d+)\s*(?:[–—-]\s*(\d+))?\s*-\s*DARS\./i
+      );
+
+    const isGlossary =
+      /^yuridik\s+atamalar$/i.test(
+        answerTopic.title
+      ) ||
+      /izohli\s+lug/i.test(
+        answerTopic.title
       );
 
     topics.push({
@@ -1434,14 +1598,30 @@ function buildTopicsFromAnswerKey(
         ),
       questions:
         localQuestions,
+      lessonNumber:
+        lessonMatch
+          ? Number(lessonMatch[1])
+          : undefined,
+      sharedSource:
+        Boolean(
+          lessonMatch?.[2] &&
+          Number(lessonMatch[2]) >
+            Number(lessonMatch[1])
+        ),
+      sourceSectionTitle:
+        answerTopic.title,
+      kind:
+        isGlossary
+          ? "glossary"
+          : "lesson",
     });
 
     offset += count;
   }
 
   /*
-    Answer-key jami soni savollardan kam chiqsa savol yo‘qolmaydi.
-    Oxirgi mavzuga qolgan savollarni qo‘shamiz.
+    Answer-key jami savollar sonidan KAM bo'lsa savol yo'qolmaydi.
+    Ortiqcha savollar oxirgi bo'limga qo'shiladi.
   */
   if (
     offset < questions.length &&
@@ -1479,7 +1659,6 @@ function buildTopicsFromAnswerKey(
       topic.questions.length > 0
   );
 }
-
 
 /* =========================================================
    V4 — POST-PARSE MAVZU AJRATISH
@@ -1695,8 +1874,7 @@ function collectPostSections(
       );
 
     if (
-      /^javoblar\s*:?\s*$/i.test(text) ||
-      /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
+      isAnswerKeyStartLine(text)
     ) {
       answerKeyStart = index;
       break;
@@ -2029,78 +2207,12 @@ function buildDynamicLessonTopicsPostParse(
 function extractAnswerKey(
   lines: TextLine[]
 ): OptionLabel[] {
-  let inAnswerSection = false;
-
-  let pendingNumbers: number[] = [];
-  const answers: OptionLabel[] = [];
-
-  for (const line of lines) {
-    const text = normalizeOneLine(line.text);
-
-    if (!inAnswerSection) {
-      if (
-        /^javoblar\s*:?\s*$/i.test(text) ||
-        /^javoblar\s+kaliti\s*:?\s*$/i.test(text)
-      ) {
-        inAnswerSection = true;
-      }
-
-      continue;
-    }
-
-    /*
-      Birinchi qator ko'pincha:
-        № 1 2 3 ... 10
-      keyingilari:
-        Savol 11 12 ... 20
-    */
-    if (
-      text.startsWith("№") ||
-      /^savol\b/i.test(text)
-    ) {
-      pendingNumbers =
-        (text.match(/\b\d{1,4}\b/g) || [])
-          .map(Number)
-          .filter((value) =>
-            Number.isFinite(value)
-          );
-
-      continue;
-    }
-
-    if (/^javob\b/i.test(text)) {
-      const rowAnswers =
-        (text.match(/\b[ABCD]\b/gi) || [])
-          .map(
-            (value) =>
-              value.toUpperCase() as OptionLabel
-          );
-
-      if (
-        pendingNumbers.length > 0 &&
-        rowAnswers.length > 0
-      ) {
-        const count = Math.min(
-          pendingNumbers.length,
-          rowAnswers.length
-        );
-
-        for (
-          let index = 0;
-          index < count;
-          index++
-        ) {
-          answers.push(
-            rowAnswers[index]
-          );
-        }
-      }
-
-      pendingNumbers = [];
-    }
-  }
-
-  return answers;
+  return extractAnswerKeyTopics(
+    lines
+  ).flatMap(
+    (topic) =>
+      topic.answers
+  );
 }
 
 /* =========================================================
@@ -3541,11 +3653,20 @@ export async function POST(
       Savollar soni va javoblar soni aynan teng bo'lsagina avtomatik
       qo'llaymiz. Bu noto'g'ri siljib ketgan javobni belgilashdan saqlaydi.
     */
+    const answerKeyTopics =
+      extractAnswerKeyTopics(
+        allLines
+      );
+
     const answerKey =
-      extractAnswerKey(allLines);
+      answerKeyTopics.flatMap(
+        (topic) =>
+          topic.answers
+      );
 
     const answerKeyApplied =
-      answerKey.length === finalQuestions.length &&
+      answerKey.length ===
+        finalQuestions.length &&
       answerKey.length > 0;
 
     if (answerKeyApplied) {
@@ -3559,20 +3680,18 @@ export async function POST(
               (option) => ({
                 ...option,
                 isCorrect:
-                  option.label === correctLabel,
+                  option.label ===
+                  correctLabel,
               })
             );
 
-          /*
-            Endi answer key topilgan bo'lsa, "to'g'ri javob topilmadi"
-            warningini olib tashlaymiz. Variantlar yetishmasa warning qoladi.
-          */
           if (
             question.warning?.includes(
               "To‘g‘ri javob topilmadi"
             )
           ) {
-            question.warning = undefined;
+            question.warning =
+              undefined;
           }
         }
       );
@@ -3589,25 +3708,82 @@ export async function POST(
     }
 
     /*
-      Global raqamlar parser tomonidan 1..N tarzida beriladi.
-      Qattiq 840 ta degan cheklov endi yo'q.
+      MAVZU MANBASI:
+      1) PDF oxiridagi answer-key katalogi mavjud bo'lsa — USTUVOR.
+         8-sinf yangi PDFda aynan shu katalog 25 ta haqiqiy bo'limni
+         beradi: Kirish + DARS guruhlari + Yuridik atamalar.
+      2) Answer-key katalogi bo'lmasa — eski source-heading usuli.
     */
-    /*
-      V4:
-      1609 savol parse bo‘lib bo‘lgandan KEYIN
-      mavzular alohida biriktiriladi.
-    */
-    const thematicStructure =
-      buildDynamicLessonTopicsPostParse(
-        allLines,
+    const answerBasedSections =
+      buildTopicsFromAnswerKey(
+        answerKeyTopics,
         finalQuestions
       );
 
+    const answerBasedTopics =
+      answerBasedSections.filter(
+        (section) =>
+          section.kind !==
+          "glossary"
+      );
+
+    const answerBasedSpecialSections =
+      answerBasedSections.filter(
+        (section) =>
+          section.kind ===
+          "glossary"
+      );
+
+    const fallbackStructure =
+      answerKeyTopics.length === 0
+        ? buildDynamicLessonTopicsPostParse(
+            allLines,
+            finalQuestions
+          )
+        : null;
+
     const topics =
-      thematicStructure.topics;
+      answerKeyTopics.length > 0
+        ? answerBasedTopics
+        : (
+            fallbackStructure?.topics ??
+            []
+          );
 
     const specialSections =
-      thematicStructure.specialSections;
+      answerKeyTopics.length > 0
+        ? answerBasedSpecialSections
+        : (
+            fallbackStructure?.specialSections ??
+            []
+          );
+
+    const sectionCount =
+      topics.length +
+      specialSections.length;
+
+    /*
+      Answer-key bo'lsa, mavzu bo'yicha taqsimlash count orqali qat'iy.
+      Savol soni answer-key bilan teng bo'lsa mapping ham to'liq.
+    */
+    const mappingComplete =
+      answerKeyTopics.length > 0
+        ? answerKey.length ===
+          finalQuestions.length
+        : Boolean(
+            fallbackStructure?.mappingComplete
+          );
+
+    const mappedQuestionCount =
+      answerKeyTopics.length > 0
+        ? Math.min(
+            answerKey.length,
+            finalQuestions.length
+          )
+        : Number(
+            fallbackStructure?.mappedQuestionCount ??
+            0
+          );
 
     console.log(
       "THEMATIC PDF TOPICS:",
@@ -3617,7 +3793,6 @@ export async function POST(
           topic.questions.length,
       }))
     );
-
     const sequenceBroken =
       finalQuestions.some(
         (question, index) =>
@@ -3692,16 +3867,22 @@ export async function POST(
       specialSectionCount:
         specialSections.length,
 
-      sectionCount:
-        thematicStructure.sectionCount,
-      mappedQuestionCount:
-        thematicStructure.mappedQuestionCount,
-      mappingComplete:
-        thematicStructure.mappingComplete,
+      sectionCount,
+      mappedQuestionCount,
+      mappingComplete,
 
       answerKeyApplied,
       answerKeyCount:
         answerKey.length,
+      answerKeyTopicCount:
+        answerKeyTopics.length,
+      expectedQuestionCount:
+        answerKey.length,
+      questionCountMatchesAnswerKey:
+        answerKey.length > 0
+          ? answerKey.length ===
+            finalQuestions.length
+          : null,
 
       editableShapeQuestionCount:
         finalQuestions.filter(
