@@ -1108,9 +1108,17 @@ async function renderPdfCropInBrowser(
       }
     }
 
+    /*
+      Vercel request body limitiga urilmaslik uchun diagramma croplari
+      PNG emas, yuqori sifatli WebP ko‘rinishida saqlanadi.
+
+      Eyler–Venn kabi qora matn/chiziqli rasmlarda 0.92 sifat juda tiniq
+      qoladi, lekin base64 hajmi PNGga nisbatan bir necha baravar kichrayadi.
+    */
     const dataUrl =
       finalCanvas.toDataURL(
-        "image/png"
+        "image/webp",
+        0.92
       );
 
     try {
@@ -3345,7 +3353,7 @@ export default function ImportPdfTestPage() {
       } catch {
         if (response.status === 413) {
           throw new Error(
-            "Yuborilayotgan ma’lumot hajmi server limitidan oshdi. Bitta rasm juda katta bo‘lsa uni kichraytirish kerak."
+            "Yuborilayotgan ma’lumot hajmi server limitidan oshdi. Diagramma rasmlari siqilgan holda yuborilishi kerak."
           );
         }
 
