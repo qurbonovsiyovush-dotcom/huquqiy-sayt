@@ -63,6 +63,80 @@ function asObject(
     : {};
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function hasHtmlTags(value: string) {
+  return /<\/?[a-z][^>]*>/i.test(value);
+}
+
+function formatLegacyQuestionHtml(value: unknown) {
+  const raw = String(value ?? "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  // Agar Neon ichida haqiqiy HTML saqlangan bo‘lsa,
+  // uni o‘zgartirmay qaytaramiz.
+  if (hasHtmlTags(raw)) {
+    return raw;
+  }
+
+  let normalized = raw
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .trim();
+
+  // Eski bazadan ko‘chirishda satr tashlashlar yo‘qolgan bo‘lsa,
+  // 1. 2. 3. ... bandlarni yana alohida qatorda chiqaramiz.
+  if (!normalized.includes("\n")) {
+    normalized = normalized.replace(
+      /\s+(?=(?:\d{1,2})\.\s+)/g,
+      "\n"
+    );
+  }
+
+  const lines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return "";
+  }
+
+  const [prompt, ...items] = lines;
+
+  return [
+    `<div class="legacyPrompt">${escapeHtml(prompt)}</div>`,
+    ...items.map(
+      (item) =>
+        `<div class="legacyItem">${escapeHtml(item)}</div>`
+    ),
+  ].join("");
+}
+
+function formatLegacyOptionHtml(value: unknown) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  return hasHtmlTags(raw)
+    ? raw
+    : escapeHtml(raw);
+}
+
 export async function GET(
   _request: NextRequest,
   context: RouteContext
@@ -179,8 +253,8 @@ export async function GET(
         id: String(row.id),
         text:
           String(
-            row.option_html ||
-              row.option_text ||
+            row.option_text ||
+              row.option_html ||
               ""
           ),
         optionText:
@@ -189,9 +263,11 @@ export async function GET(
               ""
           ),
         html:
-          row.option_html
-            ? String(row.option_html)
-            : "",
+          formatLegacyOptionHtml(
+            row.option_html ||
+              row.option_text ||
+              ""
+          ),
         isCorrect:
           row.is_correct === true,
         correct:
@@ -213,7 +289,7 @@ export async function GET(
               row.question_text || ""
             ),
           questionHtml:
-            String(
+            formatLegacyQuestionHtml(
               row.question_html ||
                 row.question_text ||
                 ""
