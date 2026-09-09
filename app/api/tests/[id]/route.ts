@@ -76,8 +76,28 @@ function hasHtmlTags(value: string) {
   return /<\/?[a-z][^>]*>/i.test(value);
 }
 
+function decodeBasicHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'");
+}
+
+function htmlToPlainQuestionText(value: string) {
+  return decodeBasicHtmlEntities(
+    value
+      .replace(/<br\s*\/?\s*>/gi, "\n")
+      .replace(/<\/(?:p|div|li|h[1-6])>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+  );
+}
+
 function formatLegacyQuestionHtml(value: unknown) {
-  const raw = String(value ?? "")
+  let raw = String(value ?? "")
     .replace(/\r\n?/g, "\n")
     .trim();
 
@@ -85,10 +105,20 @@ function formatLegacyQuestionHtml(value: unknown) {
     return "";
   }
 
-  // Agar Neon ichida haqiqiy HTML saqlangan bo‘lsa,
-  // uni o‘zgartirmay qaytaramiz.
+  /*
+    Agar savolda rasm, jadval yoki SVG bo‘lsa, HTMLni saqlaymiz.
+    Oddiy matnli HTML esa standart test ko‘rinishiga aylantiriladi,
+    shunda Rim/oddiy raqamlar bir qatorda yopishib qolmaydi.
+  */
   if (hasHtmlTags(raw)) {
-    return raw;
+    const containsRichContent =
+      /<(?:img|table|svg|math|iframe)\b/i.test(raw);
+
+    if (containsRichContent) {
+      return raw;
+    }
+
+    raw = htmlToPlainQuestionText(raw);
   }
 
   let normalized = raw
@@ -96,11 +126,17 @@ function formatLegacyQuestionHtml(value: unknown) {
     .replace(/ *\n */g, "\n")
     .trim();
 
-  // Eski bazadan ko‘chirishda satr tashlashlar yo‘qolgan bo‘lsa,
-  // 1. 2. 3. ... bandlarni yana alohida qatorda chiqaramiz.
-  if (!normalized.includes("\n")) {
+  // Oddiy raqamlar: 1. 2. 3. ...
+  // Rim raqamlari: I. II. III. IV. ...
+  const listMarkerPattern =
+    /(?:^|\s)(?:\d{1,3}|[IVXLCDM]{1,8})\.\s+/g;
+
+  const markerCount =
+    normalized.match(listMarkerPattern)?.length || 0;
+
+  if (markerCount >= 2) {
     normalized = normalized.replace(
-      /\s+(?=(?:\d{1,2})\.\s+)/g,
+      /\s+(?=(?:\d{1,3}|[IVXLCDM]{1,8})\.\s+)/g,
       "\n"
     );
   }
@@ -114,7 +150,10 @@ function formatLegacyQuestionHtml(value: unknown) {
     return "";
   }
 
-  const [prompt, ...items] = lines;
+  const [rawPrompt, ...items] = lines;
+
+  // Savol oxiridagi ? belgisi matnga yopishib qolmasin.
+  const prompt = rawPrompt.replace(/\s*\?$/, " ?");
 
   return [
     `<div class="legacyPrompt">${escapeHtml(prompt)}</div>`,
