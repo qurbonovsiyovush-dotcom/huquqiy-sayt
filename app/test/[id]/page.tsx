@@ -458,18 +458,19 @@ export default function TestSolvePage() {
       return;
     }
 
+    const currentTest = test;
+
     resultSavedRef.current = true;
 
     const totalSeconds =
-      Math.max(1, Number(test.duration)) * 60;
+      Math.max(1, Number(currentTest.duration)) * 60;
 
     const spentSeconds = Math.max(
       0,
       totalSeconds - Math.max(0, remainingSeconds)
     );
 
-async function saveResult() {
-  if (!test) return;
+    async function saveResult() {
       try {
         const response = await fetch("/api/results", {
           method: "POST",
@@ -477,9 +478,9 @@ async function saveResult() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            testId: test.id,
-            testTitle: test.title,
-            subject: test.subject,
+            testId: currentTest.id,
+            testTitle: currentTest.title,
+            subject: currentTest.subject,
             total: result.total,
             correct: result.correct,
             incorrect: result.incorrect,
