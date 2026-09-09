@@ -121,6 +121,14 @@ function lessonLabelFromTitle(
     .trim();
 }
 
+function isIntroTest(
+  title: string
+) {
+  return /^kirish$/i.test(
+    normalizeTitle(title)
+  );
+}
+
 function isControlTest(
   title: string
 ) {
@@ -288,6 +296,15 @@ export default function ThematicGradePage() {
       );
     }, [tests]);
 
+  const introTest =
+    useMemo(
+      () =>
+        tests.find((test) =>
+          isIntroTest(test.title)
+        ) || null,
+      [tests]
+    );
+
   const controlTest =
     useMemo(
       () =>
@@ -371,12 +388,40 @@ export default function ThematicGradePage() {
           !error && (
             <>
               {lessonRows.length === 0 &&
+                !introTest &&
                 !controlTest &&
                 !glossaryTest && (
                   <div className="statusBox">
                     Bu sinf bo‘yicha hozircha e’lon qilingan mavzulashtirilgan test yo‘q.
                   </div>
                 )}
+
+              {introTest && (
+                <section className="introSection">
+                  <button
+                    type="button"
+                    className="lessonButton available"
+                    onClick={() =>
+                      openTest(introTest)
+                    }
+                  >
+                    <span className="lessonNo">
+                      K
+                    </span>
+
+                    <span className="lessonText">
+                      Kirish
+                    </span>
+
+                    <span className="lessonMeta">
+                      {`${
+                        introTest.questionCount ??
+                        0
+                      } ta savol`}
+                    </span>
+                  </button>
+                </section>
+              )}
 
               <section className="lessonList">
                 {lessonRows.map(
@@ -676,6 +721,10 @@ export default function ThematicGradePage() {
             2px solid
             #9b3a3a;
           color: #7a2020;
+        }
+
+        .introSection {
+          margin-bottom: 14px;
         }
 
         .lessonList {
