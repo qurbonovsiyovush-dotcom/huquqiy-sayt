@@ -1140,6 +1140,70 @@ async function renderPdfCropInBrowser(
   }
 }
 
+function cleanVennQuestionText(value: string) {
+  const text = String(value || "").replace(/\r\n/g, "\n").trim();
+
+  /*
+    Eyler–Venn savollarida PDF text qatlami diagramma ichidagi
+    I / II / III sarlavhalarni ham savol matniga qo‘shib yuboradi.
+    Rasm crop ichida bu sarlavhalar allaqachon bor, shuning uchun
+    matndagi takroriy blokni olib tashlaymiz.
+
+    Misol:
+      ... javobni aniqlang.
+      I — Tijorat ... II — Notijorat ... III — har ikkala ...
+      a) ...
+
+    Natija:
+      ... javobni aniqlang.
+      a) ...
+  */
+  if (!/Eyler\s*[–—-]?\s*Venn/i.test(text)) {
+    return text;
+  }
+
+  const lower = text.toLowerCase();
+  const eylerIndex = lower.indexOf("eyler");
+
+  const tailStartMatch = /(?:^|\s)a\s*[\)\.]/i.exec(
+    eylerIndex >= 0 ? text.slice(eylerIndex) : text
+  );
+
+  if (!tailStartMatch) {
+    return text;
+  }
+
+  const searchBase = eylerIndex >= 0 ? eylerIndex : 0;
+  const tailStart =
+    searchBase +
+    tailStartMatch.index +
+    (tailStartMatch[0].startsWith(" ") ? 1 : 0);
+
+  const between = text.slice(searchBase, tailStart);
+  const labelMatch = /(?:^|[\s.;:!?])I\s*[–—-]\s*/.exec(between);
+
+  if (!labelMatch) {
+    return text;
+  }
+
+  const labelStart =
+    searchBase +
+    labelMatch.index +
+    (labelMatch[0].length - labelMatch[0].trimStart().length);
+
+  if (labelStart <= searchBase || tailStart <= labelStart) {
+    return text;
+  }
+
+  const before = text.slice(0, labelStart).trimEnd();
+  const after = text.slice(tailStart).trimStart();
+
+  return `${before}\n${after}`
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function attachBrowserPdfImages(
   file: File,
   questions: ImportedQuestion[]
@@ -1264,8 +1328,15 @@ async function attachBrowserPdfImages(
           )
         : [];
 
+    const cleanedQuestionText =
+      cleanVennQuestionText(
+        question.questionText
+      );
+
     result.push({
       ...question,
+      questionText:
+        cleanedQuestionText,
       imageSrc: undefined,
       shapes: [
         ...existingShapes,
