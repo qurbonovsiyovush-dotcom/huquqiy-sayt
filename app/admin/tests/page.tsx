@@ -175,6 +175,7 @@ export default function AdminTestsPage() {
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkDrafting, setBulkDrafting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -790,6 +791,118 @@ export default function AdminTestsPage() {
       setBulkPublishing(
         false
       );
+    }
+  }
+
+  /* =========================================================
+     KO'RINIB TURGAN E'LON QILINGAN TESTLARNI BIR YO'LA
+     QORALAMAGA QAYTARISH
+  ========================================================= */
+
+  async function draftVisiblePublishedTests() {
+    const allVisibleTests = filteredTests;
+
+    const publishedTests =
+      allVisibleTests.filter(
+        (test) =>
+          test.status === "published"
+      );
+
+    if (allVisibleTests.length === 0) {
+      window.alert(
+        "Hozirgi filtrda test yo‘q."
+      );
+      return;
+    }
+
+    if (publishedTests.length === 0) {
+      window.alert(
+        "Hozirgi filtrda qoralamaga qaytariladigan e’lon qilingan test yo‘q."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${publishedTests.length} ta e’lon qilingan test QORALAMAGA qaytariladi.\n\n` +
+        "Testlar o‘chirilmaydi, savollar saqlanib qoladi.\n\n" +
+        "Davom etasizmi?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBulkDrafting(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        "/api/tests/thematic",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            action: "bulk-draft-tests",
+            testIds: publishedTests.map(
+              (test) =>
+                thematicRawId(test)
+            ),
+          }),
+        }
+      );
+
+      const data = await readJson(response);
+
+      if (!response.ok || !data.success) {
+        window.alert(
+          data.message ||
+            "Testlarni bir yo‘la qoralamaga qaytarib bo‘lmadi."
+        );
+        return;
+      }
+
+      const rawDraftIds =
+        new Set<string>(
+          Array.isArray(data.draftIds)
+            ? data.draftIds.map(
+                (value: unknown) =>
+                  String(value)
+              )
+            : []
+        );
+
+      setTests((current) =>
+        current.map((test) =>
+          isNeonThematicTest(test) &&
+          rawDraftIds.has(
+            thematicRawId(test)
+          )
+            ? {
+                ...test,
+                status: "draft",
+                updatedAt:
+                  new Date().toISOString(),
+              }
+            : test
+        )
+      );
+
+      window.alert(
+        `${rawDraftIds.size} ta test qoralama holatiga qaytarildi.`
+      );
+
+      await loadTests();
+    } catch (error) {
+      console.error(error);
+
+      window.alert(
+        "Testlarni bir yo‘la qoralamaga qaytarishda server xatosi."
+      );
+    } finally {
+      setBulkDrafting(false);
     }
   }
 
@@ -2304,6 +2417,7 @@ margin: 10px auto 12px;
               disabled={
                 loading ||
                 bulkPublishing ||
+                bulkDrafting ||
                 filteredTests.every(
                   (test) =>
                     test.status !== "draft"
@@ -2320,11 +2434,35 @@ margin: 10px auto 12px;
           {selectedCategory === "thematic" && (
             <button
               type="button"
+              className="thematicDraftButton"
+              onClick={draftVisiblePublishedTests}
+              disabled={
+                loading ||
+                bulkPublishing ||
+                bulkDrafting ||
+                bulkDeleting ||
+                filteredTests.every(
+                  (test) =>
+                    test.status !== "published"
+                )
+              }
+              title="Hozir ko‘rinib turgan e’lon qilingan testlarni bir yo‘la qoralamaga qaytarish"
+            >
+              {bulkDrafting
+                ? "Qoralamaga qaytarilmoqda..."
+                : "Barchasini qoralamaga qaytarish"}
+            </button>
+          )}
+
+          {selectedCategory === "thematic" && (
+            <button
+              type="button"
               className="thematicDeleteButton"
               onClick={deleteVisibleDrafts}
               disabled={
                 loading ||
                 bulkPublishing ||
+                bulkDrafting ||
                 bulkDeleting ||
                 filteredTests.every(
                   (test) => test.status !== "draft"
@@ -2342,7 +2480,7 @@ margin: 10px auto 12px;
             type="button"
             className="refreshButton"
             onClick={loadTests}
-            disabled={loading || bulkPublishing || bulkDeleting}
+            disabled={loading || bulkPublishing || bulkDrafting || bulkDeleting}
           >
             ↻ Yangilash
           </button>
@@ -4558,6 +4696,7 @@ margin: 10px auto 12px;
         }
 
         .thematicPublishButton,
+        .thematicDraftButton,
         .thematicDeleteButton {
           min-height: 54px;
           min-width: 176px;
@@ -4610,6 +4749,28 @@ margin: 10px auto 12px;
               rgba(0,0,0,.20);
         }
 
+        .thematicDraftButton {
+          border:
+            2px solid #7a5a10;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff2a8 0%,
+              #e7c966 48%,
+              #c9a842 100%
+            );
+
+          box-shadow:
+            inset 0 3px 2px
+              rgba(255,255,255,.92),
+            inset 0 -3px 3px
+              rgba(122,90,16,.18),
+            0 5px 0 #735711,
+            0 8px 12px
+              rgba(0,0,0,.20);
+        }
+
         .thematicDeleteButton {
           border:
             2px solid #8e1515;
@@ -4633,6 +4794,7 @@ margin: 10px auto 12px;
         }
 
         .thematicPublishButton:hover:not(:disabled),
+        .thematicDraftButton:hover:not(:disabled),
         .thematicDeleteButton:hover:not(:disabled) {
           filter: brightness(1.04);
           transform:
@@ -4640,6 +4802,7 @@ margin: 10px auto 12px;
         }
 
         .thematicPublishButton:active:not(:disabled),
+        .thematicDraftButton:active:not(:disabled),
         .thematicDeleteButton:active:not(:disabled) {
           transform:
             translateY(4px);
@@ -4652,6 +4815,7 @@ margin: 10px auto 12px;
         }
 
         .thematicPublishButton:disabled,
+        .thematicDraftButton:disabled,
         .thematicDeleteButton:disabled {
           cursor:
             not-allowed;
