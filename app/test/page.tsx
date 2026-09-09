@@ -672,8 +672,10 @@ export default function TestPage() {
         }
 
         .topBar {
+          width: 100%;
           min-height: 56px;
           padding: 9px 14px;
+          box-sizing: border-box;
           display: flex;
           align-items: center;
           justify-content:
@@ -729,11 +731,11 @@ export default function TestPage() {
 
         .mainBox {
           position: relative;
-          width:
-            min(
-              1120px,
-              96%
-            );
+
+          /* Tepdagi ko‘k paneldan faqat ozgina kichik */
+          width: 96%;
+          max-width: none;
+
           margin:
             70px auto 0;
           padding:
@@ -810,6 +812,8 @@ export default function TestPage() {
         .typesPanel,
         .searchPanel,
         .testsPanel {
+          width: 100%;
+          box-sizing: border-box;
           padding: 16px;
           border:
             1.5px solid
@@ -1138,7 +1142,8 @@ export default function TestPage() {
           }
 
           .mainBox {
-            width: 100%;
+            width: 98%;
+            max-width: none;
             padding:
               55px 12px
               22px;
