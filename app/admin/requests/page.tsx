@@ -28,7 +28,6 @@ type AccessCode = {
 };
 
 type ActiveSection =
-  | "dashboard"
   | "new-code"
   | "pending"
   | "approved"
@@ -68,7 +67,7 @@ export default function AdminRequestsPage() {
     setActiveSection,
   ] =
     useState<ActiveSection>(
-      "dashboard"
+      "pending"
     );
 
   const [
@@ -127,14 +126,17 @@ export default function AdminRequestsPage() {
     setMessage(text);
     setMessageType(type);
 
-    window.setTimeout(() => {
-      setMessage("");
-      setMessageType("");
-    }, 4000);
+    window.setTimeout(
+      () => {
+        setMessage("");
+        setMessageType("");
+      },
+      4000
+    );
   }
 
   /* =========================================================
-     FOYDALANUVCHILARNI YUKLASH
+     LOAD
   ========================================================= */
 
   const loadUsers =
@@ -142,10 +144,10 @@ export default function AdminRequestsPage() {
       async (
         silent = false
       ) => {
-        if (!silent) {
-          setLoading(true);
-        } else {
+        if (silent) {
           setRefreshing(true);
+        } else {
+          setLoading(true);
         }
 
         try {
@@ -171,7 +173,7 @@ export default function AdminRequestsPage() {
 
             showMessage(
               data?.message ||
-                "Foydalanuvchilarni yuklab bo‘lmadi.",
+                "Ma’lumotlarni yuklab bo‘lmadi.",
               "error"
             );
 
@@ -187,12 +189,12 @@ export default function AdminRequestsPage() {
           );
         } catch (error) {
           console.error(
-            "ACCESS USERS LOAD ERROR:",
+            "ACCESS CODES LOAD ERROR:",
             error
           );
 
           showMessage(
-            "Server bilan bog‘lanishda xatolik yuz berdi.",
+            "Server bilan bog‘lanishda xatolik.",
             "error"
           );
         } finally {
@@ -208,7 +210,7 @@ export default function AdminRequestsPage() {
   }, [loadUsers]);
 
   /* =========================================================
-     YANGI KOD YARATISH
+     CREATE
   ========================================================= */
 
   async function createCode() {
@@ -259,7 +261,7 @@ export default function AdminRequestsPage() {
       ) {
         showMessage(
           data?.message ||
-            "Maxsus kirish kodi yaratilmadi.",
+            "Kod yaratilmadi.",
           "error"
         );
 
@@ -290,12 +292,12 @@ export default function AdminRequestsPage() {
       );
     } catch (error) {
       console.error(
-        "CREATE ACCESS CODE ERROR:",
+        "CREATE CODE ERROR:",
         error
       );
 
       showMessage(
-        "Kod yaratishda server xatosi yuz berdi.",
+        "Kod yaratishda server xatosi.",
         "error"
       );
     } finally {
@@ -322,7 +324,7 @@ export default function AdminRequestsPage() {
       action === "approve"
     ) {
       confirmation =
-        "Ushbu foydalanuvchiga saytga kirish ruxsatini berasizmi?";
+        "Ushbu foydalanuvchiga kirish ruxsatini berasizmi?";
     }
 
     if (
@@ -336,22 +338,21 @@ export default function AdminRequestsPage() {
       action === "restore"
     ) {
       confirmation =
-        "Ushbu kodni qayta faollashtirasizmi?\n\nFoydalanuvchi kodni qayta ishlatganda yana ruxsat so‘rovi yuboradi.";
+        "Ushbu kodni qayta faollashtirasizmi?";
     }
 
     if (
-      action ===
-      "deactivate"
+      action === "deactivate"
     ) {
       confirmation =
-        "Ushbu foydalanuvchining kirish huquqini bloklaysizmi?";
+        "Ushbu foydalanuvchining kirishini bloklaysizmi?";
     }
 
     if (
       action === "delete"
     ) {
       confirmation =
-        "DIQQAT!\n\nUshbu foydalanuvchi va kirish kodi butunlay o‘chiriladi.\n\nEski kod bilan boshqa kirib bo‘lmaydi.\n\nDavom etasizmi?";
+        "DIQQAT!\n\nUshbu foydalanuvchi va uning kodi butunlay o‘chiriladi.\n\nDavom etasizmi?";
     }
 
     if (
@@ -407,16 +408,16 @@ export default function AdminRequestsPage() {
 
       showMessage(
         data?.message ||
-          "Amal muvaffaqiyatli bajarildi."
+          "Amal bajarildi."
       );
     } catch (error) {
       console.error(
-        "ACCESS CODE ACTION ERROR:",
+        "ACTION ERROR:",
         error
       );
 
       showMessage(
-        "Server bilan bog‘lanishda xatolik yuz berdi.",
+        "Server bilan bog‘lanishda xatolik.",
         "error"
       );
     } finally {
@@ -442,7 +443,7 @@ export default function AdminRequestsPage() {
         () => {
           setCopiedCode("");
         },
-        1800
+        1500
       );
     } catch {
       window.prompt(
@@ -464,23 +465,18 @@ export default function AdminRequestsPage() {
           method: "POST",
         }
       );
-    } catch (error) {
-      console.error(
-        "LOGOUT ERROR:",
-        error
-      );
-    } finally {
-      sessionStorage.removeItem(
-        "qurbonov-session"
-      );
+    } catch {}
 
-      sessionStorage.removeItem(
-        "qurbonov-role"
-      );
+    sessionStorage.removeItem(
+      "qurbonov-session"
+    );
 
-      router.replace("/");
-      router.refresh();
-    }
+    sessionStorage.removeItem(
+      "qurbonov-role"
+    );
+
+    router.replace("/");
+    router.refresh();
   }
 
   /* =========================================================
@@ -493,8 +489,7 @@ export default function AdminRequestsPage() {
     if (!user.active) {
       return {
         key: "blocked",
-        text:
-          "Bloklangan / rad etilgan",
+        text: "Bloklangan",
       };
     }
 
@@ -517,7 +512,7 @@ export default function AdminRequestsPage() {
     return {
       key: "unused",
       text:
-        "Kod hali ishlatilmagan",
+        "Kod ishlatilmagan",
     };
   }
 
@@ -559,8 +554,7 @@ export default function AdminRequestsPage() {
         ).length;
 
       return {
-        total:
-          users.length,
+        total: users.length,
         pending,
         approved,
         blocked,
@@ -674,7 +668,7 @@ export default function AdminRequestsPage() {
   }
 
   /* =========================================================
-     CARD
+     USER CARD
   ========================================================= */
 
   function renderUserCard(
@@ -692,43 +686,41 @@ export default function AdminRequestsPage() {
         className="userCard"
         key={user.id}
       >
-        <div className="userTop">
-          <div>
-            <h3>
-              {user.name}
-            </h3>
+        <div className="userName">
+          {user.name}
+        </div>
 
-            <div
-              className={`statusBadge ${status.key}`}
-            >
-              {status.text}
-            </div>
-          </div>
+        <div
+          className={`statusBadge ${status.key}`}
+        >
+          {status.text}
         </div>
 
         <div className="codeBox">
-          <span>
-            Maxsus kod
-          </span>
+          <div className="codeLabel">
+            MAXSUS KIRISH KODI
+          </div>
 
-          <strong>
-            {user.code}
-          </strong>
+          <div className="codeRow">
+            <strong>
+              {user.code}
+            </strong>
 
-          <button
-            type="button"
-            className="copyButton"
-            onClick={() =>
-              copyCode(
-                user.code
-              )
-            }
-          >
-            {copiedCode ===
-            user.code
-              ? "Nusxalandi ✓"
-              : "Nusxalash"}
-          </button>
+            <button
+              type="button"
+              className="copyButton"
+              onClick={() =>
+                copyCode(
+                  user.code
+                )
+              }
+            >
+              {copiedCode ===
+              user.code
+                ? "✓"
+                : "Nusxalash"}
+            </button>
+          </div>
         </div>
 
         <div className="dateGrid">
@@ -758,7 +750,7 @@ export default function AdminRequestsPage() {
 
           <div>
             <span>
-              Tasdiqlangan
+              Tasdiq
             </span>
 
             <strong>
@@ -786,9 +778,7 @@ export default function AdminRequestsPage() {
                   )
                 }
               >
-                {working
-                  ? "Kutilmoqda..."
-                  : "Ruxsat berish"}
+                RUXSAT BERISH
               </button>
 
               <button
@@ -804,7 +794,7 @@ export default function AdminRequestsPage() {
                   )
                 }
               >
-                Rad etish
+                RAD ETISH
               </button>
             </>
           )}
@@ -824,7 +814,7 @@ export default function AdminRequestsPage() {
                 )
               }
             >
-              Kirishni bloklash
+              KIRISHNI BLOKLASH
             </button>
           )}
 
@@ -843,7 +833,7 @@ export default function AdminRequestsPage() {
                 )
               }
             >
-              Kodni bloklash
+              KODNI BLOKLASH
             </button>
           )}
 
@@ -862,7 +852,7 @@ export default function AdminRequestsPage() {
                 )
               }
             >
-              Qayta faollashtirish
+              QAYTA FAOLLASHTIRISH
             </button>
           )}
 
@@ -879,7 +869,7 @@ export default function AdminRequestsPage() {
               )
             }
           >
-            Butunlay o‘chirish
+            BUTUNLAY O‘CHIRISH
           </button>
         </div>
       </article>
@@ -927,11 +917,13 @@ export default function AdminRequestsPage() {
 
   return (
     <main className="page">
-      {/* ================================================
+
+      {/* =====================================================
           HEADER
-      ================================================= */}
+      ===================================================== */}
 
       <header className="topPanel">
+
         <button
           type="button"
           className="namePlate"
@@ -943,6 +935,7 @@ export default function AdminRequestsPage() {
         </button>
 
         <div className="topButtons">
+
           <button
             type="button"
             className="topButton"
@@ -959,12 +952,10 @@ export default function AdminRequestsPage() {
             type="button"
             className="topButton"
             onClick={() =>
-              router.push(
-                "/admin/tests"
-              )
+              router.push("/")
             }
           >
-            Testlar
+            Asosiy sahifa
           </button>
 
           <button
@@ -991,12 +982,14 @@ export default function AdminRequestsPage() {
           >
             Chiqish
           </button>
+
         </div>
+
       </header>
 
-      {/* ================================================
+      {/* =====================================================
           MESSAGE
-      ================================================= */}
+      ===================================================== */}
 
       {message && (
         <div
@@ -1011,37 +1004,31 @@ export default function AdminRequestsPage() {
         </div>
       )}
 
-      {/* ================================================
+      {/* =====================================================
           HERO
-      ================================================= */}
+      ===================================================== */}
 
       <section className="heroPanel">
+
         <div className="floatingTitle">
           Foydalanuvchilar
         </div>
 
         <h1>
-          Kirish kodlari va
-          foydalanuvchilarni
-          boshqarish
+          Kirish kodlari va foydalanuvchilarni boshqarish
         </h1>
 
-        <p>
-          Kod yaratish, ruxsat
-          berish, bloklash va
-          o‘chirish Neon bazasi
-          orqali boshqariladi.
-        </p>
       </section>
 
-      {/* ================================================
+      {/* =====================================================
           STATISTICS
-      ================================================= */}
+      ===================================================== */}
 
       <section className="statistics">
+
         <button
           type="button"
-          className="statCard"
+          className="statCard totalStat"
           onClick={() =>
             setActiveSection(
               "all"
@@ -1107,7 +1094,7 @@ export default function AdminRequestsPage() {
           </strong>
 
           <span>
-            Ishlatilmagan kod
+            Ishlatilmagan
           </span>
         </button>
 
@@ -1128,18 +1115,21 @@ export default function AdminRequestsPage() {
             Bloklangan
           </span>
         </button>
+
       </section>
 
-      {/* ================================================
+      {/* =====================================================
           MANAGEMENT
-      ================================================= */}
+      ===================================================== */}
 
       <section className="managementPanel">
+
         <div className="floatingTitle">
           Boshqaruv
         </div>
 
         <div className="managementGrid">
+
           <button
             type="button"
             className="managementCard createManagement"
@@ -1156,17 +1146,11 @@ export default function AdminRequestsPage() {
             <strong>
               Yangi kirish kodi
             </strong>
-
-            <small>
-              Yangi foydalanuvchi
-              uchun maxsus kod
-              yarating.
-            </small>
           </button>
 
           <button
             type="button"
-            className="managementCard"
+            className="managementCard pendingManagement"
             onClick={() =>
               setActiveSection(
                 "pending"
@@ -1180,16 +1164,11 @@ export default function AdminRequestsPage() {
             <strong>
               Kirish so‘rovlari
             </strong>
-
-            <small>
-              Ruxsat kutayotgan
-              foydalanuvchilar.
-            </small>
           </button>
 
           <button
             type="button"
-            className="managementCard"
+            className="managementCard approvedManagement"
             onClick={() =>
               setActiveSection(
                 "approved"
@@ -1203,17 +1182,11 @@ export default function AdminRequestsPage() {
             <strong>
               Ruxsat berilganlar
             </strong>
-
-            <small>
-              Saytga kirishi
-              tasdiqlangan
-              foydalanuvchilar.
-            </small>
           </button>
 
           <button
             type="button"
-            className="managementCard"
+            className="managementCard allManagement"
             onClick={() =>
               setActiveSection(
                 "all"
@@ -1227,16 +1200,11 @@ export default function AdminRequestsPage() {
             <strong>
               Barcha kodlar
             </strong>
-
-            <small>
-              Barcha yaratilgan
-              kodlarni boshqaring.
-            </small>
           </button>
 
           <button
             type="button"
-            className="managementCard"
+            className="managementCard blockedManagement"
             onClick={() =>
               setActiveSection(
                 "blocked"
@@ -1250,70 +1218,39 @@ export default function AdminRequestsPage() {
             <strong>
               Bloklanganlar
             </strong>
-
-            <small>
-              Rad etilgan yoki
-              bloklangan kodlar.
-            </small>
           </button>
+
         </div>
+
       </section>
 
-      {/* ================================================
+      {/* =====================================================
           CONTENT
-      ================================================= */}
+      ===================================================== */}
 
       <section className="contentPanel">
-        {/* ==============================================
-            DASHBOARD
-        =============================================== */}
 
-        {activeSection ===
-          "dashboard" && (
-          <>
-            <div className="contentTitle">
-              Boshqaruv
-            </div>
-
-            <div className="innerPanel">
-              <div className="dashboardWelcome">
-                <h2>
-                  Foydalanuvchilar
-                  boshqaruvi
-                </h2>
-
-                <p>
-                  Yuqoridagi
-                  bo‘limlardan birini
-                  tanlang.
-                </p>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ==============================================
+        {/* =================================================
             NEW CODE
-        =============================================== */}
+        ================================================= */}
 
         {activeSection ===
           "new-code" && (
           <>
+
             <div className="contentTitle">
               Yangi kirish kodi
             </div>
 
             <div className="innerPanel">
+
               <div className="createArea">
-                <label
-                  htmlFor="new-user-name"
-                >
-                  Foydalanuvchi
-                  ism-familiyasi
+
+                <label>
+                  Foydalanuvchi ism-familiyasi
                 </label>
 
                 <input
-                  id="new-user-name"
                   type="text"
                   value={name}
                   disabled={
@@ -1348,26 +1285,23 @@ export default function AdminRequestsPage() {
                   }
                 >
                   {creating
-                    ? "KOD YARATILMOQDA..."
+                    ? "YARATILMOQDA..."
                     : "KOD YARATISH"}
                 </button>
 
                 {lastCreatedCode && (
                   <div className="createdResult">
+
                     <span>
-                      Yangi kod
+                      Yangi kirish kodi
                     </span>
 
                     <h3>
-                      {
-                        lastCreatedName
-                      }
+                      {lastCreatedName}
                     </h3>
 
                     <strong>
-                      {
-                        lastCreatedCode
-                      }
+                      {lastCreatedCode}
                     </strong>
 
                     <button
@@ -1380,37 +1314,34 @@ export default function AdminRequestsPage() {
                     >
                       {copiedCode ===
                       lastCreatedCode
-                        ? "Nusxalandi ✓"
+                        ? "NUSXALANDI ✓"
                         : "KODNI NUSXALASH"}
                     </button>
 
-                    <small>
-                      Ushbu kodni
-                      foydalanuvchiga
-                      yuboring. U kodni
-                      birinchi marta
-                      ishlatganda kirish
-                      so‘rovi sizga keladi.
-                    </small>
                   </div>
                 )}
+
               </div>
+
             </div>
+
           </>
         )}
 
-        {/* ==============================================
+        {/* =================================================
             PENDING
-        =============================================== */}
+        ================================================= */}
 
         {activeSection ===
           "pending" && (
           <>
+
             <div className="contentTitle">
               Kirish so‘rovlari
             </div>
 
             <div className="innerPanel">
+
               <SearchBox
                 search={search}
                 setSearch={
@@ -1422,22 +1353,26 @@ export default function AdminRequestsPage() {
                 pendingUsers,
                 "Hozircha yangi kirish so‘rovi yo‘q."
               )}
+
             </div>
+
           </>
         )}
 
-        {/* ==============================================
+        {/* =================================================
             APPROVED
-        =============================================== */}
+        ================================================= */}
 
         {activeSection ===
           "approved" && (
           <>
+
             <div className="contentTitle">
               Ruxsat berilganlar
             </div>
 
             <div className="innerPanel">
+
               <SearchBox
                 search={search}
                 setSearch={
@@ -1449,22 +1384,26 @@ export default function AdminRequestsPage() {
                 approvedUsers,
                 "Ruxsat berilgan foydalanuvchi yo‘q."
               )}
+
             </div>
+
           </>
         )}
 
-        {/* ==============================================
+        {/* =================================================
             ALL
-        =============================================== */}
+        ================================================= */}
 
         {activeSection ===
           "all" && (
           <>
+
             <div className="contentTitle">
-              Barcha kirish kodlari
+              Barcha kodlar
             </div>
 
             <div className="innerPanel">
+
               <SearchBox
                 search={search}
                 setSearch={
@@ -1476,22 +1415,26 @@ export default function AdminRequestsPage() {
                 searchedUsers,
                 "Kirish kodi mavjud emas."
               )}
+
             </div>
+
           </>
         )}
 
-        {/* ==============================================
+        {/* =================================================
             BLOCKED
-        =============================================== */}
+        ================================================= */}
 
         {activeSection ===
           "blocked" && (
           <>
+
             <div className="contentTitle">
               Bloklanganlar
             </div>
 
             <div className="innerPanel">
+
               <SearchBox
                 search={search}
                 setSearch={
@@ -1503,26 +1446,40 @@ export default function AdminRequestsPage() {
                 blockedUsers,
                 "Bloklangan foydalanuvchi yo‘q."
               )}
+
             </div>
+
           </>
         )}
+
       </section>
 
-      <style jsx>{`
+      {/* =====================================================
+          GLOBAL CSS
+      ===================================================== */}
+
+      <style jsx global>{`
+
         * {
           box-sizing: border-box;
         }
 
+        body {
+          margin: 0;
+        }
+
         .page {
           min-height: 100vh;
-          padding: 16px 16px 80px;
+
+          padding:
+            16px 16px 90px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
               #f5f7f8 55%,
-              #edf1f3 100%
+              #e8edf0 100%
             );
 
           color: #111;
@@ -1543,19 +1500,21 @@ export default function AdminRequestsPage() {
         }
 
         button:disabled {
-          opacity: 0.55;
+          opacity: .55;
+
           cursor: not-allowed;
         }
 
-        /* ===========================================
+        /* =====================================================
            HEADER
-        =========================================== */
+        ===================================================== */
 
         .topPanel {
-          width: min(
-            1580px,
-            98%
-          );
+          width:
+            min(
+              1580px,
+              98%
+            );
 
           min-height: 105px;
 
@@ -1565,9 +1524,11 @@ export default function AdminRequestsPage() {
             18px 27px;
 
           display: flex;
+
+          align-items: center;
+
           justify-content:
             space-between;
-          align-items: center;
 
           gap: 22px;
 
@@ -1579,33 +1540,45 @@ export default function AdminRequestsPage() {
           background:
             linear-gradient(
               180deg,
-              #8bd5fb 0%,
-              #57afdd 50%,
-              #3b91bf 100%
+              #9adeff 0%,
+              #59b4e2 50%,
+              #398ebc 100%
             );
 
           box-shadow:
-            inset 0 5px 5px
+            inset 0 7px 6px
               rgba(
                 255,
                 255,
                 255,
-                0.6
+                .65
               ),
-            0 7px 0 #173c55,
-            0 13px 20px
+
+            inset 0 -5px 6px
               rgba(
                 0,
                 0,
                 0,
-                0.18
+                .15
+              ),
+
+            0 7px 0
+              #173c55,
+
+            0 14px 23px
+              rgba(
+                0,
+                0,
+                0,
+                .22
               );
         }
 
         .namePlate {
-          min-height: 58px;
+          min-height: 60px;
 
-          padding: 0 25px;
+          padding:
+            0 25px;
 
           border:
             3px solid #50585d;
@@ -1616,18 +1589,30 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #ffffff,
-              #c8c8c8
+              180deg,
+              #ffffff 0%,
+              #eeeeee 45%,
+              #bdbdbd 100%
             );
 
           box-shadow:
-            inset 0 4px 4px
+            inset 0 5px 5px
               white,
+
             0 5px 0
-              #60686c;
+              #60686c,
+
+            0 8px 12px
+              rgba(
+                0,
+                0,
+                0,
+                .18
+              );
 
           font-size: 21px;
-          font-weight: 700;
+
+          font-weight: 800;
         }
 
         .topButtons {
@@ -1638,63 +1623,88 @@ export default function AdminRequestsPage() {
           justify-content:
             flex-end;
 
-          gap: 12px;
+          gap: 13px;
         }
 
         .topButton,
         .exitButton {
-          min-height: 50px;
+          min-height: 51px;
+
+          min-width: 115px;
 
           padding:
             8px 18px;
 
           border-radius: 10px;
 
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .topButton {
           border:
-            2px solid #666;
+            2px solid #626a6e;
+
+          color: #111;
 
           background:
             linear-gradient(
               #ffffff,
-              #c8c8c8
+              #c5c5c5
             );
 
           box-shadow:
-            0 4px 0 #666;
+            inset 0 4px 4px
+              white,
+
+            0 4px 0
+              #626a6e;
+        }
+
+        .topButton:active {
+          transform:
+            translateY(3px);
+
+          box-shadow:
+            0 1px 0
+              #626a6e;
         }
 
         .exitButton {
-          min-width: 110px;
-
           border:
-            2px solid #8a1717;
+            2px solid #8f1d1d;
 
           color: white;
 
           background:
             linear-gradient(
-              #ef6666,
-              #b42121
+              #f26a6a,
+              #b21f1f
             );
 
           box-shadow:
-            0 4px 0 #7d1717;
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .35
+              ),
+
+            0 4px 0
+              #7d1717;
         }
 
-        /* ===========================================
+        /* =====================================================
            MESSAGE
-        =========================================== */
+        ===================================================== */
 
         .messageBox {
           position: fixed;
 
-          z-index: 1000;
+          z-index: 9999;
 
-          top: 25px;
+          top: 22px;
+
           left: 50%;
 
           transform:
@@ -1702,8 +1712,8 @@ export default function AdminRequestsPage() {
 
           width:
             min(
-              650px,
-              92%
+              600px,
+              90%
             );
 
           padding:
@@ -1713,16 +1723,14 @@ export default function AdminRequestsPage() {
 
           text-align: center;
 
-          font-size: 17px;
-          font-weight: 700;
+          font-weight: 800;
 
           box-shadow:
             0 7px 20px
               rgba(
                 0,
                 0,
-                0,
-                0.25
+                .25
               );
         }
 
@@ -1744,52 +1752,73 @@ export default function AdminRequestsPage() {
           background: #f5dada;
         }
 
-        /* ===========================================
+        /* =====================================================
            HERO
-        =========================================== */
-
-        .heroPanel,
-        .managementPanel,
-        .contentPanel {
-          position: relative;
-
-          border:
-            3px solid #303538;
-
-          background:
-            linear-gradient(
-              145deg,
-              #686d70,
-              #3d4245
-            );
-
-          box-shadow:
-            0 8px 0 #292e31,
-            0 17px 28px
-              rgba(
-                0,
-                0,
-                0,
-                0.22
-              );
-        }
+        ===================================================== */
 
         .heroPanel {
+          position: relative;
+
           width:
             min(
               1050px,
               92%
             );
 
-          min-height: 185px;
+          min-height: 180px;
 
           margin:
-            85px auto 50px;
+            85px auto 60px;
 
           padding:
             65px 35px 30px;
 
-          border-radius: 24px;
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          border:
+            3px solid #303538;
+
+          border-radius: 25px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #717679 0%,
+              #555a5d 45%,
+              #34383a 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .18
+              ),
+
+            inset 0 -7px 7px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              ),
+
+            0 8px 0
+              #292e31,
+
+            0 18px 28px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
 
           text-align: center;
         }
@@ -1803,77 +1832,96 @@ export default function AdminRequestsPage() {
             clamp(
               28px,
               3vw,
-              39px
+              40px
             );
 
           line-height: 1.2;
-        }
 
-        .heroPanel p {
-          max-width: 720px;
-
-          margin:
-            15px auto 0;
-
-          color: #e9eef1;
-
-          font-size: 17px;
-
-          line-height: 1.5;
+          text-shadow:
+            0 3px 2px
+              rgba(
+                0,
+                0,
+                0,
+                .45
+              );
         }
 
         .floatingTitle,
         .contentTitle {
           position: absolute;
 
-          top: -31px;
+          top: -32px;
+
           left: 50%;
 
           transform:
             translateX(-50%);
 
-          min-height: 62px;
+          min-height: 64px;
 
           padding:
-            10px 28px;
+            10px 30px;
 
           display: flex;
+
           align-items: center;
+
           justify-content: center;
 
           border:
             3px solid #174461;
 
-          border-radius: 14px;
+          border-radius: 15px;
 
           color: #073b68;
 
           background:
             linear-gradient(
-              #a5e1ff,
-              #51a2d0
+              180deg,
+              #b8ecff 0%,
+              #78c8ee 40%,
+              #4699c8 100%
             );
 
           box-shadow:
-            inset 0 4px 4px
+            inset 0 6px 5px
               rgba(
                 255,
                 255,
                 255,
-                0.6
+                .75
               ),
-            0 5px 0 #17415c;
 
-          font-size: 25px;
+            inset 0 -4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .12
+              ),
 
-          font-weight: 700;
+            0 6px 0
+              #17415c,
+
+            0 10px 15px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
+
+          font-size: 26px;
+
+          font-weight: 800;
 
           white-space: nowrap;
         }
 
-        /* ===========================================
-           STATISTICS
-        =========================================== */
+        /* =====================================================
+           STATISTICS 3D
+        ===================================================== */
 
         .statistics {
           width:
@@ -1883,55 +1931,126 @@ export default function AdminRequestsPage() {
             );
 
           margin:
-            0 auto 65px;
+            0 auto 75px;
 
           display: grid;
 
           grid-template-columns:
             repeat(
               5,
-              minmax(0, 1fr)
+              minmax(
+                0,
+                1fr
+              )
             );
 
-          gap: 14px;
+          gap: 17px;
         }
 
         .statCard {
-          min-height: 115px;
+          min-height: 118px;
 
-          padding: 14px 8px;
+          padding:
+            15px 8px;
 
           border:
-            2px solid #60686c;
+            3px solid #60686c;
 
-          border-radius: 14px;
+          border-radius: 15px;
 
           background:
             linear-gradient(
-              #ffffff,
-              #d0d0d0
+              180deg,
+              #ffffff 0%,
+              #ededed 45%,
+              #c2c2c2 100%
             );
 
           box-shadow:
-            0 5px 0 #555d61;
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            inset 0 -4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .12
+              ),
+
+            0 7px 0
+              #555d61,
+
+            0 12px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
 
           text-align: center;
+
+          transition:
+            transform .12s ease,
+            box-shadow .12s ease;
+        }
+
+        .statCard:hover {
+          transform:
+            translateY(-4px);
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 11px 0
+              #555d61,
+
+            0 17px 22px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        .statCard:active {
+          transform:
+            translateY(5px);
+
+          box-shadow:
+            0 2px 0
+              #555d61;
         }
 
         .statCard strong {
           display: block;
 
-          margin-bottom: 5px;
+          margin-bottom: 6px;
 
           color: #07517e;
 
-          font-size: 35px;
+          font-size: 36px;
+
+          font-weight: 900;
         }
 
         .statCard span {
-          font-size: 14px;
+          font-size: 15px;
 
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .pendingStat strong {
@@ -1950,23 +2069,64 @@ export default function AdminRequestsPage() {
           color: #555;
         }
 
-        /* ===========================================
-           MANAGEMENT
-        =========================================== */
+        /* =====================================================
+           MANAGEMENT PANEL
+        ===================================================== */
 
         .managementPanel {
+          position: relative;
+
           width:
             min(
-              1150px,
-              94%
+              1200px,
+              95%
             );
 
           margin: 0 auto;
 
           padding:
-            68px 28px 32px;
+            75px 30px 38px;
 
-          border-radius: 25px;
+          border:
+            3px solid #303538;
+
+          border-radius: 27px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #707578,
+              #505558 50%,
+              #34383a
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .18
+              ),
+
+            inset 0 -8px 8px
+              rgba(
+                0,
+                0,
+                0,
+                .28
+              ),
+
+            0 9px 0
+              #292e31,
+
+            0 19px 30px
+              rgba(
+                0,
+                0,
+                0,
+                .28
+              );
         }
 
         .managementGrid {
@@ -1975,37 +2135,143 @@ export default function AdminRequestsPage() {
           grid-template-columns:
             repeat(
               5,
-              minmax(0, 1fr)
+              minmax(
+                0,
+                1fr
+              )
             );
 
-          gap: 17px;
+          gap: 22px;
         }
 
         .managementCard {
-          min-height: 205px;
+          position: relative;
+
+          min-height: 190px;
 
           padding:
-            22px 15px;
+            25px 15px 30px;
 
           display: flex;
+
           flex-direction: column;
+
           align-items: center;
+
           justify-content: center;
 
-          gap: 10px;
+          gap: 18px;
 
           border:
-            3px solid #565e62;
+            3px solid #4b5358;
 
-          border-radius: 16px;
+          border-radius: 18px;
 
           color: #111;
 
           background:
             linear-gradient(
-              145deg,
-              #fafafa,
-              #d8d8d8
+              180deg,
+              #ffffff 0%,
+              #eeeeee 42%,
+              #c5c5c5 100%
+            );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            inset 0 -5px 6px
+              rgba(
+                0,
+                0,
+                0,
+                .12
+              ),
+
+            0 9px 0
+              #4c555a,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .28
+              );
+
+          text-align: center;
+
+          transition:
+            transform .12s ease,
+            box-shadow .12s ease;
+        }
+
+        .managementCard:hover {
+          transform:
+            translateY(-6px);
+        }
+
+        .managementCard:active {
+          transform:
+            translateY(6px);
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .8
+              ),
+
+            0 3px 0
+              #4c555a;
+        }
+
+        .managementCard strong {
+          font-size: 22px;
+
+          font-weight: 900;
+
+          line-height: 1.2;
+
+          text-shadow:
+            0 1px 0 white;
+        }
+
+        .managementNumber,
+        .managementIcon {
+          width: 70px;
+
+          height: 70px;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          flex-shrink: 0;
+
+          border:
+            3px solid #174461;
+
+          border-radius: 50%;
+
+          color: #07517e;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #e5f8ff,
+              #a4e1ff 45%,
+              #58acd7 100%
             );
 
           box-shadow:
@@ -2014,105 +2280,368 @@ export default function AdminRequestsPage() {
                 255,
                 255,
                 255,
-                0.9
+                .85
               ),
-            0 6px 0 #555d61;
 
-          text-align: center;
+            inset 0 -4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .14
+              ),
 
-          transition:
-            transform 0.15s ease;
+            0 5px 0
+              #174461,
+
+            0 9px 12px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
+
+          font-size: 31px;
+
+          font-weight: 900;
         }
 
-        .managementCard:hover {
-          transform:
-            translateY(-4px);
-        }
-
-        .managementCard strong {
-          font-size: 20px;
-        }
-
-        .managementCard small {
-          color: #555;
-
-          font-size: 13px;
-
-          line-height: 1.35;
-        }
-
-        .managementNumber,
-        .managementIcon {
-          min-width: 58px;
-          height: 58px;
-
-          padding: 0 10px;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border:
-            2px solid #174461;
-
-          border-radius: 50%;
-
-          color: #07517e;
-
-          background: #bcecff;
-
-          font-size: 27px;
-
-          font-weight: 700;
-        }
+        /* YANGI KOD */
 
         .createManagement {
-          border-color: #317746;
+          border-color: #347649;
 
           background:
             linear-gradient(
-              #edfff1,
-              #bfe6c9
+              180deg,
+              #f2fff5 0%,
+              #c9efd3 45%,
+              #91d5a3 100%
             );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 9px 0
+              #347649,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
         }
 
         .createManagement
-          .managementIcon {
-          border-color: #277447;
+        .managementIcon {
+          border-color: #26733f;
 
-          color: #176535;
+          color: #176536;
 
-          background: #c9f4d4;
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #f1fff4,
+              #b8efc7 50%,
+              #6ac184
+            );
+
+          box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+
+            0 5px 0
+              #26733f;
         }
 
-        /* ===========================================
+        /* PENDING */
+
+        .pendingManagement {
+          border-color: #8e741d;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fffdf1,
+              #f5e5a9 45%,
+              #d9bc57 100%
+            );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 9px 0
+              #8e741d,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        .pendingManagement
+        .managementNumber {
+          border-color: #876d17;
+
+          color: #72570b;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffbea,
+              #ffe899 50%,
+              #dab543
+            );
+
+          box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+
+            0 5px 0
+              #876d17;
+        }
+
+        /* APPROVED */
+
+        .approvedManagement {
+          border-color: #277447;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f1fff5,
+              #c5ead0 45%,
+              #81c897
+            );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 9px 0
+              #277447,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        .approvedManagement
+        .managementNumber {
+          border-color: #267344;
+
+          color: #176638;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #effff3,
+              #aee8bf 50%,
+              #65bc80
+            );
+
+          box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+
+            0 5px 0
+              #267344;
+        }
+
+        /* ALL */
+
+        .allManagement {
+          border-color: #174461;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f2fbff,
+              #c7e9f8 45%,
+              #80bddb
+            );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 9px 0
+              #174461,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        /* BLOCKED */
+
+        .blockedManagement {
+          border-color: #8f2020;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff5f5,
+              #f0c8c8 45%,
+              #d77b7b
+            );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 9px 0
+              #8f2020,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        .blockedManagement
+        .managementNumber {
+          border-color: #8f2020;
+
+          color: #971b1b;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fff4f4,
+              #f4b5b5 50%,
+              #d76565
+            );
+
+          box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+
+            0 5px 0
+              #8f2020;
+        }
+
+        /* =====================================================
            CONTENT
-        =========================================== */
+        ===================================================== */
 
         .contentPanel {
+          position: relative;
+
           width:
             min(
               1200px,
               95%
             );
 
-          min-height: 280px;
+          min-height: 320px;
 
           margin:
-            85px auto 0;
+            90px auto 0;
 
           padding:
-            80px 30px 35px;
+            80px 30px 38px;
 
-          border-radius: 25px;
+          border:
+            3px solid #303538;
+
+          border-radius: 27px;
+
+          background:
+            linear-gradient(
+              145deg,
+              #707578,
+              #505558 50%,
+              #34383a
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .18
+              ),
+
+            0 9px 0
+              #292e31,
+
+            0 19px 30px
+              rgba(
+                0,
+                0,
+                0,
+                .28
+              );
         }
 
         .contentTitle {
           min-width: 300px;
-
-          max-width: 90%;
-
-          text-align: center;
         }
 
         .innerPanel {
@@ -2126,50 +2655,96 @@ export default function AdminRequestsPage() {
           background:
             linear-gradient(
               145deg,
-              #f4f4f4,
-              #c9c9c9
+              #ffffff 0%,
+              #eeeeee 50%,
+              #c6c6c6 100%
             );
 
           box-shadow:
-            inset 0 6px 7px
+            inset 0 7px 7px
               rgba(
                 255,
                 255,
                 255,
-                0.85
+                .9
               ),
-            0 6px 0 #555d61;
+
+            0 7px 0
+              #555d61,
+
+            0 12px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .2
+              );
         }
 
-        .dashboardWelcome {
-          min-height: 200px;
+        /* =====================================================
+           SEARCH
+        ===================================================== */
+
+        .searchWrapper {
+          min-height: 62px;
+
+          margin-bottom: 26px;
 
           display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
 
-          text-align: center;
+          border:
+            2px solid #328dbb;
+
+          border-radius: 11px;
+
+          overflow: hidden;
+
+          background: white;
+
+          box-shadow:
+            inset 0 2px 4px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              );
         }
 
-        .dashboardWelcome h2 {
-          margin:
-            0 0 12px;
+        .searchInput {
+          flex: 1;
 
-          font-size: 29px;
-        }
+          min-width: 0;
 
-        .dashboardWelcome p {
-          margin: 0;
+          padding:
+            0 18px;
 
-          color: #555;
+          border: none;
+
+          outline: none;
+
+          background: transparent;
 
           font-size: 18px;
         }
 
-        /* ===========================================
+        .clearButton {
+          width: 60px;
+
+          border: none;
+
+          color: #a41414;
+
+          background: transparent;
+
+          font-size: 29px;
+
+          font-weight: 900;
+        }
+
+        /* =====================================================
            CREATE
-        =========================================== */
+        ===================================================== */
 
         .createArea {
           width:
@@ -2181,27 +2756,28 @@ export default function AdminRequestsPage() {
           margin: 0 auto;
 
           display: flex;
+
           flex-direction: column;
 
-          gap: 15px;
+          gap: 16px;
         }
 
         .createArea label {
-          font-size: 19px;
+          font-size: 20px;
 
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .createArea input {
           width: 100%;
 
-          min-height: 60px;
+          min-height: 62px;
 
           padding:
             0 18px;
 
           border:
-            2px solid #666;
+            2px solid #60686c;
 
           border-radius: 11px;
 
@@ -2210,18 +2786,14 @@ export default function AdminRequestsPage() {
           background: white;
 
           font-size: 19px;
-        }
-
-        .createArea input:focus {
-          border-color: #168fc9;
 
           box-shadow:
-            0 0 0 3px
+            inset 0 3px 4px
               rgba(
-                22,
-                143,
-                201,
-                0.15
+                0,
+                0,
+                0,
+                .1
               );
         }
 
@@ -2229,7 +2801,7 @@ export default function AdminRequestsPage() {
           min-height: 58px;
 
           margin:
-            7px auto 0;
+            6px auto 0;
 
           padding:
             0 35px;
@@ -2243,35 +2815,57 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #c9f4d4,
-              #77cc90
+              #d8f8e0,
+              #78cc91
             );
 
           box-shadow:
-            0 5px 0 #286a3f;
+            inset 0 5px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .7
+              ),
+
+            0 5px 0
+              #286a3f;
 
           font-size: 18px;
 
-          font-weight: 700;
+          font-weight: 900;
         }
 
         .createdResult {
-          margin-top: 20px;
+          margin-top: 22px;
 
           padding: 25px;
 
           display: flex;
+
           flex-direction: column;
+
           align-items: center;
 
-          gap: 10px;
+          gap: 12px;
 
           border:
             3px solid #168fc9;
 
-          border-radius: 15px;
+          border-radius: 16px;
 
-          background: #e6f8ff;
+          background:
+            linear-gradient(
+              #effaff,
+              #cdeefa
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              white,
+
+            0 5px 0
+              #168fc9;
 
           text-align: center;
         }
@@ -2279,13 +2873,13 @@ export default function AdminRequestsPage() {
         .createdResult > span {
           color: #555;
 
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .createdResult h3 {
           margin: 0;
 
-          font-size: 23px;
+          font-size: 24px;
         }
 
         .createdResult strong {
@@ -2306,8 +2900,6 @@ export default function AdminRequestsPage() {
             monospace;
 
           font-size: 25px;
-
-          letter-spacing: 1px;
         }
 
         .createdResult button {
@@ -2325,74 +2917,20 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #bcecff,
-              #64b6df
+              #c7efff,
+              #63b6df
             );
 
-          font-weight: 700;
+          box-shadow:
+            0 4px 0
+              #174461;
+
+          font-weight: 800;
         }
 
-        .createdResult small {
-          max-width: 550px;
-
-          color: #555;
-
-          line-height: 1.4;
-        }
-
-        /* ===========================================
-           SEARCH
-        =========================================== */
-
-        .searchWrapper {
-          min-height: 62px;
-
-          margin-bottom: 25px;
-
-          display: flex;
-
-          border:
-            2px solid #328dbb;
-
-          border-radius: 11px;
-
-          overflow: hidden;
-
-          background: white;
-        }
-
-        .searchInput {
-          flex: 1;
-
-          min-width: 0;
-
-          padding:
-            0 18px;
-
-          border: none;
-
-          outline: none;
-
-          font-size: 18px;
-        }
-
-        .clearButton {
-          width: 60px;
-
-          border: none;
-
-          color: #a41414;
-
-          background: transparent;
-
-          font-size: 28px;
-
-          font-weight: 700;
-        }
-
-        /* ===========================================
-           USERS
-        =========================================== */
+        /* =====================================================
+           USER CARDS
+        ===================================================== */
 
         .usersGrid {
           display: grid;
@@ -2400,80 +2938,114 @@ export default function AdminRequestsPage() {
           grid-template-columns:
             repeat(
               2,
-              minmax(0, 1fr)
+              minmax(
+                0,
+                1fr
+              )
             );
 
-          gap: 20px;
+          gap: 23px;
         }
 
         .userCard {
-          padding: 23px;
+          padding: 24px;
 
           border:
-            2px solid #555d61;
+            3px solid #51595d;
 
-          border-radius: 15px;
+          border-radius: 17px;
 
           background:
             linear-gradient(
-              #ffffff,
-              #dedede
+              145deg,
+              #ffffff 0%,
+              #eeeeee 48%,
+              #c5c5c5 100%
             );
 
           box-shadow:
-            0 5px 0 #555d61;
+            inset 0 7px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            inset 0 -5px 5px
+              rgba(
+                0,
+                0,
+                0,
+                .1
+              ),
+
+            0 7px 0
+              #555d61,
+
+            0 13px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .22
+              );
         }
 
-        .userTop {
-          margin-bottom: 15px;
+        .userName {
+          margin-bottom: 9px;
 
-          display: flex;
+          font-size: 25px;
 
-          justify-content:
-            space-between;
-
-          gap: 15px;
-        }
-
-        .userCard h3 {
-          margin:
-            0 0 8px;
-
-          font-size: 23px;
+          font-weight: 900;
         }
 
         .statusBadge {
           display: inline-block;
 
+          margin-bottom: 14px;
+
           padding:
-            6px 10px;
+            7px 12px;
 
           border-radius: 30px;
 
           font-size: 13px;
 
-          font-weight: 700;
+          font-weight: 900;
         }
 
         .statusBadge.approved {
+          border:
+            1px solid #57a66f;
+
           color: #176438;
 
           background: #d4f1dc;
         }
 
         .statusBadge.pending {
+          border:
+            1px solid #c6a939;
+
           color: #795c0b;
 
           background: #fff1b6;
         }
 
         .statusBadge.blocked {
+          border:
+            1px solid #c45b5b;
+
           color: #8b1919;
 
           background: #f3d2d2;
         }
 
         .statusBadge.unused {
+          border:
+            1px solid #aaa;
+
           color: #555;
 
           background: #e4e4e4;
@@ -2481,43 +3053,53 @@ export default function AdminRequestsPage() {
 
         .codeBox {
           margin:
-            15px 0;
+            10px 0 17px;
 
           padding: 14px;
 
-          display: grid;
-
-          grid-template-columns:
-            minmax(0, 1fr)
-            auto;
-
-          gap: 7px 12px;
-
-          align-items: center;
-
           border:
-            2px solid #80aabb;
+            2px solid #7ba8bb;
 
-          border-radius: 10px;
+          border-radius: 11px;
 
-          background: #f3fbff;
+          background:
+            linear-gradient(
+              #f8fdff,
+              #dceff6
+            );
+
+          box-shadow:
+            inset 0 3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              );
         }
 
-        .codeBox > span {
-          grid-column:
-            1 / -1;
+        .codeLabel {
+          margin-bottom: 9px;
 
           color: #555;
 
-          font-size: 12px;
+          font-size: 11px;
 
-          font-weight: 700;
-
-          text-transform:
-            uppercase;
+          font-weight: 900;
         }
 
-        .codeBox > strong {
+        .codeRow {
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          gap: 10px;
+        }
+
+        .codeRow strong {
           overflow-wrap:
             anywhere;
 
@@ -2527,25 +3109,33 @@ export default function AdminRequestsPage() {
             Consolas,
             monospace;
 
-          font-size: 18px;
+          font-size: 19px;
         }
 
         .copyButton {
-          min-height: 39px;
+          min-height: 40px;
 
           padding:
             0 12px;
 
           border:
-            1px solid #168fc9;
+            2px solid #168fc9;
 
-          border-radius: 7px;
+          border-radius: 8px;
 
           color: #07517e;
 
-          background: #dff5ff;
+          background:
+            linear-gradient(
+              #e6f8ff,
+              #a7dbef
+            );
 
-          font-weight: 700;
+          box-shadow:
+            0 3px 0
+              #168fc9;
+
+          font-weight: 800;
         }
 
         .dateGrid {
@@ -2554,28 +3144,31 @@ export default function AdminRequestsPage() {
           grid-template-columns:
             repeat(
               3,
-              minmax(0, 1fr)
+              minmax(
+                0,
+                1fr
+              )
             );
 
-          gap: 8px;
+          gap: 9px;
         }
 
         .dateGrid > div {
-          min-height: 68px;
+          min-height: 72px;
 
-          padding: 8px;
+          padding: 9px;
 
           border:
-            1px solid #aaa;
+            1px solid #999;
 
-          border-radius: 8px;
+          border-radius: 9px;
 
           background:
             rgba(
               255,
               255,
               255,
-              0.6
+              .65
             );
 
           text-align: center;
@@ -2584,7 +3177,7 @@ export default function AdminRequestsPage() {
         .dateGrid span {
           display: block;
 
-          margin-bottom: 5px;
+          margin-bottom: 6px;
 
           color: #666;
 
@@ -2598,28 +3191,28 @@ export default function AdminRequestsPage() {
         }
 
         .userActions {
-          margin-top: 17px;
+          margin-top: 18px;
 
           display: flex;
 
           flex-wrap: wrap;
 
-          gap: 9px;
+          gap: 10px;
         }
 
         .userActions button {
           flex: 1;
 
-          min-width: 135px;
+          min-width: 150px;
 
-          min-height: 47px;
+          min-height: 49px;
 
           padding:
-            7px 12px;
+            8px 12px;
 
           border-radius: 9px;
 
-          font-weight: 700;
+          font-weight: 900;
         }
 
         .approveButton {
@@ -2630,9 +3223,13 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #c8f0d3,
+              #d8f6e0,
               #78cb90
             );
+
+          box-shadow:
+            0 4px 0
+              #277447;
         }
 
         .rejectButton,
@@ -2647,6 +3244,10 @@ export default function AdminRequestsPage() {
               #ef6666,
               #b52020
             );
+
+          box-shadow:
+            0 4px 0
+              #7f1818;
         }
 
         .blockButton {
@@ -2657,9 +3258,13 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #ffe590,
-              #dab443
+              #ffeaa0,
+              #d9b342
             );
+
+          box-shadow:
+            0 4px 0
+              #8b6c18;
         }
 
         .restoreButton {
@@ -2670,34 +3275,43 @@ export default function AdminRequestsPage() {
 
           background:
             linear-gradient(
-              #b9eff1,
+              #c9f4f6,
               #6bc5ca
             );
+
+          box-shadow:
+            0 4px 0
+              #266f76;
         }
 
         .emptyBox {
-          min-height: 150px;
+          min-height: 160px;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
 
           padding: 25px;
 
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
           color: #555;
 
-          text-align: center;
+          font-size: 19px;
 
-          font-size: 18px;
+          font-weight: 700;
+
+          text-align: center;
         }
 
-        /* ===========================================
+        /* =====================================================
            RESPONSIVE
-        =========================================== */
+        ===================================================== */
 
         @media (
-          max-width: 1050px
+          max-width: 1100px
         ) {
+
           .statistics {
             grid-template-columns:
               repeat(
@@ -2719,14 +3333,15 @@ export default function AdminRequestsPage() {
                 )
               );
           }
+
         }
 
         @media (
           max-width: 850px
         ) {
+
           .topPanel {
-            flex-direction:
-              column;
+            flex-direction: column;
           }
 
           .namePlate {
@@ -2753,18 +3368,15 @@ export default function AdminRequestsPage() {
               1fr;
           }
 
-          .dateGrid {
-            grid-template-columns:
-              1fr;
-          }
         }
 
         @media (
           max-width: 650px
         ) {
+
           .page {
             padding:
-              10px 7px 50px;
+              10px 7px 55px;
           }
 
           .topPanel {
@@ -2784,17 +3396,23 @@ export default function AdminRequestsPage() {
           }
 
           .heroPanel,
+          .statistics,
           .managementPanel,
-          .contentPanel,
-          .statistics {
+          .contentPanel {
             width: 100%;
           }
 
           .heroPanel {
             margin-top: 70px;
 
+            min-height: 150px;
+
             padding:
-              55px 15px 25px;
+              55px 14px 22px;
+          }
+
+          .heroPanel h1 {
+            font-size: 27px;
           }
 
           .statistics {
@@ -2807,20 +3425,20 @@ export default function AdminRequestsPage() {
                 )
               );
 
-            gap: 8px;
+            gap: 9px;
           }
 
           .statCard {
-            min-height: 95px;
+            min-height: 100px;
           }
 
           .statCard strong {
-            font-size: 29px;
+            font-size: 30px;
           }
 
           .managementPanel {
             padding:
-              60px 12px 18px;
+              65px 12px 20px;
           }
 
           .managementGrid {
@@ -2829,12 +3447,12 @@ export default function AdminRequestsPage() {
           }
 
           .managementCard {
-            min-height: 155px;
+            min-height: 145px;
           }
 
           .contentPanel {
             padding:
-              65px 8px 15px;
+              65px 8px 18px;
           }
 
           .innerPanel {
@@ -2843,35 +3461,31 @@ export default function AdminRequestsPage() {
 
           .floatingTitle,
           .contentTitle {
-            min-width: 200px;
+            min-width: 210px;
 
             max-width: 92%;
 
             min-height: 55px;
 
             padding:
-              8px 15px;
+              8px 14px;
 
-            font-size: 20px;
+            font-size: 21px;
 
             white-space: normal;
+
+            text-align: center;
           }
 
-          .createArea input {
-            font-size: 16px;
-          }
-
-          .createdResult {
-            padding: 16px 8px;
-          }
-
-          .createdResult strong {
-            font-size: 19px;
-          }
-
-          .codeBox {
+          .dateGrid {
             grid-template-columns:
               1fr;
+          }
+
+          .codeRow {
+            flex-direction: column;
+
+            align-items: stretch;
           }
 
           .copyButton {
@@ -2879,12 +3493,11 @@ export default function AdminRequestsPage() {
           }
 
           .userCard {
-            padding: 15px 10px;
+            padding: 16px 11px;
           }
 
           .userActions {
-            flex-direction:
-              column;
+            flex-direction: column;
           }
 
           .userActions button {
@@ -2892,14 +3505,25 @@ export default function AdminRequestsPage() {
 
             min-width: 0;
           }
+
+          .createdResult {
+            padding: 16px 9px;
+          }
+
+          .createdResult strong {
+            font-size: 19px;
+          }
+
         }
+
       `}</style>
+
     </main>
   );
 }
 
 /* =========================================================
-   SEARCH COMPONENT
+   SEARCH BOX
 ========================================================= */
 
 function SearchBox({
@@ -2907,6 +3531,7 @@ function SearchBox({
   setSearch,
 }: {
   search: string;
+
   setSearch:
     React.Dispatch<
       React.SetStateAction<string>
@@ -2914,6 +3539,7 @@ function SearchBox({
 }) {
   return (
     <div className="searchWrapper">
+
       <input
         type="text"
         className="searchInput"
@@ -2938,60 +3564,6 @@ function SearchBox({
         </button>
       )}
 
-      <style jsx>{`
-        .searchWrapper {
-          min-height: 62px;
-
-          margin-bottom: 25px;
-
-          display: flex;
-
-          border:
-            2px solid #328dbb;
-
-          border-radius: 11px;
-
-          overflow: hidden;
-
-          background: white;
-        }
-
-        .searchInput {
-          flex: 1;
-
-          min-width: 0;
-
-          padding:
-            0 18px;
-
-          border: none;
-
-          outline: none;
-
-          font-family:
-            "Bell MT",
-            "Times New Roman",
-            serif;
-
-          font-size: 18px;
-        }
-
-        .clearButton {
-          width: 60px;
-
-          border: none;
-
-          color: #a41414;
-
-          background: transparent;
-
-          font-size: 28px;
-
-          font-weight: 700;
-
-          cursor: pointer;
-        }
-      `}</style>
     </div>
   );
 }
