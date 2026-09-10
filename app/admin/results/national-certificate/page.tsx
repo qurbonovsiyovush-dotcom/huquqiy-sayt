@@ -116,6 +116,8 @@ export default function NationalCertificateResultsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   async function loadResults() {
     try {
@@ -205,6 +207,116 @@ export default function NationalCertificateResultsPage() {
       averageScore,
     };
   }, [results]);
+
+  async function deleteOneResult(item: ResultItem) {
+    const userName =
+      item.user_name?.trim() ||
+      "Noma'lum foydalanuvchi";
+
+    const confirmed = window.confirm(
+      `${userName} foydalanuvchisining "${item.test_title}" natijasini o'chirasizmi?\n\nBu amalni ortga qaytarib bo'lmaydi.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingId(item.id);
+
+      const response = await fetch(
+        `/api/national-certificate/admin/results?id=${encodeURIComponent(
+          item.id
+        )}`,
+        {
+          method: "DELETE",
+          cache: "no-store",
+        }
+      );
+
+      const data = await response.json().catch(() => ({
+        success: false,
+        message: "Server javobini o'qib bo'lmadi.",
+      }));
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message ||
+            "Natijani o'chirib bo'lmadi."
+        );
+      }
+
+      setResults((current) =>
+        current.filter(
+          (result) => result.id !== item.id
+        )
+      );
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "Natijani o'chirishda xatolik yuz berdi."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function deleteAllResults() {
+    if (results.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `DIQQAT!\n\nBarcha ${results.length} ta Milliy sertifikat natijasini o'chirasizmi?\n\nBu amalni ortga qaytarib bo'lmaydi.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const secondConfirm = window.confirm(
+      "Oxirgi tasdiq: HAQIQATAN HAM barcha natijalarni o'chirmoqchimisiz?"
+    );
+
+    if (!secondConfirm) {
+      return;
+    }
+
+    try {
+      setDeletingAll(true);
+
+      const response = await fetch(
+        "/api/national-certificate/admin/results?all=1",
+        {
+          method: "DELETE",
+          cache: "no-store",
+        }
+      );
+
+      const data = await response.json().catch(() => ({
+        success: false,
+        message: "Server javobini o'qib bo'lmadi.",
+      }));
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message ||
+            "Barcha natijalarni o'chirib bo'lmadi."
+        );
+      }
+
+      setResults([]);
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "Natijalarni o'chirishda xatolik yuz berdi."
+      );
+    } finally {
+      setDeletingAll(false);
+    }
+  }
 
   function exportPdf() {
     if (allRankedResults.length === 0) {
@@ -764,7 +876,7 @@ export default function NationalCertificateResultsPage() {
 
       doc.text(
         normalizePdfText(
-          "Sertifikat balli: (to'g'ri javoblar / jami savollar) x 75. Daraja chegaralari 411-son qaror mezonlari bo'yicha."
+          "Sertifikat balli: (to'g'ri javoblar / jami savollar) x 75."
         ),
         10,
         pageHeight - 6
@@ -879,6 +991,21 @@ export default function NationalCertificateResultsPage() {
               >
                 PDF — Barcha natijalar
               </button>
+
+              <button
+                type="button"
+                className="reportButton deleteAllReport"
+                onClick={deleteAllResults}
+                disabled={
+                  loading ||
+                  deletingAll ||
+                  results.length === 0
+                }
+              >
+                {deletingAll
+                  ? "O‘chirilmoqda..."
+                  : "Barchasini o‘chirish"}
+              </button>
             </div>
           </div>
 
@@ -912,7 +1039,7 @@ export default function NationalCertificateResultsPage() {
                     <th>Sertifikat</th>
                     <th>Boshlangan</th>
                     <th>Yakunlangan</th>
-                    <th>Batafsil</th>
+                    <th>Amallar</th>
                   </tr>
                 </thead>
 
@@ -965,12 +1092,30 @@ export default function NationalCertificateResultsPage() {
                         <td>{formatDate(item.started_at)}</td>
                         <td>{formatDate(item.submitted_at)}</td>
                         <td>
-                          <Link
-                            href={`/admin/results/national-certificate/${item.id}`}
-                            className="detailButton"
-                          >
-                            Batafsil
-                          </Link>
+                          <div className="actionButtons">
+                            <Link
+                              href={`/admin/results/national-certificate/${item.id}`}
+                              className="detailButton"
+                            >
+                              Batafsil
+                            </Link>
+
+                            <button
+                              type="button"
+                              className="deleteOneButton"
+                              onClick={() =>
+                                void deleteOneResult(item)
+                              }
+                              disabled={
+                                deletingAll ||
+                                deletingId === item.id
+                              }
+                            >
+                              {deletingId === item.id
+                                ? "..."
+                                : "O‘chirish"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1499,6 +1644,72 @@ export default function NationalCertificateResultsPage() {
             inset 0 2px 0 rgba(255, 255, 255, 0.78),
             0 1px 0 #155676,
             0 4px 7px rgba(0, 0, 0, 0.16);
+        }
+
+        .deleteAllReport {
+          border: 2px solid #8b1f1f;
+          color: #ffffff;
+          background:
+            linear-gradient(
+              180deg,
+              #ff7f7f 0%,
+              #dc3c3c 48%,
+              #ad1f1f 100%
+            );
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.55),
+            inset 0 -4px 0 rgba(99,0,0,.24),
+            0 5px 0 #761919,
+            0 8px 12px rgba(0,0,0,.18);
+        }
+
+        .actionButtons {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+        }
+
+        .deleteOneButton {
+          min-width: 92px;
+          min-height: 40px;
+          padding: 8px 13px;
+          border: 2px solid #8d2626;
+          border-radius: 10px;
+          color: #7a1717;
+          background:
+            linear-gradient(
+              180deg,
+              #fff0f0 0%,
+              #f5b3b3 48%,
+              #dc7777 100%
+            );
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.82),
+            inset 0 -3px 0 rgba(111,20,20,.16),
+            0 4px 0 #8d2626;
+          font-size: 12px;
+          font-weight: 900;
+          cursor: pointer;
+          transition:
+            transform .12s ease,
+            filter .12s ease,
+            box-shadow .12s ease;
+        }
+
+        .deleteOneButton:hover:not(:disabled) {
+          transform: translateY(-1px);
+          filter: brightness(1.03);
+        }
+
+        .deleteOneButton:active:not(:disabled) {
+          transform: translateY(3px);
+          box-shadow: 0 1px 0 #8d2626;
+        }
+
+        .deleteOneButton:disabled {
+          cursor: not-allowed;
+          opacity: .55;
         }
 
         .emptyState {
