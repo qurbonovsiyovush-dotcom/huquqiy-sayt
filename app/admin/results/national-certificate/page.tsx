@@ -238,11 +238,21 @@ export default function NationalCertificateResultsPage() {
        YUQORI ZAMONAVIY HEADER
     ========================= */
 
-    doc.setFillColor(...navy);
-    doc.roundedRect(10, 9, pageWidth - 20, 20, 3, 3, "F");
+    /* 3D soya */
+    doc.setFillColor(11, 45, 69);
+    doc.roundedRect(10.8, 11.2, pageWidth - 20, 20, 3.2, 3.2, "F");
 
-    doc.setFillColor(...blue);
-    doc.roundedRect(10, 9, 5, 20, 3, 3, "F");
+    /* asosiy panel */
+    doc.setFillColor(16, 78, 119);
+    doc.roundedRect(10, 9, pageWidth - 20, 20, 3.2, 3.2, "F");
+
+    /* yuqori yaltirash */
+    doc.setFillColor(42, 145, 201);
+    doc.roundedRect(10, 9, pageWidth - 20, 5.2, 3.2, 3.2, "F");
+
+    /* chap aksent */
+    doc.setFillColor(57, 177, 226);
+    doc.roundedRect(10, 9, 5.5, 20, 3.2, 3.2, "F");
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -250,17 +260,7 @@ export default function NationalCertificateResultsPage() {
     doc.text(
       "MILLIY SERTIFIKAT NATIJALARI",
       20,
-      18
-    );
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.text(
-      normalizePdfText(
-        "Vazirlar Mahkamasining 2026-yil 29-iyuldagi 411-son qarori mezonlari asosida"
-      ),
-      20,
-      24
+      20
     );
 
     doc.setFontSize(8);
@@ -270,13 +270,6 @@ export default function NationalCertificateResultsPage() {
       ),
       pageWidth - 14,
       18,
-      { align: "right" }
-    );
-
-    doc.text(
-      "qurbonovv.uz",
-      pageWidth - 14,
-      24,
       { align: "right" }
     );
 
@@ -326,6 +319,19 @@ export default function NationalCertificateResultsPage() {
       const x =
         cardX + index * (cardWidth + cardGap);
 
+      /* 3D soya */
+      doc.setFillColor(183, 192, 198);
+      doc.roundedRect(
+        x + 0.9,
+        cardY + 1.3,
+        cardWidth,
+        cardHeight,
+        2,
+        2,
+        "F"
+      );
+
+      /* karta yuzi */
       doc.setFillColor(...card.fill);
       doc.setDrawColor(...card.stroke);
       doc.setLineWidth(0.45);
@@ -337,6 +343,16 @@ export default function NationalCertificateResultsPage() {
         2,
         2,
         "FD"
+      );
+
+      /* yuqori highlight */
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.45);
+      doc.line(
+        x + 2.4,
+        cardY + 1.7,
+        x + cardWidth - 2.4,
+        cardY + 1.7
       );
 
       doc.setTextColor(...gray);
@@ -399,6 +415,32 @@ export default function NationalCertificateResultsPage() {
           : neutralBorder)
       );
 
+      /* 3D soya */
+      doc.setFillColor(180, 188, 193);
+      doc.roundedRect(
+        x + 0.7,
+        gradeY + 0.9,
+        gradeWidth,
+        11,
+        1.7,
+        1.7,
+        "F"
+      );
+
+      doc.setFillColor(
+        ...(isFail
+          ? lightRed
+          : isTop
+          ? lightGold
+          : lightGray)
+      );
+      doc.setDrawColor(
+        ...(isFail
+          ? red
+          : isTop
+          ? gold
+          : neutralBorder)
+      );
       doc.setLineWidth(0.35);
       doc.roundedRect(
         x,
@@ -408,6 +450,15 @@ export default function NationalCertificateResultsPage() {
         1.7,
         1.7,
         "FD"
+      );
+
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.3);
+      doc.line(
+        x + 2,
+        gradeY + 1.4,
+        x + gradeWidth - 2,
+        gradeY + 1.4
       );
 
       doc.setTextColor(
