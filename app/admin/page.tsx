@@ -8,55 +8,99 @@ export default function AdminPage() {
   const items = [
     {
       title: "Foydalanuvchilar va ruxsatlar",
-      button: "Boshqarish",
       href: "/admin/requests",
+      className: "usersCard",
+      icon: "👥",
     },
     {
       title: "Lug‘at boshqaruvi",
-      button: "Boshqarish",
       href: "/admin/dictionary",
+      className: "dictionaryCard",
+      icon: "A",
     },
     {
       title: "Testlar",
-      button: "Boshqarish",
       href: "/admin/tests",
+      className: "testsCard",
+      icon: "✓",
     },
     {
       title: "Natijalar",
-      button: "Boshqarish",
       href: "/admin/results",
+      className: "resultsCard",
+      icon: "≡",
     },
   ];
 
+  /* =====================================================
+     CHIQISH
+  ===================================================== */
+
+  async function logout() {
+    try {
+      await fetch("/api/logout", {
+        method: "POST",
+      });
+    } catch (error) {
+      console.error(
+        "LOGOUT ERROR:",
+        error
+      );
+    } finally {
+      sessionStorage.removeItem(
+        "qurbonov-session"
+      );
+
+      sessionStorage.removeItem(
+        "qurbonov-role"
+      );
+
+      router.replace("/");
+      router.refresh();
+    }
+  }
+
   return (
     <main className="page">
-      {/* ================= HEADER ================= */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
       <header className="topPanel">
-        <div className="namePlate">
+        <button
+          type="button"
+          className="namePlate"
+          onClick={() =>
+            router.push("/")
+          }
+        >
           Qurbonov Siyovush Jamaliddinzoda
-        </div>
+        </button>
 
         <div className="topButtons">
           <button
             type="button"
-            className="topButton"
-            onClick={() => router.push("/")}
+            className="backButton"
+            onClick={() =>
+              router.push("/")
+            }
           >
-            Asosiy sahifa
+            ← Asosiy sahifa
           </button>
 
           <button
             type="button"
             className="exitButton"
-            onClick={() => router.push("/logout")}
+            onClick={logout}
           >
             Chiqish
           </button>
         </div>
       </header>
 
-      {/* ================= ADMIN BLOCK ================= */}
+      {/* =====================================================
+          ADMIN PANEL
+      ===================================================== */}
 
       <section className="adminBlock">
         <div className="sectionTitle">
@@ -65,22 +109,24 @@ export default function AdminPage() {
 
         <div className="cardsGrid">
           {items.map((item) => (
-            <div
-              className="adminCard"
+            <button
+              type="button"
               key={item.href}
+              className={`adminCard ${item.className}`}
+              onClick={() =>
+                router.push(
+                  item.href
+                )
+              }
             >
-              <h2>{item.title}</h2>
+              <span className="cardIcon">
+                {item.icon}
+              </span>
 
-              <button
-                type="button"
-                className="manageButton"
-                onClick={() =>
-                  router.push(item.href)
-                }
-              >
-                {item.button}
-              </button>
-            </div>
+              <strong>
+                {item.title}
+              </strong>
+            </button>
           ))}
         </div>
       </section>
@@ -92,15 +138,19 @@ export default function AdminPage() {
 
         .page {
           min-height: 100vh;
-          padding: 18px 16px 70px;
+
+          padding:
+            18px 16px 80px;
 
           background:
             linear-gradient(
               180deg,
               #ffffff 0%,
-              #f4f6f7 60%,
-              #eef1f3 100%
+              #f5f7f8 55%,
+              #e9eef1 100%
             );
+
+          color: #111;
 
           font-family:
             "Bell MT",
@@ -108,165 +158,309 @@ export default function AdminPage() {
             serif;
         }
 
-        /* ================= HEADER ================= */
+        button {
+          font-family: inherit;
+          cursor: pointer;
+        }
+
+        /* =====================================================
+           HEADER
+        ===================================================== */
 
         .topPanel {
-          width: min(1580px, 98%);
+          width:
+            min(
+              1580px,
+              98%
+            );
+
           min-height: 110px;
 
           margin: 0 auto;
 
-          padding: 20px 28px;
+          padding:
+            20px 28px;
 
           display: flex;
-          justify-content: space-between;
+
+          justify-content:
+            space-between;
+
           align-items: center;
 
-          gap: 20px;
+          gap: 22px;
 
-          border: 3px solid #173e58;
+          border:
+            3px solid #173e58;
+
           border-radius: 25px;
 
           background:
             linear-gradient(
               180deg,
-              #91d9ff,
-              #4999ce
+              #9adeff 0%,
+              #5ab5e3 48%,
+              #398ebc 100%
             );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.65),
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.68
+              ),
 
-            0 7px 0 #173c55,
+            inset 0 -5px 6px
+              rgba(
+                0,
+                0,
+                0,
+                0.14
+              ),
 
-            0 14px 20px
-              rgba(0,0,0,.18);
+            0 8px 0
+              #173c55,
+
+            0 15px 23px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
         }
 
         .namePlate {
-          padding: 17px 25px;
+          min-height: 62px;
 
-          border: 3px solid #42494e;
+          padding:
+            0 27px;
+
+          border:
+            3px solid #50585d;
+
           border-radius: 14px;
+
+          color: #111;
 
           background:
             linear-gradient(
               180deg,
-              #fafafa,
-              #aaa
+              #ffffff 0%,
+              #eeeeee 45%,
+              #bdbdbd 100%
             );
 
           box-shadow:
-            inset 0 5px 5px
-              rgba(255,255,255,.8),
+            inset 0 6px 5px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
 
-            0 5px 0 #63696d;
+            inset 0 -3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                0.1
+              ),
 
-          color: #111;
+            0 5px 0
+              #60686c;
 
-          font-size: 24px;
-          font-weight: 700;
+          font-size: 23px;
+
+          font-weight: 800;
         }
 
         .topButtons {
           display: flex;
+
+          align-items: center;
+
           gap: 15px;
         }
 
-        .topButton,
+        .backButton,
         .exitButton {
-          min-width: 145px;
-          height: 55px;
+          min-width: 155px;
 
-          border-radius: 13px;
+          min-height: 55px;
 
-          font-family: inherit;
-          font-weight: 700;
+          padding:
+            9px 20px;
 
-          cursor: pointer;
+          border-radius: 12px;
+
+          font-size: 15px;
+
+          font-weight: 800;
+
+          transition:
+            transform 0.12s ease,
+            box-shadow 0.12s ease;
         }
 
-        .topButton {
-          border: 2px solid #666;
+        .backButton {
+          border:
+            2px solid #666;
+
+          color: #111;
 
           background:
             linear-gradient(
               180deg,
               #ffffff,
-              #bbbbbb
+              #c5c5c5
             );
 
           box-shadow:
-            0 4px 0 #666;
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.9
+              ),
+
+            0 5px 0
+              #666;
         }
 
         .exitButton {
-          border: 2px solid #174461;
+          border:
+            2px solid #8f1d1d;
 
           color: white;
 
           background:
             linear-gradient(
               180deg,
-              #6bc1eb,
-              #3187b5
+              #f27272,
+              #ba2222
             );
 
           box-shadow:
-            0 4px 0 #174461;
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                0.35
+              ),
+
+            0 5px 0
+              #7d1717;
         }
 
-        /* ================= MAIN ADMIN BLOCK ================= */
+        .backButton:hover,
+        .exitButton:hover {
+          transform:
+            translateY(-2px);
+        }
+
+        .backButton:active,
+        .exitButton:active {
+          transform:
+            translateY(4px);
+
+          box-shadow:
+            0 1px 0
+              #555;
+        }
+
+        /* =====================================================
+           ADMIN PANEL
+        ===================================================== */
 
         .adminBlock {
           position: relative;
 
-          width: min(1400px, 94%);
+          width:
+            min(
+              1400px,
+              94%
+            );
 
-          margin: 100px auto 0;
+          margin:
+            105px auto 0;
 
           padding:
-            70px 34px 45px;
+            80px 38px 48px;
 
-          border: 3px solid #303538;
+          border:
+            3px solid #303538;
+
           border-radius: 28px;
 
           background:
             linear-gradient(
               145deg,
-              #696d70,
-              #3b4043
+              #707578 0%,
+              #505558 48%,
+              #34383a 100%
             );
 
           box-shadow:
-            inset 0 4px 5px
-              rgba(255,255,255,.1),
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.18
+              ),
 
-            0 8px 0 #272b2e,
+            inset 0 -8px 8px
+              rgba(
+                0,
+                0,
+                0,
+                0.28
+              ),
 
-            0 17px 27px
-              rgba(0,0,0,.23);
+            0 9px 0
+              #292e31,
+
+            0 19px 30px
+              rgba(
+                0,
+                0,
+                0,
+                0.28
+              );
         }
 
         .sectionTitle {
           position: absolute;
 
-          top: -35px;
+          top: -37px;
+
           left: 50%;
 
-          transform: translateX(-50%);
+          transform:
+            translateX(-50%);
 
-          min-width: 310px;
-          min-height: 70px;
+          min-width: 320px;
 
-          padding: 12px 30px;
+          min-height: 72px;
+
+          padding:
+            10px 30px;
 
           display: flex;
+
           align-items: center;
+
           justify-content: center;
 
-          border: 3px solid #174461;
+          border:
+            3px solid #174461;
+
           border-radius: 16px;
 
           color: #073b68;
@@ -274,142 +468,496 @@ export default function AdminPage() {
           background:
             linear-gradient(
               180deg,
-              #9bd9ff,
-              #4e9ccc
+              #b8ecff 0%,
+              #79caef 40%,
+              #499ccb 100%
             );
 
           box-shadow:
-            inset 0 5px 4px
-              rgba(255,255,255,.55),
+            inset 0 6px 5px
+              rgba(
+                255,
+                255,
+                255,
+                0.75
+              ),
 
-            0 6px 0 #17415c;
+            inset 0 -4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                0.12
+              ),
 
-          font-size: 30px;
-          font-weight: 700;
+            0 6px 0
+              #17415c,
+
+            0 10px 15px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
+
+          font-size: 31px;
+
+          font-weight: 800;
         }
 
-        /* ================= CARDS ================= */
+        /* =====================================================
+           3D KARTALAR
+        ===================================================== */
 
         .cardsGrid {
           display: grid;
 
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+            repeat(
+              2,
+              minmax(
+                0,
+                1fr
+              )
+            );
 
-          gap: 34px;
+          gap: 35px;
         }
 
         .adminCard {
-          min-height: 255px;
+          position: relative;
 
-          padding: 30px;
+          min-height: 260px;
+
+          padding:
+            32px 25px;
 
           display: flex;
+
           flex-direction: column;
+
           align-items: center;
+
           justify-content: center;
 
-          text-align: center;
+          gap: 25px;
 
-          border: 3px solid #535b5f;
-          border-radius: 20px;
+          border:
+            3px solid #535b5f;
 
-          background:
-            linear-gradient(
-              145deg,
-              #f2f2f2 0%,
-              #d4d4d4 42%,
-              #b8b8b8 100%
-            );
-
-          box-shadow:
-            inset 0 7px 7px
-              rgba(255,255,255,.92),
-
-            inset 0 -5px 5px
-              rgba(0,0,0,.10),
-
-            0 7px 0 #555d61,
-
-            0 12px 18px
-              rgba(0,0,0,.22);
-        }
-
-        .adminCard h2 {
-          margin:
-            0 0 35px;
+          border-radius: 21px;
 
           color: #111;
-
-          font-size:
-            clamp(
-              26px,
-              2.5vw,
-              35px
-            );
-
-          line-height: 1.2;
-
-          font-weight: 700;
-        }
-
-        /* ================= BUTTON ================= */
-
-        .manageButton {
-          min-width: 180px;
-          min-height: 55px;
-
-          padding: 10px 28px;
-
-          border: 3px solid #174461;
-          border-radius: 11px;
-
-          color: #073b68;
 
           background:
             linear-gradient(
               180deg,
-              #a0ddff,
-              #55a8d8
+              #ffffff 0%,
+              #eeeeee 43%,
+              #c3c3c3 100%
             );
 
           box-shadow:
-            inset 0 4px 4px
-              rgba(255,255,255,.6),
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
 
-            0 5px 0 #17415c;
+            inset 0 -6px 6px
+              rgba(
+                0,
+                0,
+                0,
+                0.11
+              ),
 
-          font-family: inherit;
+            0 9px 0
+              #555d61,
 
-          font-size: 18px;
-          font-weight: 700;
+            0 16px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.25
+              );
 
-          cursor: pointer;
+          text-align: center;
 
           transition:
-            transform .13s ease;
+            transform 0.13s ease,
+            box-shadow 0.13s ease;
         }
 
-        .manageButton:hover {
+        .adminCard:hover {
           transform:
-            translateY(-2px);
-        }
-
-        .manageButton:active {
-          transform:
-            translateY(4px);
+            translateY(-6px);
 
           box-shadow:
-            0 1px 0 #17415c;
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+
+            0 14px 0
+              #555d61,
+
+            0 22px 28px
+              rgba(
+                0,
+                0,
+                0,
+                0.27
+              );
         }
 
-        /* ================= TABLET ================= */
+        .adminCard:active {
+          transform:
+            translateY(7px);
+
+          box-shadow:
+            inset 0 5px 5px
+              rgba(
+                255,
+                255,
+                255,
+                0.8
+              ),
+
+            0 2px 0
+              #555d61;
+        }
+
+        .adminCard strong {
+          font-size:
+            clamp(
+              27px,
+              2.5vw,
+              36px
+            );
+
+          font-weight: 900;
+
+          line-height: 1.2;
+
+          text-shadow:
+            0 1px 0
+              rgba(
+                255,
+                255,
+                255,
+                0.9
+              );
+        }
+
+        /* =====================================================
+           3D DOIRA
+        ===================================================== */
+
+        .cardIcon {
+          width: 78px;
+
+          height: 78px;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content: center;
+
+          border:
+            3px solid #174461;
+
+          border-radius: 50%;
+
+          color: #07517e;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #effbff 0%,
+              #a5e2ff 48%,
+              #57abd6 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.85
+              ),
+
+            inset 0 -4px 5px
+              rgba(
+                0,
+                0,
+                0,
+                0.14
+              ),
+
+            0 6px 0
+              #174461,
+
+            0 10px 13px
+              rgba(
+                0,
+                0,
+                0,
+                0.22
+              );
+
+          font-size: 32px;
+
+          font-weight: 900;
+        }
+
+        /* =====================================================
+           KARTA RANGLARI
+        ===================================================== */
+
+        .usersCard {
+          border-color: #287344;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f2fff5 0%,
+              #d1f0d9 45%,
+              #9bd6ab 100%
+            );
+
+          box-shadow:
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+
+            0 9px 0
+              #287344,
+
+            0 16px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.24
+              );
+        }
+
+        .usersCard
+        .cardIcon {
+          border-color: #287344;
+
+          color: #176638;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #f4fff7,
+              #b8edc6,
+              #6fc187
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.85
+              ),
+
+            0 6px 0
+              #287344;
+        }
+
+        .dictionaryCard {
+          border-color: #846c1b;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fffdf1,
+              #f4e6ae 45%,
+              #d9bc5c
+            );
+
+          box-shadow:
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+
+            0 9px 0
+              #846c1b,
+
+            0 16px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.24
+              );
+        }
+
+        .dictionaryCard
+        .cardIcon {
+          border-color: #846c1b;
+
+          color: #71590a;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffdf0,
+              #ffe99a,
+              #d9b743
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.85
+              ),
+
+            0 6px 0
+              #846c1b;
+        }
+
+        .testsCard {
+          border-color: #174461;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f3fbff,
+              #cbeaf8 45%,
+              #83bfdc
+            );
+
+          box-shadow:
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+
+            0 9px 0
+              #174461,
+
+            0 16px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.24
+              );
+        }
+
+        .resultsCard {
+          border-color: #69528f;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fbf7ff,
+              #dfd2f0 45%,
+              #b29acb
+            );
+
+          box-shadow:
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+
+            0 9px 0
+              #69528f,
+
+            0 16px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.24
+              );
+        }
+
+        .resultsCard
+        .cardIcon {
+          border-color: #69528f;
+
+          color: #594078;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffaff,
+              #dfcaf3,
+              #a988c4
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.85
+              ),
+
+            0 6px 0
+              #69528f;
+        }
+
+        /* =====================================================
+           TABLET
+        ===================================================== */
 
         @media (
           max-width: 900px
         ) {
           .topPanel {
-            flex-direction: column;
+            flex-direction:
+              column;
+          }
+
+          .namePlate {
+            width: 100%;
+
+            text-align: center;
+          }
+
+          .topButtons {
+            width: 100%;
+          }
+
+          .backButton,
+          .exitButton {
+            flex: 1;
           }
 
           .cardsGrid {
@@ -418,38 +966,35 @@ export default function AdminPage() {
           }
         }
 
-        /* ================= MOBILE ================= */
+        /* =====================================================
+           MOBILE
+        ===================================================== */
 
         @media (
           max-width: 600px
         ) {
           .page {
             padding:
-              10px 8px 50px;
+              10px 8px 55px;
           }
 
           .topPanel {
             width: 100%;
 
             padding:
-              18px 14px;
+              14px;
           }
 
           .namePlate {
-            width: 100%;
-
-            text-align: center;
-
             font-size: 19px;
           }
 
           .topButtons {
-            width: 100%;
-
-            flex-direction: column;
+            flex-direction:
+              column;
           }
 
-          .topButton,
+          .backButton,
           .exitButton {
             width: 100%;
           }
@@ -460,25 +1005,40 @@ export default function AdminPage() {
             margin-top: 85px;
 
             padding:
-              60px 18px 30px;
+              65px 12px 25px;
           }
 
           .sectionTitle {
             min-width: 220px;
 
-            font-size: 24px;
-          }
+            min-height: 60px;
 
-          .adminCard {
-            min-height: 220px;
-          }
-
-          .adminCard h2 {
             font-size: 25px;
           }
 
-          .manageButton {
-            width: 100%;
+          .cardsGrid {
+            gap: 22px;
+          }
+
+          .adminCard {
+            min-height: 180px;
+
+            padding:
+              25px 12px;
+
+            gap: 18px;
+          }
+
+          .adminCard strong {
+            font-size: 25px;
+          }
+
+          .cardIcon {
+            width: 65px;
+
+            height: 65px;
+
+            font-size: 27px;
           }
         }
       `}</style>
