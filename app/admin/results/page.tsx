@@ -705,6 +705,30 @@ export default function AdminResultsPage() {
           Natijalar boshqaruvi
         </div>
 
+        <div className="resultTypeNav">
+          <button
+            type="button"
+            className="resultNavCard generalResult active"
+            onClick={() => router.push("/admin/results")}
+          >
+            <span className="resultNavIcon">≡</span>
+            <strong>Test natijalari</strong>
+          </button>
+
+          <button
+            type="button"
+            className="resultNavCard nationalResult"
+            onClick={() =>
+              router.push(
+                "/admin/results/national-certificate"
+              )
+            }
+          >
+            <span className="resultNavIcon">A+</span>
+            <strong>Milliy sertifikat natijalari</strong>
+          </button>
+        </div>
+
         <div className="statsGrid">
 
           <div className="statCard">
@@ -1304,6 +1328,157 @@ export default function AdminResultsPage() {
           font-weight: 700;
         }
 
+        .resultTypeNav {
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+          gap: 22px;
+          margin-bottom: 30px;
+        }
+
+        .resultNavCard {
+          min-height: 145px;
+          padding: 24px 20px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+
+          border: 3px solid #515b61;
+          border-radius: 19px;
+
+          color: #111;
+
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #e7eaec 50%,
+              #c4c9cc 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px rgba(255,255,255,.95),
+            inset 0 -5px 5px rgba(0,0,0,.10),
+            0 8px 0 #555d61,
+            0 14px 20px rgba(0,0,0,.22);
+
+          font-family: inherit;
+          cursor: pointer;
+
+          transition:
+            transform .13s ease,
+            filter .13s ease,
+            box-shadow .13s ease;
+        }
+
+        .resultNavCard:hover {
+          transform: translateY(-4px);
+          filter: brightness(1.02);
+        }
+
+        .resultNavCard:active {
+          transform: translateY(5px);
+          box-shadow:
+            inset 0 4px 4px rgba(255,255,255,.8),
+            0 2px 0 #555d61;
+        }
+
+        .resultNavCard strong {
+          font-size: 27px;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .resultNavIcon {
+          width: 64px;
+          height: 64px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border: 3px solid #174461;
+          border-radius: 50%;
+
+          color: #073b68;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #f4fbff,
+              #a8e0fb 48%,
+              #59a9d4 100%
+            );
+
+          box-shadow:
+            inset 0 6px 5px rgba(255,255,255,.85),
+            0 6px 0 #174461,
+            0 9px 13px rgba(0,0,0,.20);
+
+          font-size: 25px;
+          font-weight: 900;
+        }
+
+        .generalResult {
+          border-color: #174461;
+
+          background:
+            linear-gradient(
+              180deg,
+              #f0fbff 0%,
+              #cdebf8 48%,
+              #91cbe5 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px rgba(255,255,255,.94),
+            0 8px 0 #174461,
+            0 14px 20px rgba(0,0,0,.22);
+        }
+
+        .nationalResult {
+          border-color: #6d5294;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fbf7ff 0%,
+              #e2d5f1 48%,
+              #b69dce 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px rgba(255,255,255,.94),
+            0 8px 0 #6d5294,
+            0 14px 20px rgba(0,0,0,.22);
+        }
+
+        .nationalResult .resultNavIcon {
+          border-color: #6d5294;
+          color: #593d7b;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffaff,
+              #e3cff4 48%,
+              #aa89c8 100%
+            );
+
+          box-shadow:
+            inset 0 6px 5px rgba(255,255,255,.85),
+            0 6px 0 #6d5294,
+            0 9px 13px rgba(0,0,0,.20);
+        }
+
+        .resultNavCard.active {
+          outline: 3px solid rgba(255,255,255,.65);
+          outline-offset: -7px;
+        }
+
         .statsGrid {
           display: grid;
 
@@ -1788,6 +1963,7 @@ export default function AdminResultsPage() {
             font-size: 21px;
           }
 
+          .resultTypeNav,
           .statsGrid,
           .filterBar {
             grid-template-columns:
