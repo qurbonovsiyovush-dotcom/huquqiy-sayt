@@ -676,26 +676,18 @@ export default function AdminResultsPage() {
         <div className="headerButtons">
 
           <button
+            type="button"
             onClick={() =>
               router.push(
-                "/admin/tests"
+                "/admin"
               )
             }
           >
-            Testlar
+            ← Admin panel
           </button>
 
           <button
-            onClick={() =>
-              router.push(
-                "/admin/requests"
-              )
-            }
-          >
-            Admin
-          </button>
-
-          <button
+            type="button"
             onClick={() =>
               router.push("/")
             }
