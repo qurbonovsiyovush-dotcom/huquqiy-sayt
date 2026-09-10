@@ -218,172 +218,518 @@ export default function NationalCertificateResultsPage() {
       format: "a4",
     });
 
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    const navy: [number, number, number] = [19, 75, 112];
+    const blue: [number, number, number] = [44, 139, 190];
+    const lightBlue: [number, number, number] = [233, 246, 253];
+    const green: [number, number, number] = [38, 126, 76];
+    const lightGreen: [number, number, number] = [232, 247, 237];
+    const red: [number, number, number] = [178, 55, 55];
+    const lightRed: [number, number, number] = [253, 235, 235];
+    const gold: [number, number, number] = [181, 139, 23];
+    const lightGold: [number, number, number] = [255, 247, 214];
+    const gray: [number, number, number] = [93, 105, 113];
+    const lightGray: [number, number, number] = [245, 247, 248];
+    const neutralBorder: [number, number, number] = [180, 188, 193];
+
+    /* =========================
+       YUQORI ZAMONAVIY HEADER
+    ========================= */
+
+    doc.setFillColor(...navy);
+    doc.roundedRect(10, 9, pageWidth - 20, 20, 3, 3, "F");
+
+    doc.setFillColor(...blue);
+    doc.roundedRect(10, 9, 5, 20, 3, 3, "F");
+
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
-    doc.text("MILLIY SERTIFIKAT NATIJALARI", 148, 14, {
-      align: "center",
-    });
+    doc.text(
+      "MILLIY SERTIFIKAT NATIJALARI",
+      20,
+      18
+    );
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    doc.text(
-      "Darajalar: A+ 70+, A 65-69.9, B+ 60-64.9, B 55-59.9, C+ 50-54.9, C 46-49.9",
-      14,
-      22
-    );
-
+    doc.setFontSize(8.5);
     doc.text(
       normalizePdfText(
-        `Jami: ${stats.total} | Sertifikat oladi: ${stats.certified} | Sertifikat olmaydi: ${stats.notCertified} | O'rtacha ball: ${stats.averageScore.toFixed(2)}`
+        "Vazirlar Mahkamasining 2026-yil 29-iyuldagi 411-son qarori mezonlari asosida"
       ),
-      14,
-      28
+      20,
+      24
     );
 
-    autoTable(doc, {
-      startY: 35,
-      head: [[
-        "O'rin",
-        "F.I.Sh.",
-        "Test",
-        "Holat",
-        "Natija",
-        "Foiz",
-        "Sertifikat balli",
-        "Daraja",
-        "Sertifikat",
-        "Yakunlangan",
-      ]],
-      body: allRankedResults.map((item, index) => {
-        const score = getCertificateScore(item);
-        return [
-          index + 1,
-          normalizePdfText(item.user_name?.trim() || "Noma'lum foydalanuvchi"),
-          normalizePdfText(item.test_title),
-          item.status === "submitted" ? "Yakunlangan" : "Vaqti tugagan",
-          `${item.correct_count}/${item.total_questions}`,
-          `${getPercent(item).toFixed(2)}%`,
-          score.toFixed(2),
-          getCertificateLevel(score),
-          getsCertificate(score) ? "OLADI" : "OLMAYDI",
-          normalizePdfText(formatDate(item.submitted_at)),
-        ];
-      }),
-      styles: {
-        font: "helvetica",
-        fontSize: 7.2,
-        halign: "center",
-        valign: "middle",
-        cellPadding: 2,
+    doc.setFontSize(8);
+    doc.text(
+      normalizePdfText(
+        `Hisobot sanasi: ${formatDate(new Date().toISOString())}`
+      ),
+      pageWidth - 14,
+      18,
+      { align: "right" }
+    );
+
+    doc.text(
+      "qurbonovv.uz",
+      pageWidth - 14,
+      24,
+      { align: "right" }
+    );
+
+    /* =========================
+       STATISTIKA KARTALARI
+    ========================= */
+
+    const cards = [
+      {
+        label: "Jami natijalar",
+        value: String(stats.total),
+        fill: lightBlue,
+        stroke: blue,
+        valueColor: navy,
       },
-      headStyles: {
-        fontStyle: "bold",
+      {
+        label: "Sertifikat oladi",
+        value: String(stats.certified),
+        fill: lightGreen,
+        stroke: green,
+        valueColor: green,
       },
-      columnStyles: {
-        1: { halign: "left", cellWidth: 38 },
-        2: { halign: "left", cellWidth: 48 },
-        9: { cellWidth: 32 },
+      {
+        label: "Sertifikat olmaydi",
+        value: String(stats.notCertified),
+        fill: lightRed,
+        stroke: red,
+        valueColor: red,
       },
-      margin: { left: 7, right: 7 },
-    });
-
-    doc.save(`milliy-sertifikat-barcha-natijalar-${safeDate()}.pdf`);
-  }
-
-  function exportExcel() {
-    if (allRankedResults.length === 0) {
-      window.alert("Excel uchun natija mavjud emas.");
-      return;
-    }
-
-    const escapeHtml = (value: unknown) =>
-      String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-
-    const headers = [
-      "O‘rin",
-      "F.I.Sh.",
-      "Foydalanuvchi kaliti",
-      "Test",
-      "Holat",
-      "Jami savol",
-      "To‘g‘ri",
-      "Noto‘g‘ri",
-      "Javobsiz",
-      "Foiz",
-      "Sertifikat balli",
-      "Daraja",
-      "Sertifikat holati",
-      "Boshlangan",
-      "Yakunlangan",
+      {
+        label: "O'rtacha sertifikat balli",
+        value: stats.averageScore.toFixed(2),
+        fill: lightGold,
+        stroke: gold,
+        valueColor: gold,
+      },
     ];
 
-    const bodyRows = allRankedResults
-      .map((item, index) => {
-        const score = getCertificateScore(item);
-        const values = [
-          index + 1,
-          item.user_name?.trim() || "Noma’lum foydalanuvchi",
-          item.user_key,
-          item.test_title,
-          item.status === "submitted" ? "Yakunlangan" : "Vaqti tugagan",
-          item.total_questions,
-          item.correct_count,
-          item.incorrect_count,
-          item.unanswered_count,
-          `${getPercent(item).toFixed(2)}%`,
-          score.toFixed(2),
-          getCertificateLevel(score),
-          getsCertificate(score) ? "Sertifikat oladi" : "Sertifikat olmaydi",
-          formatDate(item.started_at),
-          formatDate(item.submitted_at),
-        ];
+    const cardGap = 4;
+    const cardX = 10;
+    const cardY = 34;
+    const cardWidth =
+      (pageWidth - 20 - cardGap * 3) / 4;
+    const cardHeight = 17;
 
-        return `<tr>${values
-          .map((value) => `<td>${escapeHtml(value)}</td>`)
-          .join("")}</tr>`;
-      })
-      .join("");
+    cards.forEach((card, index) => {
+      const x =
+        cardX + index * (cardWidth + cardGap);
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8" />
-<style>
-  table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11pt}
-  th,td{border:1px solid #555;padding:7px 9px;vertical-align:middle}
-  th{background:#d9edf7;font-weight:700;text-align:center}
-  .title{font-size:16pt;font-weight:700;text-align:center}
-  .summary{font-weight:700}
-</style>
-</head>
-<body>
-<table>
-<tr><td class="title" colspan="${headers.length}">MILLIY SERTIFIKAT NATIJALARI</td></tr>
-<tr><td class="summary" colspan="${headers.length}">Jami: ${stats.total} | Sertifikat oladi: ${stats.certified} | Sertifikat olmaydi: ${stats.notCertified} | O‘rtacha ball: ${stats.averageScore.toFixed(2)}</td></tr>
-<tr><td colspan="${headers.length}">Darajalar: A+ 70+; A 65–69.9; B+ 60–64.9; B 55–59.9; C+ 50–54.9; C 46–49.9.</td></tr>
-<tr>${headers.map((value) => `<th>${escapeHtml(value)}</th>`).join("")}</tr>
-${bodyRows}
-</table>
-</body>
-</html>`;
+      doc.setFillColor(...card.fill);
+      doc.setDrawColor(...card.stroke);
+      doc.setLineWidth(0.45);
+      doc.roundedRect(
+        x,
+        cardY,
+        cardWidth,
+        cardHeight,
+        2,
+        2,
+        "FD"
+      );
 
-    const blob = new Blob(["\uFEFF" + html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
+      doc.setTextColor(...gray);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.text(
+        normalizePdfText(card.label),
+        x + 4,
+        cardY + 5.5
+      );
+
+      doc.setTextColor(...card.valueColor);
+      doc.setFontSize(13);
+      doc.text(
+        card.value,
+        x + 4,
+        cardY + 13
+      );
     });
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `milliy-sertifikat-barcha-natijalar-${safeDate()}.xls`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    /* =========================
+       DARAJA LEGENDASI
+    ========================= */
+
+    const gradeItems = [
+      ["A+", "70+"],
+      ["A", "65-69.9"],
+      ["B+", "60-64.9"],
+      ["B", "55-59.9"],
+      ["C+", "50-54.9"],
+      ["C", "46-49.9"],
+      ["-", "46 dan past"],
+    ];
+
+    const gradeY = 56;
+    const gradeGap = 2.5;
+    const gradeWidth =
+      (pageWidth - 20 - gradeGap * 6) / 7;
+
+    gradeItems.forEach(([grade, range], index) => {
+      const x =
+        10 + index * (gradeWidth + gradeGap);
+
+      const isFail = grade === "-";
+      const isTop = grade === "A+";
+
+      doc.setFillColor(
+        ...(isFail
+          ? lightRed
+          : isTop
+          ? lightGold
+          : lightGray)
+      );
+
+      doc.setDrawColor(
+        ...(isFail
+          ? red
+          : isTop
+          ? gold
+          : neutralBorder)
+      );
+
+      doc.setLineWidth(0.35);
+      doc.roundedRect(
+        x,
+        gradeY,
+        gradeWidth,
+        11,
+        1.7,
+        1.7,
+        "FD"
+      );
+
+      doc.setTextColor(
+        ...(isFail
+          ? red
+          : isTop
+          ? gold
+          : navy)
+      );
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text(
+        grade,
+        x + 4,
+        gradeY + 4.7
+      );
+
+      doc.setTextColor(...gray);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.text(
+        range,
+        x + 4,
+        gradeY + 8.7
+      );
+    });
+
+    /* =========================
+       NATIJALAR JADVALI
+    ========================= */
+
+    autoTable(doc, {
+      startY: 72,
+
+      head: [
+        [
+          "O'rin",
+          "F.I.Sh.",
+          "Test",
+          "Holat",
+          "To'g'ri",
+          "Noto'g'ri",
+          "Javobsiz",
+          "Foiz",
+          "Sertifikat balli",
+          "Daraja",
+          "Sertifikat holati",
+          "Yakunlangan",
+        ],
+      ],
+
+      body: allRankedResults.map(
+        (item, index) => {
+          const score =
+            getCertificateScore(item);
+
+          return [
+            index + 1,
+            normalizePdfText(
+              item.user_name?.trim() ||
+                "Noma'lum foydalanuvchi"
+            ),
+            normalizePdfText(
+              item.test_title
+            ),
+            item.status === "submitted"
+              ? "Yakunlangan"
+              : "Vaqti tugagan",
+            item.correct_count,
+            item.incorrect_count,
+            item.unanswered_count,
+            `${getPercent(item).toFixed(2)}%`,
+            score.toFixed(2),
+            getCertificateLevel(score),
+            getsCertificate(score)
+              ? "Sertifikat oladi"
+              : "Sertifikat olmaydi",
+            normalizePdfText(
+              formatDate(item.submitted_at)
+            ),
+          ];
+        }
+      ),
+
+      theme: "grid",
+
+      styles: {
+        font: "helvetica",
+        fontSize: 7.3,
+        textColor: [35, 45, 52],
+        lineColor: [216, 222, 226],
+        lineWidth: 0.2,
+        cellPadding: {
+          top: 2.8,
+          right: 2.2,
+          bottom: 2.8,
+          left: 2.2,
+        },
+        valign: "middle",
+        halign: "center",
+        overflow: "linebreak",
+      },
+
+      headStyles: {
+        fillColor: navy,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 7.4,
+        lineColor: navy,
+        cellPadding: 3.1,
+      },
+
+      alternateRowStyles: {
+        fillColor: [248, 250, 251],
+      },
+
+      columnStyles: {
+        0: {
+          cellWidth: 13,
+          fontStyle: "bold",
+        },
+        1: {
+          cellWidth: 35,
+          halign: "left",
+          fontStyle: "bold",
+        },
+        2: {
+          cellWidth: 38,
+          halign: "left",
+        },
+        3: {
+          cellWidth: 24,
+        },
+        4: {
+          cellWidth: 16,
+        },
+        5: {
+          cellWidth: 17,
+        },
+        6: {
+          cellWidth: 16,
+        },
+        7: {
+          cellWidth: 17,
+          fontStyle: "bold",
+        },
+        8: {
+          cellWidth: 24,
+          fontStyle: "bold",
+        },
+        9: {
+          cellWidth: 17,
+          fontStyle: "bold",
+        },
+        10: {
+          cellWidth: 30,
+          fontStyle: "bold",
+        },
+        11: {
+          cellWidth: 32,
+        },
+      },
+
+      margin: {
+        top: 16,
+        left: 10,
+        right: 10,
+        bottom: 15,
+      },
+
+      didParseCell: (data) => {
+        if (data.section !== "body") {
+          return;
+        }
+
+        const row =
+          data.row.raw as Array<
+            string | number
+          >;
+
+        const score =
+          Number(row?.[8] || 0);
+
+        const level =
+          String(row?.[9] || "-");
+
+        const certified =
+          score >= 46;
+
+        if (data.column.index === 0) {
+          data.cell.styles.fillColor =
+            data.row.index === 0
+              ? lightGold
+              : data.row.index === 1
+              ? [238, 241, 243]
+              : data.row.index === 2
+              ? [248, 231, 217]
+              : data.cell.styles.fillColor;
+
+          data.cell.styles.textColor =
+            navy;
+        }
+
+        if (data.column.index === 8) {
+          data.cell.styles.fillColor =
+            certified
+              ? lightBlue
+              : lightRed;
+
+          data.cell.styles.textColor =
+            certified
+              ? navy
+              : red;
+
+          data.cell.styles.fontStyle =
+            "bold";
+        }
+
+        if (data.column.index === 9) {
+          if (level === "A+") {
+            data.cell.styles.fillColor =
+              lightGold;
+            data.cell.styles.textColor =
+              [130, 96, 0];
+          } else if (level === "-") {
+            data.cell.styles.fillColor =
+              lightRed;
+            data.cell.styles.textColor =
+              red;
+          } else {
+            data.cell.styles.fillColor =
+              lightGreen;
+            data.cell.styles.textColor =
+              green;
+          }
+
+          data.cell.styles.fontStyle =
+            "bold";
+        }
+
+        if (data.column.index === 10) {
+          data.cell.styles.fillColor =
+            certified
+              ? lightGreen
+              : lightRed;
+
+          data.cell.styles.textColor =
+            certified
+              ? green
+              : red;
+
+          data.cell.styles.fontStyle =
+            "bold";
+        }
+      },
+
+    });
+
+    /* =========================
+       FOOTER - BARCHA SAHIFALAR
+    ========================= */
+
+    const totalPages =
+      doc.getNumberOfPages();
+
+    for (
+      let pageNumber = 1;
+      pageNumber <= totalPages;
+      pageNumber++
+    ) {
+      doc.setPage(pageNumber);
+
+      if (pageNumber > 1) {
+        doc.setFont(
+          "helvetica",
+          "bold"
+        );
+        doc.setFontSize(8);
+        doc.setTextColor(...navy);
+        doc.text(
+          "MILLIY SERTIFIKAT NATIJALARI",
+          10,
+          10
+        );
+      }
+
+      doc.setDrawColor(215, 221, 225);
+      doc.setLineWidth(0.25);
+      doc.line(
+        10,
+        pageHeight - 10,
+        pageWidth - 10,
+        pageHeight - 10
+      );
+
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+      doc.setFontSize(6.7);
+      doc.setTextColor(...gray);
+
+      doc.text(
+        normalizePdfText(
+          "Sertifikat balli: (to'g'ri javoblar / jami savollar) x 75. Daraja chegaralari 411-son qaror mezonlari bo'yicha."
+        ),
+        10,
+        pageHeight - 6
+      );
+
+      doc.text(
+        `${pageNumber}/${totalPages}`,
+        pageWidth - 10,
+        pageHeight - 6,
+        { align: "right" }
+      );
+    }
+
+    doc.save(
+      `milliy-sertifikat-natijalari-${safeDate()}.pdf`
+    );
   }
 
   return (
@@ -481,15 +827,6 @@ ${bodyRows}
                 disabled={loading || allRankedResults.length === 0}
               >
                 PDF — Barcha natijalar
-              </button>
-
-              <button
-                type="button"
-                className="reportButton excelReport"
-                onClick={exportExcel}
-                disabled={loading || allRankedResults.length === 0}
-              >
-                Excel — Barcha natijalar
               </button>
             </div>
           </div>
@@ -1285,12 +1622,6 @@ ${bodyRows}
           border: 2px solid #8d1d1d;
           background: linear-gradient(#ffd9d9, #df6464);
           color: #711414;
-        }
-
-        .excelReport {
-          border: 2px solid #267344;
-          background: linear-gradient(#ddf8e5, #6bc68a);
-          color: #155b33;
         }
 
         table { min-width: 1900px; }
