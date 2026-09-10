@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type ResultItem = {
   id: string;
@@ -52,6 +54,63 @@ function formatNumber(value: string | number) {
     : numberValue.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+
+type CertificateLevel = "A+" | "A" | "B+" | "B" | "C+" | "C" | "—";
+
+function getPercent(item: ResultItem) {
+  const fromApi = Number(item.percentage);
+  if (Number.isFinite(fromApi)) return fromApi;
+
+  const total = Math.max(0, Number(item.total_questions) || 0);
+  const correct = Math.max(0, Number(item.correct_count) || 0);
+  return total > 0 ? (correct / total) * 100 : 0;
+}
+
+/*
+  Nizom daraja chegaralarini belgilaydi.
+  0–75 ballga o‘tkazish sayt ichidagi proporsional formula:
+  (to‘g‘ri javoblar / jami savollar) × 75.
+*/
+function getCertificateScore(item: ResultItem) {
+  const total = Math.max(0, Number(item.total_questions) || 0);
+  const correct = Math.max(0, Number(item.correct_count) || 0);
+  return total > 0 ? Math.min(75, Math.max(0, (correct / total) * 75)) : 0;
+}
+
+function getCertificateLevel(score: number): CertificateLevel {
+  if (score >= 70) return "A+";
+  if (score >= 65) return "A";
+  if (score >= 60) return "B+";
+  if (score >= 55) return "B";
+  if (score >= 50) return "C+";
+  if (score >= 46) return "C";
+  return "—";
+}
+
+function getsCertificate(score: number) {
+  return score >= 46;
+}
+
+function normalizePdfText(value: string) {
+  return String(value || "")
+    .replace(/[‘’ʻʼ`´]/g, "'")
+    .replace(/[–—]/g, "-");
+}
+
+function sortResults(items: ResultItem[]) {
+  return [...items].sort((a, b) => {
+    const scoreDiff = getCertificateScore(b) - getCertificateScore(a);
+    if (Math.abs(scoreDiff) > 0.0001) return scoreDiff;
+    if (b.correct_count !== a.correct_count) return b.correct_count - a.correct_count;
+    if (a.incorrect_count !== b.incorrect_count) return a.incorrect_count - b.incorrect_count;
+    return new Date(a.submitted_at || a.created_at).getTime() - new Date(b.submitted_at || b.created_at).getTime();
+  });
+}
+
+function safeDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function NationalCertificateResultsPage() {
   const [results, setResults] = useState<ResultItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,46 +154,237 @@ export default function NationalCertificateResultsPage() {
     loadResults();
   }, []);
 
+  const allRankedResults = useMemo(() => sortResults(results), [results]);
+
   const filteredResults = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    if (!query) {
-      return results;
-    }
+    const list = !query
+      ? results
+      : results.filter((item) => {
+          const score = getCertificateScore(item);
+          const level = getCertificateLevel(score);
+          const certificateText = getsCertificate(score)
+            ? "sertifikat oladi"
+            : "sertifikat olmaydi";
 
-    return results.filter((item) => {
-      return (
-        item.test_title.toLowerCase().includes(query) ||
-        (item.user_name || "").toLowerCase().includes(query) ||
-        item.user_key.toLowerCase().includes(query)
-      );
-    });
+          return [
+            item.test_title,
+            item.user_name || "",
+            item.user_key,
+            level,
+            certificateText,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+        });
+
+    return sortResults(list);
   }, [results, search]);
 
   const stats = useMemo(() => {
-    const submitted = results.filter(
-      (item) => item.status === "submitted"
+    const certified = results.filter((item) =>
+      getsCertificate(getCertificateScore(item))
     ).length;
 
-    const expired = results.filter(
-      (item) => item.status === "expired"
-    ).length;
+    const notCertified = results.length - certified;
 
-    const average =
+    const averageScore =
       results.length === 0
         ? 0
         : results.reduce(
-            (sum, item) => sum + Number(item.percentage || 0),
+            (sum, item) => sum + getCertificateScore(item),
             0
           ) / results.length;
 
     return {
       total: results.length,
-      submitted,
-      expired,
-      average,
+      certified,
+      notCertified,
+      averageScore,
     };
   }, [results]);
+
+  function exportPdf() {
+    if (allRankedResults.length === 0) {
+      window.alert("PDF uchun natija mavjud emas.");
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(17);
+    doc.text("MILLIY SERTIFIKAT NATIJALARI", 148, 14, {
+      align: "center",
+    });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    doc.text(
+      "Darajalar: A+ 70+, A 65-69.9, B+ 60-64.9, B 55-59.9, C+ 50-54.9, C 46-49.9",
+      14,
+      22
+    );
+
+    doc.text(
+      normalizePdfText(
+        `Jami: ${stats.total} | Sertifikat oladi: ${stats.certified} | Sertifikat olmaydi: ${stats.notCertified} | O'rtacha ball: ${stats.averageScore.toFixed(2)}`
+      ),
+      14,
+      28
+    );
+
+    autoTable(doc, {
+      startY: 35,
+      head: [[
+        "O'rin",
+        "F.I.Sh.",
+        "Test",
+        "Holat",
+        "Natija",
+        "Foiz",
+        "Sertifikat balli",
+        "Daraja",
+        "Sertifikat",
+        "Yakunlangan",
+      ]],
+      body: allRankedResults.map((item, index) => {
+        const score = getCertificateScore(item);
+        return [
+          index + 1,
+          normalizePdfText(item.user_name?.trim() || "Noma'lum foydalanuvchi"),
+          normalizePdfText(item.test_title),
+          item.status === "submitted" ? "Yakunlangan" : "Vaqti tugagan",
+          `${item.correct_count}/${item.total_questions}`,
+          `${getPercent(item).toFixed(2)}%`,
+          score.toFixed(2),
+          getCertificateLevel(score),
+          getsCertificate(score) ? "OLADI" : "OLMAYDI",
+          normalizePdfText(formatDate(item.submitted_at)),
+        ];
+      }),
+      styles: {
+        font: "helvetica",
+        fontSize: 7.2,
+        halign: "center",
+        valign: "middle",
+        cellPadding: 2,
+      },
+      headStyles: {
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        1: { halign: "left", cellWidth: 38 },
+        2: { halign: "left", cellWidth: 48 },
+        9: { cellWidth: 32 },
+      },
+      margin: { left: 7, right: 7 },
+    });
+
+    doc.save(`milliy-sertifikat-barcha-natijalar-${safeDate()}.pdf`);
+  }
+
+  function exportExcel() {
+    if (allRankedResults.length === 0) {
+      window.alert("Excel uchun natija mavjud emas.");
+      return;
+    }
+
+    const escapeHtml = (value: unknown) =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    const headers = [
+      "O‘rin",
+      "F.I.Sh.",
+      "Foydalanuvchi kaliti",
+      "Test",
+      "Holat",
+      "Jami savol",
+      "To‘g‘ri",
+      "Noto‘g‘ri",
+      "Javobsiz",
+      "Foiz",
+      "Sertifikat balli",
+      "Daraja",
+      "Sertifikat holati",
+      "Boshlangan",
+      "Yakunlangan",
+    ];
+
+    const bodyRows = allRankedResults
+      .map((item, index) => {
+        const score = getCertificateScore(item);
+        const values = [
+          index + 1,
+          item.user_name?.trim() || "Noma’lum foydalanuvchi",
+          item.user_key,
+          item.test_title,
+          item.status === "submitted" ? "Yakunlangan" : "Vaqti tugagan",
+          item.total_questions,
+          item.correct_count,
+          item.incorrect_count,
+          item.unanswered_count,
+          `${getPercent(item).toFixed(2)}%`,
+          score.toFixed(2),
+          getCertificateLevel(score),
+          getsCertificate(score) ? "Sertifikat oladi" : "Sertifikat olmaydi",
+          formatDate(item.started_at),
+          formatDate(item.submitted_at),
+        ];
+
+        return `<tr>${values
+          .map((value) => `<td>${escapeHtml(value)}</td>`)
+          .join("")}</tr>`;
+      })
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<style>
+  table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:11pt}
+  th,td{border:1px solid #555;padding:7px 9px;vertical-align:middle}
+  th{background:#d9edf7;font-weight:700;text-align:center}
+  .title{font-size:16pt;font-weight:700;text-align:center}
+  .summary{font-weight:700}
+</style>
+</head>
+<body>
+<table>
+<tr><td class="title" colspan="${headers.length}">MILLIY SERTIFIKAT NATIJALARI</td></tr>
+<tr><td class="summary" colspan="${headers.length}">Jami: ${stats.total} | Sertifikat oladi: ${stats.certified} | Sertifikat olmaydi: ${stats.notCertified} | O‘rtacha ball: ${stats.averageScore.toFixed(2)}</td></tr>
+<tr><td colspan="${headers.length}">Darajalar: A+ 70+; A 65–69.9; B+ 60–64.9; B 55–59.9; C+ 50–54.9; C 46–49.9.</td></tr>
+<tr>${headers.map((value) => `<th>${escapeHtml(value)}</th>`).join("")}</tr>
+${bodyRows}
+</table>
+</body>
+</html>`;
+
+    const blob = new Blob(["\uFEFF" + html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `milliy-sertifikat-barcha-natijalar-${safeDate()}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <main className="page">
@@ -147,11 +397,16 @@ export default function NationalCertificateResultsPage() {
           </div>
 
           <div className="topActions">
-            <Link
-              href="/admin/tests"
-              className="button secondary"
-            >
-              Testlar
+            <Link href="/admin/results" className="button secondary">
+              ← Natijalar
+            </Link>
+
+            <Link href="/admin" className="button secondary">
+              Admin panel
+            </Link>
+
+            <Link href="/" className="button secondary">
+              Asosiy sahifa
             </Link>
 
             <button
@@ -171,43 +426,72 @@ export default function NationalCertificateResultsPage() {
             <strong>{stats.total}</strong>
           </article>
 
-          <article className="statCard">
-            <span>Yakunlangan</span>
-            <strong>{stats.submitted}</strong>
+          <article className="statCard successStat">
+            <span>Sertifikat oladi</span>
+            <strong>{stats.certified}</strong>
+          </article>
+
+          <article className="statCard dangerStat">
+            <span>Sertifikat olmaydi</span>
+            <strong>{stats.notCertified}</strong>
           </article>
 
           <article className="statCard">
-            <span>Vaqti tugagan</span>
-            <strong>{stats.expired}</strong>
+            <span>O‘rtacha sertifikat balli</span>
+            <strong>{stats.averageScore.toFixed(2)}</strong>
           </article>
+        </section>
 
-          <article className="statCard">
-            <span>O‘rtacha natija</span>
-            <strong>
-              {stats.average.toFixed(2)}%
-            </strong>
-          </article>
+        <section className="gradingPanel">
+          <div className="gradingTitle">Nizom bo‘yicha darajalar</div>
+
+          <div className="gradingGrid">
+            <div className="gradeBox gradeAPlus"><strong>A+</strong><span>70 va undan yuqori</span></div>
+            <div className="gradeBox"><strong>A</strong><span>65 – 69.9</span></div>
+            <div className="gradeBox"><strong>B+</strong><span>60 – 64.9</span></div>
+            <div className="gradeBox"><strong>B</strong><span>55 – 59.9</span></div>
+            <div className="gradeBox"><strong>C+</strong><span>50 – 54.9</span></div>
+            <div className="gradeBox"><strong>C</strong><span>46 – 49.9</span></div>
+            <div className="gradeBox failGrade"><strong>—</strong><span>46 dan past</span></div>
+          </div>
         </section>
 
         <section className="panel">
           <div className="panelHeader">
             <div>
-              <h2>Natijalar ro‘yxati</h2>
-
+              <h2>Natijalar reytingi</h2>
               <p>
-                {filteredResults.length} ta natija ko‘rsatilmoqda
+                {filteredResults.length} ta natija ko‘rsatilmoqda. Jadval sertifikat balli bo‘yicha tartiblangan.
               </p>
             </div>
 
-            <input
-              type="search"
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Test yoki foydalanuvchi bo‘yicha qidirish..."
-              className="searchInput"
-            />
+            <div className="panelTools">
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Test, foydalanuvchi yoki daraja..."
+                className="searchInput"
+              />
+
+              <button
+                type="button"
+                className="reportButton pdfReport"
+                onClick={exportPdf}
+                disabled={loading || allRankedResults.length === 0}
+              >
+                PDF — Barcha natijalar
+              </button>
+
+              <button
+                type="button"
+                className="reportButton excelReport"
+                onClick={exportExcel}
+                disabled={loading || allRankedResults.length === 0}
+              >
+                Excel — Barcha natijalar
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -218,27 +502,26 @@ export default function NationalCertificateResultsPage() {
           )}
 
           {loading ? (
-            <div className="emptyState">
-              Natijalar yuklanmoqda...
-            </div>
+            <div className="emptyState">Natijalar yuklanmoqda...</div>
           ) : filteredResults.length === 0 ? (
-            <div className="emptyState">
-              Natija topilmadi.
-            </div>
+            <div className="emptyState">Natija topilmadi.</div>
           ) : (
             <div className="tableWrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>#</th>
+                    <th>O‘rin</th>
                     <th>Test</th>
                     <th>Foydalanuvchi</th>
                     <th>Holat</th>
                     <th>To‘g‘ri</th>
                     <th>Noto‘g‘ri</th>
                     <th>Javobsiz</th>
-                    <th>Ball</th>
+                    <th>Natija</th>
                     <th>Foiz</th>
+                    <th>Sertifikat balli</th>
+                    <th>Daraja</th>
+                    <th>Sertifikat</th>
                     <th>Boshlangan</th>
                     <th>Yakunlangan</th>
                     <th>Batafsil</th>
@@ -246,99 +529,64 @@ export default function NationalCertificateResultsPage() {
                 </thead>
 
                 <tbody>
-                  {filteredResults.map((item, index) => (
-                    <tr key={item.id}>
-                      <td>{index + 1}</td>
+                  {filteredResults.map((item, index) => {
+                    const score = getCertificateScore(item);
+                    const level = getCertificateLevel(score);
+                    const certified = getsCertificate(score);
 
-                      <td>
-                        <div className="testCell">
-                          <strong>
-                            {item.test_title}
-                          </strong>
+                    return (
+                      <tr key={item.id}>
+                        <td><span className="rank">{index + 1}</span></td>
 
-                          <span>
-                            {item.total_questions} savol
+                        <td>
+                          <div className="testCell">
+                            <strong>{item.test_title}</strong>
+                            <span>{item.total_questions} savol</span>
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className="userCell">
+                            <strong>{item.user_name?.trim() || "Noma’lum foydalanuvchi"}</strong>
+                            <span title={item.user_key}>
+                              {item.user_key.length > 18
+                                ? `${item.user_key.slice(0, 18)}...`
+                                : item.user_key}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td>
+                          <span className={item.status === "submitted" ? "status submitted" : "status expired"}>
+                            {item.status === "submitted" ? "Yakunlangan" : "Vaqti tugagan"}
                           </span>
-                        </div>
-                      </td>
+                        </td>
 
-                      <td>
-                        <div className="userCell">
-                          <strong>
-                            {item.user_name?.trim() ||
-                              "Noma’lum foydalanuvchi"}
-                          </strong>
-
-                          <span title={item.user_key}>
-                            {item.user_key.length > 18
-                              ? `${item.user_key.slice(
-                                  0,
-                                  18
-                                )}...`
-                              : item.user_key}
+                        <td className="correct">{item.correct_count}</td>
+                        <td className="incorrect">{item.incorrect_count}</td>
+                        <td>{item.unanswered_count}</td>
+                        <td><strong>{item.correct_count}/{item.total_questions}</strong></td>
+                        <td><strong>{getPercent(item).toFixed(2)}%</strong></td>
+                        <td><span className="scoreBadge">{score.toFixed(2)}</span></td>
+                        <td><span className="levelBadge">{level}</span></td>
+                        <td>
+                          <span className={certified ? "certificateBadge certificateYes" : "certificateBadge certificateNo"}>
+                            {certified ? "Sertifikat oladi" : "Sertifikat olmaydi"}
                           </span>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span
-                          className={
-                            item.status === "submitted"
-                              ? "status submitted"
-                              : "status expired"
-                          }
-                        >
-                          {item.status === "submitted"
-                            ? "Yakunlangan"
-                            : "Vaqti tugagan"}
-                        </span>
-                      </td>
-
-                      <td className="correct">
-                        {item.correct_count}
-                      </td>
-
-                      <td className="incorrect">
-                        {item.incorrect_count}
-                      </td>
-
-                      <td>
-                        {item.unanswered_count}
-                      </td>
-
-                      <td>
-                        {formatNumber(item.raw_score)}
-                        /
-                        {item.total_questions}
-                      </td>
-
-                      <td>
-                        <strong>
-                          {Number(
-                            item.percentage
-                          ).toFixed(2)}
-                          %
-                        </strong>
-                      </td>
-
-                      <td>
-                        {formatDate(item.started_at)}
-                      </td>
-
-                      <td>
-                        {formatDate(item.submitted_at)}
-                      </td>
-
-                      <td>
-                        <Link
-                          href={`/admin/results/national-certificate/${item.id}`}
-                          className="detailButton"
-                        >
-                          Batafsil
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>{formatDate(item.started_at)}</td>
+                        <td>{formatDate(item.submitted_at)}</td>
+                        <td>
+                          <Link
+                            href={`/admin/results/national-certificate/${item.id}`}
+                            className="detailButton"
+                          >
+                            Batafsil
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -953,6 +1201,175 @@ export default function NationalCertificateResultsPage() {
             flex: 1;
             text-align: center;
           }
+        }
+
+
+        /* ===== MILLIY SERTIFIKAT YANGI QO‘SHIMCHALAR ===== */
+        .statsGrid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .successStat strong { color: #1d7a3a; }
+        .dangerStat strong { color: #b12620; }
+
+        .gradingPanel {
+          margin: 38px 0 26px;
+          padding: 28px 18px 18px;
+          border: 3px solid #3d474e;
+          border-radius: 18px;
+          background: linear-gradient(145deg, #666c70, #444a4e);
+          box-shadow: inset 0 3px 0 rgba(255,255,255,.15), 0 7px 0 #353c40, 0 14px 24px rgba(0,0,0,.17);
+        }
+
+        .gradingTitle {
+          width: fit-content;
+          margin: -53px auto 20px;
+          padding: 10px 28px;
+          border: 3px solid #174461;
+          border-radius: 14px;
+          background: linear-gradient(#abe6ff, #58a8d7);
+          box-shadow: inset 0 5px 4px rgba(255,255,255,.7), 0 5px 0 #17415c;
+          color: #073b68;
+          font-size: 21px;
+          font-weight: 900;
+        }
+
+        .gradingGrid {
+          display: grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .gradeBox {
+          min-height: 86px;
+          padding: 10px 8px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          border: 2px solid #5b6266;
+          border-radius: 12px;
+          background: linear-gradient(#fff, #d8dcdf);
+          box-shadow: inset 0 3px 3px #fff, 0 4px 0 #5a6267;
+          text-align: center;
+        }
+
+        .gradeBox strong { color: #0b527a; font-size: 25px; }
+        .gradeBox span { font-size: 12px; font-weight: 900; }
+        .gradeAPlus { background: linear-gradient(#fff8bd, #e9c744); }
+        .failGrade { background: linear-gradient(#ffeaea, #e8aaaa); }
+
+        .panelTools {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .panelTools .searchInput { width: 300px; }
+
+        .reportButton {
+          min-height: 46px;
+          padding: 0 15px;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 13px;
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow: inset 0 2px 0 rgba(255,255,255,.78), 0 4px 0 rgba(0,0,0,.42);
+        }
+
+        .pdfReport {
+          border: 2px solid #8d1d1d;
+          background: linear-gradient(#ffd9d9, #df6464);
+          color: #711414;
+        }
+
+        .excelReport {
+          border: 2px solid #267344;
+          background: linear-gradient(#ddf8e5, #6bc68a);
+          color: #155b33;
+        }
+
+        table { min-width: 1900px; }
+
+        .rank,
+        .scoreBadge,
+        .levelBadge,
+        .certificateBadge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+        }
+
+        .rank {
+          width: 34px;
+          height: 34px;
+          border: 2px solid #59636a;
+          border-radius: 50%;
+          background: linear-gradient(#fff, #cfd4d7);
+          box-shadow: 0 3px 0 #59636a;
+        }
+
+        .scoreBadge {
+          min-width: 72px;
+          min-height: 34px;
+          padding: 6px 10px;
+          border: 2px solid #174461;
+          border-radius: 10px;
+          color: #073b68;
+          background: linear-gradient(#dff5ff, #85cdea);
+          box-shadow: 0 3px 0 #174461;
+        }
+
+        .levelBadge {
+          min-width: 52px;
+          min-height: 34px;
+          padding: 6px 9px;
+          border: 2px solid #6f622a;
+          border-radius: 10px;
+          background: linear-gradient(#fff9cb, #e6d071);
+          box-shadow: 0 3px 0 #6f622a;
+        }
+
+        .certificateBadge {
+          min-height: 34px;
+          padding: 6px 10px;
+          border-radius: 10px;
+          font-size: 11px;
+          box-shadow: inset 0 1px 0 #fff, 0 3px 0 rgba(0,0,0,.25);
+        }
+
+        .certificateYes {
+          border: 2px solid #287344;
+          color: #176638;
+          background: linear-gradient(#effff4, #aee4be);
+        }
+
+        .certificateNo {
+          border: 2px solid #9a2b2b;
+          color: #812020;
+          background: linear-gradient(#fff0f0, #eab1b1);
+        }
+
+        @media (max-width: 1250px) {
+          .gradingGrid { grid-template-columns: repeat(4, 1fr); }
+          .panelHeader { flex-direction: column; align-items: stretch; }
+          .panelTools { justify-content: flex-start; }
+        }
+
+        @media (max-width: 950px) {
+          .gradingGrid { grid-template-columns: repeat(2, 1fr); }
+          .panelTools .searchInput { width: 100%; }
+        }
+
+        @media (max-width: 560px) {
+          .gradingGrid { grid-template-columns: 1fr; }
+          .panelTools { flex-direction: column; }
+          .reportButton { width: 100%; }
         }
       `}</style>
     </main>
