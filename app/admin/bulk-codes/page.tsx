@@ -26,6 +26,7 @@ type ApiResult = {
   message?: string;
   count?: number;
   users?: unknown;
+  ids?: unknown;
 };
 
 const BATCH_STORAGE_KEY =
@@ -788,7 +789,7 @@ export default function BulkCodesPage() {
     }
   }
 
-  async function deleteCurrentBatch() {
+  async function deleteApprovedCodes() {
     if (
       users.length === 0
     ) {
@@ -797,7 +798,7 @@ export default function BulkCodesPage() {
 
     const confirmed =
       window.confirm(
-        `DIQQAT!\n\nFaqat hozir ekranda turgan ${users.length} ta ommaviy kod bazadan butunlay o‘chiriladi.\n\nDavom etasizmi?`
+        `DIQQAT!\n\nHozirgi ommaviy ro‘yxatdan FAQAT RUXSAT BERILGAN kodlar bazadan butunlay o‘chiriladi.\n\nRuxsat kutilayotgan kodlar saqlanib qoladi.\n\nDavom etasizmi?`
       );
 
     if (!confirmed) {
@@ -843,26 +844,68 @@ export default function BulkCodesPage() {
       ) {
         setError(
           data.message ||
-            "Kodlar o‘chirilmadi."
+            "Ruxsat berilgan kodlar o‘chirilmadi."
         );
         return;
       }
 
-      const deletedCount =
-        data.count ??
-        users.length;
+      const deletedIds =
+        Array.isArray(
+          data.ids
+        )
+          ? data.ids
+              .map(
+                (value: unknown): string =>
+                  String(
+                    value || ""
+                  )
+              )
+              .filter(
+                (id: string): boolean =>
+                  Boolean(id)
+              )
+          : [];
 
-      saveBatch([]);
+      if (
+        deletedIds.length === 0
+      ) {
+        setMessage(
+          data.message ||
+            "Ruxsat berilgan ommaviy kod topilmadi."
+        );
+        return;
+      }
+
+      const deletedSet =
+        new Set<string>(
+          deletedIds
+        );
+
+      const remainingUsers =
+        users.filter(
+          (
+            user:
+              CreatedUser
+          ): boolean =>
+            !deletedSet.has(
+              user.id
+            )
+        );
+
+      saveBatch(
+        remainingUsers
+      );
 
       setMessage(
-        `${deletedCount} ta ommaviy kod o‘chirildi.`
+        data.message ||
+          `${deletedIds.length} ta ruxsat berilgan ommaviy kod o‘chirildi.`
       );
     } catch (deleteError) {
       console.error(
         deleteError
       );
       setError(
-        "Ommaviy kodlarni o‘chirishda server xatosi."
+        "Ruxsat berilgan ommaviy kodlarni o‘chirishda server xatosi."
       );
     } finally {
       setDeleting(false);
@@ -1083,12 +1126,12 @@ Usmonov Javohir`}
               className="deleteButton"
               disabled={busy}
               onClick={
-                deleteCurrentBatch
+                deleteApprovedCodes
               }
             >
               {deleting
                 ? "O‘CHIRILMOQDA..."
-                : "YARATILGAN KODLARNI O‘CHIRISH"}
+                : "RUXSAT BERILGANLARNI O‘CHIRISH"}
             </button>
           </div>
 
