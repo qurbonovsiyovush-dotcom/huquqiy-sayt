@@ -2674,22 +2674,37 @@ function PageStyles() {
         font-weight: 700 !important;
       }
 
-      /* Designer avtomatik qo‘shgan bo‘sh paragraf joy egallamasin */
+      /* ===== VENNDAN KEYINGI ORTIQCHA BO‘SHLIQLARNI TO‘LIQ TOZALASH ===== */
+
       .questionText.htmlContent .nc-venn2 + p,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
-        display: block !important;
-        min-height: 0 !important;
+        display: none !important;
         height: 0 !important;
+        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         line-height: 0 !important;
-        overflow: hidden !important;
       }
 
-      /* Venn ortidan keladigan a), b), c)... matn normal masofada boshlansin */
-      .questionText.htmlContent .nc-venn2 + p + *,
-      .questionText.htmlContent .nc-object[data-kind="venn2"] + p + * {
-        margin-top: 10px !important;
+      .questionText.htmlContent p:empty,
+      .questionText.htmlContent div:empty:not(.nc-object),
+      .questionText.htmlContent p:has(> br:only-child),
+      .questionText.htmlContent div:has(> br:only-child):not(.nc-object) {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 0 !important;
+      }
+
+      .questionText.htmlContent .nc-venn2 {
+        margin-bottom: 0 !important;
+      }
+
+      .questionText.htmlContent .nc-venn2 + *,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] + * {
+        margin-top: 4px !important;
       }
 
       .htmlContent img {
@@ -3285,11 +3300,10 @@ function PageStyles() {
         .questionText.htmlContent .nc-object[data-kind="venn2"] {
           width: 760px !important;
           max-width: 100% !important;
-          height: auto !important;
-          min-height: 0 !important;
-          aspect-ratio: 760 / 420;
-          margin-top: 12px !important;
-          margin-bottom: -38px !important;
+          height: 345px !important;
+          min-height: 345px !important;
+          aspect-ratio: auto !important;
+          margin: 8px auto 0 !important;
         }
 
         .option {
