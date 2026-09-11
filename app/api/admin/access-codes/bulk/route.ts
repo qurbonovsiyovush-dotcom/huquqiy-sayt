@@ -10,9 +10,10 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =====================================================
-   TYPES
-===================================================== */
+type RequestBody = {
+  names?: unknown;
+  ids?: unknown;
+};
 
 type BulkEntry = {
   id: string;
@@ -24,15 +25,15 @@ type CreatedUser = {
   id: string;
   name: string;
   code: string;
+  active: boolean;
+  approved: boolean;
 };
 
-/* =====================================================
-   ADMIN TEKSHIRISH
-===================================================== */
+const CODE_CHARS =
+  "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 async function isAdmin() {
-  const cookieStore =
-    await cookies();
+  const cookieStore = await cookies();
 
   const session =
     cookieStore.get(
@@ -45,29 +46,15 @@ async function isAdmin() {
     )?.value;
 
   return Boolean(
-    session &&
-      role === "admin"
+    session && role === "admin"
   );
 }
-
-/* =====================================================
-   KOD BELGILARI
-===================================================== */
-
-const CODE_CHARS =
-  "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-/* =====================================================
-   RANDOM QISM
-===================================================== */
 
 function randomPart(
   length: number
 ) {
   const bytes =
-    crypto.randomBytes(
-      length
-    );
+    crypto.randomBytes(length);
 
   let result = "";
 
@@ -86,13 +73,6 @@ function randomPart(
   return result;
 }
 
-/* =====================================================
-   KIRISH KODI
-
-   Masalan:
-   QURBONOV-7K4M-92PX
-===================================================== */
-
 function makeAccessCode() {
   return (
     "QURBONOV-" +
@@ -102,16 +82,61 @@ function makeAccessCode() {
   );
 }
 
-/* =====================================================
-   UNIQUE KODLAR YARATISH
-===================================================== */
+function normalizeNames(
+  value: unknown
+): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(
+      (
+        item: unknown
+      ): string =>
+        String(item || "")
+          .replace(/\s+/g, " ")
+          .trim()
+    )
+    .filter(
+      (
+        item: string
+      ): boolean =>
+        Boolean(item)
+    );
+}
+
+function normalizeIds(
+  value: unknown
+): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map(
+          (
+            item: unknown
+          ): string =>
+            String(item || "")
+              .trim()
+        )
+        .filter(
+          (
+            item: string
+          ): boolean =>
+            Boolean(item)
+        )
+    )
+  );
+}
 
 async function createUniqueCodes(
   count: number
 ): Promise<string[]> {
-  const result: string[] =
-    [];
-
+  const result: string[] = [];
   const reserved =
     new Set<string>();
 
@@ -129,8 +154,7 @@ async function createUniqueCodes(
     }
 
     const needed =
-      count -
-      result.length;
+      count - result.length;
 
     const candidates:
       string[] = [];
@@ -149,7 +173,6 @@ async function createUniqueCodes(
       }
 
       reserved.add(code);
-
       candidates.push(code);
     }
 
@@ -173,16 +196,17 @@ async function createUniqueCodes(
     const existingCodes =
       new Set<string>(
         existing.map(
-          (row: any) =>
+          (row: {
+            code?: unknown;
+          }): string =>
             String(
-              row.code
+              row.code || ""
             )
         )
       );
 
     for (
-      const code of
-      candidates
+      const code of candidates
     ) {
       if (
         !existingCodes.has(
@@ -200,25 +224,16 @@ async function createUniqueCodes(
   );
 }
 
-/* =====================================================
-   POST
-===================================================== */
-
 export async function POST(
   request: NextRequest
 ) {
   try {
-    /* =================================================
-       ADMIN TEKSHIRISH
-    ================================================= */
-
     if (
       !(await isAdmin())
     ) {
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Faqat administrator uchun.",
         },
@@ -228,61 +243,17 @@ export async function POST(
       );
     }
 
-    /* =================================================
-       BODY
-    ================================================= */
-
-    const body:
-      Record<
-        string,
-        unknown
-      > =
-      await request
+    const body =
+      (await request
         .json()
         .catch(
           () => ({})
-        );
+        )) as RequestBody;
 
-    /* =================================================
-       ISMLARNI OLISH
-    ================================================= */
-
-    const incoming:
-      unknown[] =
-      Array.isArray(
+    const names =
+      normalizeNames(
         body.names
-      )
-        ? body.names
-        : [];
-
-    const names:
-      string[] =
-      incoming
-        .map(
-          (
-            value:
-              unknown
-          ): string =>
-            String(
-              value || ""
-            )
-              .replace(
-                /\s+/g,
-                " "
-              )
-              .trim()
-        )
-        .filter(
-          (
-            value:
-              string
-          ): boolean =>
-            Boolean(value)
-        );
-
-    /* =================================================
-       BO‘SH RO‘YXAT
-    ================================================= */
+      );
 
     if (
       names.length === 0
@@ -290,7 +261,6 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Ism-familiyalar topilmadi.",
         },
@@ -300,17 +270,12 @@ export async function POST(
       );
     }
 
-    /* =================================================
-       LIMIT
-    ================================================= */
-
     if (
       names.length > 500
     ) {
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Bir martada maksimum 500 ta foydalanuvchi.",
         },
@@ -319,10 +284,6 @@ export async function POST(
         }
       );
     }
-
-    /* =================================================
-       ISM UZUNLIGI
-    ================================================= */
 
     for (
       const name of names
@@ -333,7 +294,6 @@ export async function POST(
         return NextResponse.json(
           {
             success: false,
-
             message:
               `Ism-familiya juda uzun: ${name}`,
           },
@@ -344,53 +304,38 @@ export async function POST(
       }
     }
 
-    /* =================================================
-       KODLARNI YARATISH
-    ================================================= */
-
-    const codes:
-      string[] =
+    const codes =
       await createUniqueCodes(
         names.length
       );
-
-    /* =================================================
-       DATABASE UCHUN MA’LUMOT
-    ================================================= */
 
     const entries:
       BulkEntry[] =
       names.map(
         (
-          name:
-            string,
-          index:
-            number
+          name: string,
+          index: number
         ): BulkEntry => ({
           id:
             crypto.randomUUID(),
-
           name,
-
           code:
             codes[index],
         })
       );
 
     const payload =
-      JSON.stringify(
-        entries
-      );
+      JSON.stringify(entries);
 
-    /* =================================================
-       BAZAGA BITTA SO‘ROVDA YOZISH
+    /*
+      MUHIM:
+      approved = FALSE
+      requested_at = NOW()
 
-       active = TRUE
-       approved = TRUE
-
-       Demak kod darhol ishlaydi.
-    ================================================= */
-
+      Demak yaratilgan ommaviy kodlar darhol
+      "Kirish so‘rovlari" bo‘limida ko‘rinadi va
+      admin ruxsat bermaguncha to‘g‘ridan-to‘g‘ri kirmaydi.
+    */
     const rows =
       await sql`
         INSERT INTO access_codes (
@@ -409,10 +354,10 @@ export async function POST(
           x.code,
           x.name,
           TRUE,
-          TRUE,
+          FALSE,
+          NOW(),
+          NOW(),
           NULL,
-          NOW(),
-          NOW(),
           NULL
         FROM jsonb_to_recordset(
           ${payload}::jsonb
@@ -425,40 +370,40 @@ export async function POST(
         DO NOTHING
         RETURNING
           id,
+          name,
           code,
-          name
+          active,
+          approved
       `;
-
-    /* =================================================
-       NATIJANI FORMATLASH
-    ================================================= */
 
     const createdUsers:
       CreatedUser[] =
       rows.map(
-        (
-          row: any
-        ): CreatedUser => ({
+        (row: {
+          id?: unknown;
+          name?: unknown;
+          code?: unknown;
+          active?: unknown;
+          approved?: unknown;
+        }): CreatedUser => ({
           id:
             String(
-              row.id
+              row.id || ""
             ),
-
           name:
             String(
-              row.name
+              row.name || ""
             ),
-
           code:
             String(
-              row.code
+              row.code || ""
             ),
+          active:
+            row.active === true,
+          approved:
+            row.approved === true,
         })
       );
-
-    /* =================================================
-       HAMMASI YARATILDIMI?
-    ================================================= */
 
     if (
       createdUsers.length !==
@@ -467,13 +412,10 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           message:
             `${createdUsers.length} ta kod yaratildi. ${names.length} ta kodning hammasi yaratilmagan.`,
-
           count:
             createdUsers.length,
-
           users:
             createdUsers,
         },
@@ -483,34 +425,235 @@ export async function POST(
       );
     }
 
-    /* =================================================
-       SUCCESS
-    ================================================= */
-
     return NextResponse.json({
       success: true,
-
       count:
         createdUsers.length,
-
       users:
         createdUsers,
-
       message:
-        `${createdUsers.length} ta kod yaratildi.`,
+        `${createdUsers.length} ta kod yaratildi. Ruxsat berilmaguncha foydalanuvchilar kira olmaydi.`,
     });
   } catch (error) {
     console.error(
-      "BULK ACCESS CODE ERROR:",
+      "BULK ACCESS CODE POST ERROR:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-
         message:
           "Kodlarni yaratishda server xatosi yuz berdi.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest
+) {
+  try {
+    if (
+      !(await isAdmin())
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Faqat administrator uchun.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    const body =
+      (await request
+        .json()
+        .catch(
+          () => ({})
+        )) as RequestBody;
+
+    const ids =
+      normalizeIds(
+        body.ids
+      );
+
+    if (
+      ids.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Ruxsat beriladigan kodlar topilmadi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      ids.length > 500
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Bir martada maksimum 500 ta kodga ruxsat beriladi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const payload =
+      JSON.stringify(ids);
+
+    const rows =
+      await sql`
+        UPDATE access_codes
+        SET
+          active = TRUE,
+          approved = TRUE,
+          approved_at = NOW(),
+          rejected_at = NULL
+        WHERE id IN (
+          SELECT value
+          FROM jsonb_array_elements_text(
+            ${payload}::jsonb
+          )
+        )
+        RETURNING id
+      `;
+
+    return NextResponse.json({
+      success: true,
+      count:
+        rows.length,
+      message:
+        `${rows.length} ta kodga kirish ruxsati berildi.`,
+    });
+  } catch (error) {
+    console.error(
+      "BULK ACCESS CODE PATCH ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Ommaviy ruxsat berishda server xatosi yuz berdi.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest
+) {
+  try {
+    if (
+      !(await isAdmin())
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Faqat administrator uchun.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    const body =
+      (await request
+        .json()
+        .catch(
+          () => ({})
+        )) as RequestBody;
+
+    const ids =
+      normalizeIds(
+        body.ids
+      );
+
+    if (
+      ids.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "O‘chiriladigan kodlar topilmadi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      ids.length > 500
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Bir martada maksimum 500 ta kod o‘chiriladi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const payload =
+      JSON.stringify(ids);
+
+    const rows =
+      await sql`
+        DELETE FROM access_codes
+        WHERE id IN (
+          SELECT value
+          FROM jsonb_array_elements_text(
+            ${payload}::jsonb
+          )
+        )
+        RETURNING id
+      `;
+
+    return NextResponse.json({
+      success: true,
+      count:
+        rows.length,
+      message:
+        `${rows.length} ta ommaviy kod o‘chirildi.`,
+    });
+  } catch (error) {
+    console.error(
+      "BULK ACCESS CODE DELETE ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Ommaviy kodlarni o‘chirishda server xatosi yuz berdi.",
       },
       {
         status: 500,
