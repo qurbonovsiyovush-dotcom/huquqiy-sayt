@@ -91,6 +91,11 @@ export default function AdminRequestsPage() {
     setDeletingPending,
   ] = useState(false);
 
+  const [
+    approvingPending,
+    setApprovingPending,
+  ] = useState(false);
+
   const [name, setName] =
     useState("");
 
@@ -563,6 +568,94 @@ export default function AdminRequestsPage() {
     URL.revokeObjectURL(
       url
     );
+  }
+
+  /* =========================================================
+     KIRISH SO‘ROVLARINING HAMMASIGA RUXSAT BERISH
+  ========================================================= */
+
+  async function approveAllPending() {
+    const total =
+      statistics.pending;
+
+    if (total === 0) {
+      showMessage(
+        "Kirish so‘rovi mavjud emas.",
+        "error"
+      );
+
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Kirish so‘rovida turgan ${total} ta foydalanuvchining BARCHASIGA ruxsat beriladi.\n\nDavom etasizmi?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setApprovingPending(true);
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin/access-codes",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "approve-all-pending",
+              }),
+          }
+        );
+
+      const data =
+        await readJson(
+          response
+        );
+
+      if (
+        !response.ok ||
+        data?.success !== true
+      ) {
+        showMessage(
+          data?.message ||
+            "Kirish so‘rovlariga ruxsat berib bo‘lmadi.",
+          "error"
+        );
+
+        return;
+      }
+
+      setSearch("");
+      await loadUsers(true);
+
+      showMessage(
+        data?.message ||
+          "Barcha kirish so‘rovlariga ruxsat berildi."
+      );
+    } catch (error) {
+      console.error(
+        "APPROVE ALL PENDING ERROR:",
+        error
+      );
+
+      showMessage(
+        "Server bilan bog‘lanishda xatolik.",
+        "error"
+      );
+    } finally {
+      setApprovingPending(false);
+    }
   }
 
   /* =========================================================
@@ -1947,12 +2040,30 @@ export default function AdminRequestsPage() {
 
               {statistics.pending >
                 0 && (
-                <div className="deleteAllPendingWrap">
+                <div className="pendingBulkActions">
+                  <button
+                    type="button"
+                    className="approveAllPendingButton"
+                    disabled={
+                      approvingPending ||
+                      deletingPending ||
+                      refreshing
+                    }
+                    onClick={
+                      approveAllPending
+                    }
+                  >
+                    {approvingPending
+                      ? "RUXSAT BERILMOQDA..."
+                      : `BARCHASIGA RUXSAT BERISH (${statistics.pending})`}
+                  </button>
+
                   <button
                     type="button"
                     className="deleteAllPendingButton"
                     disabled={
                       deletingPending ||
+                      approvingPending ||
                       refreshing
                     }
                     onClick={
@@ -1961,7 +2072,7 @@ export default function AdminRequestsPage() {
                   >
                     {deletingPending
                       ? "O‘CHIRILMOQDA..."
-                      : `KIRISH SO‘ROVLARINING HAMMASINI O‘CHIRISH (${statistics.pending})`}
+                      : `HAMMASINI O‘CHIRISH (${statistics.pending})`}
                   </button>
                 </div>
               )}
@@ -3386,12 +3497,46 @@ export default function AdminRequestsPage() {
            KIRISH SO‘ROVLARI / RUXSAT BERILGANLARNI HAMMASINI O‘CHIRISH
         ===================================================== */
 
-        .deleteAllPendingWrap,
+        .pendingBulkActions,
         .deleteAllApprovedWrap {
           width: 100%;
           margin: -4px 0 28px;
           display: flex;
           justify-content: flex-end;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+
+        .approveAllPendingButton {
+          min-height: 54px;
+          padding: 0 24px;
+          border: 3px solid #1f6b39;
+          border-radius: 12px;
+          background:
+            linear-gradient(
+              180deg,
+              #c9f4d2 0%,
+              #72d08b 48%,
+              #2f9d51 100%
+            );
+          box-shadow:
+            inset 0 4px 4px
+              rgba(255,255,255,.62),
+            0 5px 0 #1d6b38,
+            0 9px 14px
+              rgba(0,0,0,.18);
+          color: #ffffff;
+          font-size: 16px;
+          font-weight: 900;
+          letter-spacing: .2px;
+        }
+
+        .approveAllPendingButton:active:not(:disabled) {
+          transform: translateY(3px);
+          box-shadow:
+            inset 0 3px 4px
+              rgba(255,255,255,.4),
+            0 2px 0 #1d6b38;
         }
 
         .deleteAllPendingButton,
