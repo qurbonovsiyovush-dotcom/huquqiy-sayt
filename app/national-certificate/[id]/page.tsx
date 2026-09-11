@@ -2524,7 +2524,7 @@ function PageStyles() {
         font-size: 12px;
       }
 
-      /* SAVOLNI ALOHIDA KUCHLI 3D PANEL */
+      /* ===== SAVOL MATNI: ADMIN FORMATINI 1:1 SAQLASH ===== */
       .questionText {
         position: relative;
         margin-top: 30px;
@@ -2553,39 +2553,18 @@ function PageStyles() {
           0 14px 22px rgba(21, 45, 61, 0.19);
       }
 
-      /* Admin editorda saqlangan eski <font size="..."> formatlarini
-         public sahifada aynan kerakli o‘lchamlarda ko‘rsatamiz. */
-      .questionText.htmlContent font[size="1"] {
-        font-size: 12px !important;
-      }
+      /* QuestionDesigner execCommand(fontSize) saqlagan legacy <font size> qiymatlari */
+      .questionText.htmlContent font[size="1"] { font-size: 12px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 14px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 16px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 18px !important; }
+      .questionText.htmlContent font[size="5"] { font-size: 24px !important; }
+      .questionText.htmlContent font[size="6"] { font-size: 32px !important; }
+      .questionText.htmlContent font[size="7"] { font-size: 38px !important; }
 
-      .questionText.htmlContent font[size="2"] {
-        font-size: 14px !important;
-      }
-
-      .questionText.htmlContent font[size="3"] {
-        font-size: 16px !important;
-      }
-
-      .questionText.htmlContent font[size="4"] {
-        font-size: 18px !important;
-      }
-
-      .questionText.htmlContent font[size="5"] {
-        font-size: 24px !important;
-      }
-
-      .questionText.htmlContent font[size="6"] {
-        font-size: 32px !important;
-      }
-
-      .questionText.htmlContent font[size="7"] {
-        font-size: 38px !important;
-      }
-
-      /* Ichki HTML admin editordagi ierarxiyani saqlaydi. */
+      /* Admin ichida yozilgan satr, paragraf va ro‘yxatlarning o‘z formatini buzmaymiz */
       .questionText.htmlContent p,
-      .questionText.htmlContent div,
+      .questionText.htmlContent div:not(.nc-object),
       .questionText.htmlContent span,
       .questionText.htmlContent li {
         line-height: 1.5;
@@ -2595,35 +2574,22 @@ function PageStyles() {
         margin: 5px 0;
       }
 
-      /* 1, 2, 3, 4 kabi raqamli bandlar. */
-      .questionText.htmlContent ol {
-        margin: 8px 0;
-        padding-left: 32px;
+      .questionText.htmlContent ol,
+      .questionText.htmlContent ul {
+        margin: 8px 0 10px;
+        padding-left: 34px;
         list-style-position: outside;
       }
 
-      .questionText.htmlContent ol > li {
-        margin: 4px 0;
-        padding-left: 3px;
+      .questionText.htmlContent ol > li,
+      .questionText.htmlContent ul > li {
+        margin: 5px 0;
+        padding-left: 4px;
         text-indent: 0;
       }
 
       .questionText.htmlContent ol > li::marker {
-        font-family: "Bell MT", Georgia, "Times New Roman", serif;
         font-weight: 700;
-      }
-
-      /* Oddiy bullet ro‘yxatlar. */
-      .questionText.htmlContent ul {
-        margin: 8px 0;
-        padding-left: 32px;
-        list-style-position: outside;
-      }
-
-      .questionText.htmlContent ul > li {
-        margin: 4px 0;
-        padding-left: 3px;
-        text-indent: 0;
       }
 
       .htmlContent img {
