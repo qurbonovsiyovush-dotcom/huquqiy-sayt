@@ -624,6 +624,13 @@ export async function DELETE(
     const payload =
       JSON.stringify(ids);
 
+    /*
+      MUHIM:
+      Faqat administrator avval RUXSAT BERGAN
+      (approved = TRUE) kodlargina o‘chiriladi.
+
+      Ruxsat kutilayotgan kodlarga tegilmaydi.
+    */
     const rows =
       await sql`
         DELETE FROM access_codes
@@ -633,15 +640,34 @@ export async function DELETE(
             ${payload}::jsonb
           )
         )
+        AND approved = TRUE
         RETURNING id
       `;
+
+    const deletedIds =
+      rows.map(
+        (row: {
+          id?: unknown;
+        }): string =>
+          String(
+            row.id || ""
+          )
+      )
+      .filter(
+        (id: string): boolean =>
+          Boolean(id)
+      );
 
     return NextResponse.json({
       success: true,
       count:
-        rows.length,
+        deletedIds.length,
+      ids:
+        deletedIds,
       message:
-        `${rows.length} ta ommaviy kod o‘chirildi.`,
+        deletedIds.length > 0
+          ? `${deletedIds.length} ta ruxsat berilgan ommaviy kod o‘chirildi.`
+          : "Ruxsat berilgan ommaviy kod topilmadi.",
     });
   } catch (error) {
     console.error(
