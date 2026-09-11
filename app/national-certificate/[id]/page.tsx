@@ -2602,7 +2602,7 @@ function PageStyles() {
         max-width: 92% !important;
         height: 420px !important;
         min-height: 420px !important;
-        margin: 14px auto -90px !important;
+        margin: 14px auto -220px !important;
         padding: 0 !important;
         clear: both !important;
         float: none !important;
