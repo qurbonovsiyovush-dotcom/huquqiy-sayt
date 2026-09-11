@@ -2539,16 +2539,91 @@ function PageStyles() {
             #d5e3ed 100%
           );
         color: #10233a;
-        font-size: clamp(24px, 2.25vw, 31px);
-        line-height: 1.65;
-        font-weight: 900;
-        overflow-wrap: anywhere;
-        text-shadow: 0 1px 0 #fff;
+        font-family: "Bell MT", Georgia, "Times New Roman", serif;
+        font-size: 18px;
+        line-height: 1.5;
+        font-weight: 600;
+        overflow-wrap: break-word;
+        word-break: normal;
+        text-shadow: none;
         box-shadow:
           inset 0 3px 0 #fff,
           inset 0 -7px 0 rgba(57, 78, 91, 0.13),
           0 8px 0 #647783,
           0 14px 22px rgba(21, 45, 61, 0.19);
+      }
+
+      /* Admin editorda saqlangan eski <font size="..."> formatlarini
+         public sahifada aynan kerakli o‘lchamlarda ko‘rsatamiz. */
+      .questionText.htmlContent font[size="1"] {
+        font-size: 12px !important;
+      }
+
+      .questionText.htmlContent font[size="2"] {
+        font-size: 14px !important;
+      }
+
+      .questionText.htmlContent font[size="3"] {
+        font-size: 16px !important;
+      }
+
+      .questionText.htmlContent font[size="4"] {
+        font-size: 18px !important;
+      }
+
+      .questionText.htmlContent font[size="5"] {
+        font-size: 24px !important;
+      }
+
+      .questionText.htmlContent font[size="6"] {
+        font-size: 32px !important;
+      }
+
+      .questionText.htmlContent font[size="7"] {
+        font-size: 38px !important;
+      }
+
+      /* Ichki HTML admin editordagi ierarxiyani saqlaydi. */
+      .questionText.htmlContent p,
+      .questionText.htmlContent div,
+      .questionText.htmlContent span,
+      .questionText.htmlContent li {
+        line-height: 1.5;
+      }
+
+      .questionText.htmlContent p {
+        margin: 5px 0;
+      }
+
+      /* 1, 2, 3, 4 kabi raqamli bandlar. */
+      .questionText.htmlContent ol {
+        margin: 8px 0;
+        padding-left: 32px;
+        list-style-position: outside;
+      }
+
+      .questionText.htmlContent ol > li {
+        margin: 4px 0;
+        padding-left: 3px;
+        text-indent: 0;
+      }
+
+      .questionText.htmlContent ol > li::marker {
+        font-family: "Bell MT", Georgia, "Times New Roman", serif;
+        font-weight: 700;
+      }
+
+      /* Oddiy bullet ro‘yxatlar. */
+      .questionText.htmlContent ul {
+        margin: 8px 0;
+        padding-left: 32px;
+        list-style-position: outside;
+      }
+
+      .questionText.htmlContent ul > li {
+        margin: 4px 0;
+        padding-left: 3px;
+        text-indent: 0;
       }
 
       .htmlContent img {
@@ -3136,7 +3211,8 @@ function PageStyles() {
 
         .questionText {
           padding: 20px 16px 22px;
-          font-size: 21px;
+          font-size: 16px;
+          line-height: 1.5;
         }
 
         .option {
@@ -3263,4 +3339,3 @@ function PageStyles() {
     `}</style>
   );
 }
-
