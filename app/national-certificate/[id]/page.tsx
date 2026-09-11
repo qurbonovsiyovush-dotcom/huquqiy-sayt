@@ -193,6 +193,302 @@ export default function NationalCertificateTestPage() {
     test?.questions[currentIndex] ??
     null;
 
+  const questionHtmlRef =
+    useRef<HTMLDivElement | null>(null);
+
+  /*
+    Saqlangan eski Venn HTML turli width/height/position qiymatlari bilan
+    kelishi mumkin. Public sahifada uni bir xil, tabiiy document-flow
+    ko‘rinishiga keltiramiz va Venn bilan keyingi matn orasidagi barcha
+    bo‘sh spacer elementlarni olib tashlaymiz.
+  */
+  useEffect(() => {
+    const root = questionHtmlRef.current;
+
+    if (
+      !root ||
+      !currentQuestion?.questionHtml
+    ) {
+      return;
+    }
+
+    let frame1 = 0;
+    let frame2 = 0;
+
+    const normalizeVenn = () => {
+      const venns =
+        root.querySelectorAll<HTMLElement>(
+          '.nc-venn2, [data-kind="venn2"]'
+        );
+
+      venns.forEach((venn) => {
+        venn.style.setProperty(
+          "display",
+          "block",
+          "important"
+        );
+        venn.style.setProperty(
+          "position",
+          "relative",
+          "important"
+        );
+        venn.style.setProperty(
+          "left",
+          "auto",
+          "important"
+        );
+        venn.style.setProperty(
+          "top",
+          "auto",
+          "important"
+        );
+        venn.style.setProperty(
+          "right",
+          "auto",
+          "important"
+        );
+        venn.style.setProperty(
+          "bottom",
+          "auto",
+          "important"
+        );
+        venn.style.setProperty(
+          "width",
+          "min(760px, 100%)",
+          "important"
+        );
+        venn.style.setProperty(
+          "max-width",
+          "100%",
+          "important"
+        );
+        venn.style.setProperty(
+          "height",
+          "auto",
+          "important"
+        );
+        venn.style.setProperty(
+          "min-height",
+          "0",
+          "important"
+        );
+        venn.style.setProperty(
+          "margin",
+          "10px auto 4px",
+          "important"
+        );
+        venn.style.setProperty(
+          "padding",
+          "0",
+          "important"
+        );
+        venn.style.setProperty(
+          "float",
+          "none",
+          "important"
+        );
+        venn.style.setProperty(
+          "clear",
+          "both",
+          "important"
+        );
+        venn.style.setProperty(
+          "transform",
+          "none",
+          "important"
+        );
+        venn.style.setProperty(
+          "overflow",
+          "visible",
+          "important"
+        );
+
+        const svg =
+          venn.querySelector(
+            ":scope > svg"
+          ) as SVGSVGElement | null;
+
+        if (svg) {
+          svg.style.setProperty(
+            "display",
+            "block",
+            "important"
+          );
+          svg.style.setProperty(
+            "position",
+            "static",
+            "important"
+          );
+          svg.style.setProperty(
+            "left",
+            "auto",
+            "important"
+          );
+          svg.style.setProperty(
+            "top",
+            "auto",
+            "important"
+          );
+          svg.style.setProperty(
+            "width",
+            "100%",
+            "important"
+          );
+          svg.style.setProperty(
+            "height",
+            "auto",
+            "important"
+          );
+          svg.style.setProperty(
+            "max-width",
+            "100%",
+            "important"
+          );
+          svg.style.setProperty(
+            "margin",
+            "0",
+            "important"
+          );
+          svg.style.setProperty(
+            "transform",
+            "none",
+            "important"
+          );
+          svg.style.setProperty(
+            "overflow",
+            "visible",
+            "important"
+          );
+
+          /*
+            width/height atributlari eski saqlangan piksel balandligini
+            majburlamasligi uchun faqat viewBox proporsiyasi ishlaydi.
+          */
+          svg.removeAttribute("width");
+          svg.removeAttribute("height");
+          svg.setAttribute(
+            "preserveAspectRatio",
+            "xMidYMid meet"
+          );
+        }
+
+        /*
+          Venn ortidan editor <p><br></p>, bo‘sh div yoki whitespace
+          text node qoldirgan bo‘lsa — birinchi haqiqiy matngacha
+          hammasini olib tashlaymiz.
+        */
+        let next =
+          venn.nextSibling;
+
+        while (next) {
+          const following =
+            next.nextSibling;
+
+          if (
+            next.nodeType ===
+            Node.TEXT_NODE
+          ) {
+            const value =
+              (next.textContent || "")
+                .replace(
+                  /\u00a0/g,
+                  ""
+                )
+                .trim();
+
+            if (!value) {
+              next.parentNode?.removeChild(
+                next
+              );
+              next = following;
+              continue;
+            }
+
+            break;
+          }
+
+          if (
+            next.nodeType ===
+            Node.ELEMENT_NODE
+          ) {
+            const element =
+              next as HTMLElement;
+
+            const text =
+              (
+                element.textContent ||
+                ""
+              )
+                .replace(
+                  /\u00a0/g,
+                  ""
+                )
+                .trim();
+
+            const meaningful =
+              element.querySelector(
+                "img,svg,table,input,textarea,button,[data-object-id]"
+              );
+
+            if (
+              !text &&
+              !meaningful
+            ) {
+              element.remove();
+              next = following;
+              continue;
+            }
+
+            element.style.setProperty(
+              "margin-top",
+              "4px",
+              "important"
+            );
+
+            break;
+          }
+
+          break;
+        }
+      });
+    };
+
+    frame1 =
+      window.requestAnimationFrame(
+        () => {
+          frame2 =
+            window.requestAnimationFrame(
+              normalizeVenn
+            );
+        }
+      );
+
+    const onResize = () => {
+      normalizeVenn();
+    };
+
+    window.addEventListener(
+      "resize",
+      onResize
+    );
+
+    return () => {
+      window.cancelAnimationFrame(
+        frame1
+      );
+      window.cancelAnimationFrame(
+        frame2
+      );
+      window.removeEventListener(
+        "resize",
+        onResize
+      );
+    };
+  }, [
+    currentQuestion?.id,
+    currentQuestion?.questionHtml,
+  ]);
+
   const answeredCount = useMemo(() => {
     if (!test) {
       return 0;
@@ -1380,6 +1676,7 @@ export default function NationalCertificateTestPage() {
 
               {currentQuestion.questionHtml ? (
                 <div
+                  ref={questionHtmlRef}
                   className="questionText htmlContent"
                   dangerouslySetInnerHTML={{
                     __html:
@@ -2593,51 +2890,35 @@ function PageStyles() {
         font-weight: 700;
       }
 
-      /* ===== EYLER–VENN: TABIIY OQIMDA, USTMA-UST TUSHMAYDI ===== */
+      /* ===== EYLER–VENN: PUBLIC RENDER FALLBACK ===== */
       .questionText.htmlContent .nc-venn2,
       .questionText.htmlContent .nc-object[data-kind="venn2"] {
         display: block !important;
         position: relative !important;
-
-        width: 760px !important;
-        max-width: 92% !important;
-
-        /* Muhim: fixed height yo‘q. SVG o‘z balandligini o‘zi beradi. */
+        width: min(760px, 100%) !important;
+        max-width: 100% !important;
         height: auto !important;
         min-height: 0 !important;
-
-        margin: 12px auto 8px !important;
+        margin: 10px auto 4px !important;
         padding: 0 !important;
-
-        clear: both !important;
         float: none !important;
+        clear: both !important;
         overflow: visible !important;
-
-        left: auto !important;
-        top: auto !important;
-        right: auto !important;
-        bottom: auto !important;
         transform: none !important;
       }
 
       .questionText.htmlContent .nc-venn2 > svg,
       .questionText.htmlContent .nc-object[data-kind="venn2"] > svg {
         display: block !important;
-
-        /* Muhim: absolute EMAS. Shunda keyingi matn SVG tugagan joydan boshlanadi. */
         position: static !important;
-
         width: 100% !important;
         height: auto !important;
         max-width: 100% !important;
-        aspect-ratio: 760 / 420 !important;
-
-        margin: 0 auto !important;
+        margin: 0 !important;
         overflow: visible !important;
         transform: none !important;
       }
 
-      /* Venn tepasidagi I va II sarlavhalar */
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(1),
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(2),
       .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:nth-of-type(1),
@@ -2663,7 +2944,6 @@ function PageStyles() {
         white-space: normal !important;
       }
 
-      /* Doira ichidagi I / II / III */
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(3) > div,
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(4) > div,
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(5) > div,
@@ -2674,7 +2954,6 @@ function PageStyles() {
         font-weight: 800 !important;
       }
 
-      /* Pastdagi III izohi */
       .questionText.htmlContent .nc-venn2 foreignObject:last-of-type > div,
       .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:last-of-type > div {
         font-size: 18px !important;
@@ -2682,7 +2961,6 @@ function PageStyles() {
         font-weight: 700 !important;
       }
 
-      /* Designer qo‘shgan bo‘sh paragraf joy egallamasin */
       .questionText.htmlContent .nc-venn2 + p,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
         display: none !important;
@@ -2691,12 +2969,6 @@ function PageStyles() {
         margin: 0 !important;
         padding: 0 !important;
         line-height: 0 !important;
-      }
-
-      /* Venn ichidagi bo‘sh bo‘lmagan keyingi matn normal masofada */
-      .questionText.htmlContent .nc-venn2 + *,
-      .questionText.htmlContent .nc-object[data-kind="venn2"] + * {
-        margin-top: 6px !important;
       }
 
       .htmlContent img {
@@ -3286,23 +3558,6 @@ function PageStyles() {
           padding: 20px 16px 22px;
           font-size: 17px;
           line-height: 1.5;
-        }
-
-        .questionText.htmlContent .nc-venn2,
-        .questionText.htmlContent .nc-object[data-kind="venn2"] {
-          width: 760px !important;
-          max-width: 100% !important;
-          height: auto !important;
-          min-height: 0 !important;
-          margin: 10px auto 6px !important;
-        }
-
-        .questionText.htmlContent .nc-venn2 > svg,
-        .questionText.htmlContent .nc-object[data-kind="venn2"] > svg {
-          position: static !important;
-          width: 100% !important;
-          height: auto !important;
-          aspect-ratio: 760 / 420 !important;
         }
 
         .option {
