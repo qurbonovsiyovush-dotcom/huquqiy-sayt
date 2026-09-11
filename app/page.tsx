@@ -990,16 +990,31 @@ export default function Home() {
           </button>
 
           {isAdmin && (
-            <button
-              className="menuButton"
-              onClick={() =>
-                router.push(
-                  "/admin/requests"
-                )
-              }
-            >
-              Admin
-            </button>
+            <>
+              <button
+                type="button"
+                className="menuButton"
+                onClick={() =>
+                  router.push(
+                    "/admin/requests"
+                  )
+                }
+              >
+                Admin
+              </button>
+
+              <button
+                type="button"
+                className="menuButton"
+                onClick={() =>
+                  router.push(
+                    "/admin/bulk-codes"
+                  )
+                }
+              >
+                Ommaviy kodlar
+              </button>
+            </>
           )}
 
           <button
