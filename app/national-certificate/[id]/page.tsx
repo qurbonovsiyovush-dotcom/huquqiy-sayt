@@ -1111,7 +1111,7 @@ export default function NationalCertificateTestPage() {
 
   if (loading) {
     return (
-      <main className="ncPage">
+      <main className="ncPage loadingPage">
         <div className="centerBox">
           <div className="loader" />
           <h2>
@@ -2020,6 +2020,31 @@ function PageStyles() {
           linear-gradient(180deg, #f7f9fb 0%, #e8edf2 100%);
       }
 
+      /* ===== TEST YUKLANMOQDA: EKRAN MARKAZIDA ===== */
+      .loadingPage {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .loadingPage .centerBox {
+        width: min(92vw, 430px);
+        margin: 0;
+        padding: 42px 28px 38px;
+        text-align: center;
+        border-radius: 18px;
+      }
+
+      .loadingPage .centerBox h2 {
+        margin: 0;
+        color: #172538;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        line-height: 1.3;
+        font-weight: 800;
+      }
+
       .centerBox,
       .errorPage {
         width: min(92%, 620px);
@@ -2052,7 +2077,7 @@ function PageStyles() {
 
       .loader {
         width: 46px;
-        height: 50px;
+        height: 46px;
         margin: 0 auto 20px;
         border-radius: 50%;
         border: 5px solid #cbd3da;
