@@ -86,6 +86,11 @@ export default function AdminRequestsPage() {
     setDeletingApproved,
   ] = useState(false);
 
+  const [
+    deletingPending,
+    setDeletingPending,
+  ] = useState(false);
+
   const [name, setName] =
     useState("");
 
@@ -558,6 +563,79 @@ export default function AdminRequestsPage() {
     URL.revokeObjectURL(
       url
     );
+  }
+
+  /* =========================================================
+     KIRISH SO‘ROVLARINING HAMMASINI O‘CHIRISH
+  ========================================================= */
+
+  async function deleteAllPending() {
+    const total = statistics.pending;
+
+    if (total === 0) {
+      showMessage(
+        "Kirish so‘rovi mavjud emas.",
+        "error"
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `DIQQAT!\n\nKirish so‘rovida turgan ${total} ta foydalanuvchi va ularning kirish kodlari BUTUNLAY o‘chiriladi.\n\nBu amalni ortga qaytarib bo‘lmaydi.\n\nDavom etasizmi?`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingPending(true);
+
+    try {
+      const response = await fetch(
+        "/api/admin/access-codes",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "delete-all-pending",
+          }),
+        }
+      );
+
+      const data = await readJson(response);
+
+      if (
+        !response.ok ||
+        data?.success !== true
+      ) {
+        showMessage(
+          data?.message ||
+            "Kirish so‘rovlarini o‘chirib bo‘lmadi.",
+          "error"
+        );
+        return;
+      }
+
+      setSearch("");
+      await loadUsers(true);
+
+      showMessage(
+        data?.message ||
+          "Barcha kirish so‘rovlari o‘chirildi."
+      );
+    } catch (error) {
+      console.error(
+        "DELETE ALL PENDING ERROR:",
+        error
+      );
+
+      showMessage(
+        "Server bilan bog‘lanishda xatolik.",
+        "error"
+      );
+    } finally {
+      setDeletingPending(false);
+    }
   }
 
   /* =========================================================
@@ -1866,6 +1944,27 @@ export default function AdminRequestsPage() {
                   setSearch
                 }
               />
+
+              {statistics.pending >
+                0 && (
+                <div className="deleteAllPendingWrap">
+                  <button
+                    type="button"
+                    className="deleteAllPendingButton"
+                    disabled={
+                      deletingPending ||
+                      refreshing
+                    }
+                    onClick={
+                      deleteAllPending
+                    }
+                  >
+                    {deletingPending
+                      ? "O‘CHIRILMOQDA..."
+                      : `KIRISH SO‘ROVLARINING HAMMASINI O‘CHIRISH (${statistics.pending})`}
+                  </button>
+                </div>
+              )}
 
               {renderUserList(
                 pendingUsers,
@@ -3284,9 +3383,10 @@ export default function AdminRequestsPage() {
         }
 
         /* =====================================================
-           RUXSAT BERILGANLARNI HAMMASINI O‘CHIRISH
+           KIRISH SO‘ROVLARI / RUXSAT BERILGANLARNI HAMMASINI O‘CHIRISH
         ===================================================== */
 
+        .deleteAllPendingWrap,
         .deleteAllApprovedWrap {
           width: 100%;
           margin: -4px 0 28px;
@@ -3294,6 +3394,7 @@ export default function AdminRequestsPage() {
           justify-content: flex-end;
         }
 
+        .deleteAllPendingButton,
         .deleteAllApprovedButton {
           min-height: 54px;
           padding: 0 24px;
@@ -3318,6 +3419,7 @@ export default function AdminRequestsPage() {
           letter-spacing: .2px;
         }
 
+        .deleteAllPendingButton:active:not(:disabled),
         .deleteAllApprovedButton:active:not(:disabled) {
           transform: translateY(3px);
           box-shadow:
