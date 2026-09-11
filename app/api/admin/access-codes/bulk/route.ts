@@ -10,11 +10,24 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CODE_CHARS =
-  "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/* =====================================================
+   TYPES
+===================================================== */
+
+type BulkEntry = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+type CreatedUser = {
+  id: string;
+  name: string;
+  code: string;
+};
 
 /* =====================================================
-   ADMIN
+   ADMIN TEKSHIRISH
 ===================================================== */
 
 async function isAdmin() {
@@ -38,7 +51,14 @@ async function isAdmin() {
 }
 
 /* =====================================================
-   RANDOM
+   KOD BELGILARI
+===================================================== */
+
+const CODE_CHARS =
+  "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/* =====================================================
+   RANDOM QISM
 ===================================================== */
 
 function randomPart(
@@ -66,6 +86,13 @@ function randomPart(
   return result;
 }
 
+/* =====================================================
+   KIRISH KODI
+
+   Masalan:
+   QURBONOV-7K4M-92PX
+===================================================== */
+
 function makeAccessCode() {
   return (
     "QURBONOV-" +
@@ -76,13 +103,14 @@ function makeAccessCode() {
 }
 
 /* =====================================================
-   UNIQUE KODLAR
+   UNIQUE KODLAR YARATISH
 ===================================================== */
 
 async function createUniqueCodes(
   count: number
-) {
-  const result: string[] = [];
+): Promise<string[]> {
+  const result: string[] =
+    [];
 
   const reserved =
     new Set<string>();
@@ -101,7 +129,8 @@ async function createUniqueCodes(
     }
 
     const needed =
-      count - result.length;
+      count -
+      result.length;
 
     const candidates:
       string[] = [];
@@ -142,18 +171,23 @@ async function createUniqueCodes(
       `;
 
     const existingCodes =
-      new Set(
+      new Set<string>(
         existing.map(
           (row: any) =>
-            String(row.code)
+            String(
+              row.code
+            )
         )
       );
 
     for (
-      const code of candidates
+      const code of
+      candidates
     ) {
       if (
-        !existingCodes.has(code)
+        !existingCodes.has(
+          code
+        )
       ) {
         result.push(code);
       }
@@ -174,6 +208,10 @@ export async function POST(
   request: NextRequest
 ) {
   try {
+    /* =================================================
+       ADMIN TEKSHIRISH
+    ================================================= */
+
     if (
       !(await isAdmin())
     ) {
@@ -190,22 +228,41 @@ export async function POST(
       );
     }
 
-    const body =
+    /* =================================================
+       BODY
+    ================================================= */
+
+    const body:
+      Record<
+        string,
+        unknown
+      > =
       await request
         .json()
-        .catch(() => ({}));
+        .catch(
+          () => ({})
+        );
 
-    const incoming =
+    /* =================================================
+       ISMLARNI OLISH
+    ================================================= */
+
+    const incoming:
+      unknown[] =
       Array.isArray(
-        body?.names
+        body.names
       )
         ? body.names
         : [];
 
-    const names =
+    const names:
+      string[] =
       incoming
         .map(
-          (value: unknown) =>
+          (
+            value:
+              unknown
+          ): string =>
             String(
               value || ""
             )
@@ -215,7 +272,17 @@ export async function POST(
               )
               .trim()
         )
-        .filter(Boolean);
+        .filter(
+          (
+            value:
+              string
+          ): boolean =>
+            Boolean(value)
+        );
+
+    /* =================================================
+       BO‘SH RO‘YXAT
+    ================================================= */
 
     if (
       names.length === 0
@@ -233,6 +300,10 @@ export async function POST(
       );
     }
 
+    /* =================================================
+       LIMIT
+    ================================================= */
+
     if (
       names.length > 500
     ) {
@@ -248,6 +319,10 @@ export async function POST(
         }
       );
     }
+
+    /* =================================================
+       ISM UZUNLIGI
+    ================================================= */
 
     for (
       const name of names
@@ -269,17 +344,29 @@ export async function POST(
       }
     }
 
-    const codes =
+    /* =================================================
+       KODLARNI YARATISH
+    ================================================= */
+
+    const codes:
+      string[] =
       await createUniqueCodes(
         names.length
       );
 
-    const entries =
+    /* =================================================
+       DATABASE UCHUN MA’LUMOT
+    ================================================= */
+
+    const entries:
+      BulkEntry[] =
       names.map(
         (
-          name,
-          index
-        ) => ({
+          name:
+            string,
+          index:
+            number
+        ): BulkEntry => ({
           id:
             crypto.randomUUID(),
 
@@ -294,6 +381,15 @@ export async function POST(
       JSON.stringify(
         entries
       );
+
+    /* =================================================
+       BAZAGA BITTA SO‘ROVDA YOZISH
+
+       active = TRUE
+       approved = TRUE
+
+       Demak kod darhol ishlaydi.
+    ================================================= */
 
     const rows =
       await sql`
@@ -325,52 +421,83 @@ export async function POST(
           code TEXT,
           name TEXT
         )
+        ON CONFLICT (code)
+        DO NOTHING
         RETURNING
           id,
           code,
           name
       `;
 
-    const rowMap =
-      new Map(
-        rows.map(
-          (row: any) => [
-            String(row.code),
+    /* =================================================
+       NATIJANI FORMATLASH
+    ================================================= */
 
-            {
-              id:
-                String(row.id),
+    const createdUsers:
+      CreatedUser[] =
+      rows.map(
+        (
+          row: any
+        ): CreatedUser => ({
+          id:
+            String(
+              row.id
+            ),
 
-              name:
-                String(row.name),
+          name:
+            String(
+              row.name
+            ),
 
-              code:
-                String(row.code),
-            },
-          ]
-        )
+          code:
+            String(
+              row.code
+            ),
+        })
       );
 
-    const users =
-      entries
-        .map(
-          (entry) =>
-            rowMap.get(
-              entry.code
-            )
-        )
-        .filter(Boolean);
+    /* =================================================
+       HAMMASI YARATILDIMI?
+    ================================================= */
+
+    if (
+      createdUsers.length !==
+      names.length
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          message:
+            `${createdUsers.length} ta kod yaratildi. ${names.length} ta kodning hammasi yaratilmagan.`,
+
+          count:
+            createdUsers.length,
+
+          users:
+            createdUsers,
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    /* =================================================
+       SUCCESS
+    ================================================= */
 
     return NextResponse.json({
       success: true,
 
       count:
-        users.length,
+        createdUsers.length,
 
-      users,
+      users:
+        createdUsers,
 
       message:
-        `${users.length} ta kod yaratildi.`,
+        `${createdUsers.length} ta kod yaratildi.`,
     });
   } catch (error) {
     console.error(
