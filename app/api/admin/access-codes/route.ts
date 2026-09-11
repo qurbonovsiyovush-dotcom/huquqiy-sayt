@@ -290,6 +290,7 @@ export async function GET() {
    restore
    deactivate
    delete
+   delete-all-pending
    delete-all-approved
 ===================================================== */
 
@@ -426,7 +427,45 @@ export async function POST(
     }
 
     /* =================================================
-       2. RUXSAT BERILGANLARNING HAMMASINI O‘CHIRISH
+       2. KIRISH SO‘ROVLARINING HAMMASINI O‘CHIRISH
+
+       Faqat:
+       active = TRUE
+       approved = FALSE
+       requested_at IS NOT NULL
+
+       bo‘lgan, ya’ni aynan "Kirish so‘rovlari"da
+       turgan foydalanuvchilar o‘chiriladi.
+
+       Ishlatilmagan kodlar, ruxsat berilganlar va
+       bloklanganlarga tegmaydi.
+    ================================================= */
+
+    if (
+      action ===
+      "delete-all-pending"
+    ) {
+      const deleted =
+        await sql`
+          DELETE FROM access_codes
+          WHERE
+            active = TRUE
+            AND approved = FALSE
+            AND requested_at IS NOT NULL
+          RETURNING id
+        `;
+
+      return NextResponse.json({
+        success: true,
+        deletedCount:
+          deleted.length,
+        message:
+          `${deleted.length} ta kirish so‘rovi o‘chirildi.`,
+      });
+    }
+
+    /* =================================================
+       3. RUXSAT BERILGANLARNING HAMMASINI O‘CHIRISH
 
        Bu amal faqat active = TRUE va approved = TRUE
        bo‘lgan foydalanuvchilarni o‘chiradi.
