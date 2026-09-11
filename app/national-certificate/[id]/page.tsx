@@ -2593,16 +2593,18 @@ function PageStyles() {
         font-weight: 700;
       }
 
-      /* Eyler–Venn: shakldan keyingi ortiqcha bo‘shliqni qisqartirish */
+      /* ===== EYLER–VENN: TEPADAGI YOZUVLAR + PASTDAGI BO‘SHLIQ ===== */
       .questionText.htmlContent .nc-venn2,
       .questionText.htmlContent .nc-object[data-kind="venn2"] {
         display: block !important;
+        position: relative !important;
         width: min(760px, 100%) !important;
         height: 330px !important;
         min-height: 0 !important;
-        margin: 14px auto 8px !important;
+        margin: 16px auto -135px !important;
         padding: 0 !important;
         clear: both !important;
+        float: none !important;
         overflow: visible !important;
       }
 
@@ -2612,14 +2614,58 @@ function PageStyles() {
         width: 100% !important;
         height: 100% !important;
         margin: 0 auto !important;
+        overflow: visible !important;
       }
 
+      /* Venn tepasidagi I va II sarlavhalari kesilmasin */
+      .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(1),
+      .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(2),
+      .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:nth-of-type(1),
+      .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:nth-of-type(2) {
+        height: 72px !important;
+        overflow: visible !important;
+      }
+
+      .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(1) > div,
+      .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(2) > div,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:nth-of-type(1) > div,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:nth-of-type(2) > div {
+        height: 72px !important;
+        overflow: visible !important;
+        font-size: 16px !important;
+        line-height: 1.08 !important;
+        font-weight: 700 !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding-top: 2px !important;
+        text-align: center !important;
+        white-space: normal !important;
+      }
+
+      /* Pastdagi III izohi */
+      .questionText.htmlContent .nc-venn2 foreignObject:last-of-type > div,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:last-of-type > div {
+        font-size: 16px !important;
+        line-height: 1.15 !important;
+        font-weight: 700 !important;
+      }
+
+      /* Designer avtomatik qo‘shgan bo‘sh paragrafni butunlay olib tashlaymiz */
       .questionText.htmlContent .nc-venn2 + p,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
+        display: none !important;
         min-height: 0 !important;
+        height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
-        line-height: 0.35 !important;
+        line-height: 0 !important;
+      }
+
+      /* Venn ortidan keladigan matn diagrammaga yaqin boshlansin */
+      .questionText.htmlContent .nc-venn2 + p + *,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] + p + * {
+        margin-top: 14px !important;
       }
 
       .htmlContent img {
@@ -3214,8 +3260,8 @@ function PageStyles() {
         .questionText.htmlContent .nc-venn2,
         .questionText.htmlContent .nc-object[data-kind="venn2"] {
           height: 285px !important;
-          margin-top: 10px !important;
-          margin-bottom: 6px !important;
+          margin-top: 12px !important;
+          margin-bottom: -105px !important;
         }
 
         .option {
