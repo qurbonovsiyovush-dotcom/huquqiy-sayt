@@ -2593,16 +2593,19 @@ function PageStyles() {
         font-weight: 700;
       }
 
-      /* ===== EYLER–VENN: KATTA SHAKL + TO‘LIQ SARLAVHA + KAM BO‘SHLIQ ===== */
+      /* ===== EYLER–VENN: SHAKL KATTA QOLADI, ORTIQCHA BO‘SHLIQ YO‘Q ===== */
       .questionText.htmlContent .nc-venn2,
       .questionText.htmlContent .nc-object[data-kind="venn2"] {
         display: block !important;
         position: relative !important;
         width: 760px !important;
         max-width: 92% !important;
-        height: 420px !important;
-        min-height: 420px !important;
-        margin: 14px auto -220px !important;
+
+        /* Sahifa layoutida faqat real kontent egallagan balandlik saqlanadi */
+        height: 345px !important;
+        min-height: 345px !important;
+
+        margin: 8px auto 12px !important;
         padding: 0 !important;
         clear: both !important;
         float: none !important;
@@ -2613,8 +2616,13 @@ function PageStyles() {
       .questionText.htmlContent .nc-venn2 > svg,
       .questionText.htmlContent .nc-object[data-kind="venn2"] > svg {
         display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: -45px !important;
+
+        /* SVG ning asl katta o‘lchami saqlanadi — shrink qilinmaydi */
         width: 100% !important;
-        height: 100% !important;
+        height: 420px !important;
         max-width: 100% !important;
         margin: 0 auto !important;
         overflow: visible !important;
@@ -2666,21 +2674,22 @@ function PageStyles() {
         font-weight: 700 !important;
       }
 
-      /* Designer avtomatik qo‘shgan bo‘sh paragrafni minimal qilamiz */
+      /* Designer avtomatik qo‘shgan bo‘sh paragraf joy egallamasin */
       .questionText.htmlContent .nc-venn2 + p,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
         display: block !important;
-        min-height: 6px !important;
-        height: 6px !important;
+        min-height: 0 !important;
+        height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
-        line-height: 6px !important;
+        line-height: 0 !important;
+        overflow: hidden !important;
       }
 
-      /* Venn ortidan keladigan a), b), c)... matn diagrammaga yaqin boshlansin */
+      /* Venn ortidan keladigan a), b), c)... matn normal masofada boshlansin */
       .questionText.htmlContent .nc-venn2 + p + *,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + p + * {
-        margin-top: 8px !important;
+        margin-top: 10px !important;
       }
 
       .htmlContent img {
