@@ -63,9 +63,11 @@ function formatUser(
 ) {
   return {
     id: String(row.id),
+
     code: String(
       row.code || ""
     ),
+
     name: String(
       row.name || ""
     ),
@@ -143,7 +145,7 @@ function makeAccessCode() {
 }
 
 /* =====================================================
-   YANGI UNIQUE KOD TOPISH
+   BITTA UNIQUE KOD TOPISH
 ===================================================== */
 
 async function createUniqueCode() {
@@ -176,6 +178,95 @@ async function createUniqueCode() {
 }
 
 /* =====================================================
+   OMMAVIY UNIQUE KODLAR TOPISH
+===================================================== */
+
+async function createUniqueCodes(
+  count: number
+) {
+  const result: string[] = [];
+
+  const reserved =
+    new Set<string>();
+
+  while (
+    result.length < count
+  ) {
+    const needed =
+      count - result.length;
+
+    const candidates:
+      string[] = [];
+
+    while (
+      candidates.length <
+      needed
+    ) {
+      const code =
+        makeAccessCode();
+
+      if (
+        reserved.has(code)
+      ) {
+        continue;
+      }
+
+      reserved.add(code);
+
+      candidates.push(code);
+    }
+
+    const payload =
+      JSON.stringify(
+        candidates.map(
+          (code) => ({
+            code,
+          })
+        )
+      );
+
+    const existing =
+      await sql`
+        SELECT
+          a.code
+        FROM access_codes a
+        INNER JOIN
+          jsonb_to_recordset(
+            ${payload}::jsonb
+          ) AS x(
+            code TEXT
+          )
+        ON a.code = x.code
+      `;
+
+    const existingCodes =
+      new Set(
+        existing.map(
+          (row: any) =>
+            String(row.code)
+        )
+      );
+
+    for (
+      const code of candidates
+    ) {
+      if (
+        !existingCodes.has(
+          code
+        )
+      ) {
+        result.push(code);
+      }
+    }
+  }
+
+  return result.slice(
+    0,
+    count
+  );
+}
+
+/* =====================================================
    GET
    BARCHA KIRISH KODLARINI OLISH
 ===================================================== */
@@ -188,6 +279,7 @@ export async function GET() {
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Faqat administrator uchun.",
         },
@@ -212,7 +304,8 @@ export async function GET() {
         FROM access_codes
         ORDER BY
           CASE
-            WHEN requested_at IS NOT NULL
+            WHEN
+              requested_at IS NOT NULL
               AND approved = FALSE
               AND active = TRUE
             THEN 0
@@ -258,7 +351,9 @@ export async function GET() {
         users.length,
 
       pendingCount,
+
       approvedCount,
+
       inactiveCount,
     });
   } catch (error) {
@@ -270,6 +365,7 @@ export async function GET() {
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Kirish kodlarini olishda xatolik yuz berdi.",
       },
@@ -284,7 +380,9 @@ export async function GET() {
    POST
 
    action:
+
    create
+   bulk-create
    approve
    reject
    restore
@@ -302,6 +400,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Faqat administrator uchun.",
         },
@@ -324,7 +423,7 @@ export async function POST(
         .toLowerCase();
 
     /* =================================================
-       1. YANGI KOD YARATISH
+       1. BITTA YANGI KOD YARATISH
     ================================================= */
 
     if (
@@ -344,6 +443,7 @@ export async function POST(
         return NextResponse.json(
           {
             success: false,
+
             message:
               "Foydalanuvchi ism-familiyasini kiriting.",
           },
@@ -359,6 +459,7 @@ export async function POST(
         return NextResponse.json(
           {
             success: false,
+
             message:
               "Ism-familiya juda uzun.",
           },
@@ -412,6 +513,7 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+
         message:
           "Yangi kirish kodi yaratildi.",
 
@@ -421,6 +523,159 @@ export async function POST(
           ),
 
         code,
+      });
+    }
+
+    /* =================================================
+       2. OMMAVIY KOD YARATISH
+
+       1 DAN 500 TAGACHA
+
+       BULAR DARHOL TASDIQLANGAN
+       HOLATDA YARATILADI.
+    ================================================= */
+
+    if (
+      action === "bulk-create"
+    ) {
+      const count =
+        Number(
+          body?.count || 0
+        );
+
+      if (
+        !Number.isInteger(
+          count
+        ) ||
+        count < 1 ||
+        count > 500
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+
+            message:
+              "Kodlar soni 1 dan 500 gacha bo‘lishi kerak.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const codes =
+        await createUniqueCodes(
+          count
+        );
+
+      const entries =
+        codes.map(
+          (
+            code,
+            index
+          ) => ({
+            id:
+              crypto.randomUUID(),
+
+            code,
+
+            name:
+              `Talaba ${String(
+                index + 1
+              ).padStart(
+                3,
+                "0"
+              )}`,
+          })
+        );
+
+      const payload =
+        JSON.stringify(
+          entries
+        );
+
+      const rows =
+        await sql`
+          INSERT INTO access_codes (
+            id,
+            code,
+            name,
+            active,
+            approved,
+            requested_at,
+            created_at,
+            approved_at,
+            rejected_at
+          )
+          SELECT
+            x.id,
+            x.code,
+            x.name,
+            TRUE,
+            TRUE,
+            NULL,
+            NOW(),
+            NOW(),
+            NULL
+          FROM
+            jsonb_to_recordset(
+              ${payload}::jsonb
+            ) AS x(
+              id TEXT,
+              code TEXT,
+              name TEXT
+            )
+          ON CONFLICT (code)
+          DO NOTHING
+          RETURNING
+            id,
+            code,
+            name,
+            active,
+            approved,
+            requested_at,
+            created_at,
+            approved_at,
+            rejected_at
+        `;
+
+      if (
+        rows.length !== count
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+
+            message:
+              `${rows.length} ta kod yaratildi. ${count} ta kod to‘liq yaratilmaganligi sababli qayta urinib ko‘ring.`,
+
+            count:
+              rows.length,
+
+            users:
+              rows.map(
+                formatUser
+              ),
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+
+        message:
+          `${rows.length} ta kirish kodi yaratildi.`,
+
+        count:
+          rows.length,
+
+        users:
+          rows.map(
+            formatUser
+          ),
       });
     }
 
@@ -437,6 +692,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Foydalanuvchi ID topilmadi.",
         },
@@ -469,6 +725,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Kirish kodi topilmadi.",
         },
@@ -479,7 +736,7 @@ export async function POST(
     }
 
     /* =================================================
-       2. TASDIQLASH
+       3. TASDIQLASH
     ================================================= */
 
     if (
@@ -508,8 +765,10 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+
         message:
           "Foydalanuvchiga kirish ruxsati berildi.",
+
         user:
           formatUser(
             rows[0]
@@ -518,7 +777,7 @@ export async function POST(
     }
 
     /* =================================================
-       3. RAD ETISH
+       4. RAD ETISH
     ================================================= */
 
     if (
@@ -547,8 +806,10 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+
         message:
           "Foydalanuvchining kirish so‘rovi rad etildi.",
+
         user:
           formatUser(
             rows[0]
@@ -557,7 +818,7 @@ export async function POST(
     }
 
     /* =================================================
-       4. QAYTA FAOLLASHTIRISH
+       5. QAYTA FAOLLASHTIRISH
 
        Kod ishlaydi, lekin yana admin
        tasdig‘ini kutadi.
@@ -590,8 +851,10 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+
         message:
           "Kirish kodi qayta faollashtirildi.",
+
         user:
           formatUser(
             rows[0]
@@ -600,7 +863,7 @@ export async function POST(
     }
 
     /* =================================================
-       5. KODNI BLOKLASH
+       6. KODNI BLOKLASH
     ================================================= */
 
     if (
@@ -630,8 +893,10 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+
         message:
           "Kirish kodi bloklandi.",
+
         user:
           formatUser(
             rows[0]
@@ -640,7 +905,7 @@ export async function POST(
     }
 
     /* =================================================
-       6. BUTUNLAY O‘CHIRISH
+       7. BUTUNLAY O‘CHIRISH
     ================================================= */
 
     if (
@@ -653,8 +918,10 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
+
         message:
           "Kirish kodi o‘chirildi.",
+
         id,
       });
     }
@@ -666,6 +933,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Noma’lum amal.",
       },
@@ -682,6 +950,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Kirish kodini boshqarishda server xatosi yuz berdi.",
       },
