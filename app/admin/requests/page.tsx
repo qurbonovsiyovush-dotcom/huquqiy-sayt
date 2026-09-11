@@ -1402,17 +1402,17 @@ export default function AdminRequestsPage() {
             type="button"
             className="managementCard bulkManagement"
             onClick={() =>
-              setActiveSection(
-                "bulk-create"
+              router.push(
+                "/admin/bulk-codes"
               )
             }
           >
             <span className="managementIcon">
-              250
+              PDF
             </span>
 
             <strong>
-              Ommaviy parol yaratish
+              Ommaviy kodlar
             </strong>
           </button>
 
