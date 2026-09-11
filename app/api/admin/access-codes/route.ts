@@ -290,6 +290,7 @@ export async function GET() {
    restore
    deactivate
    delete
+   approve-all-pending
    delete-all-pending
    delete-all-approved
 ===================================================== */
@@ -427,7 +428,46 @@ export async function POST(
     }
 
     /* =================================================
-       2. KIRISH SO‘ROVLARINING HAMMASINI O‘CHIRISH
+       2. KIRISH SO‘ROVLARINING HAMMASIGA RUXSAT BERISH
+
+       Faqat aynan "Kirish so‘rovlari"da turgan:
+       active = TRUE
+       approved = FALSE
+       requested_at IS NOT NULL
+
+       foydalanuvchilar tasdiqlanadi.
+    ================================================= */
+
+    if (
+      action ===
+      "approve-all-pending"
+    ) {
+      const approved =
+        await sql`
+          UPDATE access_codes
+          SET
+            active = TRUE,
+            approved = TRUE,
+            approved_at = NOW(),
+            rejected_at = NULL
+          WHERE
+            active = TRUE
+            AND approved = FALSE
+            AND requested_at IS NOT NULL
+          RETURNING id
+        `;
+
+      return NextResponse.json({
+        success: true,
+        approvedCount:
+          approved.length,
+        message:
+          `${approved.length} ta kirish so‘roviga ruxsat berildi.`,
+      });
+    }
+
+    /* =================================================
+       3. KIRISH SO‘ROVLARINING HAMMASINI O‘CHIRISH
 
        Faqat:
        active = TRUE
