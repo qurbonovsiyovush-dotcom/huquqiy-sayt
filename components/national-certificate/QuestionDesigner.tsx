@@ -52,6 +52,16 @@ function cleanHtml(root: HTMLElement) {
         "nc-selected"
       );
 
+      node.removeAttribute(
+        "data-nc-cell-selected"
+      );
+
+      if (
+        node instanceof HTMLElement
+      ) {
+        node.style.boxShadow = "";
+      }
+
       if (
         node.hasAttribute(
           "data-nc-ui"
@@ -79,8 +89,21 @@ export default function QuestionDesigner({
       null
     );
 
+  const selectedTableCellRef =
+    useRef<HTMLTableCellElement | null>(
+      null
+    );
+
   const [selectedId, setSelectedId] =
     useState<string>("");
+
+  const [selectionBox, setSelectionBox] =
+    useState<{
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    } | null>(null);
 
   const [fill, setFill] =
     useState("#ffffff");
@@ -108,6 +131,8 @@ export default function QuestionDesigner({
     top: number;
     width: number;
     height: number;
+    ratio: number;
+    lockRatio: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -164,6 +189,7 @@ export default function QuestionDesigner({
         )}px`;
 
         emit();
+        syncSelectionSoon(data.id);
       }
 
       if (resizeRef.current) {
@@ -230,15 +256,109 @@ export default function QuestionDesigner({
             data.top + dy;
         }
 
-        width = Math.max(
-          40,
-          width
-        );
+        /*
+          Venn diagrammalarida proporsiyani QAT'IY saqlaymiz.
+          Shunda parent kichrayganda ichidagi matn va doiralar
+          alohida-alohida siqilib, ustma-ust tushmaydi.
+        */
+        if (data.lockRatio) {
+          const ratio =
+            data.ratio || 1;
 
-        height = Math.max(
-          30,
-          height
-        );
+          const horizontalHandle =
+            data.handle === "e" ||
+            data.handle === "w";
+
+          const verticalHandle =
+            data.handle === "n" ||
+            data.handle === "s";
+
+          if (horizontalHandle) {
+            width = Math.max(
+              180,
+              width
+            );
+
+            height =
+              width / ratio;
+          } else if (verticalHandle) {
+            height = Math.max(
+              110,
+              height
+            );
+
+            width =
+              height * ratio;
+          } else {
+            const widthScale =
+              Math.abs(
+                width /
+                  Math.max(
+                    data.width,
+                    1
+                  )
+              );
+
+            const heightScale =
+              Math.abs(
+                height /
+                  Math.max(
+                    data.height,
+                    1
+                  )
+              );
+
+            const scale =
+              Math.max(
+                widthScale,
+                heightScale
+              );
+
+            width = Math.max(
+              180,
+              data.width * scale
+            );
+
+            height =
+              width / ratio;
+          }
+
+          /*
+            G'arb / shimol tutqichlarida qarama-qarshi chet
+            joyida qolishi uchun left/top ni qayta hisoblaymiz.
+          */
+          if (
+            data.handle.includes(
+              "w"
+            )
+          ) {
+            left =
+              data.left +
+              data.width -
+              width;
+          }
+
+          if (
+            data.handle.includes(
+              "n"
+            )
+          ) {
+            top =
+              data.top +
+              data.height -
+              height;
+          }
+        } else {
+          width = Math.max(
+            40,
+            width
+          );
+
+          height = Math.max(
+            30,
+            height
+          );
+        }
 
         node.style.left = `${Math.max(
           0,
@@ -254,6 +374,7 @@ export default function QuestionDesigner({
         node.style.height = `${height}px`;
 
         emit();
+        syncSelectionSoon(data.id);
       }
     }
 
@@ -284,6 +405,50 @@ export default function QuestionDesigner({
       );
     };
   }, []);
+
+  useEffect(() => {
+    const root =
+      editorRef.current;
+
+    const wrap =
+      root?.parentElement as HTMLElement | null;
+
+    if (!selectedId) {
+      setSelectionBox(null);
+      return;
+    }
+
+    syncSelectionSoon(
+      selectedId
+    );
+
+    const handle = () =>
+      updateSelectionBox(
+        selectedId
+      );
+
+    window.addEventListener(
+      "resize",
+      handle
+    );
+
+    wrap?.addEventListener(
+      "scroll",
+      handle
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        handle
+      );
+
+      wrap?.removeEventListener(
+        "scroll",
+        handle
+      );
+    };
+  }, [selectedId]);
 
   function emit() {
     const root =
@@ -343,24 +508,144 @@ export default function QuestionDesigner({
     ) as HTMLElement | null;
   }
 
-  function applyObjectStyle() {
+
+  function updateSelectionBox(
+    id = selectedId
+  ) {
+    const root =
+      editorRef.current;
+
+    const wrap =
+      root?.parentElement as HTMLElement | null;
+
+    if (
+      !root ||
+      !wrap ||
+      !id
+    ) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const node =
+      root.querySelector(
+        `[data-object-id="${id}"]`
+      ) as HTMLElement | null;
+
+    if (!node) {
+      setSelectionBox(null);
+      return;
+    }
+
+    const nodeRect =
+      node.getBoundingClientRect();
+
+    const wrapRect =
+      wrap.getBoundingClientRect();
+
+    setSelectionBox({
+      left:
+        nodeRect.left -
+        wrapRect.left +
+        wrap.scrollLeft,
+      top:
+        nodeRect.top -
+        wrapRect.top +
+        wrap.scrollTop,
+      width:
+        nodeRect.width,
+      height:
+        nodeRect.height,
+    });
+  }
+
+  function syncSelectionSoon(
+    id = selectedId
+  ) {
+    requestAnimationFrame(() =>
+      updateSelectionBox(id)
+    );
+  }
+
+  function applyObjectStyleValues(
+    nextFill: string,
+    nextStroke: string,
+    nextStrokeWidth: number
+  ) {
     const node =
       selectedObject();
 
     if (!node) return;
 
-    node.style.backgroundColor =
-      fill;
+    const kind =
+      node.getAttribute(
+        "data-kind"
+      ) || "";
 
     node.style.borderColor =
-      stroke;
+      nextStroke;
 
-    node.style.borderWidth = `${strokeWidth}px`;
+    node.style.borderWidth = `${nextStrokeWidth}px`;
 
     node.style.borderStyle =
       "solid";
 
+    if (
+      kind === "line"
+    ) {
+      node.style.background =
+        nextStroke;
+
+      node.style.boxShadow =
+        "0 2px 2px rgba(0,0,0,.25)";
+    } else if (
+      node.classList.contains(
+        "nc-3d-object"
+      )
+    ) {
+      node.style.background =
+        threeDBackground(
+          nextFill
+        );
+
+      node.style.boxShadow =
+        threeDShadow(
+          nextStroke
+        );
+    } else {
+      node.style.background =
+        nextFill;
+    }
+
     emit();
+    syncSelectionSoon();
+  }
+
+  function applyObjectStyle() {
+    applyObjectStyleValues(
+      fill,
+      stroke,
+      strokeWidth
+    );
+  }
+
+  function threeDBackground(
+    base: string
+  ) {
+    return `linear-gradient(180deg,
+      color-mix(in srgb, ${base} 58%, white) 0%,
+      color-mix(in srgb, ${base} 82%, white) 18%,
+      ${base} 58%,
+      color-mix(in srgb, ${base} 82%, black) 100%)`;
+  }
+
+  function threeDShadow(
+    borderColor: string
+  ) {
+    return `inset 0 4px 3px rgba(255,255,255,.72),
+      inset 0 -3px 3px rgba(0,0,0,.12),
+      0 7px 0 color-mix(in srgb, ${borderColor} 72%, black),
+      0 10px 14px rgba(0,0,0,.22)`;
   }
 
   function insertObject(
@@ -404,8 +689,22 @@ export default function QuestionDesigner({
         ? ""
         : "Matn";
 
+    const background =
+      kind === "line"
+        ? stroke
+        : threeDBackground(
+            fill
+          );
+
+    const shadow =
+      kind === "line"
+        ? "0 2px 2px rgba(0,0,0,.25)"
+        : threeDShadow(
+            stroke
+          );
+
     insertHtml(
-      `<div class="nc-object" data-object-id="${id}" data-kind="${kind}" contenteditable="${
+      `<div class="nc-object nc-3d-object" data-object-id="${id}" data-kind="${kind}" contenteditable="${
         kind === "line"
           ? "false"
           : "true"
@@ -417,187 +716,120 @@ export default function QuestionDesigner({
         kind === "line"
           ? 0
           : 12
-      }px;border:${strokeWidth}px solid ${stroke};border-radius:${radius};background:${fill};font-weight:700;text-align:center;box-sizing:border-box;">${text}</div><p><br></p>`
+      }px;border:${strokeWidth}px solid ${stroke};border-radius:${radius};background:${background};box-shadow:${shadow};font-weight:800;text-align:center;box-sizing:border-box;">${text}</div><p><br></p>`
     );
   }
 
   function insertVenn2() {
     const id = uid();
+    const clipId = `clip-${id}`;
 
     insertHtml(
-      `<div
-        class="nc-venn nc-object"
-        data-object-id="${id}"
-        data-kind="venn2"
-        contenteditable="true"
-        style="
-          position:relative;
-          width:720px;
-          max-width:96%;
-          height:285px;
-          margin:14px auto 8px;
-          padding:0;
-          border:0;
-          background:#fff;
-          box-sizing:border-box;
-          overflow:visible;
-        "
-      >
+      `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" data-lock-ratio="true" contenteditable="false"
+        style="position:relative;width:760px;max-width:96%;height:320px;margin:14px auto 8px;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
+        <svg viewBox="0 0 760 320" width="100%" height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          style="display:block;width:100%;height:100%;overflow:visible;">
+          <defs>
+            <clipPath id="${clipId}">
+              <ellipse cx="300" cy="165" rx="155" ry="95"></ellipse>
+            </clipPath>
+          </defs>
 
-        <div
-          style="
-            position:absolute;
-            left:40px;
-            top:0;
-            width:280px;
-            min-height:48px;
-            text-align:center;
-            font-size:17px;
-            line-height:1.1;
-            font-weight:700;
-          "
-        >
-          I — Chap to‘plamga xos
-        </div>
+          <foreignObject x="35" y="4" width="300" height="58">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:visible;padding-top:2px;box-sizing:border-box;">
+              I — Unitar davlatga xos
+            </div>
+          </foreignObject>
 
-        <div
-          style="
-            position:absolute;
-            right:40px;
-            top:0;
-            width:280px;
-            min-height:48px;
-            text-align:center;
-            font-size:17px;
-            line-height:1.1;
-            font-weight:700;
-          "
-        >
-          II — O‘ng to‘plamga xos
-        </div>
+          <foreignObject x="425" y="4" width="300" height="58">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:visible;padding-top:2px;box-sizing:border-box;">
+              II — Federativ davlatga xos
+            </div>
+          </foreignObject>
 
-        <div
-          style="
-            position:absolute;
-            left:120px;
-            top:55px;
-            width:310px;
-            height:185px;
-            border:3px solid #263b46;
-            border-radius:50%;
-            background:#fff;
-            box-sizing:border-box;
-          "
-        ></div>
+          <ellipse cx="455" cy="165" rx="155" ry="95"
+            fill="#bca7e8" fill-opacity="0.72"
+            clip-path="url(#${clipId})"></ellipse>
 
-        <div
-          style="
-            position:absolute;
-            right:120px;
-            top:55px;
-            width:310px;
-            height:185px;
-            border:3px solid #263b46;
-            border-radius:50%;
-            background:#fff;
-            box-sizing:border-box;
-          "
-        ></div>
+          <ellipse cx="300" cy="165" rx="155" ry="95"
+            fill="white" fill-opacity="0.01"
+            stroke="#263b46" stroke-width="3"></ellipse>
 
-        <div
-          style="
-            position:absolute;
-            left:305px;
-            top:58px;
-            width:110px;
-            height:179px;
-            border-radius:48%;
-            background:rgba(160,130,220,.55);
-            pointer-events:none;
-          "
-        ></div>
+          <ellipse cx="455" cy="165" rx="155" ry="95"
+            fill="white" fill-opacity="0.01"
+            stroke="#263b46" stroke-width="3"></ellipse>
 
-        <div
-          style="
-            position:absolute;
-            left:205px;
-            top:132px;
-            font-size:22px;
-            font-weight:800;
-          "
-        >
-          I
-        </div>
+          <foreignObject x="190" y="141" width="90" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">I</div>
+          </foreignObject>
 
-        <div
-          style="
-            position:absolute;
-            right:205px;
-            top:132px;
-            font-size:22px;
-            font-weight:800;
-          "
-        >
-          II
-        </div>
+          <foreignObject x="477" y="141" width="90" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">II</div>
+          </foreignObject>
 
-        <div
-          style="
-            position:absolute;
-            left:50%;
-            transform:translateX(-50%);
-            top:132px;
-            font-size:22px;
-            font-weight:900;
-          "
-        >
-          III
-        </div>
+          <foreignObject x="334" y="141" width="90" height="48">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:900;outline:none;overflow:hidden;">III</div>
+          </foreignObject>
 
-        <div
-          style="
-            position:absolute;
-            left:50%;
-            transform:translateX(-50%);
-            top:250px;
-            width:330px;
-            text-align:center;
-            font-size:17px;
-            line-height:1.1;
-            font-weight:700;
-          "
-        >
-          III — har ikkalasiga xos
-        </div>
-
+          <foreignObject x="190" y="275" width="380" height="36">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:visible;">
+              III — har ikkalasiga xos
+            </div>
+          </foreignObject>
+        </svg>
       </div>`
     );
   }
-
 
   function insertVenn3() {
     const id = uid();
 
     insertHtml(
-      `<div class="nc-venn nc-object" data-object-id="${id}" data-kind="venn3" contenteditable="true" style="position:relative;width:720px;max-width:96%;height:470px;margin:22px auto;border:0;background:#fff;">
-        <div style="position:absolute;left:65px;top:75px;width:330px;height:245px;border:3px solid #263b46;border-radius:50%;background:rgba(77,176,225,.12);"></div>
-        <div style="position:absolute;right:65px;top:75px;width:330px;height:245px;border:3px solid #263b46;border-radius:50%;background:rgba(85,204,155,.12);"></div>
-        <div style="position:absolute;left:195px;top:185px;width:330px;height:245px;border:3px solid #263b46;border-radius:50%;background:rgba(241,187,74,.12);"></div>
-        <div style="position:absolute;left:90px;top:28px;font-weight:800;">A to‘plam</div>
-        <div style="position:absolute;right:90px;top:28px;font-weight:800;">B to‘plam</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:2px;font-weight:800;">C to‘plam</div>
-        <div style="position:absolute;left:150px;top:170px;font-weight:800;">I</div>
-        <div style="position:absolute;right:150px;top:170px;font-weight:800;">II</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:345px;font-weight:800;">III</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:145px;font-weight:800;">IV</div>
-        <div style="position:absolute;left:255px;top:270px;font-weight:800;">V</div>
-        <div style="position:absolute;right:255px;top:270px;font-weight:800;">VI</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:235px;font-weight:900;">VII</div>
+      `<div class="nc-object nc-venn3" data-object-id="${id}" data-kind="venn3" data-lock-ratio="true" contenteditable="false"
+        style="position:relative;width:720px;max-width:96%;height:470px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
+        <svg viewBox="0 0 720 470" width="100%" height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          style="display:block;width:100%;height:100%;overflow:visible;">
+
+          <ellipse cx="285" cy="195" rx="170" ry="125"
+            fill="rgba(77,176,225,.12)" stroke="#263b46" stroke-width="3"></ellipse>
+          <ellipse cx="435" cy="195" rx="170" ry="125"
+            fill="rgba(85,204,155,.12)" stroke="#263b46" stroke-width="3"></ellipse>
+          <ellipse cx="360" cy="310" rx="170" ry="125"
+            fill="rgba(241,187,74,.12)" stroke="#263b46" stroke-width="3"></ellipse>
+
+          <foreignObject x="70" y="8" width="220" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">A to‘plam</div>
+          </foreignObject>
+          <foreignObject x="430" y="8" width="220" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">B to‘plam</div>
+          </foreignObject>
+          <foreignObject x="250" y="425" width="220" height="42">
+            <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">C to‘plam</div>
+          </foreignObject>
+
+          <foreignObject x="155" y="157" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">I</div></foreignObject>
+          <foreignObject x="465" y="157" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">II</div></foreignObject>
+          <foreignObject x="310" y="362" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">III</div></foreignObject>
+          <foreignObject x="310" y="127" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">IV</div></foreignObject>
+          <foreignObject x="230" y="257" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">V</div></foreignObject>
+          <foreignObject x="390" y="257" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;outline:none;overflow:hidden;">VI</div></foreignObject>
+          <foreignObject x="310" y="217" width="100" height="48"><div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:900;outline:none;overflow:hidden;">VII</div></foreignObject>
+        </svg>
       </div><p><br></p>`
     );
   }
 
   function insertTable() {
+    const id = uid();
+
     const rows =
       Math.max(
         1,
@@ -644,7 +876,7 @@ export default function QuestionDesigner({
       ).join("");
 
     insertHtml(
-      `<div class="nc-table-wrap" style="overflow-x:auto;margin:16px 0;"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
+      `<div class="nc-table-wrap nc-object" data-object-id="${id}" data-kind="table" contenteditable="false" style="position:relative;overflow-x:auto;margin:16px 0;width:100%;box-sizing:border-box;border:2px solid #536a75;border-radius:10px;background:#fff;box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 6px 0 #617782,0 9px 12px rgba(0,0,0,.18);"><table style="width:100%;border-collapse:collapse;background:#fff;">${body}</table></div><p><br></p>`
     );
   }
 
@@ -652,14 +884,296 @@ export default function QuestionDesigner({
     const id = uid();
 
     insertHtml(
-      `<div class="nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="true" style="position:relative;width:620px;max-width:96%;height:280px;margin:18px auto;border:2px dashed #6c7d86;background:#fff;">
-        <div style="position:absolute;left:0;right:0;top:33%;border-top:2px solid #263b46;"></div>
-        <div style="position:absolute;left:0;right:0;top:66%;border-top:2px solid #263b46;"></div>
-        <div style="position:absolute;top:0;bottom:0;left:33%;border-left:2px solid #263b46;"></div>
-        <div style="position:absolute;top:0;bottom:0;left:66%;border-left:2px solid #263b46;"></div>
-        <div style="padding:12px;font-weight:700;">Qo‘lda jadval: chiziqlarni tanlab o‘zgartiring yoki yangi chiziq qo‘shing.</div>
+      `<div class="nc-table-object nc-object" data-object-id="${id}" data-kind="manual-table" contenteditable="false" style="position:relative;width:620px;max-width:96%;margin:18px auto;background:#fff;padding:4px;box-sizing:border-box;border:2px solid #536a75;border-radius:10px;box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 6px 0 #617782,0 9px 12px rgba(0,0,0,.18);">
+        <table data-manual-table="true" contenteditable="false" style="width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;">
+          <tbody>
+            <tr>
+              <td contenteditable="true" style="border:2px solid #263b46;height:58px;padding:8px;vertical-align:middle;"></td>
+            </tr>
+          </tbody>
+        </table>
       </div><p><br></p>`
     );
+  }
+
+  function currentTableCell() {
+    return selectedTableCellRef.current;
+  }
+
+  function currentTable() {
+    const cell = currentTableCell();
+    return cell?.closest("table") as HTMLTableElement | null;
+  }
+
+  function selectTableCell(
+    cell: HTMLTableCellElement | null
+  ) {
+    editorRef.current
+      ?.querySelectorAll("[data-nc-cell-selected='true']")
+      .forEach((node) => {
+        node.removeAttribute("data-nc-cell-selected");
+        (node as HTMLElement).style.boxShadow = "";
+      });
+
+    selectedTableCellRef.current = cell;
+
+    if (cell) {
+      cell.setAttribute("data-nc-cell-selected", "true");
+      cell.style.boxShadow = "inset 0 0 0 3px #0a9ee8";
+    }
+  }
+
+  function addTableRow() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row = cell.parentElement as HTMLTableRowElement;
+    const newRow = table.insertRow(row.rowIndex + 1);
+
+    const columns = Math.max(
+      1,
+      row.cells.length
+    );
+
+    for (let i = 0; i < columns; i++) {
+      const td = newRow.insertCell();
+      td.contentEditable = "true";
+      td.style.border = "2px solid #263b46";
+      td.style.height = "58px";
+      td.style.padding = "8px";
+      td.style.verticalAlign = "middle";
+    }
+
+    emit();
+  }
+
+  function addTableColumn() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const colIndex =
+      cell.cellIndex + 1;
+
+    Array.from(table.rows).forEach((row) => {
+      const td = row.insertCell(
+        Math.min(
+          colIndex,
+          row.cells.length
+        )
+      );
+
+      td.contentEditable = "true";
+      td.style.border = "2px solid #263b46";
+      td.style.height = "58px";
+      td.style.padding = "8px";
+      td.style.verticalAlign = "middle";
+    });
+
+    emit();
+  }
+
+  function deleteTableRow() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    if (table.rows.length <= 1) {
+      window.alert("Jadvalda kamida 1 qator qolishi kerak.");
+      return;
+    }
+
+    const row = cell.parentElement as HTMLTableRowElement;
+    table.deleteRow(row.rowIndex);
+    selectTableCell(null);
+    emit();
+  }
+
+  function deleteTableColumn() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    if (cell.parentElement && (cell.parentElement as HTMLTableRowElement).cells.length <= 1) {
+      window.alert("Jadvalda kamida 1 ustun qolishi kerak.");
+      return;
+    }
+
+    const index = cell.cellIndex;
+
+    Array.from(table.rows).forEach((row) => {
+      if (row.cells[index]) {
+        row.deleteCell(index);
+      }
+    });
+
+    selectTableCell(null);
+    emit();
+  }
+
+  function mergeCellRight() {
+    const cell = currentTableCell();
+
+    if (!cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement;
+
+    const next =
+      row.cells[cell.cellIndex + 1];
+
+    if (!next) {
+      window.alert("O‘ng tomonda qo‘shiladigan katak yo‘q.");
+      return;
+    }
+
+    cell.colSpan =
+      (cell.colSpan || 1) +
+      (next.colSpan || 1);
+
+    if (next.innerHTML.trim()) {
+      cell.innerHTML +=
+        (cell.innerHTML.trim() ? "<br>" : "") +
+        next.innerHTML;
+    }
+
+    next.remove();
+    emit();
+  }
+
+  function mergeCellDown() {
+    const table = currentTable();
+    const cell = currentTableCell();
+
+    if (!table || !cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement;
+
+    const nextRow =
+      table.rows[row.rowIndex + 1];
+
+    if (!nextRow) {
+      window.alert("Pastda qo‘shiladigan katak yo‘q.");
+      return;
+    }
+
+    const below =
+      nextRow.cells[
+        Math.min(
+          cell.cellIndex,
+          nextRow.cells.length - 1
+        )
+      ];
+
+    if (!below) return;
+
+    cell.rowSpan =
+      (cell.rowSpan || 1) +
+      (below.rowSpan || 1);
+
+    if (below.innerHTML.trim()) {
+      cell.innerHTML +=
+        (cell.innerHTML.trim() ? "<br>" : "") +
+        below.innerHTML;
+    }
+
+    below.remove();
+    emit();
+  }
+
+  function splitCell() {
+    const cell = currentTableCell();
+
+    if (!cell) {
+      window.alert("Avval jadval katagini bosing.");
+      return;
+    }
+
+    const row =
+      cell.parentElement as HTMLTableRowElement;
+
+    if (cell.colSpan > 1) {
+      const count = cell.colSpan;
+      cell.colSpan = 1;
+
+      for (let i = 1; i < count; i++) {
+        const td = row.insertCell(
+          cell.cellIndex + i
+        );
+
+        td.contentEditable = "true";
+        td.style.border = "2px solid #263b46";
+        td.style.height = "58px";
+        td.style.padding = "8px";
+      }
+
+      emit();
+      return;
+    }
+
+    if (cell.rowSpan > 1) {
+      const table = currentTable();
+      if (!table) return;
+
+      const startRow =
+        row.rowIndex;
+
+      const count =
+        cell.rowSpan;
+
+      cell.rowSpan = 1;
+
+      for (let i = 1; i < count; i++) {
+        const targetRow =
+          table.rows[
+            startRow + i
+          ];
+
+        if (!targetRow) continue;
+
+        const td =
+          targetRow.insertCell(
+            Math.min(
+              cell.cellIndex,
+              targetRow.cells.length
+            )
+          );
+
+        td.contentEditable = "true";
+        td.style.border = "2px solid #263b46";
+        td.style.height = "58px";
+        td.style.padding = "8px";
+      }
+
+      emit();
+      return;
+    }
+
+    window.alert("Bu katak birlashtirilmagan.");
   }
 
   async function copySelected() {
@@ -765,16 +1279,148 @@ export default function QuestionDesigner({
     emit();
   }
 
+  function ensureObjectForTarget(
+    target: HTMLElement
+  ) {
+    const existing =
+      target.closest(
+        "[data-object-id]"
+      ) as HTMLElement | null;
+
+    if (existing) {
+      return existing;
+    }
+
+    if (
+      target.tagName !== "IMG"
+    ) {
+      return null;
+    }
+
+    const img =
+      target as HTMLImageElement;
+
+    const id = uid();
+
+    const rect =
+      img.getBoundingClientRect();
+
+    const width =
+      Math.max(
+        80,
+        Math.round(
+          rect.width ||
+            img.width ||
+            img.naturalWidth ||
+            320
+        )
+      );
+
+    const height =
+      Math.max(
+        60,
+        Math.round(
+          rect.height ||
+            img.height ||
+            img.naturalHeight ||
+            220
+        )
+      );
+
+    const wrapper =
+      document.createElement(
+        "div"
+      );
+
+    wrapper.className =
+      "nc-object nc-image-object nc-3d-object";
+
+    wrapper.setAttribute(
+      "data-object-id",
+      id
+    );
+
+    wrapper.setAttribute(
+      "data-kind",
+      "image"
+    );
+
+    wrapper.setAttribute(
+      "contenteditable",
+      "false"
+    );
+
+    wrapper.style.position =
+      "relative";
+
+    wrapper.style.display =
+      "inline-block";
+
+    wrapper.style.width = `${width}px`;
+    wrapper.style.height = `${height}px`;
+    wrapper.style.maxWidth =
+      "96%";
+    wrapper.style.margin =
+      "18px auto";
+    wrapper.style.border =
+      "2px solid #263b46";
+    wrapper.style.borderRadius =
+      "10px";
+    wrapper.style.background =
+      "linear-gradient(180deg,#ffffff,#e8eef2)";
+    wrapper.style.boxShadow =
+      "inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22)";
+    wrapper.style.overflow =
+      "visible";
+    wrapper.style.boxSizing =
+      "border-box";
+
+    img.parentNode?.insertBefore(
+      wrapper,
+      img
+    );
+
+    wrapper.appendChild(img);
+
+    img.style.display =
+      "block";
+    img.style.width =
+      "100%";
+    img.style.height =
+      "100%";
+    img.style.maxWidth =
+      "none";
+    img.style.objectFit =
+      "contain";
+    img.style.userSelect =
+      "none";
+    img.style.pointerEvents =
+      "none";
+
+    emit();
+
+    return wrapper;
+  }
+
   function onEditorClick(
     event: React.MouseEvent<HTMLDivElement>
   ) {
     const target =
       event.target as HTMLElement;
 
-    const object =
+    const clickedCell =
       target.closest(
-        "[data-object-id]"
-      ) as HTMLElement | null;
+        "td,th"
+      ) as HTMLTableCellElement | null;
+
+    selectTableCell(
+      clickedCell
+    );
+
+    const object =
+      ensureObjectForTarget(
+        target
+      );
 
     editorRef.current
       ?.querySelectorAll(
@@ -788,6 +1434,7 @@ export default function QuestionDesigner({
 
     if (!object) {
       setSelectedId("");
+      setSelectionBox(null);
       return;
     }
 
@@ -801,6 +1448,8 @@ export default function QuestionDesigner({
       ) || "";
 
     setSelectedId(id);
+
+    syncSelectionSoon(id);
 
     const computed =
       getComputedStyle(object);
@@ -822,6 +1471,141 @@ export default function QuestionDesigner({
     );
   }
 
+  function onEditorPointerDown(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (
+      disabled ||
+      event.button !== 0
+    ) {
+      return;
+    }
+
+    const target =
+      event.target as HTMLElement;
+
+    /*
+      Venn ichidagi yozuv yoki jadval katagi tahrirlanayotgan bo‘lsa,
+      obyektni sudrashni boshlamaymiz. Shunda kursor bilan matnni
+      bemalol belgilash va o‘zgartirish mumkin.
+    */
+    if (
+      target.closest(
+        '[data-nc-editable="true"]'
+      ) ||
+      target.closest(
+        'td[contenteditable="true"],th[contenteditable="true"]'
+      )
+    ) {
+      return;
+    }
+
+    const object =
+      ensureObjectForTarget(
+        target
+      );
+
+    if (!object) {
+      return;
+    }
+
+    const id =
+      object.getAttribute(
+        "data-object-id"
+      ) || "";
+
+    if (!id) {
+      return;
+    }
+
+    const rect =
+      object.getBoundingClientRect();
+
+    const edge = 14;
+
+    const nearEdge =
+      event.clientX -
+        rect.left <= edge ||
+      rect.right -
+        event.clientX <= edge ||
+      event.clientY -
+        rect.top <= edge ||
+      rect.bottom -
+        event.clientY <= edge;
+
+    const kind =
+      object.getAttribute(
+        "data-kind"
+      ) || "";
+
+    const dragAnywhere =
+      kind === "image";
+
+    if (
+      !nearEdge &&
+      !dragAnywhere
+    ) {
+      return;
+    }
+
+    setSelectedId(id);
+    syncSelectionSoon(id);
+
+    const root =
+      editorRef.current;
+
+    if (!root) return;
+
+    if (
+      object.style.position !==
+      "absolute"
+    ) {
+      const rootRect =
+        root.getBoundingClientRect();
+
+      const objectRect =
+        object.getBoundingClientRect();
+
+      object.style.position =
+        "absolute";
+
+      object.style.left = `${Math.max(
+        0,
+        objectRect.left -
+          rootRect.left +
+          root.scrollLeft
+      )}px`;
+
+      object.style.top = `${Math.max(
+        0,
+        objectRect.top -
+          rootRect.top +
+          root.scrollTop
+      )}px`;
+
+      object.style.margin = "0";
+    }
+
+    dragRef.current = {
+      id,
+      startX:
+        event.clientX,
+      startY:
+        event.clientY,
+      left:
+        parseFloat(
+          object.style.left
+        ) || object.offsetLeft,
+      top:
+        parseFloat(
+          object.style.top
+        ) || object.offsetTop,
+    };
+
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   function startDrag(
     event: React.PointerEvent
   ) {
@@ -837,19 +1621,38 @@ export default function QuestionDesigner({
 
     if (!node) return;
 
-    const parent =
-      node.offsetParent as HTMLElement | null;
+    const root =
+      editorRef.current;
+
+    if (!root) return;
 
     if (
-      !parent ||
       node.style.position !==
         "absolute"
     ) {
+      const rootRect =
+        root.getBoundingClientRect();
+
+      const nodeRect =
+        node.getBoundingClientRect();
+
       node.style.position =
         "absolute";
 
-      node.style.left = `${node.offsetLeft}px`;
-      node.style.top = `${node.offsetTop}px`;
+      node.style.left = `${Math.max(
+        0,
+        nodeRect.left -
+          rootRect.left +
+          root.scrollLeft
+      )}px`;
+
+      node.style.top = `${Math.max(
+        0,
+        nodeRect.top -
+          rootRect.top +
+          root.scrollTop
+      )}px`;
+
       node.style.margin = "0";
     }
 
@@ -888,15 +1691,38 @@ export default function QuestionDesigner({
 
     if (!node) return;
 
+    const root =
+      editorRef.current;
+
+    if (!root) return;
+
     if (
       node.style.position !==
         "absolute"
     ) {
+      const rootRect =
+        root.getBoundingClientRect();
+
+      const nodeRect =
+        node.getBoundingClientRect();
+
       node.style.position =
         "absolute";
 
-      node.style.left = `${node.offsetLeft}px`;
-      node.style.top = `${node.offsetTop}px`;
+      node.style.left = `${Math.max(
+        0,
+        nodeRect.left -
+          rootRect.left +
+          root.scrollLeft
+      )}px`;
+
+      node.style.top = `${Math.max(
+        0,
+        nodeRect.top -
+          rootRect.top +
+          root.scrollTop
+      )}px`;
+
       node.style.margin = "0";
     }
 
@@ -919,6 +1745,16 @@ export default function QuestionDesigner({
         node.offsetWidth,
       height:
         node.offsetHeight,
+      ratio:
+        node.offsetWidth /
+        Math.max(
+          node.offsetHeight,
+          1
+        ),
+      lockRatio:
+        node.getAttribute(
+          "data-lock-ratio"
+        ) === "true",
     };
 
     event.preventDefault();
@@ -943,7 +1779,7 @@ export default function QuestionDesigner({
       const id = uid();
 
       insertHtml(
-        `<div class="nc-object nc-image-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;background:#fff;overflow:hidden;"><img src="${String(
+        `<div class="nc-object nc-image-object nc-3d-object" data-object-id="${id}" data-kind="image" contenteditable="false" style="position:relative;width:420px;height:280px;max-width:96%;margin:18px auto;border:2px solid #263b46;border-radius:10px;background:linear-gradient(180deg,#ffffff,#e8eef2);box-shadow:inset 0 3px 3px rgba(255,255,255,.75),0 7px 0 #526b77,0 10px 14px rgba(0,0,0,.22);overflow:visible;"><img src="${String(
           reader.result || ""
         )}" alt="Savol rasmi" style="width:100%;height:100%;object-fit:contain;display:block;" /></div><p><br></p>`
       );
@@ -1188,6 +2024,62 @@ export default function QuestionDesigner({
 
         <button
           type="button"
+          onClick={addTableRow}
+          disabled={disabled}
+        >
+          + Qator
+        </button>
+
+        <button
+          type="button"
+          onClick={addTableColumn}
+          disabled={disabled}
+        >
+          + Ustun
+        </button>
+
+        <button
+          type="button"
+          onClick={deleteTableRow}
+          disabled={disabled}
+        >
+          − Qator
+        </button>
+
+        <button
+          type="button"
+          onClick={deleteTableColumn}
+          disabled={disabled}
+        >
+          − Ustun
+        </button>
+
+        <button
+          type="button"
+          onClick={mergeCellRight}
+          disabled={disabled}
+        >
+          Birlashtir →
+        </button>
+
+        <button
+          type="button"
+          onClick={mergeCellDown}
+          disabled={disabled}
+        >
+          Birlashtir ↓
+        </button>
+
+        <button
+          type="button"
+          onClick={splitCell}
+          disabled={disabled}
+        >
+          Katakni ajrat
+        </button>
+
+        <button
+          type="button"
           onClick={() =>
             insertObject(
               "line"
@@ -1341,11 +2233,18 @@ export default function QuestionDesigner({
                 ? fill
                 : "#ffffff"
             }
-            onChange={(e) =>
-              setFill(
-                e.target.value
-              )
-            }
+            onChange={(e) => {
+              const value =
+                e.target.value;
+
+              setFill(value);
+
+              applyObjectStyleValues(
+                value,
+                stroke,
+                strokeWidth
+              );
+            }}
             disabled={
               disabled ||
               !selectedId
@@ -1364,11 +2263,18 @@ export default function QuestionDesigner({
                 ? stroke
                 : "#263b46"
             }
-            onChange={(e) =>
-              setStroke(
-                e.target.value
-              )
-            }
+            onChange={(e) => {
+              const value =
+                e.target.value;
+
+              setStroke(value);
+
+              applyObjectStyleValues(
+                fill,
+                value,
+                strokeWidth
+              );
+            }}
             disabled={
               disabled ||
               !selectedId
@@ -1386,13 +2292,22 @@ export default function QuestionDesigner({
             value={
               strokeWidth
             }
-            onChange={(e) =>
-              setStrokeWidth(
+            onChange={(e) => {
+              const value =
                 Number(
                   e.target.value
-                ) || 0
-              )
-            }
+                ) || 0;
+
+              setStrokeWidth(
+                value
+              );
+
+              applyObjectStyleValues(
+                fill,
+                stroke,
+                value
+              );
+            }}
             disabled={
               disabled ||
               !selectedId
@@ -1459,6 +2374,9 @@ export default function QuestionDesigner({
           onClick={
             onEditorClick
           }
+          onPointerDown={
+            onEditorPointerDown
+          }
           onPaste={() =>
             setTimeout(
               emit,
@@ -1467,20 +2385,31 @@ export default function QuestionDesigner({
           }
         />
 
-        {selectedId && (
+        {selectedId &&
+          selectionBox && (
           <div
             className="selectionUi"
             data-nc-ui="true"
+            style={{
+              left:
+                selectionBox.left,
+              top:
+                selectionBox.top,
+              width:
+                selectionBox.width,
+              height:
+                selectionBox.height,
+            }}
           >
             <button
               type="button"
-              className="moveHandle"
-              onPointerDown={
-                startDrag
+              className="deleteBubble"
+              onClick={
+                deleteSelected
               }
-              title="Sudrash"
+              title="O‘chirish"
             >
-              ✥
+              ×
             </button>
 
             {HANDLES.map(
@@ -1509,13 +2438,13 @@ export default function QuestionDesigner({
 
       <p className="hint">
         Obyektni tanlang.
-        ✥ bilan sudrang,
-        atrofigidagi 8 ta
-        nuqtadan tortib
+        8 ta nuqtadan tortib
         o‘lchamini o‘zgartiring.
-        Rasm, shakl va Venn
-        elementlari ham shu
-        usulda ishlaydi.
+        Shakl chegarasidan
+        ushlab sudrashingiz mumkin.
+        Rasm, Venn, jadval va
+        boshqa obyektlar ham
+        bir xil ishlaydi.
       </p>
 
       <style jsx>{`
@@ -1628,96 +2557,136 @@ export default function QuestionDesigner({
           cursor: pointer;
         }
 
+        .canvas :global(.nc-image-object) {
+          cursor: grab;
+          touch-action: none;
+        }
+
+        .canvas :global(.nc-image-object:active) {
+          cursor: grabbing;
+        }
+
         .canvas :global(.nc-selected) {
-          outline: 2px dashed #058bd6 !important;
-          outline-offset: 3px;
+          outline: none !important;
         }
 
         .selectionUi {
           position: absolute;
-          inset: 14px;
+          z-index: 999;
+          border: 2px dashed #078bcf;
+          box-sizing: border-box;
           pointer-events: none;
         }
 
-        .moveHandle {
+        .deleteBubble {
           position: absolute;
-          right: 8px;
-          top: 8px;
-          z-index: 1000;
-          width: 38px;
-          height: 38px;
-          border: 2px solid #064f7c;
-          border-radius: 8px;
-          background: #45bce9;
+          right: -19px;
+          top: -21px;
+          z-index: 1002;
+          width: 36px;
+          height: 36px;
+          padding: 0;
+          border: 2px solid #8b0f12;
+          border-radius: 50%;
+          background: linear-gradient(
+            180deg,
+            #f44343,
+            #b71218
+          );
           color: #fff;
-          font-size: 20px;
-          font-weight: 900;
+          box-shadow:
+            inset 0 2px 2px rgba(255,255,255,.55),
+            0 2px 3px rgba(0,0,0,.35);
+          font-size: 28px;
+          line-height: 30px;
+          font-weight: 400;
           pointer-events: auto;
-          cursor: move;
+          cursor: pointer;
         }
 
         .resizeHandle {
           position: absolute;
-          z-index: 1000;
-          width: 12px;
-          height: 12px;
+          z-index: 1001;
+          width: 18px;
+          height: 18px;
           padding: 0;
-          border: 2px solid #064f7c;
-          border-radius: 2px;
+          border: 2px solid #006eaa;
+          border-radius: 4px;
           background: #fff;
+          box-shadow:
+            inset 0 0 0 2px #e8f7ff;
           pointer-events: auto;
         }
 
         .resizeHandle.nw {
-          left: 2px;
-          top: 2px;
+          left: -10px;
+          top: -10px;
           cursor: nwse-resize;
         }
 
         .resizeHandle.n {
           left: 50%;
-          top: 2px;
+          top: -10px;
           transform: translateX(-50%);
           cursor: ns-resize;
         }
 
         .resizeHandle.ne {
-          right: 2px;
-          top: 2px;
+          right: -10px;
+          top: -10px;
           cursor: nesw-resize;
         }
 
         .resizeHandle.e {
-          right: 2px;
+          right: -10px;
           top: 50%;
           transform: translateY(-50%);
           cursor: ew-resize;
         }
 
         .resizeHandle.se {
-          right: 2px;
-          bottom: 2px;
+          right: -10px;
+          bottom: -10px;
           cursor: nwse-resize;
         }
 
         .resizeHandle.s {
           left: 50%;
-          bottom: 2px;
+          bottom: -10px;
           transform: translateX(-50%);
           cursor: ns-resize;
         }
 
         .resizeHandle.sw {
-          left: 2px;
-          bottom: 2px;
+          left: -10px;
+          bottom: -10px;
           cursor: nesw-resize;
         }
 
         .resizeHandle.w {
-          left: 2px;
+          left: -10px;
           top: 50%;
           transform: translateY(-50%);
           cursor: ew-resize;
+        }
+
+
+        .canvas :global(.nc-3d-object) {
+          transition:
+            box-shadow .08s ease,
+            filter .08s ease;
+        }
+
+        .canvas :global(.nc-3d-object:hover) {
+          filter: brightness(1.02);
+        }
+
+        .selectionUi::after {
+          content: "";
+          position: absolute;
+          inset: -4px;
+          border: 1px solid rgba(255,255,255,.8);
+          pointer-events: none;
         }
 
         .hint {
