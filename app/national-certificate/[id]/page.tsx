@@ -373,82 +373,39 @@ export default function NationalCertificateTestPage() {
         }
 
         /*
-          Venn ortidan editor <p><br></p>, bo‘sh div yoki whitespace
-          text node qoldirgan bo‘lsa — birinchi haqiqiy matngacha
-          hammasini olib tashlaymiz.
+          Muhim: Venn ortidagi haqiqiy matnga tegmaymiz.
+          Faqat aynan bo‘sh <p><br></p> bo‘lsa olib tashlaymiz.
+          Shunda a), b), c)... bandlar hech qachon yo‘qolmaydi.
         */
-        let next =
-          venn.nextSibling;
+        const nextElement =
+          venn.nextElementSibling as HTMLElement | null;
 
-        while (next) {
-          const following =
-            next.nextSibling;
+        if (nextElement) {
+          const tag =
+            nextElement.tagName.toLowerCase();
 
-          if (
-            next.nodeType ===
-            Node.TEXT_NODE
-          ) {
-            const value =
-              (next.textContent || "")
-                .replace(
-                  /\u00a0/g,
-                  ""
-                )
-                .trim();
+          const cleanText =
+            (nextElement.textContent || "")
+              .replace(/\u00a0/g, "")
+              .trim();
 
-            if (!value) {
-              next.parentNode?.removeChild(
-                next
-              );
-              next = following;
-              continue;
-            }
-
-            break;
-          }
+          const onlyBr =
+            nextElement.children.length === 1 &&
+            nextElement.children[0]?.tagName.toLowerCase() === "br";
 
           if (
-            next.nodeType ===
-            Node.ELEMENT_NODE
+            tag === "p" &&
+            cleanText === "" &&
+            onlyBr
           ) {
-            const element =
-              next as HTMLElement;
-
-            const text =
-              (
-                element.textContent ||
-                ""
-              )
-                .replace(
-                  /\u00a0/g,
-                  ""
-                )
-                .trim();
-
-            const meaningful =
-              element.querySelector(
-                "img,svg,table,input,textarea,button,[data-object-id]"
-              );
-
-            if (
-              !text &&
-              !meaningful
-            ) {
-              element.remove();
-              next = following;
-              continue;
-            }
-
-            element.style.setProperty(
+            nextElement.remove();
+          } else {
+            nextElement.style.setProperty(
               "margin-top",
               "4px",
               "important"
             );
-
-            break;
           }
-
-          break;
         }
       });
     };
@@ -2961,8 +2918,10 @@ function PageStyles() {
         font-weight: 700 !important;
       }
 
-      .questionText.htmlContent .nc-venn2 + p,
-      .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
+      /* Faqat haqiqatan bo‘sh <p><br></p> ni yashiramiz.
+         Matnli birinchi p (masalan, a) band) hech qachon yashirilmaydi. */
+      .questionText.htmlContent .nc-venn2 + p:has(> br:only-child),
+      .questionText.htmlContent .nc-object[data-kind="venn2"] + p:has(> br:only-child) {
         display: none !important;
         height: 0 !important;
         min-height: 0 !important;
