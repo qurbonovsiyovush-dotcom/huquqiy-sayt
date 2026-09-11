@@ -29,6 +29,7 @@ type AccessCode = {
 
 type ActiveSection =
   | "new-code"
+  | "bulk-create"
   | "pending"
   | "approved"
   | "all"
@@ -51,6 +52,30 @@ export default function AdminRequestsPage() {
     useState(false);
 
   const [creating, setCreating] =
+    useState(false);
+
+  const [
+    bulkCreating,
+    setBulkCreating,
+  ] =
+    useState(false);
+
+  const [
+    bulkCount,
+    setBulkCount,
+  ] =
+    useState(250);
+
+  const [
+    bulkCreatedUsers,
+    setBulkCreatedUsers,
+  ] =
+    useState<AccessCode[]>([]);
+
+  const [
+    bulkCopied,
+    setBulkCopied,
+  ] =
     useState(false);
 
   const [workingId, setWorkingId] =
@@ -303,6 +328,231 @@ export default function AdminRequestsPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  /* =========================================================
+     BULK CREATE
+  ========================================================= */
+
+  async function createBulkCodes() {
+    const count =
+      Number(bulkCount);
+
+    if (
+      !Number.isInteger(count) ||
+      count < 1 ||
+      count > 500
+    ) {
+      showMessage(
+        "Kodlar soni 1 dan 500 gacha bo‘lishi kerak.",
+        "error"
+      );
+
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `${count} ta yangi kirish kodi yaratiladi.\n\n` +
+        `Kodlar darhol tasdiqlangan holatda bo‘ladi.\n\n` +
+        `Davom etasizmi?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBulkCreating(true);
+    setBulkCreatedUsers([]);
+    setBulkCopied(false);
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin/access-codes",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "bulk-create",
+
+                count,
+              }),
+          }
+        );
+
+      const data =
+        await readJson(
+          response
+        );
+
+      if (
+        !response.ok ||
+        data?.success !== true
+      ) {
+        showMessage(
+          data?.message ||
+            "Ommaviy kodlar yaratilmadi.",
+          "error"
+        );
+
+        return;
+      }
+
+      const created =
+        Array.isArray(
+          data?.users
+        )
+          ? data.users
+          : [];
+
+      setBulkCreatedUsers(
+        created
+      );
+
+      await loadUsers(true);
+
+      showMessage(
+        `${created.length} ta kirish kodi yaratildi.`
+      );
+    } catch (error) {
+      console.error(
+        "BULK CREATE ERROR:",
+        error
+      );
+
+      showMessage(
+        "Ommaviy kod yaratishda server xatosi.",
+        "error"
+      );
+    } finally {
+      setBulkCreating(false);
+    }
+  }
+
+  async function copyBulkCodes() {
+    if (
+      bulkCreatedUsers.length ===
+      0
+    ) {
+      return;
+    }
+
+    const text =
+      bulkCreatedUsers
+        .map(
+          (user) =>
+            `${user.name}\t${user.code}`
+        )
+        .join("\n");
+
+    try {
+      await navigator.clipboard.writeText(
+        text
+      );
+
+      setBulkCopied(true);
+
+      window.setTimeout(
+        () => {
+          setBulkCopied(false);
+        },
+        1800
+      );
+    } catch {
+      window.prompt(
+        "Ro‘yxatni nusxalang:",
+        text
+      );
+    }
+  }
+
+  function downloadBulkCodes() {
+    if (
+      bulkCreatedUsers.length ===
+      0
+    ) {
+      return;
+    }
+
+    const escapeCsv =
+      (value: string) =>
+        `"${value.replace(
+          /"/g,
+          '""'
+        )}"`;
+
+    const csv =
+      [
+        [
+          "№",
+          "Talaba",
+          "Kirish kodi",
+        ].join(","),
+
+        ...bulkCreatedUsers.map(
+          (user, index) =>
+            [
+              String(
+                index + 1
+              ),
+
+              escapeCsv(
+                user.name
+              ),
+
+              escapeCsv(
+                user.code
+              ),
+            ].join(",")
+        ),
+      ].join("\r\n");
+
+    const blob =
+      new Blob(
+        [
+          "\uFEFF" +
+            csv,
+        ],
+        {
+          type:
+            "text/csv;charset=utf-8",
+        }
+      );
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+    const link =
+      document.createElement(
+        "a"
+      );
+
+    link.href = url;
+
+    link.download =
+      `kirish-kodlari-${bulkCreatedUsers.length}.csv`;
+
+    document.body.appendChild(
+      link
+    );
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(
+      url
+    );
   }
 
   /* =========================================================
@@ -1150,6 +1400,24 @@ export default function AdminRequestsPage() {
 
           <button
             type="button"
+            className="managementCard bulkManagement"
+            onClick={() =>
+              setActiveSection(
+                "bulk-create"
+              )
+            }
+          >
+            <span className="managementIcon">
+              250
+            </span>
+
+            <strong>
+              Ommaviy parol yaratish
+            </strong>
+          </button>
+
+          <button
+            type="button"
             className="managementCard pendingManagement"
             onClick={() =>
               setActiveSection(
@@ -1317,6 +1585,163 @@ export default function AdminRequestsPage() {
                         ? "NUSXALANDI ✓"
                         : "KODNI NUSXALASH"}
                     </button>
+
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+
+          </>
+        )}
+
+        {/* =================================================
+            BULK CREATE
+        ================================================= */}
+
+        {activeSection ===
+          "bulk-create" && (
+          <>
+
+            <div className="contentTitle">
+              Ommaviy parol yaratish
+            </div>
+
+            <div className="innerPanel">
+
+              <div className="bulkCreateArea">
+
+                <div className="bulkInfo">
+                  Bir bosishda 1 tadan 500 tagacha
+                  alohida kirish kodi yaratishingiz mumkin.
+                  Yaratilgan kodlar darhol ruxsat berilgan
+                  holatda bo‘ladi.
+                </div>
+
+                <label>
+                  Nechta parol yaratilsin?
+                </label>
+
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={bulkCount}
+                  disabled={
+                    bulkCreating
+                  }
+                  onChange={(e) =>
+                    setBulkCount(
+                      Number(
+                        e.target.value
+                      )
+                    )
+                  }
+                />
+
+                <button
+                  type="button"
+                  className="bulkCreateButton"
+                  disabled={
+                    bulkCreating
+                  }
+                  onClick={
+                    createBulkCodes
+                  }
+                >
+                  {bulkCreating
+                    ? "YARATILMOQDA..."
+                    : `${bulkCount} TA PAROL YARATISH`}
+                </button>
+
+                {bulkCreatedUsers.length >
+                  0 && (
+                  <div className="bulkResult">
+
+                    <div className="bulkResultHeader">
+
+                      <div>
+                        <span>
+                          Yaratildi
+                        </span>
+
+                        <strong>
+                          {bulkCreatedUsers.length} ta
+                        </strong>
+                      </div>
+
+                      <div className="bulkResultActions">
+
+                        <button
+                          type="button"
+                          onClick={
+                            copyBulkCodes
+                          }
+                        >
+                          {bulkCopied
+                            ? "NUSXALANDI ✓"
+                            : "HAMMASINI NUSXALASH"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={
+                            downloadBulkCodes
+                          }
+                        >
+                          CSV YUKLAB OLISH
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                    <div className="bulkTableWrap">
+
+                      <table className="bulkTable">
+
+                        <thead>
+                          <tr>
+                            <th>№</th>
+                            <th>Talaba</th>
+                            <th>Kirish kodi</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {bulkCreatedUsers.map(
+                            (
+                              user,
+                              index
+                            ) => (
+                              <tr
+                                key={
+                                  user.id
+                                }
+                              >
+                                <td>
+                                  {index +
+                                    1}
+                                </td>
+
+                                <td>
+                                  {user.name}
+                                </td>
+
+                                <td>
+                                  <strong>
+                                    {user.code}
+                                  </strong>
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+
+                      </table>
+
+                    </div>
 
                   </div>
                 )}
@@ -2134,7 +2559,7 @@ export default function AdminRequestsPage() {
 
           grid-template-columns:
             repeat(
-              5,
+              6,
               minmax(
                 0,
                 1fr
@@ -2366,6 +2791,69 @@ export default function AdminRequestsPage() {
 
             0 5px 0
               #26733f;
+        }
+
+        /* OMMAVIY PAROL */
+
+        .bulkManagement {
+          border-color: #6a4f99;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fbf7ff,
+              #e1d2f5 45%,
+              #b598dc 100%
+            );
+
+          box-shadow:
+            inset 0 8px 7px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
+            0 9px 0
+              #6a4f99,
+
+            0 14px 18px
+              rgba(
+                0,
+                0,
+                0,
+                .25
+              );
+        }
+
+        .bulkManagement
+        .managementIcon {
+          border-color: #64478e;
+
+          color: #56377f;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffaff,
+              #ddc9f6 50%,
+              #aa86d5
+            );
+
+          box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              ),
+
+            0 5px 0
+              #64478e;
+
+          font-size: 20px;
         }
 
         /* PENDING */
@@ -2926,6 +3414,278 @@ export default function AdminRequestsPage() {
               #174461;
 
           font-weight: 800;
+        }
+
+        /* =====================================================
+           BULK CREATE
+        ===================================================== */
+
+        .bulkCreateArea {
+          width:
+            min(
+              950px,
+              100%
+            );
+
+          margin: 0 auto;
+
+          display: flex;
+
+          flex-direction: column;
+
+          gap: 17px;
+        }
+
+        .bulkInfo {
+          padding: 16px 18px;
+
+          border:
+            2px solid #6a4f99;
+
+          border-radius: 12px;
+
+          color: #4f3477;
+
+          background: #f4edff;
+
+          font-size: 17px;
+
+          font-weight: 700;
+
+          line-height: 1.45;
+        }
+
+        .bulkCreateArea label {
+          font-size: 20px;
+
+          font-weight: 800;
+        }
+
+        .bulkCreateArea input {
+          width: 100%;
+
+          min-height: 62px;
+
+          padding:
+            0 18px;
+
+          border:
+            2px solid #60686c;
+
+          border-radius: 11px;
+
+          outline: none;
+
+          background: white;
+
+          font-size: 21px;
+
+          font-weight: 800;
+
+          box-shadow:
+            inset 0 3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                .1
+              );
+        }
+
+        .bulkCreateButton {
+          min-height: 60px;
+
+          margin:
+            6px auto 0;
+
+          padding:
+            0 35px;
+
+          border:
+            3px solid #65478f;
+
+          border-radius: 11px;
+
+          color: #43296b;
+
+          background:
+            linear-gradient(
+              #f1e6ff,
+              #bfa1e4
+            );
+
+          box-shadow:
+            inset 0 5px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .7
+              ),
+
+            0 5px 0
+              #65478f;
+
+          font-size: 18px;
+
+          font-weight: 900;
+        }
+
+        .bulkResult {
+          margin-top: 20px;
+
+          padding: 20px;
+
+          border:
+            3px solid #65478f;
+
+          border-radius: 16px;
+
+          background:
+            linear-gradient(
+              #fbf8ff,
+              #eee4fb
+            );
+
+          box-shadow:
+            inset 0 5px 5px
+              white,
+
+            0 5px 0
+              #65478f;
+        }
+
+        .bulkResultHeader {
+          margin-bottom: 18px;
+
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          gap: 15px;
+
+          flex-wrap: wrap;
+        }
+
+        .bulkResultHeader > div:first-child {
+          display: flex;
+
+          align-items: center;
+
+          gap: 10px;
+        }
+
+        .bulkResultHeader span {
+          color: #555;
+
+          font-weight: 800;
+        }
+
+        .bulkResultHeader strong {
+          color: #4f3477;
+
+          font-size: 24px;
+        }
+
+        .bulkResultActions {
+          display: flex;
+
+          flex-wrap: wrap;
+
+          gap: 10px;
+        }
+
+        .bulkResultActions button {
+          min-height: 46px;
+
+          padding:
+            0 16px;
+
+          border:
+            2px solid #65478f;
+
+          border-radius: 9px;
+
+          color: #43296b;
+
+          background:
+            linear-gradient(
+              #f5ecff,
+              #cbb3e9
+            );
+
+          font-weight: 900;
+        }
+
+        .bulkTableWrap {
+          max-height: 520px;
+
+          overflow: auto;
+
+          border:
+            2px solid #8e78ad;
+
+          border-radius: 12px;
+
+          background: white;
+        }
+
+        .bulkTable {
+          width: 100%;
+
+          border-collapse:
+            collapse;
+
+          font-family:
+            "Times New Roman",
+            serif;
+
+          font-size: 16px;
+        }
+
+        .bulkTable th,
+        .bulkTable td {
+          padding:
+            11px 12px;
+
+          border-bottom:
+            1px solid #ddd;
+
+          text-align: left;
+        }
+
+        .bulkTable th {
+          position: sticky;
+
+          top: 0;
+
+          z-index: 1;
+
+          color: #43296b;
+
+          background: #e9ddf8;
+
+          font-weight: 900;
+        }
+
+        .bulkTable td:first-child,
+        .bulkTable th:first-child {
+          width: 70px;
+
+          text-align: center;
+        }
+
+        .bulkTable td strong {
+          color: #073b68;
+
+          font-family:
+            Consolas,
+            monospace;
+
+          white-space: nowrap;
         }
 
         /* =====================================================
@@ -3512,6 +4272,22 @@ export default function AdminRequestsPage() {
 
           .createdResult strong {
             font-size: 19px;
+          }
+
+          .bulkResult {
+            padding: 12px 7px;
+          }
+
+          .bulkResultActions {
+            width: 100%;
+          }
+
+          .bulkResultActions button {
+            width: 100%;
+          }
+
+          .bulkTable {
+            font-size: 14px;
           }
 
         }
