@@ -425,17 +425,21 @@ export default function QuestionDesigner({
     const id = uid();
 
     insertHtml(
-      `<div class="nc-venn nc-object" data-object-id="${id}" data-kind="venn2" contenteditable="true" style="position:relative;width:720px;max-width:96%;height:390px;margin:22px auto;padding:0;border:0;background:#fff;box-sizing:border-box;">
-        <div style="position:absolute;left:40px;top:8px;width:280px;text-align:center;font-weight:700;">I — Chap to‘plamga xos</div>
-        <div style="position:absolute;right:40px;top:8px;width:280px;text-align:center;font-weight:700;">II — O‘ng to‘plamga xos</div>
-        <div style="position:absolute;left:110px;top:75px;width:330px;height:235px;border:3px solid #263b46;border-radius:50%;background:#fff;"></div>
-        <div style="position:absolute;right:110px;top:75px;width:330px;height:235px;border:3px solid #263b46;border-radius:50%;background:#fff;"></div>
-        <div style="position:absolute;left:305px;top:78px;width:110px;height:229px;border-radius:48%;background:rgba(67,168,216,.38);pointer-events:none;"></div>
-        <div style="position:absolute;left:195px;top:175px;font-size:24px;font-weight:800;">I</div>
-        <div style="position:absolute;right:195px;top:175px;font-size:24px;font-weight:800;">II</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);top:175px;font-size:24px;font-weight:900;">III</div>
-        <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:5px;width:330px;text-align:center;font-weight:700;">III — har ikkalasiga xos</div>
-      </div><p><br></p>`
+      `<div class="nc-venn nc-object" data-object-id="${id}" data-kind="venn2" contenteditable="true" style="position:relative;width:720px;max-width:96%;height:295px;margin:14px auto 8px;padding:0;border:0;background:#fff;box-sizing:border-box;overflow:visible;">
+        <div style="position:absolute;left:35px;top:0;width:285px;min-height:42px;text-align:center;font-size:16px;line-height:1.08;font-weight:700;overflow:visible;">I — Chap to‘plamga xos</div>
+        <div style="position:absolute;right:35px;top:0;width:285px;min-height:42px;text-align:center;font-size:16px;line-height:1.08;font-weight:700;overflow:visible;">II — O‘ng to‘plamga xos</div>
+
+        <div style="position:absolute;left:105px;top:52px;width:330px;height:185px;border:3px solid #263b46;border-radius:50%;background:#fff;box-sizing:border-box;"></div>
+        <div style="position:absolute;right:105px;top:52px;width:330px;height:185px;border:3px solid #263b46;border-radius:50%;background:#fff;box-sizing:border-box;"></div>
+
+        <div style="position:absolute;left:305px;top:55px;width:110px;height:179px;border-radius:48%;background:rgba(178,157,226,.72);pointer-events:none;"></div>
+
+        <div style="position:absolute;left:195px;top:126px;font-size:22px;font-weight:800;line-height:1;">I</div>
+        <div style="position:absolute;right:195px;top:126px;font-size:22px;font-weight:800;line-height:1;">II</div>
+        <div style="position:absolute;left:50%;transform:translateX(-50%);top:126px;font-size:22px;font-weight:900;line-height:1;">III</div>
+
+        <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:330px;text-align:center;font-size:16px;line-height:1.1;font-weight:700;">III — har ikkalasiga xos</div>
+      </div><p style="margin:4px 0;line-height:1;"><br></p>`
     );
   }
 
