@@ -373,39 +373,77 @@ export default function NationalCertificateTestPage() {
         }
 
         /*
-          Muhim: Venn ortidagi haqiqiy matnga tegmaymiz.
-          Faqat aynan bo‘sh <p><br></p> bo‘lsa olib tashlaymiz.
-          Shunda a), b), c)... bandlar hech qachon yo‘qolmaydi.
+          Venn bilan a), b), c)... orasida editor bir nechta bo‘sh
+          p/div/br yoki whitespace node saqlab yuborishi mumkin.
+          Faqat MUTLAQO BO‘SH node'larni ketma-ket olib tashlaymiz.
+          Birinchi haqiqiy matnli elementga yetishimiz bilan to‘xtaymiz.
+          Shu sabab a) band hech qachon o‘chmaydi.
         */
-        const nextElement =
-          venn.nextElementSibling as HTMLElement | null;
+        let next =
+          venn.nextSibling;
 
-        if (nextElement) {
-          const tag =
-            nextElement.tagName.toLowerCase();
-
-          const cleanText =
-            (nextElement.textContent || "")
-              .replace(/\u00a0/g, "")
-              .trim();
-
-          const onlyBr =
-            nextElement.children.length === 1 &&
-            nextElement.children[0]?.tagName.toLowerCase() === "br";
+        while (next) {
+          const following =
+            next.nextSibling;
 
           if (
-            tag === "p" &&
-            cleanText === "" &&
-            onlyBr
+            next.nodeType ===
+            Node.TEXT_NODE
           ) {
-            nextElement.remove();
-          } else {
-            nextElement.style.setProperty(
+            const textValue =
+              (next.textContent || "")
+                .replace(/\u00a0/g, "")
+                .trim();
+
+            if (!textValue) {
+              next.parentNode?.removeChild(
+                next
+              );
+              next = following;
+              continue;
+            }
+
+            break;
+          }
+
+          if (
+            next.nodeType ===
+            Node.ELEMENT_NODE
+          ) {
+            const element =
+              next as HTMLElement;
+
+            const cleanText =
+              (element.textContent || "")
+                .replace(/\u00a0/g, "")
+                .trim();
+
+            const hasMeaningfulObject =
+              Boolean(
+                element.querySelector(
+                  "img,svg,table,input,textarea,button,[data-object-id]"
+                )
+              );
+
+            if (
+              cleanText === "" &&
+              !hasMeaningfulObject
+            ) {
+              element.remove();
+              next = following;
+              continue;
+            }
+
+            element.style.setProperty(
               "margin-top",
               "4px",
               "important"
             );
+
+            break;
           }
+
+          break;
         }
       });
     };
@@ -2916,6 +2954,12 @@ function PageStyles() {
         font-size: 18px !important;
         line-height: 1.15 !important;
         font-weight: 700 !important;
+      }
+
+      /* Diagramma tugashi bilan keyingi haqiqiy matn yaqin boshlanadi */
+      .questionText.htmlContent .nc-venn2,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] {
+        margin-bottom: 4px !important;
       }
 
       /* Faqat haqiqatan bo‘sh <p><br></p> ni yashiramiz.
