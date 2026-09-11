@@ -2540,8 +2540,8 @@ function PageStyles() {
           );
         color: #10233a;
         font-family: "Bell MT", Georgia, "Times New Roman", serif;
-        font-size: 18px;
-        line-height: 1.5;
+        font-size: 20px;
+        line-height: 1.52;
         font-weight: 600;
         overflow-wrap: break-word;
         word-break: normal;
@@ -2554,10 +2554,10 @@ function PageStyles() {
       }
 
       /* QuestionDesigner execCommand(fontSize) saqlagan legacy <font size> qiymatlari */
-      .questionText.htmlContent font[size="1"] { font-size: 12px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 14px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 16px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 18px !important; }
+      .questionText.htmlContent font[size="1"] { font-size: 13px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 15px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 17px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 19px !important; }
       .questionText.htmlContent font[size="5"] { font-size: 24px !important; }
       .questionText.htmlContent font[size="6"] { font-size: 32px !important; }
       .questionText.htmlContent font[size="7"] { font-size: 38px !important; }
@@ -2589,7 +2589,37 @@ function PageStyles() {
       }
 
       .questionText.htmlContent ol > li::marker {
+        font-size: 1em;
         font-weight: 700;
+      }
+
+      /* Eyler–Venn: shakldan keyingi ortiqcha bo‘shliqni qisqartirish */
+      .questionText.htmlContent .nc-venn2,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] {
+        display: block !important;
+        width: min(760px, 100%) !important;
+        height: 330px !important;
+        min-height: 0 !important;
+        margin: 14px auto 8px !important;
+        padding: 0 !important;
+        clear: both !important;
+        overflow: visible !important;
+      }
+
+      .questionText.htmlContent .nc-venn2 > svg,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] > svg {
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 auto !important;
+      }
+
+      .questionText.htmlContent .nc-venn2 + p,
+      .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 0.35 !important;
       }
 
       .htmlContent img {
@@ -3177,8 +3207,15 @@ function PageStyles() {
 
         .questionText {
           padding: 20px 16px 22px;
-          font-size: 16px;
+          font-size: 17px;
           line-height: 1.5;
+        }
+
+        .questionText.htmlContent .nc-venn2,
+        .questionText.htmlContent .nc-object[data-kind="venn2"] {
+          height: 285px !important;
+          margin-top: 10px !important;
+          margin-bottom: 6px !important;
         }
 
         .option {
