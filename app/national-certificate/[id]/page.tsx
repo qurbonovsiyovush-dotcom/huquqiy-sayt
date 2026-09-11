@@ -2593,43 +2593,51 @@ function PageStyles() {
         font-weight: 700;
       }
 
-      /* ===== EYLER–VENN: SHAKL KATTA QOLADI, ORTIQCHA BO‘SHLIQ YO‘Q ===== */
+      /* ===== EYLER–VENN: TABIIY OQIMDA, USTMA-UST TUSHMAYDI ===== */
       .questionText.htmlContent .nc-venn2,
       .questionText.htmlContent .nc-object[data-kind="venn2"] {
         display: block !important;
         position: relative !important;
+
         width: 760px !important;
         max-width: 92% !important;
 
-        /* Sahifa layoutida faqat real kontent egallagan balandlik saqlanadi */
-        height: 345px !important;
-        min-height: 345px !important;
+        /* Muhim: fixed height yo‘q. SVG o‘z balandligini o‘zi beradi. */
+        height: auto !important;
+        min-height: 0 !important;
 
-        margin: 8px auto 12px !important;
+        margin: 12px auto 8px !important;
         padding: 0 !important;
+
         clear: both !important;
         float: none !important;
         overflow: visible !important;
+
+        left: auto !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: auto !important;
         transform: none !important;
       }
 
       .questionText.htmlContent .nc-venn2 > svg,
       .questionText.htmlContent .nc-object[data-kind="venn2"] > svg {
         display: block !important;
-        position: absolute !important;
-        left: 0 !important;
-        top: -45px !important;
 
-        /* SVG ning asl katta o‘lchami saqlanadi — shrink qilinmaydi */
+        /* Muhim: absolute EMAS. Shunda keyingi matn SVG tugagan joydan boshlanadi. */
+        position: static !important;
+
         width: 100% !important;
-        height: 420px !important;
+        height: auto !important;
         max-width: 100% !important;
+        aspect-ratio: 760 / 420 !important;
+
         margin: 0 auto !important;
         overflow: visible !important;
         transform: none !important;
       }
 
-      /* Venn tepasidagi I va II sarlavhalari 3 qatorda ham to‘liq ko‘rinsin */
+      /* Venn tepasidagi I va II sarlavhalar */
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(1),
       .questionText.htmlContent .nc-venn2 foreignObject:nth-of-type(2),
       .questionText.htmlContent .nc-object[data-kind="venn2"] foreignObject:nth-of-type(1),
@@ -2674,8 +2682,7 @@ function PageStyles() {
         font-weight: 700 !important;
       }
 
-      /* ===== VENNDAN KEYINGI ORTIQCHA BO‘SHLIQLARNI TO‘LIQ TOZALASH ===== */
-
+      /* Designer qo‘shgan bo‘sh paragraf joy egallamasin */
       .questionText.htmlContent .nc-venn2 + p,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + p {
         display: none !important;
@@ -2686,25 +2693,10 @@ function PageStyles() {
         line-height: 0 !important;
       }
 
-      .questionText.htmlContent p:empty,
-      .questionText.htmlContent div:empty:not(.nc-object),
-      .questionText.htmlContent p:has(> br:only-child),
-      .questionText.htmlContent div:has(> br:only-child):not(.nc-object) {
-        display: none !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 0 !important;
-      }
-
-      .questionText.htmlContent .nc-venn2 {
-        margin-bottom: 0 !important;
-      }
-
+      /* Venn ichidagi bo‘sh bo‘lmagan keyingi matn normal masofada */
       .questionText.htmlContent .nc-venn2 + *,
       .questionText.htmlContent .nc-object[data-kind="venn2"] + * {
-        margin-top: 4px !important;
+        margin-top: 6px !important;
       }
 
       .htmlContent img {
@@ -3300,10 +3292,17 @@ function PageStyles() {
         .questionText.htmlContent .nc-object[data-kind="venn2"] {
           width: 760px !important;
           max-width: 100% !important;
-          height: 345px !important;
-          min-height: 345px !important;
-          aspect-ratio: auto !important;
-          margin: 8px auto 0 !important;
+          height: auto !important;
+          min-height: 0 !important;
+          margin: 10px auto 6px !important;
+        }
+
+        .questionText.htmlContent .nc-venn2 > svg,
+        .questionText.htmlContent .nc-object[data-kind="venn2"] > svg {
+          position: static !important;
+          width: 100% !important;
+          height: auto !important;
+          aspect-ratio: 760 / 420 !important;
         }
 
         .option {
