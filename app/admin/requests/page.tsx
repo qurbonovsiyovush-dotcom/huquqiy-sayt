@@ -81,6 +81,11 @@ export default function AdminRequestsPage() {
   const [workingId, setWorkingId] =
     useState<string | null>(null);
 
+  const [
+    deletingApproved,
+    setDeletingApproved,
+  ] = useState(false);
+
   const [name, setName] =
     useState("");
 
@@ -553,6 +558,94 @@ export default function AdminRequestsPage() {
     URL.revokeObjectURL(
       url
     );
+  }
+
+  /* =========================================================
+     RUXSAT BERILGANLARNING HAMMASINI O‘CHIRISH
+  ========================================================= */
+
+  async function deleteAllApproved() {
+    const total =
+      statistics.approved;
+
+    if (total === 0) {
+      showMessage(
+        "Ruxsat berilgan foydalanuvchi yo‘q.",
+        "error"
+      );
+
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `DIQQAT!\n\nRuxsat berilgan ${total} ta foydalanuvchi va ularning kirish kodlari BUTUNLAY o‘chiriladi.\n\nBu amalni ortga qaytarib bo‘lmaydi.\n\nDavom etasizmi?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingApproved(true);
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin/access-codes",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "delete-all-approved",
+              }),
+          }
+        );
+
+      const data =
+        await readJson(
+          response
+        );
+
+      if (
+        !response.ok ||
+        data?.success !== true
+      ) {
+        showMessage(
+          data?.message ||
+            "Ruxsat berilganlarni o‘chirib bo‘lmadi.",
+          "error"
+        );
+
+        return;
+      }
+
+      setSearch("");
+      await loadUsers(true);
+
+      showMessage(
+        data?.message ||
+          "Ruxsat berilganlar o‘chirildi."
+      );
+    } catch (error) {
+      console.error(
+        "DELETE ALL APPROVED ERROR:",
+        error
+      );
+
+      showMessage(
+        "Server bilan bog‘lanishda xatolik.",
+        "error"
+      );
+    } finally {
+      setDeletingApproved(false);
+    }
   }
 
   /* =========================================================
@@ -1804,6 +1897,27 @@ export default function AdminRequestsPage() {
                   setSearch
                 }
               />
+
+              {statistics.approved >
+                0 && (
+                <div className="deleteAllApprovedWrap">
+                  <button
+                    type="button"
+                    className="deleteAllApprovedButton"
+                    disabled={
+                      deletingApproved ||
+                      refreshing
+                    }
+                    onClick={
+                      deleteAllApproved
+                    }
+                  >
+                    {deletingApproved
+                      ? "O‘CHIRILMOQDA..."
+                      : `RUXSAT BERILGANLARNING HAMMASINI O‘CHIRISH (${statistics.approved})`}
+                  </button>
+                </div>
+              )}
 
               {renderUserList(
                 approvedUsers,
@@ -3167,6 +3281,49 @@ export default function AdminRequestsPage() {
                 0,
                 .2
               );
+        }
+
+        /* =====================================================
+           RUXSAT BERILGANLARNI HAMMASINI O‘CHIRISH
+        ===================================================== */
+
+        .deleteAllApprovedWrap {
+          width: 100%;
+          margin: -4px 0 28px;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .deleteAllApprovedButton {
+          min-height: 54px;
+          padding: 0 24px;
+          border: 3px solid #861717;
+          border-radius: 12px;
+          background:
+            linear-gradient(
+              180deg,
+              #ffb1b1 0%,
+              #ef5e5e 48%,
+              #bd1d1d 100%
+            );
+          box-shadow:
+            inset 0 4px 4px
+              rgba(255,255,255,.62),
+            0 5px 0 #7b1111,
+            0 9px 14px
+              rgba(0,0,0,.18);
+          color: #ffffff;
+          font-size: 16px;
+          font-weight: 900;
+          letter-spacing: .2px;
+        }
+
+        .deleteAllApprovedButton:active:not(:disabled) {
+          transform: translateY(3px);
+          box-shadow:
+            inset 0 3px 4px
+              rgba(255,255,255,.4),
+            0 2px 0 #7b1111;
         }
 
         /* =====================================================
