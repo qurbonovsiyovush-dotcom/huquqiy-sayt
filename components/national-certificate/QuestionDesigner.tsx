@@ -43,6 +43,10 @@ function cleanHtml(root: HTMLElement) {
   const clone =
     root.cloneNode(true) as HTMLElement;
 
+  /*
+    1. Editorning vaqtinchalik UI elementlarini
+       saqlanadigan HTML'dan olib tashlaymiz.
+  */
   clone
     .querySelectorAll(
       ".nc-selected,[data-nc-ui]"
@@ -51,16 +55,6 @@ function cleanHtml(root: HTMLElement) {
       node.classList.remove(
         "nc-selected"
       );
-
-      node.removeAttribute(
-        "data-nc-cell-selected"
-      );
-
-      if (
-        node instanceof HTMLElement
-      ) {
-        node.style.boxShadow = "";
-      }
 
       if (
         node.hasAttribute(
@@ -71,8 +65,106 @@ function cleanHtml(root: HTMLElement) {
       }
     });
 
+  /*
+    2. Venn diagrammasi editorda sudralgan yoki resize
+       qilingan bo'lsa, editor uni position:absolute
+       holatiga o'tkazishi mumkin.
+
+       Saqlashda left/top koordinatalarini olib tashlaymiz,
+       lekin width/height ni saqlaymiz. Shunda foydalanuvchi
+       bergan o'lcham qoladi, public sahifada esa Venn oddiy
+       oqimda markazda turadi.
+  */
+  clone
+    .querySelectorAll(
+      '[data-kind="venn2"], [data-kind="venn3"]'
+    )
+    .forEach((node) => {
+      const element =
+        node as HTMLElement;
+
+      element.style.position =
+        "relative";
+
+      element.style.left =
+        "auto";
+
+      element.style.top =
+        "auto";
+
+      element.style.right =
+        "auto";
+
+      element.style.bottom =
+        "auto";
+
+      element.style.margin =
+        "14px auto 10px";
+
+      element.style.float =
+        "none";
+
+      element.style.clear =
+        "both";
+
+      element.style.display =
+        "block";
+    });
+
+  /*
+    3. Venn ortidan qolib ketgan bo'sh <p><br></p>
+       elementlarini olib tashlaymiz. Bu bo'sh elementlar
+       public sahifada diagramma bilan keyingi matn orasini
+       keragidan ortiq ochib yubormasligi kerak.
+  */
+  clone
+    .querySelectorAll(
+      '[data-kind="venn2"], [data-kind="venn3"]'
+    )
+    .forEach((node) => {
+      let next =
+        node.nextElementSibling;
+
+      while (next) {
+        const tag =
+          next.tagName.toLowerCase();
+
+        const text =
+          (next.textContent || "")
+            .replace(
+              /\u00a0/g,
+              ""
+            )
+            .trim();
+
+        const hasRealContent =
+          Boolean(
+            next.querySelector(
+              "img,svg,table,[data-object-id]"
+            )
+          );
+
+        if (
+          tag === "p" &&
+          !text &&
+          !hasRealContent
+        ) {
+          const remove = next;
+
+          next =
+            next.nextElementSibling;
+
+          remove.remove();
+          continue;
+        }
+
+        break;
+      }
+    });
+
   return clone.innerHTML;
 }
+
 
 export default function QuestionDesigner({
   value,
@@ -726,65 +818,65 @@ export default function QuestionDesigner({
 
     insertHtml(
       `<div class="nc-object nc-venn2" data-object-id="${id}" data-kind="venn2" data-lock-ratio="true" contenteditable="false"
-        style="position:relative;width:760px;max-width:96%;height:320px;margin:14px auto 8px;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
-        <svg viewBox="0 0 760 320" width="100%" height="100%"
+        style="position:relative;width:760px;max-width:96%;height:420px;margin:22px auto;border:0;background:#fff;overflow:visible;box-sizing:border-box;">
+        <svg viewBox="0 0 760 420" width="100%" height="100%"
           preserveAspectRatio="xMidYMid meet"
           style="display:block;width:100%;height:100%;overflow:visible;">
           <defs>
             <clipPath id="${clipId}">
-              <ellipse cx="300" cy="165" rx="155" ry="95"></ellipse>
+              <ellipse cx="300" cy="220" rx="205" ry="125"></ellipse>
             </clipPath>
           </defs>
 
-          <foreignObject x="35" y="4" width="300" height="58">
+          <foreignObject x="30" y="8" width="300" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:visible;padding-top:2px;box-sizing:border-box;">
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
               I — Unitar davlatga xos
             </div>
           </foreignObject>
 
-          <foreignObject x="425" y="4" width="300" height="58">
+          <foreignObject x="430" y="8" width="300" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:visible;padding-top:2px;box-sizing:border-box;">
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
               II — Federativ davlatga xos
             </div>
           </foreignObject>
 
-          <ellipse cx="455" cy="165" rx="155" ry="95"
+          <ellipse cx="460" cy="220" rx="205" ry="125"
             fill="#bca7e8" fill-opacity="0.72"
             clip-path="url(#${clipId})"></ellipse>
 
-          <ellipse cx="300" cy="165" rx="155" ry="95"
+          <ellipse cx="300" cy="220" rx="205" ry="125"
             fill="white" fill-opacity="0.01"
             stroke="#263b46" stroke-width="3"></ellipse>
 
-          <ellipse cx="455" cy="165" rx="155" ry="95"
+          <ellipse cx="460" cy="220" rx="205" ry="125"
             fill="white" fill-opacity="0.01"
             stroke="#263b46" stroke-width="3"></ellipse>
 
-          <foreignObject x="190" y="141" width="90" height="48">
+          <foreignObject x="175" y="196" width="100" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
               style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">I</div>
           </foreignObject>
 
-          <foreignObject x="477" y="141" width="90" height="48">
+          <foreignObject x="485" y="196" width="100" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
               style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:800;outline:none;overflow:hidden;">II</div>
           </foreignObject>
 
-          <foreignObject x="334" y="141" width="90" height="48">
+          <foreignObject x="330" y="196" width="100" height="48">
             <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
               style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:900;outline:none;overflow:hidden;">III</div>
           </foreignObject>
 
-          <foreignObject x="190" y="275" width="380" height="36">
+          <foreignObject x="190" y="372" width="380" height="42">
             <div xmlns="http://www.w3.org/1999/xhtml" data-nc-editable="true" contenteditable="true"
-              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:visible;">
+              style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:800;line-height:1.1;outline:none;overflow:hidden;">
               III — har ikkalasiga xos
             </div>
           </foreignObject>
         </svg>
-      </div>`
+      </div><p><br></p>`
     );
   }
 
