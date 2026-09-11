@@ -198,13 +198,8 @@ export default function NationalCertificateDetailedResultPage() {
         return;
       }
 
-      /*
-       * MUHIM:
-       * showSaveFilePicker foydalanuvchi tugmani bosgan
-       * ayni "user gesture" ichida chaqirilishi kerak.
-       * Shuning uchun Save As oynasini PDF generatsiyasidan
-       * OLDIN ochamiz.
-       */
+      const previousFilter = filter;
+
       const safeName =
         result.userName
           .trim()
@@ -230,78 +225,9 @@ export default function NationalCertificateDetailedResultPage() {
       const suggestedFileName =
         `${safeName}-${safeTest}-natija.pdf`;
 
-      type SaveFilePickerOptions = {
-        suggestedName?: string;
-        types?: Array<{
-          description?: string;
-          accept: Record<string, string[]>;
-        }>;
-      };
-
-      type WritableLike = {
-        write: (data: Blob) => Promise<void>;
-        close: () => Promise<void>;
-      };
-
-      type FileHandleLike = {
-        createWritable: () => Promise<WritableLike>;
-      };
-
-      const browserWindow =
-        window as typeof window & {
-          showSaveFilePicker?: (
-            options?: SaveFilePickerOptions
-          ) => Promise<FileHandleLike>;
-        };
-
-      let chosenHandle:
-        | FileHandleLike
-        | null = null;
-
-      /*
-       * Save As oynasini darhol ochamiz.
-       */
-      if (
-        typeof browserWindow.showSaveFilePicker ===
-        "function"
-      ) {
-        try {
-          chosenHandle =
-            await browserWindow.showSaveFilePicker({
-              suggestedName:
-                suggestedFileName,
-              types: [
-                {
-                  description:
-                    "PDF hujjat",
-                  accept: {
-                    "application/pdf": [
-                      ".pdf",
-                    ],
-                  },
-                },
-              ],
-            });
-        } catch (pickerError) {
-          if (
-            pickerError instanceof DOMException &&
-            pickerError.name === "AbortError"
-          ) {
-            return;
-          }
-
-          throw pickerError;
-        }
-      }
-
       setIsExportingPdf(true);
-      setError("");
 
       try {
-        /*
-         * PDFda barcha 45 ta savol bo‘lishi uchun
-         * har doim "Barchasi" holatiga qaytamiz.
-         */
         if (filter !== "all") {
           setFilter("all");
 
@@ -309,18 +235,13 @@ export default function NationalCertificateDetailedResultPage() {
             (resolve) => {
               requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                  requestAnimationFrame(
-                    () => resolve()
-                  );
+                  setTimeout(resolve, 80);
                 });
               });
             }
           );
         }
 
-        /*
-         * Shriftlar yuklanishini kutamiz.
-         */
         if (
           typeof document !== "undefined" &&
           "fonts" in document
@@ -331,9 +252,7 @@ export default function NationalCertificateDetailedResultPage() {
                 fonts: FontFaceSet;
               }
             ).fonts.ready;
-          } catch {
-            // Font xatosi PDF eksportini to‘xtatmaydi.
-          }
+          } catch {}
         }
 
         const [
@@ -359,9 +278,6 @@ export default function NationalCertificateDetailedResultPage() {
           );
         }
 
-        /*
-         * Har bir 3D blokni alohida yuqori sifatda capture qilamiz.
-         */
         const blocks = Array.from(
           root.querySelectorAll<HTMLElement>(
             [
@@ -422,25 +338,28 @@ export default function NationalCertificateDetailedResultPage() {
             document.createElement("div");
 
           wrapper.style.position =
-            "absolute";
+            "fixed";
           wrapper.style.left =
             "-100000px";
           wrapper.style.top =
             "0";
           wrapper.style.width =
-            `${Math.ceil(rect.width) + 36}px`;
+            `${Math.max(
+              Math.ceil(rect.width),
+              720
+            )}px`;
           wrapper.style.padding =
-            "18px";
+            "14px";
           wrapper.style.margin =
             "0";
           wrapper.style.background =
             "#eef2f6";
           wrapper.style.boxSizing =
             "border-box";
-          wrapper.style.zIndex =
-            "-9999";
           wrapper.style.pointerEvents =
             "none";
+          wrapper.style.opacity =
+            "1";
 
           const clone =
             source.cloneNode(
@@ -465,10 +384,17 @@ export default function NationalCertificateDetailedResultPage() {
           );
 
           try {
+            await new Promise<void>(
+              (resolve) =>
+                requestAnimationFrame(
+                  () => resolve()
+                )
+            );
+
             return await html2canvas(
               wrapper,
               {
-                scale: 3,
+                scale: 1.7,
                 useCORS: true,
                 allowTaint: false,
                 backgroundColor:
@@ -477,13 +403,10 @@ export default function NationalCertificateDetailedResultPage() {
                 scrollX: 0,
                 scrollY: 0,
                 windowWidth:
-                  Math.ceil(
-                    wrapper.scrollWidth
-                  ),
+                  wrapper.scrollWidth,
                 windowHeight:
-                  Math.ceil(
-                    wrapper.scrollHeight
-                  ),
+                  wrapper.scrollHeight,
+                imageTimeout: 15000,
               }
             );
           } finally {
@@ -504,7 +427,7 @@ export default function NationalCertificateDetailedResultPage() {
           const imageData =
             canvas.toDataURL(
               "image/jpeg",
-              0.99
+              0.9
             );
 
           let imageWidth =
@@ -523,10 +446,8 @@ export default function NationalCertificateDetailedResultPage() {
               printableHeight /
               imageHeight;
 
-            imageHeight *=
-              ratio;
-            imageWidth *=
-              ratio;
+            imageHeight *= ratio;
+            imageWidth *= ratio;
           }
 
           if (
@@ -555,7 +476,7 @@ export default function NationalCertificateDetailedResultPage() {
             imageWidth,
             imageHeight,
             undefined,
-            "SLOW"
+            "FAST"
           );
 
           cursorY +=
@@ -566,55 +487,44 @@ export default function NationalCertificateDetailedResultPage() {
             false;
 
           if (
-            index % 6 === 5
+            index % 4 === 3
           ) {
             await new Promise<void>(
               (resolve) =>
                 setTimeout(
                   resolve,
-                  0
+                  10
                 )
             );
           }
         }
 
-        const pdfBlob =
-          pdf.output("blob");
-
-        /*
-         * Agar Save As oynasi mavjud bo‘lsa,
-         * avval tanlangan joyga yozamiz.
-         */
-        if (chosenHandle) {
-          const writable =
-            await chosenHandle.createWritable();
-
-          await writable.write(
-            pdfBlob
-          );
-
-          await writable.close();
-        } else {
-          /*
-           * showSaveFilePicker mavjud bo‘lmagan brauzerlar
-           * uchun oddiy yuklab olish fallback.
-           */
-          pdf.save(
-            suggestedFileName
-          );
-        }
+        pdf.save(
+          suggestedFileName
+        );
       } catch (err) {
         console.error(
           "PDF export error:",
           err
         );
 
-        setError(
+        const message =
           err instanceof Error
             ? err.message
-            : "PDFni saqlashda xatolik yuz berdi."
+            : "PDFni saqlashda xatolik yuz berdi.";
+
+        window.alert(
+          `PDFni saqlab bo‘lmadi.\n\n${message}`
         );
       } finally {
+        if (
+          previousFilter !== "all"
+        ) {
+          setFilter(
+            previousFilter
+          );
+        }
+
         setIsExportingPdf(false);
       }
     }, [
