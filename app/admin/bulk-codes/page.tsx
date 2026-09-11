@@ -1,14 +1,21 @@
 "use client";
 
 import {
-  ChangeEvent,
   useMemo,
   useState,
+} from "react";
+
+import type {
+  ChangeEvent,
 } from "react";
 
 import {
   useRouter,
 } from "next/navigation";
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type CreatedUser = {
   id?: string;
@@ -64,7 +71,7 @@ function pdfEscape(
 }
 
 /* =========================================================
-   ROUND RECT PDF PATH
+   ROUND RECT
 ========================================================= */
 
 function roundedRect(
@@ -75,8 +82,7 @@ function roundedRect(
   r: number
 ) {
   const c =
-    r *
-    0.5522847498;
+    r * 0.5522847498;
 
   const n = (
     value: number
@@ -156,11 +162,14 @@ function roundedRect(
 
 /* =========================================================
    PDF YARATISH
+
+   PDF ichida faqat:
+   Aliyev Bekzod | QURBONOV-7K4M-92PX
 ========================================================= */
 
 function buildPdf(
   users: CreatedUser[]
-) {
+): string {
   const PAGE_W =
     595.28;
 
@@ -204,11 +213,17 @@ function buildPdf(
   const pageObjectIds:
     number[] = [];
 
+  /* CATALOG */
+
   objects[1] =
     "<< /Type /Catalog /Pages 2 0 R >>";
 
+  /* FONT */
+
   objects[3] =
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+
+  /* PAGES */
 
   for (
     let pageIndex = 0;
@@ -241,8 +256,10 @@ function buildPdf(
 
     pageUsers.forEach(
       (
-        user,
-        index
+        user:
+          CreatedUser,
+        index:
+          number
       ) => {
         const x =
           CARD_X;
@@ -252,27 +269,30 @@ function buildPdf(
           TOP -
           CARD_H -
           index *
-            (CARD_H + GAP);
+            (
+              CARD_H +
+              GAP
+            );
 
-        /* --------------------------
-           3D SHADOW
-        -------------------------- */
+        /* =============================
+           PASTKI 3D SOYA
+        ============================= */
 
         commands.push(
           "q"
         );
 
         commands.push(
-          "0.12 0.15 0.19 rg"
+          "0.10 0.14 0.18 rg"
         );
 
         commands.push(
           roundedRect(
-            x + 6,
-            y - 7,
+            x + 7,
+            y - 8,
             CARD_W,
             CARD_H,
-            12
+            13
           )
         );
 
@@ -284,25 +304,25 @@ function buildPdf(
           "Q"
         );
 
-        /* --------------------------
-           SECOND SHADOW
-        -------------------------- */
+        /* =============================
+           O‘RTA SOYA
+        ============================= */
 
         commands.push(
           "q"
         );
 
         commands.push(
-          "0.52 0.62 0.70 rg"
+          "0.40 0.55 0.65 rg"
         );
 
         commands.push(
           roundedRect(
             x + 3,
-            y - 3,
+            y - 4,
             CARD_W,
             CARD_H,
-            12
+            13
           )
         );
 
@@ -314,16 +334,16 @@ function buildPdf(
           "Q"
         );
 
-        /* --------------------------
-           MAIN CARD
-        -------------------------- */
+        /* =============================
+           ASOSIY KARTA
+        ============================= */
 
         commands.push(
           "q"
         );
 
         commands.push(
-          "0.96 0.98 1 rg"
+          "0.96 0.99 1 rg"
         );
 
         commands.push(
@@ -332,7 +352,7 @@ function buildPdf(
             y,
             CARD_W,
             CARD_H,
-            12
+            13
           )
         );
 
@@ -344,20 +364,20 @@ function buildPdf(
           "Q"
         );
 
-        /* --------------------------
-           BORDER
-        -------------------------- */
+        /* =============================
+           CHEGARA
+        ============================= */
 
         commands.push(
           "q"
         );
 
         commands.push(
-          "0.10 0.25 0.36 RG"
+          "0.05 0.24 0.36 RG"
         );
 
         commands.push(
-          "1.7 w"
+          "1.8 w"
         );
 
         commands.push(
@@ -366,7 +386,7 @@ function buildPdf(
             y,
             CARD_W,
             CARD_H,
-            12
+            13
           )
         );
 
@@ -378,9 +398,9 @@ function buildPdf(
           "Q"
         );
 
-        /* --------------------------
-           TOP 3D LIGHT
-        -------------------------- */
+        /* =============================
+           YUQORI YORUG‘LIK
+        ============================= */
 
         commands.push(
           "q"
@@ -391,7 +411,7 @@ function buildPdf(
         );
 
         commands.push(
-          "2.2 w"
+          "2.5 w"
         );
 
         commands.push(
@@ -402,7 +422,7 @@ function buildPdf(
           )} ${(
             y +
             CARD_H -
-            11
+            10
           ).toFixed(
             2
           )} m`
@@ -418,7 +438,7 @@ function buildPdf(
           )} ${(
             y +
             CARD_H -
-            11
+            10
           ).toFixed(
             2
           )} l`
@@ -432,14 +452,14 @@ function buildPdf(
           "Q"
         );
 
-        /* --------------------------
-           TEXT
-        -------------------------- */
+        /* =============================
+           MATN
+        ============================= */
 
         const text =
           `${user.name}  |  ${user.code}`;
 
-        const safe =
+        const safeText =
           pdfSafeText(
             text
           );
@@ -448,18 +468,20 @@ function buildPdf(
           15;
 
         const maxWidth =
-          CARD_W - 46;
+          CARD_W - 50;
 
-        const approximateWidth =
-          () =>
-            safe.length *
+        function approximateWidth() {
+          return (
+            safeText.length *
             fontSize *
-            0.535;
+            0.535
+          );
+        }
 
         while (
           approximateWidth() >
             maxWidth &&
-          fontSize > 9
+          fontSize > 8
         ) {
           fontSize -=
             0.5;
@@ -470,8 +492,10 @@ function buildPdf(
 
         const textX =
           x +
-          (CARD_W -
-            textWidth) /
+          (
+            CARD_W -
+            textWidth
+          ) /
             2;
 
         const textY =
@@ -492,7 +516,7 @@ function buildPdf(
         );
 
         commands.push(
-          "0.05 0.09 0.13 rg"
+          "0.03 0.12 0.18 rg"
         );
 
         commands.push(
@@ -532,18 +556,27 @@ function buildPdf(
       contentObject
     ] =
       `<< /Length ${stream.length} >>\n` +
-      `stream\n${stream}\nendstream`;
+      `stream\n` +
+      `${stream}\n` +
+      `endstream`;
   }
+
+  /* PAGE TREE */
 
   objects[2] =
     `<< /Type /Pages /Kids [` +
     pageObjectIds
       .map(
-        (id) =>
+        (
+          id:
+            number
+        ) =>
           `${id} 0 R`
       )
       .join(" ") +
     `] /Count ${pageCount} >>`;
+
+  /* PDF HEADER */
 
   let pdf =
     "%PDF-1.4\n";
@@ -554,6 +587,8 @@ function buildPdf(
       objectCount + 1
     ).fill(0);
 
+  /* OBJECTS */
+
   for (
     let id = 1;
     id <= objectCount;
@@ -563,10 +598,16 @@ function buildPdf(
       pdf.length;
 
     pdf +=
-      `${id} 0 obj\n` +
-      `${objects[id]}\n` +
-      `endobj\n`;
+      `${id} 0 obj\n`;
+
+    pdf +=
+      `${objects[id]}\n`;
+
+    pdf +=
+      "endobj\n";
   }
+
+  /* XREF */
 
   const xrefOffset =
     pdf.length;
@@ -595,17 +636,26 @@ function buildPdf(
       " 00000 n \n";
   }
 
+  /* TRAILER */
+
   pdf +=
-    `trailer\n` +
+    `trailer\n`;
+
+  pdf +=
     `<< /Size ${
       objectCount + 1
-    } /Root 1 0 R >>\n` +
-    `startxref\n` +
-    `${xrefOffset}\n` +
+    } /Root 1 0 R >>\n`;
+
+  pdf +=
+    `startxref\n`;
+
+  pdf +=
+    `${xrefOffset}\n`;
+
+  pdf +=
     `%%EOF`;
 
-  return new TextEncoder()
-    .encode(pdf);
+  return pdf;
 }
 
 /* =========================================================
@@ -620,13 +670,17 @@ export default function BulkCodesPage() {
     namesText,
     setNamesText,
   ] =
-    useState("");
+    useState<string>(
+      ""
+    );
 
   const [
     creating,
     setCreating,
   ] =
-    useState(false);
+    useState<boolean>(
+      false
+    );
 
   const [
     users,
@@ -640,27 +694,37 @@ export default function BulkCodesPage() {
     message,
     setMessage,
   ] =
-    useState("");
+    useState<string>(
+      ""
+    );
 
   const [
     error,
     setError,
   ] =
-    useState("");
+    useState<string>(
+      ""
+    );
 
   /* =======================================================
-     NAMES
+     ISMLAR
   ======================================================= */
 
-  const names =
-    useMemo(
+  const names:
+    string[] =
+    useMemo<
+      string[]
+    >(
       () =>
         namesText
           .split(
             /\r?\n/
           )
           .map(
-            (item) =>
+            (
+              item:
+                string
+            ) =>
               item
                 .replace(
                   /\s+/g,
@@ -669,7 +733,13 @@ export default function BulkCodesPage() {
                 .trim()
           )
           .filter(
-            Boolean
+            (
+              item:
+                string
+            ) =>
+              Boolean(
+                item
+              )
           ),
       [
         namesText,
@@ -677,7 +747,7 @@ export default function BulkCodesPage() {
     );
 
   /* =======================================================
-     TXT FILE
+     TXT FAYLNI O‘QISH
   ======================================================= */
 
   async function readTextFile(
@@ -685,7 +755,8 @@ export default function BulkCodesPage() {
       ChangeEvent<HTMLInputElement>
   ) {
     const file =
-      event.target
+      event
+        .target
         .files?.[0];
 
     if (!file) {
@@ -700,12 +771,25 @@ export default function BulkCodesPage() {
         text
       );
 
-      setUsers([]);
+      setUsers(
+        []
+      );
 
-      setMessage("");
+      setMessage(
+        ""
+      );
 
-      setError("");
-    } catch {
+      setError(
+        ""
+      );
+    } catch (
+      readError:
+        unknown
+    ) {
+      console.error(
+        readError
+      );
+
       setError(
         "Matn faylini o‘qib bo‘lmadi."
       );
@@ -713,7 +797,7 @@ export default function BulkCodesPage() {
   }
 
   /* =======================================================
-     CREATE
+     KODLARNI YARATISH
   ======================================================= */
 
   async function createCodes() {
@@ -746,13 +830,21 @@ export default function BulkCodesPage() {
       return;
     }
 
-    setCreating(true);
+    setCreating(
+      true
+    );
 
-    setMessage("");
+    setMessage(
+      ""
+    );
 
-    setError("");
+    setError(
+      ""
+    );
 
-    setUsers([]);
+    setUsers(
+      []
+    );
 
     try {
       const response =
@@ -776,32 +868,108 @@ export default function BulkCodesPage() {
           }
         );
 
-      const data =
+      const data:
+        unknown =
         await response
           .json()
           .catch(
-            () => ({})
+            () => null
           );
 
       if (
         !response.ok ||
-        data?.success !==
-          true
+        !data ||
+        typeof data !==
+          "object"
       ) {
         setError(
-          data?.message ||
+          "Kodlar yaratilmadi."
+        );
+
+        return;
+      }
+
+      const result =
+        data as {
+          success?: boolean;
+          message?: string;
+          users?: unknown;
+        };
+
+      if (
+        result.success !==
+        true
+      ) {
+        setError(
+          result.message ||
             "Kodlar yaratilmadi."
         );
 
         return;
       }
 
-      const created =
+      const created:
+        CreatedUser[] =
         Array.isArray(
-          data?.users
+          result.users
         )
-          ? data.users
+          ? (
+              result.users as unknown[]
+            )
+              .filter(
+                (
+                  item:
+                    unknown
+                ): item is CreatedUser => {
+                  if (
+                    !item ||
+                    typeof item !==
+                      "object"
+                  ) {
+                    return false;
+                  }
+
+                  const value =
+                    item as Record<
+                      string,
+                      unknown
+                    >;
+
+                  return (
+                    typeof value.name ===
+                      "string" &&
+                    typeof value.code ===
+                      "string"
+                  );
+                }
+              )
+              .map(
+                (
+                  item:
+                    CreatedUser
+                ) => ({
+                  id:
+                    item.id,
+
+                  name:
+                    item.name,
+
+                  code:
+                    item.code,
+                })
+              )
           : [];
+
+      if (
+        created.length ===
+        0
+      ) {
+        setError(
+          "Yaratilgan kodlar topilmadi."
+        );
+
+        return;
+      }
 
       setUsers(
         created
@@ -810,9 +978,12 @@ export default function BulkCodesPage() {
       setMessage(
         `${created.length} ta kod yaratildi.`
       );
-    } catch (err) {
+    } catch (
+      createError:
+        unknown
+    ) {
       console.error(
-        err
+        createError
       );
 
       setError(
@@ -826,12 +997,13 @@ export default function BulkCodesPage() {
   }
 
   /* =======================================================
-     COPY
+     HAMMASINI NUSXALASH
   ======================================================= */
 
   async function copyAll() {
     if (
-      users.length === 0
+      users.length ===
+      0
     ) {
       return;
     }
@@ -839,7 +1011,10 @@ export default function BulkCodesPage() {
     const text =
       users
         .map(
-          (user) =>
+          (
+            user:
+              CreatedUser
+          ) =>
             `${user.name}  |  ${user.code}`
         )
         .join(
@@ -865,24 +1040,27 @@ export default function BulkCodesPage() {
   }
 
   /* =======================================================
-     PDF
+     PDF YUKLASH
   ======================================================= */
 
   function downloadPdf() {
     if (
-      users.length === 0
+      users.length ===
+      0
     ) {
       return;
     }
 
-    const bytes =
+    const pdf =
       buildPdf(
         users
       );
 
     const blob =
       new Blob(
-        [bytes],
+        [
+          pdf,
+        ],
         {
           type:
             "application/pdf",
@@ -894,24 +1072,25 @@ export default function BulkCodesPage() {
         blob
       );
 
-    const a =
+    const link =
       document.createElement(
         "a"
       );
 
-    a.href =
+    link.href =
       url;
 
-    a.download =
+    link.download =
       "kirish-kodlari.pdf";
 
-    document.body.appendChild(
-      a
-    );
+    document.body
+      .appendChild(
+        link
+      );
 
-    a.click();
+    link.click();
 
-    a.remove();
+    link.remove();
 
     window.setTimeout(
       () => {
@@ -961,6 +1140,9 @@ export default function BulkCodesPage() {
             <input
               type="file"
               accept=".txt,text/plain"
+              disabled={
+                creating
+              }
               onChange={
                 readTextFile
               }
@@ -981,12 +1163,26 @@ export default function BulkCodesPage() {
           disabled={
             creating
           }
-          onChange={(e) => {
+          onChange={(
+            event
+          ) => {
             setNamesText(
-              e.target.value
+              event
+                .target
+                .value
             );
 
-            setUsers([]);
+            setUsers(
+              []
+            );
+
+            setMessage(
+              ""
+            );
+
+            setError(
+              ""
+            );
           }}
           placeholder={`Aliyev Bekzod
 Karimova Dilnoza
@@ -1055,8 +1251,10 @@ Usmonov Javohir`}
 
             {users.map(
               (
-                user,
-                index
+                user:
+                  CreatedUser,
+                index:
+                  number
               ) => (
                 <div
                   className="codeCard"
@@ -1066,17 +1264,15 @@ Usmonov Javohir`}
                   }
                 >
                   <span>
-                    {
-                      user.name
-                    }
+                    {user.name}
                   </span>
 
-                  <b>|</b>
+                  <b>
+                    |
+                  </b>
 
                   <strong>
-                    {
-                      user.code
-                    }
+                    {user.code}
                   </strong>
                 </div>
               )
@@ -1089,20 +1285,48 @@ Usmonov Javohir`}
 
       <style jsx>{`
 
+        * {
+          box-sizing:
+            border-box;
+        }
+
         .page {
-          min-height: 100vh;
-          padding: 24px;
+          min-height:
+            100vh;
+
+          padding:
+            24px;
+
           background:
             linear-gradient(
               145deg,
               #eef5f9,
               #d7e4ec
             );
-          color: #101820;
+
+          color:
+            #101820;
+
           font-family:
             Arial,
             Helvetica,
             sans-serif;
+        }
+
+        button {
+          cursor:
+            pointer;
+
+          font-weight:
+            900;
+        }
+
+        button:disabled {
+          opacity:
+            .55;
+
+          cursor:
+            not-allowed;
         }
 
         .topBar {
@@ -1111,28 +1335,53 @@ Usmonov Javohir`}
               1100px,
               100%
             );
+
           margin:
             0 auto 28px;
-          display: flex;
-          align-items: center;
-          gap: 20px;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          gap:
+            20px;
         }
 
         .title {
-          flex: 1;
-          padding: 18px 24px;
+          flex:
+            1;
+
+          padding:
+            18px 24px;
+
           border:
-            2px solid #15394f;
-          border-radius: 17px;
+            2px solid
+              #15394f;
+
+          border-radius:
+            17px;
+
           background:
             linear-gradient(
               180deg,
               #ffffff,
               #dceaf2
             );
+
           box-shadow:
+            inset 0 5px 5px
+              rgba(
+                255,
+                255,
+                255,
+                .95
+              ),
+
             0 7px 0
               #17394d,
+
             0 14px 24px
               rgba(
                 0,
@@ -1140,40 +1389,45 @@ Usmonov Javohir`}
                 0,
                 .18
               );
+
           font-size:
             clamp(
               22px,
               3vw,
               34px
             );
-          font-weight: 900;
-          text-align: center;
-        }
 
-        button {
-          cursor: pointer;
-          font-weight: 900;
-        }
+          font-weight:
+            900;
 
-        button:disabled {
-          opacity: .55;
-          cursor:
-            not-allowed;
+          text-align:
+            center;
         }
 
         .backButton {
-          min-height: 55px;
+          min-height:
+            55px;
+
           padding:
             0 22px;
+
           border:
-            2px solid #4d5960;
-          border-radius: 12px;
+            2px solid
+              #4d5960;
+
+          border-radius:
+            12px;
+
           background:
             linear-gradient(
               #ffffff,
               #cbd2d6
             );
+
           box-shadow:
+            inset 0 4px 4px
+              white,
+
             0 5px 0
               #4d5960;
         }
@@ -1185,21 +1439,39 @@ Usmonov Javohir`}
               1100px,
               100%
             );
+
           margin:
             0 auto 35px;
-          padding: 28px;
+
+          padding:
+            28px;
+
           border:
-            2px solid #304754;
-          border-radius: 22px;
+            2px solid
+              #304754;
+
+          border-radius:
+            22px;
+
           background:
             linear-gradient(
               145deg,
               #ffffff,
               #e5edf1
             );
+
           box-shadow:
+            inset 0 6px 6px
+              rgba(
+                255,
+                255,
+                255,
+                .9
+              ),
+
             0 9px 0
               #304754,
+
             0 18px 30px
               rgba(
                 0,
@@ -1210,61 +1482,128 @@ Usmonov Javohir`}
         }
 
         .uploadRow {
-          margin-bottom: 18px;
-          display: flex;
+          margin-bottom:
+            18px;
+
+          display:
+            flex;
+
           justify-content:
             space-between;
-          gap: 15px;
-          align-items: center;
+
+          align-items:
+            center;
+
+          gap:
+            15px;
         }
 
         .fileButton {
-          min-height: 52px;
+          min-height:
+            52px;
+
           padding:
             0 22px;
-          display: flex;
-          align-items: center;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
           justify-content:
             center;
+
           border:
-            2px solid #1e5a7a;
-          border-radius: 12px;
+            2px solid
+              #1e5a7a;
+
+          border-radius:
+            12px;
+
           background:
             linear-gradient(
               #dff5ff,
               #91cfe9
             );
+
           box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .9
+              ),
+
             0 5px 0
               #1e5a7a;
-          font-weight: 900;
-          cursor: pointer;
+
+          font-weight:
+            900;
+
+          cursor:
+            pointer;
         }
 
         .fileButton input {
-          display: none;
+          display:
+            none;
         }
 
         .countBox {
           padding:
             12px 20px;
-          border-radius: 12px;
+
           border:
-            2px solid #59666d;
-          background: white;
-          font-weight: 900;
+            2px solid
+              #59666d;
+
+          border-radius:
+            12px;
+
+          background:
+            white;
+
+          box-shadow:
+            inset 0 3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              );
+
+          font-weight:
+            900;
         }
 
         textarea {
-          width: 100%;
-          min-height: 330px;
-          padding: 20px;
-          resize: vertical;
+          width:
+            100%;
+
+          min-height:
+            330px;
+
+          padding:
+            20px;
+
+          resize:
+            vertical;
+
           border:
-            2px solid #64737b;
-          border-radius: 15px;
-          outline: none;
-          background: white;
+            2px solid
+              #64737b;
+
+          border-radius:
+            15px;
+
+          outline:
+            none;
+
+          background:
+            white;
+
           box-shadow:
             inset 0 4px 7px
               rgba(
@@ -1273,84 +1612,180 @@ Usmonov Javohir`}
                 0,
                 .10
               );
+
           font-family:
             Arial,
+            Helvetica,
             sans-serif;
-          font-size: 18px;
-          line-height: 1.65;
+
+          font-size:
+            18px;
+
+          line-height:
+            1.65;
+        }
+
+        textarea:focus {
+          border-color:
+            #1f83b5;
+
+          box-shadow:
+            inset 0 4px 7px
+              rgba(
+                0,
+                0,
+                0,
+                .10
+              ),
+
+            0 0 0 4px
+              rgba(
+                31,
+                131,
+                181,
+                .12
+              );
         }
 
         .createButton {
-          min-height: 60px;
+          min-height:
+            60px;
+
           margin:
             25px auto 0;
+
           padding:
             0 36px;
-          display: block;
+
+          display:
+            block;
+
           border:
-            2px solid #176438;
-          border-radius: 13px;
-          color: white;
+            2px solid
+              #176438;
+
+          border-radius:
+            13px;
+
+          color:
+            white;
+
           background:
             linear-gradient(
               #49be74,
               #23864a
             );
+
           box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .25
+              ),
+
             0 6px 0
               #176438;
-          font-size: 17px;
+
+          font-size:
+            17px;
+        }
+
+        .createButton:active {
+          transform:
+            translateY(
+              4px
+            );
+
+          box-shadow:
+            0 2px 0
+              #176438;
         }
 
         .successBox,
         .errorBox {
-          margin-top: 22px;
-          padding: 14px;
-          border-radius: 11px;
-          text-align: center;
-          font-weight: 800;
+          margin-top:
+            22px;
+
+          padding:
+            14px;
+
+          border-radius:
+            11px;
+
+          text-align:
+            center;
+
+          font-weight:
+            800;
         }
 
         .successBox {
           border:
-            2px solid #2d7b4b;
+            2px solid
+              #2d7b4b;
+
           background:
             #dff5e6;
+
           color:
             #176438;
         }
 
         .errorBox {
           border:
-            2px solid #9b2d2d;
+            2px solid
+              #9b2d2d;
+
           background:
             #f8dddd;
+
           color:
             #8a2020;
         }
 
         .resultActions {
-          margin-bottom: 28px;
-          display: flex;
-          flex-wrap: wrap;
+          margin-bottom:
+            28px;
+
+          display:
+            flex;
+
+          flex-wrap:
+            wrap;
+
           justify-content:
             center;
-          gap: 15px;
+
+          gap:
+            15px;
         }
 
         .resultActions button {
-          min-height: 54px;
+          min-height:
+            54px;
+
           padding:
             0 25px;
+
           border:
-            2px solid #3c4d57;
-          border-radius: 11px;
+            2px solid
+              #3c4d57;
+
+          border-radius:
+            11px;
+
           background:
             linear-gradient(
               white,
               #cbd6dc
             );
+
           box-shadow:
+            inset 0 4px 4px
+              white,
+
             0 5px 0
               #3c4d57;
         }
@@ -1359,34 +1794,63 @@ Usmonov Javohir`}
         .pdfButton {
           border-color:
             #1c6840;
-          color: white;
+
+          color:
+            white;
+
           background:
             linear-gradient(
               #55c97d,
               #278c51
             );
+
           box-shadow:
+            inset 0 4px 4px
+              rgba(
+                255,
+                255,
+                255,
+                .25
+              ),
+
             0 5px 0
               #1c6840;
         }
 
         .cards {
-          display: grid;
-          gap: 18px;
+          display:
+            grid;
+
+          gap:
+            18px;
         }
 
         .codeCard {
-          min-height: 76px;
+          min-height:
+            76px;
+
           padding:
             16px 24px;
-          display: flex;
-          align-items: center;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
           justify-content:
             center;
-          gap: 16px;
+
+          gap:
+            16px;
+
           border:
-            2px solid #173e55;
-          border-radius: 15px;
+            2px solid
+              #173e55;
+
+          border-radius:
+            15px;
+
           background:
             linear-gradient(
               180deg,
@@ -1394,6 +1858,7 @@ Usmonov Javohir`}
               #edf5f9 55%,
               #cfdee7 100%
             );
+
           box-shadow:
             inset 0 5px 4px
               rgba(
@@ -1402,8 +1867,18 @@ Usmonov Javohir`}
                 255,
                 .95
               ),
+
+            inset 0 -3px 4px
+              rgba(
+                0,
+                0,
+                0,
+                .08
+              ),
+
             0 7px 0
               #173e55,
+
             0 13px 19px
               rgba(
                 0,
@@ -1411,6 +1886,7 @@ Usmonov Javohir`}
                 0,
                 .17
               );
+
           font-size:
             clamp(
               16px,
@@ -1420,26 +1896,33 @@ Usmonov Javohir`}
         }
 
         .codeCard span {
-          font-weight: 800;
+          font-weight:
+            800;
         }
 
         .codeCard b {
           color:
             #61727c;
+
+          font-size:
+            22px;
         }
 
         .codeCard strong {
-          letter-spacing:
-            1px;
           color:
             #0b4d73;
+
+          letter-spacing:
+            1px;
         }
 
         @media (
-          max-width: 700px
+          max-width:
+            700px
         ) {
           .page {
-            padding: 12px;
+            padding:
+              12px;
           }
 
           .topBar {
@@ -1448,25 +1931,47 @@ Usmonov Javohir`}
           }
 
           .backButton {
-            width: 100%;
+            width:
+              100%;
+          }
+
+          .title {
+            width:
+              100%;
           }
 
           .panel,
           .resultPanel {
-            padding: 17px;
+            padding:
+              17px;
           }
 
           .uploadRow {
             align-items:
               stretch;
+
             flex-direction:
               column;
           }
 
+          .fileButton,
+          .countBox {
+            width:
+              100%;
+
+            text-align:
+              center;
+          }
+
           .codeCard {
-            flex-wrap: wrap;
-            gap: 8px;
-            text-align: center;
+            flex-wrap:
+              wrap;
+
+            gap:
+              8px;
+
+            text-align:
+              center;
           }
         }
 
