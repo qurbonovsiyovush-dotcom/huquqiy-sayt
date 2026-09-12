@@ -351,14 +351,16 @@ export default function NationalCertificateDetailedResultPage() {
         const pageHeight =
           pdf.internal.pageSize.getHeight();
 
-        const marginX = 11;
+        const marginLeft = 14;
+        const marginRight = 7;
         const marginTop = 7;
         const marginBottom = 7;
         const blockGap = 6.5;
 
         const printableWidth =
           pageWidth -
-          marginX * 2;
+          marginLeft -
+          marginRight;
 
         const printableHeight =
           pageHeight -
@@ -576,7 +578,7 @@ export default function NationalCertificateDetailedResultPage() {
               pdf.addImage(
                 sliceImageData,
                 "JPEG",
-                marginX,
+                marginLeft,
                 marginTop,
                 imageWidth,
                 sliceHeightMm,
@@ -616,7 +618,7 @@ export default function NationalCertificateDetailedResultPage() {
             }
 
             const x =
-              marginX +
+              marginLeft +
               (printableWidth -
                 imageWidth) /
                 2;
