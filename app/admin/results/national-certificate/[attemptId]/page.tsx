@@ -417,6 +417,32 @@ export default function NationalCertificateDetailedResultPage() {
           clone.style.boxSizing =
             "border-box";
 
+          /*
+            Faqat PDF nusxasida raqamlangan/markerli ro‘yxatlarni
+            savol qutisining chap chetidan ichkariga suramiz.
+            Shunda 1., 2., 3. raqamlar a), b), c) kabi matn bilan
+            bir xil xavfsiz ichki masofada ko‘rinadi.
+          */
+          clone
+            .querySelectorAll<HTMLElement>(
+              ".questionText ol, .questionText ul"
+            )
+            .forEach((list) => {
+              list.style.paddingLeft =
+                "34px";
+              list.style.marginLeft =
+                "0";
+            });
+
+          clone
+            .querySelectorAll<HTMLElement>(
+              ".questionText li"
+            )
+            .forEach((item) => {
+              item.style.paddingLeft =
+                "2px";
+            });
+
           wrapper.appendChild(
             clone
           );
