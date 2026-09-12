@@ -354,7 +354,7 @@ export default function NationalCertificateDetailedResultPage() {
         const marginX = 7;
         const marginTop = 7;
         const marginBottom = 7;
-        const blockGap = 3.5;
+        const blockGap = 6.5;
 
         const printableWidth =
           pageWidth -
@@ -389,7 +389,7 @@ export default function NationalCertificateDetailedResultPage() {
               720
             )}px`;
           wrapper.style.padding =
-            "14px";
+            "18px 16px 24px";
           wrapper.style.margin =
             "0";
           wrapper.style.background =
