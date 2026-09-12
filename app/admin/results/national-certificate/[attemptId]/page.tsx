@@ -418,29 +418,156 @@ export default function NationalCertificateDetailedResultPage() {
             "border-box";
 
           /*
-            Faqat PDF nusxasida raqamlangan/markerli ro‘yxatlarni
-            savol qutisining chap chetidan ichkariga suramiz.
-            Shunda 1., 2., 3. raqamlar a), b), c) kabi matn bilan
-            bir xil xavfsiz ichki masofada ko‘rinadi.
+            FAQAT PDF NUSXASI UCHUN.
+
+            Savol matnidagi 1., 2., 3. kabi raqamlar ba'zi savollarda
+            <ol>/<li> emas, oddiy HTML matn + <br> ko'rinishida saqlangan.
+            Shu sabab CSS selector bilan li ni surish yetarli emas.
+
+            Quyidagi kod aynan ko'rinadigan satr boshidagi raqam markerini
+            (1., 2., 3. ...) topib, a), b), c) satrlari kabi ichkariga suradi.
+            Savol sarlavhasi, javob variantlari va saytning oddiy ko'rinishiga
+            tegmaydi.
           */
           clone
             .querySelectorAll<HTMLElement>(
-              ".questionText ol, .questionText ul"
+              ".questionText"
             )
-            .forEach((list) => {
-              list.style.paddingLeft =
-                "34px";
-              list.style.marginLeft =
-                "0";
-            });
+            .forEach((questionText) => {
+              /* Haqiqiy <ol> bo'lsa */
+              questionText
+                .querySelectorAll<HTMLElement>("ol")
+                .forEach((list) => {
+                  list.style.marginLeft = "0";
+                  list.style.paddingLeft = "36px";
+                  list.style.boxSizing = "border-box";
+                });
 
-          clone
-            .querySelectorAll<HTMLElement>(
-              ".questionText li"
-            )
-            .forEach((item) => {
-              item.style.paddingLeft =
-                "2px";
+              /* Alohida <p>, <div>, <li> bilan yozilgan raqamli satrlar */
+              questionText
+                .querySelectorAll<HTMLElement>(
+                  "p, div, li"
+                )
+                .forEach((element) => {
+                  const value =
+                    (element.textContent || "").trim();
+
+                  if (/^\d+\s*[.)]/.test(value)) {
+                    element.style.marginLeft = "18px";
+                    element.style.boxSizing = "border-box";
+                  }
+                });
+
+              /*
+                <br> dan keyin kelgan oddiy text-node:
+                <br>1. matn...
+                <br>2. matn...
+              */
+              const textNodes: Text[] = [];
+              const walker =
+                document.createTreeWalker(
+                  questionText,
+                  NodeFilter.SHOW_TEXT
+                );
+
+              while (walker.nextNode()) {
+                textNodes.push(
+                  walker.currentNode as Text
+                );
+              }
+
+              textNodes.forEach((textNode) => {
+                const raw =
+                  textNode.nodeValue || "";
+
+                const previous =
+                  textNode.previousSibling;
+
+                const startsAfterBr =
+                  previous instanceof HTMLElement &&
+                  previous.tagName === "BR";
+
+                const hasNumberAfterNewline =
+                  /\n\s*\d+\s*[.)]/.test(raw);
+
+                if (
+                  !startsAfterBr &&
+                  !hasNumberAfterNewline
+                ) {
+                  return;
+                }
+
+                const fragment =
+                  document.createDocumentFragment();
+
+                const pattern =
+                  /(^|\n)(\s*)(\d+\s*[.)])(\s*)/g;
+
+                let lastIndex = 0;
+                let matched = false;
+                let match:
+                  | RegExpExecArray
+                  | null;
+
+                while (
+                  (match = pattern.exec(raw)) !== null
+                ) {
+                  matched = true;
+
+                  fragment.appendChild(
+                    document.createTextNode(
+                      raw.slice(
+                        lastIndex,
+                        match.index
+                      )
+                    )
+                  );
+
+                  if (match[1]) {
+                    fragment.appendChild(
+                      document.createTextNode(
+                        match[1]
+                      )
+                    );
+                  }
+
+                  const marker =
+                    document.createElement("span");
+
+                  marker.textContent =
+                    match[3];
+
+                  marker.style.display =
+                    "inline-block";
+                  marker.style.marginLeft =
+                    "18px";
+                  marker.style.marginRight =
+                    "4px";
+
+                  fragment.appendChild(
+                    marker
+                  );
+
+                  lastIndex =
+                    match.index +
+                    match[0].length;
+                }
+
+                if (!matched) {
+                  return;
+                }
+
+                fragment.appendChild(
+                  document.createTextNode(
+                    raw.slice(lastIndex)
+                  )
+                );
+
+                textNode.parentNode?.replaceChild(
+                  fragment,
+                  textNode
+                );
+              });
             });
 
           wrapper.appendChild(
