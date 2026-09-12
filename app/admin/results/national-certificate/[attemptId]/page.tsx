@@ -104,6 +104,46 @@ function formatDate(value: string | null) {
   );
 }
 
+
+type CertificateLevel =
+  | "A+"
+  | "A"
+  | "B+"
+  | "B"
+  | "C+"
+  | "C"
+  | "—";
+
+function getCertificateLevel(
+  percentage: number
+): CertificateLevel {
+  const value =
+    Number.isFinite(percentage)
+      ? Math.min(
+          100,
+          Math.max(0, percentage)
+        )
+      : 0;
+
+  if (value >= 70) return "A+";
+  if (value >= 65) return "A";
+  if (value >= 60) return "B+";
+  if (value >= 55) return "B";
+  if (value >= 50) return "C+";
+  if (value >= 46) return "C";
+
+  return "—";
+}
+
+function getsCertificate(
+  percentage: number
+) {
+  return (
+    Number.isFinite(percentage) &&
+    percentage >= 46
+  );
+}
+
 export default function NationalCertificateDetailedResultPage() {
   const params = useParams();
 
@@ -694,6 +734,22 @@ export default function NationalCertificateDetailedResultPage() {
             <span>
               Umumiy natija
             </span>
+
+            <div className="heroGrade">
+              <b>
+                {getCertificateLevel(
+                  result.percentage
+                )}
+              </b>
+
+              <small>
+                {getsCertificate(
+                  result.percentage
+                )
+                  ? "Sertifikat oladi"
+                  : "Sertifikat olmaydi"}
+              </small>
+            </div>
           </div>
         </section>
 
@@ -1457,6 +1513,27 @@ function PageStyles() {
         color: #234861;
         font-size: 11px;
         font-weight: 800;
+      }
+
+      .heroGrade {
+        margin-top: 7px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .heroGrade b {
+        color: #102f49;
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      .heroGrade small {
+        color: #234861;
+        font-size: 9px;
+        font-weight: 900;
+        line-height: 1.15;
       }
 
       .statsGrid {
