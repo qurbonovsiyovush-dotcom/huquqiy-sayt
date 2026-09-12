@@ -351,7 +351,7 @@ export default function NationalCertificateDetailedResultPage() {
         const pageHeight =
           pdf.internal.pageSize.getHeight();
 
-        const marginX = 7;
+        const marginX = 11;
         const marginTop = 7;
         const marginBottom = 7;
         const blockGap = 6.5;
@@ -470,61 +470,175 @@ export default function NationalCertificateDetailedResultPage() {
               0.9
             );
 
-          let imageWidth =
+          const imageWidth =
             printableWidth;
 
-          let imageHeight =
+          const imageHeight =
             (canvas.height *
               imageWidth) /
             canvas.width;
 
+          /*
+            Muhim:
+            Juda baland savol kartasini bitta sahifaga sig‘dirish uchun
+            kichraytirmaymiz. Aks holda savol, variantlar va yozuvlar
+            vertikal siqilib, bir-biriga "yopishib" ko‘rinadi.
+
+            Baland blokni tabiiy masshtabda sahifalarga bo‘lib joylaymiz.
+          */
           if (
             imageHeight >
             printableHeight
           ) {
-            const ratio =
-              printableHeight /
-              imageHeight;
+            if (
+              !isFirstBlock &&
+              cursorY > marginTop
+            ) {
+              pdf.addPage();
+            }
 
-            imageHeight *= ratio;
-            imageWidth *= ratio;
-          }
+            const pxPerMm =
+              canvas.width /
+              imageWidth;
 
-          if (
-            !isFirstBlock &&
-            cursorY +
-              imageHeight >
-              pageHeight -
-                marginBottom
-          ) {
-            pdf.addPage();
+            const sliceHeightPx =
+              Math.max(
+                1,
+                Math.floor(
+                  printableHeight *
+                    pxPerMm
+                )
+              );
+
+            let sourceY = 0;
+            let sliceIndex = 0;
+
+            while (
+              sourceY < canvas.height
+            ) {
+              const currentSliceHeight =
+                Math.min(
+                  sliceHeightPx,
+                  canvas.height -
+                    sourceY
+                );
+
+              const sliceCanvas =
+                document.createElement(
+                  "canvas"
+                );
+
+              sliceCanvas.width =
+                canvas.width;
+
+              sliceCanvas.height =
+                currentSliceHeight;
+
+              const sliceContext =
+                sliceCanvas.getContext(
+                  "2d"
+                );
+
+              if (!sliceContext) {
+                throw new Error(
+                  "PDF sahifasini tayyorlashda canvas xatosi yuz berdi."
+                );
+              }
+
+              sliceContext.drawImage(
+                canvas,
+                0,
+                sourceY,
+                canvas.width,
+                currentSliceHeight,
+                0,
+                0,
+                canvas.width,
+                currentSliceHeight
+              );
+
+              const sliceImageData =
+                sliceCanvas.toDataURL(
+                  "image/jpeg",
+                  0.9
+                );
+
+              const sliceHeightMm =
+                currentSliceHeight /
+                pxPerMm;
+
+              if (
+                sliceIndex > 0
+              ) {
+                pdf.addPage();
+              }
+
+              pdf.addImage(
+                sliceImageData,
+                "JPEG",
+                marginX,
+                marginTop,
+                imageWidth,
+                sliceHeightMm,
+                undefined,
+                "FAST"
+              );
+
+              sourceY +=
+                currentSliceHeight;
+
+              sliceIndex += 1;
+            }
+
             cursorY =
-              marginTop;
+              marginTop +
+              (
+                (canvas.height %
+                  sliceHeightPx) ||
+                sliceHeightPx
+              ) /
+                pxPerMm +
+              blockGap;
+
+            isFirstBlock =
+              false;
+          } else {
+            if (
+              !isFirstBlock &&
+              cursorY +
+                imageHeight >
+                pageHeight -
+                  marginBottom
+            ) {
+              pdf.addPage();
+              cursorY =
+                marginTop;
+            }
+
+            const x =
+              marginX +
+              (printableWidth -
+                imageWidth) /
+                2;
+
+            pdf.addImage(
+              imageData,
+              "JPEG",
+              x,
+              cursorY,
+              imageWidth,
+              imageHeight,
+              undefined,
+              "FAST"
+            );
+
+            cursorY +=
+              imageHeight +
+              blockGap;
+
+            isFirstBlock =
+              false;
           }
-
-          const x =
-            marginX +
-            (printableWidth -
-              imageWidth) /
-              2;
-
-          pdf.addImage(
-            imageData,
-            "JPEG",
-            x,
-            cursorY,
-            imageWidth,
-            imageHeight,
-            undefined,
-            "FAST"
-          );
-
-          cursorY +=
-            imageHeight +
-            blockGap;
-
-          isFirstBlock =
-            false;
 
           if (
             index % 4 === 3
