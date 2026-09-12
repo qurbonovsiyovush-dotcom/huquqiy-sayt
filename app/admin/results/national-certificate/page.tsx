@@ -67,14 +67,27 @@ function getPercent(item: ResultItem) {
 }
 
 /*
-  Nizom daraja chegaralarini belgilaydi.
-  0–75 ballga o‘tkazish sayt ichidagi proporsional formula:
-  (to‘g‘ri javoblar / jami savollar) × 75.
+  Daraja to‘g‘ridan-to‘g‘ri FOIZ natijasiga qarab beriladi.
+
+  A+  — 70% va undan yuqori
+  A   — 65% – 69.99%
+  B+  — 60% – 64.99%
+  B   — 55% – 59.99%
+  C+  — 50% – 54.99%
+  C   — 46% – 49.99%
+  —   — 46% dan past
+
+  Shu sabab "sertifikat balli" ham foiz natijasining o‘zi
+  sifatida ishlatiladi; 75 ballik proporsional formula yo‘q.
 */
 function getCertificateScore(item: ResultItem) {
-  const total = Math.max(0, Number(item.total_questions) || 0);
-  const correct = Math.max(0, Number(item.correct_count) || 0);
-  return total > 0 ? Math.min(75, Math.max(0, (correct / total) * 75)) : 0;
+  return Math.min(
+    100,
+    Math.max(
+      0,
+      getPercent(item)
+    )
+  );
 }
 
 function getCertificateLevel(score: number): CertificateLevel {
@@ -412,7 +425,7 @@ export default function NationalCertificateResultsPage() {
         valueColor: red,
       },
       {
-        label: "O'rtacha sertifikat balli",
+        label: "O'rtacha sertifikat balli (foiz)",
         value: stats.averageScore.toFixed(2),
         fill: lightGold,
         stroke: gold,
@@ -876,7 +889,7 @@ export default function NationalCertificateResultsPage() {
 
       doc.text(
         normalizePdfText(
-          "Sertifikat balli: (to'g'ri javoblar / jami savollar) x 75."
+          "Sertifikat balli foiz natijasiga teng. Daraja foiz natijasiga qarab belgilanadi."
         ),
         10,
         pageHeight - 6
@@ -964,7 +977,7 @@ export default function NationalCertificateResultsPage() {
           </article>
 
           <article className="statCard">
-            <span>O‘rtacha sertifikat balli</span>
+            <span>O‘rtacha sertifikat balli (foiz)</span>
             <strong>{stats.averageScore.toFixed(2)}</strong>
           </article>
         </section>
@@ -988,7 +1001,7 @@ export default function NationalCertificateResultsPage() {
             <div>
               <h2>Natijalar reytingi</h2>
               <p>
-                {filteredResults.length} ta natija ko‘rsatilmoqda. Jadval sertifikat balli bo‘yicha tartiblangan.
+                {filteredResults.length} ta natija ko‘rsatilmoqda. Jadval foiz natijasiga teng sertifikat balli bo‘yicha tartiblangan.
               </p>
             </div>
 
