@@ -80,12 +80,11 @@ const KEYS: OptionKey[] = [
 
 function emptyOptions(): EditorOption[] {
   return KEYS.map(
-    (key, index) => ({
+    (key) => ({
       key,
       text: "",
       html: "",
-      isCorrect:
-        index === 0,
+      isCorrect: false,
     })
   );
 }
@@ -450,8 +449,7 @@ export default function NationalCertificateTestEditorPage() {
                       true ||
                     found.isCorrect ===
                       true
-                  : index ===
-                    0,
+                  : false,
             };
           }
         )
