@@ -3301,16 +3301,12 @@ function PageStyles() {
         font-size: 12px;
       }
 
-      /* ===== SAVOL MATNI: OQROQ, KATTAROQ VA TINIQROQ ===== */
+      /* ===== SAVOL MATNI: ESKI YOZUV USLUBI, FAQAT KATTAROQ ===== */
       .questionText {
         position: relative;
         margin-top: 26px;
         padding: 30px 30px 32px;
 
-        /*
-          Savol bloki variantlardan vizual ajralib turadi,
-          lekin juda kulrang yoki og‘ir 3D ko‘rinmaydi.
-        */
         border: 2px solid #aab8c3;
         border-radius: 16px;
 
@@ -3322,25 +3318,20 @@ function PageStyles() {
             #f2f6f9 100%
           );
 
-        color: #17263a;
+        color: #10233a;
 
+        /*
+          Oldingi yozuv uslubi saqlanadi.
+          Faqat hajmi 22px dan 24px ga oshiriladi.
+        */
         font-family:
           Georgia,
           "Times New Roman",
           serif;
 
-        /*
-          Desktopda savol ancha tiniq ko‘rinadi.
-          Juda katta monitorlarda ham ortiqcha kattalashmaydi.
-        */
-        font-size: clamp(
-          24px,
-          1.5vw,
-          26px
-        );
-
-        line-height: 1.56;
-        font-weight: 700;
+        font-size: 24px;
+        line-height: 1.5;
+        font-weight: 600;
 
         overflow-wrap: break-word;
         word-break: normal;
@@ -3352,57 +3343,55 @@ function PageStyles() {
       }
 
       /*
-        Eski editorda saqlangan <font size="..."> qiymatlari
-        savolni juda mayda ko‘rsatib yubormasligi uchun
-        public sahifada o‘qilishi qulay px qiymatlarga o‘tkaziladi.
+        Eski editor saqlagan <font size="..."> larni ham
+        eski nisbatda qoldirib, faqat 1–2 px kattalashtiramiz.
       */
-      .questionText.htmlContent font[size="1"] { font-size: 17px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 19px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 21px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 24px !important; }
-      .questionText.htmlContent font[size="5"] { font-size: 28px !important; }
+      .questionText.htmlContent font[size="1"] { font-size: 15px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 17px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 20px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 23px !important; }
+      .questionText.htmlContent font[size="5"] { font-size: 27px !important; }
       .questionText.htmlContent font[size="6"] { font-size: 34px !important; }
       .questionText.htmlContent font[size="7"] { font-size: 40px !important; }
 
       /*
-        Ba’zi eski savollarda p/span/div ichiga alohida kichik font-size
-        inline yozilgan bo‘lishi mumkin. Ularni base savol shriftiga
-        moslaymiz. <font size="..."> bo‘lsa yuqoridagi selector saqlanadi.
+        MUHIM:
+        p/span/div/li ga font-size yoki font-weight ni !important
+        bilan majburlamaymiz. Shuning uchun editor saqlagan eski
+        yozuv ko‘rinishi va raqamdan keyingi tabiiy masofa saqlanadi.
       */
       .questionText.htmlContent p,
       .questionText.htmlContent div:not(.nc-object),
       .questionText.htmlContent span,
-      .questionText.htmlContent li,
-      .questionText.htmlContent font,
-      .questionText.htmlContent em,
-      .questionText.htmlContent strong,
-      .questionText.htmlContent b {
+      .questionText.htmlContent li {
         font-family:
           Georgia,
           "Times New Roman",
-          serif !important;
+          serif;
 
-        font-size: inherit !important;
-        line-height: 1.56;
-        color: inherit !important;
-        font-weight: inherit !important;
+        line-height: 1.48;
       }
 
       .questionText.htmlContent p {
-        margin: 6px 0;
+        margin: 5px 0;
+        font-size: 0.96em;
       }
 
+      /*
+        Raqamli ro‘yxatda 1. 2. 3. dan keyingi bo‘shliq
+        kattalashib ketmasligi uchun indentni ixcham qilamiz.
+      */
       .questionText.htmlContent ol,
       .questionText.htmlContent ul {
         margin: 8px 0 10px;
-        padding-left: 36px;
+        padding-left: 28px;
         list-style-position: outside;
       }
 
       .questionText.htmlContent ol > li,
       .questionText.htmlContent ul > li {
         margin: 6px 0;
-        padding-left: 4px;
+        padding-left: 0;
         text-indent: 0;
         font-size: 0.96em;
         line-height: 1.48;
@@ -4167,14 +4156,19 @@ function PageStyles() {
           margin-top: 20px;
           padding: 20px 17px 22px;
           font-size: 20px;
-          line-height: 1.56;
-          font-weight: 700;
+          line-height: 1.5;
+          font-weight: 600;
           border-radius: 14px;
         }
 
-        .questionText.htmlContent font[size="3"] { font-size: 19px !important; }
+        .questionText.htmlContent font[size="3"] { font-size: 18px !important; }
         .questionText.htmlContent font[size="4"] { font-size: 20px !important; }
         .questionText.htmlContent font[size="5"] { font-size: 23px !important; }
+
+        .questionText.htmlContent ol,
+        .questionText.htmlContent ul {
+          padding-left: 24px;
+        }
 
         .option {
           padding: 13px;
