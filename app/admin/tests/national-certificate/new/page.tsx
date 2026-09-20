@@ -100,7 +100,15 @@ export default function NewNationalCertificateTestPage() {
         return;
       }
 
-      setCreatedTest(data.test as CreatedTest);
+      const created = data.test as CreatedTest;
+
+      router.replace(
+        `/admin/tests/national-certificate/${encodeURIComponent(
+          created.id
+        )}`
+      );
+
+      return;
     } catch (error) {
       console.error(error);
 
