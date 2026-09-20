@@ -3322,7 +3322,7 @@ function PageStyles() {
             #f2f6f9 100%
           );
 
-        color: #111827;
+        color: #17263a;
 
         font-family:
           Georgia,
@@ -3334,13 +3334,13 @@ function PageStyles() {
           Juda katta monitorlarda ham ortiqcha kattalashmaydi.
         */
         font-size: clamp(
-          22px,
-          1.35vw,
-          24px
+          24px,
+          1.5vw,
+          26px
         );
 
-        line-height: 1.62;
-        font-weight: 600;
+        line-height: 1.56;
+        font-weight: 700;
 
         overflow-wrap: break-word;
         word-break: normal;
@@ -3356,13 +3356,13 @@ function PageStyles() {
         savolni juda mayda ko‘rsatib yubormasligi uchun
         public sahifada o‘qilishi qulay px qiymatlarga o‘tkaziladi.
       */
-      .questionText.htmlContent font[size="1"] { font-size: 16px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 18px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 20px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 22px !important; }
-      .questionText.htmlContent font[size="5"] { font-size: 26px !important; }
-      .questionText.htmlContent font[size="6"] { font-size: 33px !important; }
-      .questionText.htmlContent font[size="7"] { font-size: 39px !important; }
+      .questionText.htmlContent font[size="1"] { font-size: 17px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 19px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 21px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 24px !important; }
+      .questionText.htmlContent font[size="5"] { font-size: 28px !important; }
+      .questionText.htmlContent font[size="6"] { font-size: 34px !important; }
+      .questionText.htmlContent font[size="7"] { font-size: 40px !important; }
 
       /*
         Ba’zi eski savollarda p/span/div ichiga alohida kichik font-size
@@ -3372,15 +3372,20 @@ function PageStyles() {
       .questionText.htmlContent p,
       .questionText.htmlContent div:not(.nc-object),
       .questionText.htmlContent span,
-      .questionText.htmlContent li {
+      .questionText.htmlContent li,
+      .questionText.htmlContent font,
+      .questionText.htmlContent em,
+      .questionText.htmlContent strong,
+      .questionText.htmlContent b {
         font-family:
           Georgia,
           "Times New Roman",
-          serif;
+          serif !important;
 
         font-size: inherit !important;
-        line-height: 1.62;
-        color: inherit;
+        line-height: 1.56;
+        color: inherit !important;
+        font-weight: inherit !important;
       }
 
       .questionText.htmlContent p {
@@ -4161,14 +4166,15 @@ function PageStyles() {
         .questionText {
           margin-top: 20px;
           padding: 20px 17px 22px;
-          font-size: 19px;
-          line-height: 1.58;
+          font-size: 20px;
+          line-height: 1.56;
+          font-weight: 700;
           border-radius: 14px;
         }
 
-        .questionText.htmlContent font[size="3"] { font-size: 18px !important; }
-        .questionText.htmlContent font[size="4"] { font-size: 19px !important; }
-        .questionText.htmlContent font[size="5"] { font-size: 22px !important; }
+        .questionText.htmlContent font[size="3"] { font-size: 19px !important; }
+        .questionText.htmlContent font[size="4"] { font-size: 20px !important; }
+        .questionText.htmlContent font[size="5"] { font-size: 23px !important; }
 
         .option {
           padding: 13px;
