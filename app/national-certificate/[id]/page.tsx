@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 type TestOption = {
   id: string;
@@ -133,6 +133,10 @@ function formatNumber(value: number) {
 
 export default function NationalCertificateTestPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+
+  const isAdminPreview =
+    searchParams.get("preview") === "1";
 
   const testId =
     typeof params?.id === "string"
@@ -183,10 +187,13 @@ export default function NationalCertificateTestPage() {
 
   const storageKey = useMemo(
     () =>
-      testId
+      !isAdminPreview && testId
         ? `national-certificate-progress:${testId}`
         : "",
-    [testId]
+    [
+      isAdminPreview,
+      testId,
+    ]
   );
 
   const currentQuestion =
@@ -567,11 +574,21 @@ export default function NationalCertificateTestPage() {
       setError("");
 
       try {
+        const endpoint =
+          isAdminPreview
+            ? `/api/national-certificate/tests/${encodeURIComponent(
+                testId
+              )}`
+            : `/api/national-certificate/tests/${encodeURIComponent(
+                testId
+              )}/public`;
+
         const response = await fetch(
-          `/api/national-certificate/tests/${testId}/public`,
+          endpoint,
           {
             method: "GET",
             cache: "no-store",
+            credentials: "include",
           }
         );
 
@@ -580,7 +597,8 @@ export default function NationalCertificateTestPage() {
 
         if (
           !response.ok ||
-          !data.success
+          !data.success ||
+          !data.test
         ) {
           throw new Error(
             data.message ||
@@ -588,10 +606,257 @@ export default function NationalCertificateTestPage() {
           );
         }
 
-        const loadedTest =
-          data.test as TestData;
+        const rawTest =
+          data.test;
 
-        setTest(loadedTest);
+        const rawQuestions =
+          Array.isArray(
+            rawTest.questions
+          )
+            ? rawTest.questions
+            : [];
+
+        const normalizedQuestions:
+          TestQuestion[] =
+          rawQuestions
+            .map((question: any) => {
+              const questionNumber =
+                Number(
+                  question.questionNumber ??
+                    question.question_number
+                );
+
+              const questionType =
+                String(
+                  question.questionType ??
+                    question.question_type ??
+                    (
+                      questionNumber <= 35
+                        ? "closed"
+                        : "open"
+                    )
+                ) === "open"
+                  ? "open"
+                  : "closed";
+
+              const rawOptions =
+                Array.isArray(
+                  question.options
+                )
+                  ? question.options
+                  : [];
+
+              return {
+                id:
+                  String(
+                    question.id ??
+                      ""
+                  ),
+
+                questionNumber,
+
+                questionType,
+
+                questionText:
+                  String(
+                    question.questionText ??
+                      question.question_text ??
+                      ""
+                  ),
+
+                questionHtml:
+                  String(
+                    question.questionHtml ??
+                      question.question_html ??
+                      ""
+                  ),
+
+                points:
+                  Number(
+                    question.points ??
+                      0
+                  ),
+
+                options:
+                  rawOptions.map(
+                    (option: any) => ({
+                      id:
+                        String(
+                          option.id ??
+                            option.option_id ??
+                            `${question.id}-${option.option_key ?? option.key ?? ""}`
+                        ),
+
+                      key:
+                        String(
+                          option.key ??
+                            option.option_key ??
+                            ""
+                        ),
+
+                      text:
+                        String(
+                          option.text ??
+                            option.option_text ??
+                            ""
+                        ),
+
+                      html:
+                        String(
+                          option.html ??
+                            option.option_html ??
+                            ""
+                        ),
+
+                      sortOrder:
+                        Number(
+                          option.sortOrder ??
+                            option.sort_order ??
+                            0
+                        ),
+                    })
+                  ),
+              } as TestQuestion;
+            })
+            .filter(
+              (
+                question: TestQuestion
+              ) =>
+                Boolean(
+                  question.id
+                ) &&
+                Number.isInteger(
+                  question.questionNumber
+                )
+            )
+            .sort(
+              (
+                a: TestQuestion,
+                b: TestQuestion
+              ) =>
+                a.questionNumber -
+                b.questionNumber
+            );
+
+        const savedClosedCount =
+          normalizedQuestions.filter(
+            (question) =>
+              question.questionType ===
+              "closed"
+          ).length;
+
+        const savedOpenCount =
+          normalizedQuestions.filter(
+            (question) =>
+              question.questionType ===
+              "open"
+          ).length;
+
+        const loadedTest:
+          TestData = {
+          id:
+            String(
+              rawTest.id
+            ),
+
+          title:
+            String(
+              rawTest.title ||
+                "Nomsiz test"
+            ),
+
+          description:
+            String(
+              rawTest.description ||
+                ""
+            ),
+
+          subject:
+            String(
+              rawTest.subject ||
+                "law"
+            ),
+
+          durationMinutes:
+            Number(
+              rawTest.durationMinutes ??
+                rawTest.duration_minutes ??
+                90
+            ),
+
+          closedQuestionCount:
+            isAdminPreview
+              ? savedClosedCount
+              : Number(
+                  rawTest.closedQuestionCount ??
+                    rawTest.closed_question_count ??
+                    savedClosedCount
+                ),
+
+          openQuestionCount:
+            isAdminPreview
+              ? savedOpenCount
+              : Number(
+                  rawTest.openQuestionCount ??
+                    rawTest.open_question_count ??
+                    savedOpenCount
+                ),
+
+          totalQuestions:
+            isAdminPreview
+              ? normalizedQuestions.length
+              : Number(
+                  rawTest.totalQuestions ??
+                    rawTest.total_questions ??
+                    normalizedQuestions.length
+                ),
+
+          attemptLimit:
+            (
+              rawTest.attemptLimit ??
+              rawTest.attempt_limit
+            ) == null
+              ? null
+              : Number(
+                  rawTest.attemptLimit ??
+                    rawTest.attempt_limit
+                ),
+
+          questions:
+            normalizedQuestions,
+        };
+
+        if (
+          loadedTest.questions.length ===
+          0
+        ) {
+          throw new Error(
+            isAdminPreview
+              ? "Preview uchun hali birorta savol saqlanmagan."
+              : "Test savollari mavjud emas."
+          );
+        }
+
+        setTest(
+          loadedTest
+        );
+
+        if (
+          isAdminPreview
+        ) {
+          /*
+            Preview real foydalanuvchining localStorage
+            javoblarini olmaydi va hech narsani DBga yozmaydi.
+          */
+          setAnswers({});
+          setCurrentIndex(0);
+          setAttempt(null);
+          setResult(null);
+          setMessage(
+            "ADMIN PREVIEW — bu rejimda urinish va natija saqlanmaydi."
+          );
+          return;
+        }
 
         try {
           const savedRaw =
@@ -649,6 +914,7 @@ export default function NationalCertificateTestPage() {
     }, [
       testId,
       storageKey,
+      isAdminPreview,
     ]);
 
   useEffect(() => {
@@ -658,6 +924,66 @@ export default function NationalCertificateTestPage() {
   const startTest =
     useCallback(async () => {
       if (!testId) {
+        return;
+      }
+
+      if (
+        isAdminPreview
+      ) {
+        if (!test) {
+          return;
+        }
+
+        const startedAt =
+          new Date();
+
+        const expiresAt =
+          new Date(
+            startedAt.getTime() +
+              Math.max(
+                1,
+                Number(
+                  test.durationMinutes
+                )
+              ) *
+                60 *
+                1000
+          );
+
+        setAttempt({
+          id:
+            `preview-${testId}`,
+          testId,
+          status:
+            "preview",
+          startedAt:
+            startedAt.toISOString(),
+          expiresAt:
+            expiresAt.toISOString(),
+          durationMinutes:
+            test.durationMinutes,
+        });
+
+        setAnswers({});
+        setCurrentIndex(0);
+
+        setRemainingSeconds(
+          Math.max(
+            1,
+            Number(
+              test.durationMinutes
+            )
+          ) * 60
+        );
+
+        autoSubmitStarted.current =
+          false;
+
+        setError("");
+        setMessage(
+          "ADMIN PREVIEW — urinish va natija bazaga yozilmaydi."
+        );
+
         return;
       }
 
@@ -808,6 +1134,7 @@ export default function NationalCertificateTestPage() {
       storageKey,
       test,
       userName,
+      isAdminPreview,
     ]);
 
   const submitTest =
@@ -820,6 +1147,35 @@ export default function NationalCertificateTestPage() {
           !test ||
           submitting
         ) {
+          return;
+        }
+
+        if (
+          isAdminPreview
+        ) {
+          /*
+            Preview yakunlanganda hech qanday API chaqirilmaydi.
+            Natija va attempt bazaga yozilmaydi.
+          */
+          setConfirmFinish(false);
+          setAttempt(null);
+          setRemainingSeconds(
+            Math.max(
+              1,
+              Number(
+                test.durationMinutes
+              )
+            ) * 60
+          );
+          setAnswers({});
+          setCurrentIndex(0);
+
+          setMessage(
+            automatic
+              ? "ADMIN PREVIEW — preview vaqti tugadi. Hech qanday natija saqlanmadi."
+              : "ADMIN PREVIEW — preview yakunlandi. Hech qanday natija saqlanmadi."
+          );
+
           return;
         }
 
@@ -941,6 +1297,7 @@ export default function NationalCertificateTestPage() {
         answers,
         submitting,
         storageKey,
+        isAdminPreview,
       ]
     );
 
@@ -1444,48 +1801,61 @@ export default function NationalCertificateTestPage() {
               )}
             </div>
 
-            <div className="nameField">
-              <label
-                htmlFor="national-certificate-user-name"
-              >
-                Ism, familiya va otangiz ismi
-              </label>
+            {isAdminPreview ? (
+              <div className="previewNotice">
+                <strong>
+                  ADMIN PREVIEW
+                </strong>
 
-              <input
-                id="national-certificate-user-name"
-                type="text"
-                value={userName}
-                onChange={(event) => {
-                  setUserName(
-                    event.target.value
-                  );
+                <span>
+                  Ko‘rinish foydalanuvchi sahifasining o‘zi.
+                  Preview davomida attempt va natija bazaga yozilmaydi.
+                </span>
+              </div>
+            ) : (
+              <div className="nameField">
+                <label
+                  htmlFor="national-certificate-user-name"
+                >
+                  Ism, familiya va otangiz ismi
+                </label>
 
-                  if (error) {
-                    setError("");
-                  }
-                }}
-                placeholder="Masalan: Ali Valiyev Nurali o‘g‘li"
-                maxLength={100}
-                autoComplete="name"
-                disabled={starting}
-                onKeyDown={(event) => {
-                  if (
-                    event.key ===
-                      "Enter" &&
-                    !starting &&
-                    userName.trim()
-                  ) {
-                    startTest();
-                  }
-                }}
-              />
+                <input
+                  id="national-certificate-user-name"
+                  type="text"
+                  value={userName}
+                  onChange={(event) => {
+                    setUserName(
+                      event.target.value
+                    );
 
-              <span>
-                Natijangiz administrator
-                panelida shu F.I.Sh. bilan
-                saqlanadi.
-              </span>
-            </div>
+                    if (error) {
+                      setError("");
+                    }
+                  }}
+                  placeholder="Masalan: Ali Valiyev Nurali o‘g‘li"
+                  maxLength={100}
+                  autoComplete="name"
+                  disabled={starting}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key ===
+                        "Enter" &&
+                      !starting &&
+                      userName.trim()
+                    ) {
+                      startTest();
+                    }
+                  }}
+                />
+
+                <span>
+                  Natijangiz administrator
+                  panelida shu F.I.Sh. bilan
+                  saqlanadi.
+                </span>
+              </div>
+            )}
 
             {error && (
               <div className="errorMessage">
@@ -1505,6 +1875,8 @@ export default function NationalCertificateTestPage() {
             >
               {starting
                 ? "Boshlanmoqda..."
+                : isAdminPreview
+                ? "PREVIEWNI BOSHLASH"
                 : "Testni boshlash"}
             </button>
           </section>
@@ -2337,6 +2709,42 @@ function PageStyles() {
         margin: 8px 0;
         line-height: 1.6;
         color: #465464;
+      }
+
+      .previewNotice {
+        margin-top: 27px;
+        padding: 18px 20px;
+        border: 2px solid #9b7a18;
+        border-radius: 13px;
+        background:
+          linear-gradient(
+            180deg,
+            #fff7c9 0%,
+            #efd36e 100%
+          );
+        box-shadow:
+          inset 0 3px 2px rgba(255,255,255,.9),
+          0 4px 0 #92761f;
+        text-align: left;
+      }
+
+      .previewNotice strong,
+      .previewNotice span {
+        display: block;
+      }
+
+      .previewNotice strong {
+        margin-bottom: 6px;
+        color: #5b4300;
+        font-size: 14px;
+        letter-spacing: 1px;
+      }
+
+      .previewNotice span {
+        color: #4f4630;
+        line-height: 1.55;
+        font-size: 13px;
+        font-weight: 700;
       }
 
       .nameField {
