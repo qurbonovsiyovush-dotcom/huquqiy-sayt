@@ -410,29 +410,9 @@ export async function POST(
       `;
 
       await sql`
-        UPDATE national_certificate_tests t
-        SET
-          closed_question_count = (
-            SELECT COUNT(*)::int
-            FROM national_certificate_questions q
-            WHERE
-              q.test_id = t.id
-              AND q.question_type = 'closed'
-          ),
-          open_question_count = (
-            SELECT COUNT(*)::int
-            FROM national_certificate_questions q
-            WHERE
-              q.test_id = t.id
-              AND q.question_type = 'open'
-          ),
-          total_questions = (
-            SELECT COUNT(*)::int
-            FROM national_certificate_questions q
-            WHERE q.test_id = t.id
-          ),
-          updated_at = NOW()
-        WHERE t.id = ${testId}
+        UPDATE national_certificate_tests
+        SET updated_at = NOW()
+        WHERE id = ${testId}
       `;
 
       return NextResponse.json(
@@ -574,29 +554,9 @@ export async function POST(
     }
 
     await sql`
-      UPDATE national_certificate_tests t
-      SET
-        closed_question_count = (
-          SELECT COUNT(*)::int
-          FROM national_certificate_questions q
-          WHERE
-            q.test_id = t.id
-            AND q.question_type = 'closed'
-        ),
-        open_question_count = (
-          SELECT COUNT(*)::int
-          FROM national_certificate_questions q
-          WHERE
-            q.test_id = t.id
-            AND q.question_type = 'open'
-        ),
-        total_questions = (
-          SELECT COUNT(*)::int
-          FROM national_certificate_questions q
-          WHERE q.test_id = t.id
-        ),
-        updated_at = NOW()
-      WHERE t.id = ${testId}
+      UPDATE national_certificate_tests
+      SET updated_at = NOW()
+      WHERE id = ${testId}
     `;
 
     return NextResponse.json(
