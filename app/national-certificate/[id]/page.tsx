@@ -3301,11 +3301,11 @@ function PageStyles() {
         font-size: 12px;
       }
 
-      /* ===== SAVOL MATNI: ESKI YOZUV USLUBI, FAQAT KATTAROQ ===== */
+      /* ===== SAVOL MATNI: BARCHA SAVOLLARDA BIR XIL KO‘RINISH ===== */
       .questionText {
         position: relative;
         margin-top: 26px;
-        padding: 30px 30px 32px;
+        padding: 30px 32px 32px;
 
         border: 2px solid #aab8c3;
         border-radius: 16px;
@@ -3314,122 +3314,134 @@ function PageStyles() {
           linear-gradient(
             180deg,
             #ffffff 0%,
-            #fbfcfd 58%,
-            #f2f6f9 100%
+            #fcfdfe 58%,
+            #f4f7f9 100%
           );
 
-        color: #10233a;
+        color: #101827;
 
         /*
-          Oldingi yozuv uslubi saqlanadi.
-          Faqat hajmi 22px dan 24px ga oshiriladi.
+          Word namunasiga yaqin yozuv.
+          Bell MT qurilmada bo‘lmasa Georgia/Times ishlaydi.
         */
         font-family:
+          "Bell MT",
           Georgia,
           "Times New Roman",
           serif;
 
-        font-size: 28px;
-        line-height: 1.52;
-        font-weight: 600;
+        font-size: 26px;
+        line-height: 1.46;
+        font-weight: 700;
 
         overflow-wrap: break-word;
         word-break: normal;
         text-shadow: none;
 
         box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.98),
-          0 4px 12px rgba(31, 48, 65, 0.10);
+          inset 0 1px 0 rgba(255,255,255,.98),
+          0 4px 12px rgba(31,48,65,.10);
       }
 
       /*
-        Eski editor saqlagan <font size="..."> larni ham
-        eski nisbatda qoldirib, faqat 1–2 px kattalashtiramiz.
-      */
-      .questionText.htmlContent font[size="1"] { font-size: 17px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 21px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 25px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 28px !important; }
-      .questionText.htmlContent font[size="5"] { font-size: 32px !important; }
-      .questionText.htmlContent font[size="6"] { font-size: 36px !important; }
-      .questionText.htmlContent font[size="7"] { font-size: 42px !important; }
-
-      /*
         MUHIM:
-        p/span/div/li ga font-size yoki font-weight ni !important
-        bilan majburlamaymiz. Shuning uchun editor saqlagan eski
-        yozuv ko‘rinishi va raqamdan keyingi tabiiy masofa saqlanadi.
+        Eski savollar turli vaqtda turli font-size/font-weight
+        bilan saqlangan. Shu sabab ayrim savollar katta, ayrimlari
+        kichik chiqayotgan edi.
+
+        Endi SAVOLNING ICHKI HTML SHRIFTLARI bir xil qilinadi.
+        Bu faqat savol matniga tegadi — A/B/C/D variantlariga tegmaydi.
       */
       .questionText.htmlContent p,
       .questionText.htmlContent div:not(.nc-object),
       .questionText.htmlContent span,
-      .questionText.htmlContent li {
+      .questionText.htmlContent li,
+      .questionText.htmlContent font,
+      .questionText.htmlContent strong,
+      .questionText.htmlContent b {
         font-family:
+          "Bell MT",
           Georgia,
           "Times New Roman",
-          serif;
+          serif !important;
 
-        line-height: 1.48;
+        font-size: inherit !important;
+        line-height: inherit !important;
+        font-weight: inherit !important;
+        color: inherit !important;
       }
 
       /*
-        REFERENSDAGI KO‘RINISH:
-        - birinchi satr qalin;
-        - qavs ichidagi manba qalin emas, italic;
-        - pastdagi bandlar bir xil tartibda va ixcham.
+        Eski <font size="..."> atributlari endi savol hajmini
+        o‘zgartirmaydi. Hammasi yuqoridagi umumiy hajmga bo‘ysunadi.
       */
-      .questionText.htmlContent p {
-        margin: 6px 0;
-        font-size: 0.96em;
+      .questionText.htmlContent font[size] {
+        font-size: inherit !important;
       }
 
-      .questionText.htmlContent > p:first-child {
+      /*
+        Asosiy savol gapining ko‘rinishi.
+      */
+      .questionText.htmlContent > p:first-child,
+      .questionText.htmlContent > div:first-child {
         margin-top: 0;
         margin-bottom: 12px;
-        font-size: 1em;
-        line-height: 1.42;
-        font-weight: 700;
+        font-size: 1em !important;
+        line-height: 1.42 !important;
+        font-weight: 700 !important;
+      }
+
+      .questionText.htmlContent p {
+        margin: 6px 0;
       }
 
       /*
-        Qavs ichidagi qonun/manba matni:
-        birinchi satr qalin bo‘lsa ham, em/i qalinlashmaydi.
+        Qavs ichidagi manba:
+        (O‘zbekiston Respublikasi Konstitutsiyasi)
+        qalin EMAS, italic.
       */
       .questionText.htmlContent em,
       .questionText.htmlContent i {
-        font-size: 0.90em !important;
-        line-height: 1.4;
+        font-family:
+          "Bell MT",
+          Georgia,
+          "Times New Roman",
+          serif !important;
+
+        font-size: 0.92em !important;
+        line-height: 1.42 !important;
         font-weight: 400 !important;
         font-style: italic !important;
-        color: #263445 !important;
+        color: #202a38 !important;
       }
 
       /*
-        Raqamli ro‘yxat: marker va matn orasidagi masofa kichik,
-        barcha bandlar bir xil chap chiziqda turadi.
+        1. 2. 3. 4. bandlar Word namunasidagidek tizimli:
+        marker matndan uzoqlashib ketmaydi.
       */
       .questionText.htmlContent ol,
       .questionText.htmlContent ul {
         margin: 8px 0 0;
-        padding-left: 30px;
+        padding-left: 1.45em;
         list-style-position: outside;
       }
 
       .questionText.htmlContent ol > li,
       .questionText.htmlContent ul > li {
-        margin: 8px 0;
-        padding-left: 2px;
+        margin: 7px 0;
+        padding-left: 0.10em;
         text-indent: 0;
-        font-size: 0.90em;
-        line-height: 1.42;
-        font-weight: 600;
+
+        font-size: 0.92em !important;
+        line-height: 1.42 !important;
+        font-weight: 700 !important;
       }
 
       .questionText.htmlContent ol > li::marker,
       .questionText.htmlContent ul > li::marker {
         font-size: 0.96em;
         font-weight: 700;
-        color: #10233a;
+        color: #101827;
       }
 
       /* ===== EYLER–VENN: PUBLIC RENDER FALLBACK ===== */
@@ -4177,29 +4189,26 @@ function PageStyles() {
         .questionText {
           margin-top: 20px;
           padding: 20px 17px 22px;
-          font-size: 22px;
-          line-height: 1.5;
-          font-weight: 600;
+          font-size: 21px;
+          line-height: 1.48;
+          font-weight: 700;
           border-radius: 14px;
         }
 
-        .questionText.htmlContent font[size="3"] { font-size: 20px !important; }
-        .questionText.htmlContent font[size="4"] { font-size: 22px !important; }
-        .questionText.htmlContent font[size="5"] { font-size: 25px !important; }
-
         .questionText.htmlContent ol,
         .questionText.htmlContent ul {
-          padding-left: 26px;
+          padding-left: 1.40em;
         }
 
-        .questionText.htmlContent > p:first-child {
+        .questionText.htmlContent > p:first-child,
+        .questionText.htmlContent > div:first-child {
           margin-bottom: 10px;
         }
 
         .questionText.htmlContent ol > li,
         .questionText.htmlContent ul > li {
-          margin: 7px 0;
-          font-size: 0.92em;
+          margin: 6px 0;
+          font-size: 0.94em !important;
         }
 
         .option {
