@@ -488,6 +488,17 @@ async function saveResult() {
             earnedPoints: result.earnedPoints,
             totalPoints: result.totalPoints,
             spentSeconds,
+
+            /*
+              MUHIM:
+              Reyting tizimi uchun foydalanuvchining
+              har bir savolga bergan javobini serverga yuboramiz.
+
+              Server /api/results ichida bu javoblarni
+              Neon bazadagi haqiqiy javob kaliti bilan
+              qayta tekshiradi.
+            */
+            answers,
           }),
         });
 
