@@ -3346,30 +3346,92 @@ function PageStyles() {
       /* ===== QUESTION CARD ===== */
 
       .questionCard {
-        padding: 32px;
+        position: relative;
+        padding: 34px;
+        border: 3px solid #4f5d66;
+        border-radius: 28px;
+
+        background:
+          linear-gradient(
+            145deg,
+            #ffffff 0%,
+            #f8fafb 32%,
+            #e8edf0 72%,
+            #d5dce1 100%
+          );
+
+        box-shadow:
+          inset 0 8px 7px rgba(255,255,255,.98),
+          inset 0 -10px 14px rgba(55,70,82,.18),
+          0 9px 0 #59656d,
+          0 18px 30px rgba(18,35,48,.24);
+      }
+
+      .questionCard::before {
+        content: "";
+        position: absolute;
+        inset: 8px;
+        pointer-events: none;
+
+        border: 1px solid rgba(255,255,255,.92);
         border-radius: 20px;
+
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.95);
       }
 
       .questionMeta {
+        position: relative;
+        z-index: 1;
+
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        padding: 14px 16px;
-        border: 2px solid #59646c;
-        border-radius: 12px;
+
+        padding: 15px 17px;
+
+        border: 2px solid #56636c;
+        border-radius: 15px;
+
         background:
           linear-gradient(
             180deg,
             #ffffff 0%,
-            #e5e9ec 58%,
-            #cbd1d5 100%
+            #f4f6f7 24%,
+            #dce2e6 67%,
+            #c3cbd0 100%
           );
+
         box-shadow:
-          inset 0 2px 0 #fff,
-          inset 0 -4px 0 rgba(50, 58, 64, 0.12),
-          0 5px 0 #6a747b,
-          0 9px 13px rgba(0, 0, 0, 0.12);
+          inset 0 5px 4px rgba(255,255,255,.98),
+          inset 0 -6px 7px rgba(53,66,75,.16),
+          0 6px 0 #647078,
+          0 11px 17px rgba(20,34,44,.18);
+      }
+
+      .questionMeta::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 6px;
+        height: 35%;
+
+        pointer-events: none;
+        border-radius: 10px;
+
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255,255,255,.72),
+            rgba(255,255,255,0)
+          );
+      }
+
+      .questionMeta > * {
+        position: relative;
+        z-index: 1;
       }
 
       .questionNumber {
@@ -3409,15 +3471,16 @@ function PageStyles() {
         margin-top: 26px;
         padding: 30px 32px 32px;
 
-        border: 2px solid #aab8c3;
-        border-radius: 16px;
+        border: 2px solid #8fa0ad;
+        border-radius: 24px;
 
         background:
           linear-gradient(
-            180deg,
+            145deg,
             #ffffff 0%,
-            #fcfdfe 58%,
-            #f4f7f9 100%
+            #ffffff 28%,
+            #f8fafb 60%,
+            #edf2f5 100%
           );
 
         color: #101827;
@@ -3441,8 +3504,44 @@ function PageStyles() {
         text-shadow: none;
 
         box-shadow:
-          inset 0 1px 0 rgba(255,255,255,.98),
-          0 4px 12px rgba(31,48,65,.10);
+          inset 0 7px 6px rgba(255,255,255,.98),
+          inset 0 -8px 12px rgba(63,80,94,.13),
+          0 7px 0 #8c9aa4,
+          0 14px 22px rgba(25,43,57,.18);
+      }
+
+      .questionText::before {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        pointer-events: none;
+
+        border: 1px solid rgba(255,255,255,.95);
+        border-radius: 17px;
+      }
+
+      .questionText::after {
+        content: "";
+        position: absolute;
+        left: 5%;
+        right: 5%;
+        top: 7px;
+        height: 22%;
+        pointer-events: none;
+
+        border-radius: 18px;
+
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255,255,255,.55),
+            rgba(255,255,255,0)
+          );
+      }
+
+      .questionText > * {
+        position: relative;
+        z-index: 1;
       }
 
       /*
@@ -4223,6 +4322,13 @@ function PageStyles() {
         .resultCard,
         .questionCard {
           padding: 20px;
+          border-radius: 21px;
+
+          box-shadow:
+            inset 0 5px 5px rgba(255,255,255,.96),
+            inset 0 -7px 9px rgba(55,70,82,.15),
+            0 6px 0 #59656d,
+            0 12px 20px rgba(18,35,48,.20);
         }
 
         .startStats,
