@@ -3301,28 +3301,45 @@ function PageStyles() {
         font-size: 12px;
       }
 
-      /* ===== SAVOL MATNI: KATTAROQ, TOZA VA O‘QILISHI OSON ===== */
+      /* ===== SAVOL MATNI: OQROQ, KATTAROQ VA TINIQROQ ===== */
       .questionText {
         position: relative;
-        margin-top: 30px;
-        padding: 34px 34px 36px;
-        border: 3px solid #3e596a;
+        margin-top: 26px;
+        padding: 30px 30px 32px;
+
+        /*
+          Savol bloki variantlardan vizual ajralib turadi,
+          lekin juda kulrang yoki og‘ir 3D ko‘rinmaydi.
+        */
+        border: 2px solid #aab8c3;
         border-radius: 16px;
+
         background:
           linear-gradient(
             180deg,
             #ffffff 0%,
-            #edf5fb 48%,
-            #d5e3ed 100%
+            #fbfcfd 58%,
+            #f2f6f9 100%
           );
-        color: #10233a;
 
-        /* Bell MT o‘rniga ekranda aniqroq Georgia */
-        font-family: Georgia, "Times New Roman", serif;
+        color: #111827;
 
-        /* Oldingi 20px -> 22px */
-        font-size: 22px;
-        line-height: 1.5;
+        font-family:
+          Georgia,
+          "Times New Roman",
+          serif;
+
+        /*
+          Desktopda savol ancha tiniq ko‘rinadi.
+          Juda katta monitorlarda ham ortiqcha kattalashmaydi.
+        */
+        font-size: clamp(
+          22px,
+          1.35vw,
+          24px
+        );
+
+        line-height: 1.62;
         font-weight: 600;
 
         overflow-wrap: break-word;
@@ -3330,40 +3347,44 @@ function PageStyles() {
         text-shadow: none;
 
         box-shadow:
-          inset 0 3px 0 #fff,
-          inset 0 -7px 0 rgba(57, 78, 91, 0.13),
-          0 8px 0 #647783,
-          0 14px 22px rgba(21, 45, 61, 0.19);
+          inset 0 1px 0 rgba(255, 255, 255, 0.98),
+          0 4px 12px rgba(31, 48, 65, 0.10);
       }
 
       /*
-        QuestionDesigner execCommand(fontSize) saqlagan eski <font size="...">
-        qiymatlarini public sahifada aniq px ga aylantiramiz.
-
-        size=4 -> odatiy bandlar (1,2,3 va a,b,c,d) uchun 21px
-        size=5 -> asosiy savol/sarlavha uchun 25px
+        Eski editorda saqlangan <font size="..."> qiymatlari
+        savolni juda mayda ko‘rsatib yubormasligi uchun
+        public sahifada o‘qilishi qulay px qiymatlarga o‘tkaziladi.
       */
-      .questionText.htmlContent font[size="1"] { font-size: 14px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 16px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 19px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 21px !important; }
-      .questionText.htmlContent font[size="5"] { font-size: 25px !important; }
+      .questionText.htmlContent font[size="1"] { font-size: 16px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 18px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 20px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 22px !important; }
+      .questionText.htmlContent font[size="5"] { font-size: 26px !important; }
       .questionText.htmlContent font[size="6"] { font-size: 33px !important; }
       .questionText.htmlContent font[size="7"] { font-size: 39px !important; }
 
-      /* Ichki matnlarning shrift turi ham bir xil bo‘lsin */
+      /*
+        Ba’zi eski savollarda p/span/div ichiga alohida kichik font-size
+        inline yozilgan bo‘lishi mumkin. Ularni base savol shriftiga
+        moslaymiz. <font size="..."> bo‘lsa yuqoridagi selector saqlanadi.
+      */
       .questionText.htmlContent p,
       .questionText.htmlContent div:not(.nc-object),
       .questionText.htmlContent span,
       .questionText.htmlContent li {
-        font-family: Georgia, "Times New Roman", serif;
-        line-height: 1.48;
+        font-family:
+          Georgia,
+          "Times New Roman",
+          serif;
+
+        font-size: inherit !important;
+        line-height: 1.62;
+        color: inherit;
       }
 
-      /* Oddiy bandlar savol sarlavhasidan faqat ozgina kichik */
       .questionText.htmlContent p {
-        margin: 5px 0;
-        font-size: 0.96em;
+        margin: 6px 0;
       }
 
       .questionText.htmlContent ol,
@@ -4138,9 +4159,11 @@ function PageStyles() {
         }
 
         .questionText {
-          padding: 20px 16px 22px;
+          margin-top: 20px;
+          padding: 20px 17px 22px;
           font-size: 19px;
-          line-height: 1.48;
+          line-height: 1.58;
+          border-radius: 14px;
         }
 
         .questionText.htmlContent font[size="3"] { font-size: 18px !important; }
