@@ -3347,10 +3347,10 @@ function PageStyles() {
         eski nisbatda qoldirib, faqat 1–2 px kattalashtiramiz.
       */
       .questionText.htmlContent font[size="1"] { font-size: 17px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 19px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 23px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 26px !important; }
-      .questionText.htmlContent font[size="5"] { font-size: 30px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 21px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 25px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 28px !important; }
+      .questionText.htmlContent font[size="5"] { font-size: 32px !important; }
       .questionText.htmlContent font[size="6"] { font-size: 36px !important; }
       .questionText.htmlContent font[size="7"] { font-size: 42px !important; }
 
@@ -3372,42 +3372,64 @@ function PageStyles() {
         line-height: 1.48;
       }
 
+      /*
+        REFERENSDAGI KO‘RINISH:
+        - birinchi satr qalin;
+        - qavs ichidagi manba qalin emas, italic;
+        - pastdagi bandlar bir xil tartibda va ixcham.
+      */
       .questionText.htmlContent p {
-        margin: 5px 0;
+        margin: 6px 0;
         font-size: 0.96em;
       }
 
+      .questionText.htmlContent > p:first-child {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 1em;
+        line-height: 1.42;
+        font-weight: 700;
+      }
+
       /*
-        Raqamli ro‘yxatda 1. 2. 3. dan keyingi bo‘shliq
-        kattalashib ketmasligi uchun indentni ixcham qilamiz.
+        Qavs ichidagi qonun/manba matni:
+        birinchi satr qalin bo‘lsa ham, em/i qalinlashmaydi.
+      */
+      .questionText.htmlContent em,
+      .questionText.htmlContent i {
+        font-size: 0.90em !important;
+        line-height: 1.4;
+        font-weight: 400 !important;
+        font-style: italic !important;
+        color: #263445 !important;
+      }
+
+      /*
+        Raqamli ro‘yxat: marker va matn orasidagi masofa kichik,
+        barcha bandlar bir xil chap chiziqda turadi.
       */
       .questionText.htmlContent ol,
       .questionText.htmlContent ul {
-        margin: 8px 0 10px;
-        padding-left: 28px;
+        margin: 8px 0 0;
+        padding-left: 30px;
         list-style-position: outside;
       }
 
       .questionText.htmlContent ol > li,
       .questionText.htmlContent ul > li {
-        margin: 6px 0;
-        padding-left: 0;
+        margin: 8px 0;
+        padding-left: 2px;
         text-indent: 0;
-        font-size: 0.96em;
-        line-height: 1.48;
+        font-size: 0.90em;
+        line-height: 1.42;
+        font-weight: 600;
       }
 
       .questionText.htmlContent ol > li::marker,
       .questionText.htmlContent ul > li::marker {
-        font-size: 0.98em;
+        font-size: 0.96em;
         font-weight: 700;
-      }
-
-      /* Qavs ichidagi qonun manbasi: asosiy savoldan sal kichik */
-      .questionText.htmlContent em,
-      .questionText.htmlContent i {
-        font-size: 0.92em;
-        line-height: 1.4;
+        color: #10233a;
       }
 
       /* ===== EYLER–VENN: PUBLIC RENDER FALLBACK ===== */
@@ -4167,7 +4189,17 @@ function PageStyles() {
 
         .questionText.htmlContent ol,
         .questionText.htmlContent ul {
-          padding-left: 24px;
+          padding-left: 26px;
+        }
+
+        .questionText.htmlContent > p:first-child {
+          margin-bottom: 10px;
+        }
+
+        .questionText.htmlContent ol > li,
+        .questionText.htmlContent ul > li {
+          margin: 7px 0;
+          font-size: 0.92em;
         }
 
         .option {
