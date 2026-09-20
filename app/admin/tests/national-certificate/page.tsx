@@ -561,9 +561,9 @@ export default function NationalCertificateAdminTestsPage() {
                     className="grayButton actionButton"
                     onClick={() =>
                       router.push(
-                        `/admin/tests/national-certificate/${encodeURIComponent(
+                        `/national-certificate/${encodeURIComponent(
                           test.id
-                        )}/preview`
+                        )}?preview=1`
                       )
                     }
                   >
