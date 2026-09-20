@@ -4,8 +4,6 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SUBMIT_GRACE_MS = 15_000;
-
 type RawAnswer = {
   questionId?: unknown;
   selectedOptionId?: unknown;
@@ -152,26 +150,23 @@ export async function POST(
     const now = new Date();
 
     /*
-      Brauzer aynan 00:00 da avtomatik yuborganda
-      internetdagi kichik kechikish sababli so‘rov
-      serverga bir necha soniya kech yetib kelishi mumkin.
+      QAT’IY SERVER VAQT NAZORATI
 
-      Shu sabab faqat yuborish transporti uchun
-      15 soniyalik server grace bor.
+      expiresAt ga yetgan zahoti urinish tugaydi.
+      Hech qanday qo‘shimcha "grace" vaqt yo‘q.
 
-      Foydalanuvchi interfeysida esa vaqt baribir
-      00:00 da bloklanadi.
+      Frontend ham 00:00 da darhol bloklanishi kerak,
+      lekin asosiy himoya aynan serverda.
     */
     if (
-      now.getTime() >
-      expiresAt.getTime() +
-        SUBMIT_GRACE_MS
+      now.getTime() >=
+      expiresAt.getTime()
     ) {
       await sql`
         UPDATE national_certificate_attempts
         SET
           status = 'expired',
-          submitted_at = NOW(),
+          submitted_at = ${expiresAt.toISOString()}::timestamptz,
           correct_count = 0,
           incorrect_count = 0,
           unanswered_count = 45,
