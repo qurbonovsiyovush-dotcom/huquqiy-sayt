@@ -727,6 +727,21 @@ export default function AdminResultsPage() {
             <span className="resultNavIcon">A+</span>
             <strong>Milliy sertifikat natijalari</strong>
           </button>
+
+          <button
+            type="button"
+            className="resultNavCard rankingResult"
+            onClick={() =>
+              router.push(
+                "/admin/results/ranking"
+              )
+            }
+          >
+            <span className="resultNavIcon rankingIcon">
+              🏆
+            </span>
+            <strong>Umumiy reyting</strong>
+          </button>
         </div>
 
         <div className="statsGrid">
@@ -1331,7 +1346,7 @@ export default function AdminResultsPage() {
         .resultTypeNav {
           display: grid;
           grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+            repeat(3, minmax(0, 1fr));
           gap: 22px;
           margin-bottom: 30px;
         }
@@ -1472,6 +1487,47 @@ export default function AdminResultsPage() {
             inset 0 6px 5px rgba(255,255,255,.85),
             0 6px 0 #6d5294,
             0 9px 13px rgba(0,0,0,.20);
+        }
+
+        .rankingResult {
+          border-color: #987116;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fff9dc 0%,
+              #f6dfa0 48%,
+              #d6ad43 100%
+            );
+
+          box-shadow:
+            inset 0 7px 6px rgba(255,255,255,.95),
+            inset 0 -5px 5px rgba(122,88,0,.16),
+            0 8px 0 #8d6817,
+            0 14px 20px rgba(0,0,0,.22);
+        }
+
+        .rankingResult .resultNavIcon {
+          border-color: #8d6817;
+          color: #6f5008;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffef4,
+              #ffe58d 48%,
+              #d6aa33 100%
+            );
+
+          box-shadow:
+            inset 0 6px 5px rgba(255,255,255,.88),
+            0 6px 0 #8d6817,
+            0 9px 13px rgba(0,0,0,.20);
+        }
+
+        .rankingIcon {
+          font-size: 28px;
+          line-height: 1;
         }
 
         .resultNavCard.active {
@@ -1895,6 +1951,15 @@ export default function AdminResultsPage() {
           .filterBar {
             grid-template-columns:
               1fr 1fr 1fr;
+          }
+        }
+
+        @media (
+          max-width: 1100px
+        ) {
+          .resultTypeNav {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
           }
         }
 
