@@ -19,6 +19,9 @@ const ADMIN_CODE =
 const ADMIN_NAME =
   "Qurbonov Siyovush Jamaliddinzoda";
 
+const ADMIN_USER_ID =
+  "admin";
+
 /* =====================================================
    COOKIE
 ===================================================== */
@@ -58,10 +61,15 @@ function clearCookie(
   );
 }
 
+/* =====================================================
+   SESSION COOKIE'LARI
+===================================================== */
+
 function setSessionCookies(
   response: NextResponse,
   role: "admin" | "user",
-  name: string
+  name: string,
+  userId: string
 ) {
   response.cookies.set(
     "qurbonov_session",
@@ -81,11 +89,28 @@ function setSessionCookies(
     cookieOptions()
   );
 
+  /*
+    MUHIM:
+    Bu foydalanuvchining Neon bazadagi
+    doimiy ID si.
+
+    Session o‘zgarsa ham bu ID o‘zgarmaydi.
+  */
+  response.cookies.set(
+    "qurbonov_user_id",
+    userId,
+    cookieOptions()
+  );
+
   clearCookie(
     response,
     "qurbonov_pending"
   );
 }
+
+/* =====================================================
+   TASDIQ KUTAYOTGAN FOYDALANUVCHI
+===================================================== */
 
 function setPendingCookie(
   response: NextResponse,
@@ -139,15 +164,21 @@ export async function POST(
       const response =
         NextResponse.json({
           success: true,
-          status: "authenticated",
+          status:
+            "authenticated",
           role: "admin",
+
+          userId:
+            ADMIN_USER_ID,
+
           redirect: "/",
         });
 
       setSessionCookies(
         response,
         "admin",
-        ADMIN_NAME
+        ADMIN_NAME,
+        ADMIN_USER_ID
       );
 
       return response;
@@ -175,11 +206,14 @@ export async function POST(
         LIMIT 1
       `;
 
-    if (users.length === 0) {
+    if (
+      users.length === 0
+    ) {
       return NextResponse.json(
         {
           success: false,
-          status: "not-found",
+          status:
+            "not-found",
           error:
             "Kirish kodi noto‘g‘ri.",
         },
@@ -193,7 +227,9 @@ export async function POST(
       users[0];
 
     const userId =
-      String(user.id);
+      String(
+        user.id
+      );
 
     const userName =
       String(
@@ -205,12 +241,15 @@ export async function POST(
        BLOKLANGAN / RAD ETILGAN
     ================================================= */
 
-    if (user.active !== true) {
+    if (
+      user.active !== true
+    ) {
       const response =
         NextResponse.json(
           {
             success: false,
-            status: "rejected",
+            status:
+              "rejected",
             error:
               "Kirish so‘rovingiz rad etilgan.",
           },
@@ -224,6 +263,11 @@ export async function POST(
         "qurbonov_pending"
       );
 
+      clearCookie(
+        response,
+        "qurbonov_user_id"
+      );
+
       return response;
     }
 
@@ -231,25 +275,32 @@ export async function POST(
        ADMIN HALI TASDIQLAMAGAN
     ================================================= */
 
-    if (user.approved !== true) {
+    if (
+      user.approved !== true
+    ) {
       /*
         Birinchi marta kod ishlatilganda
         requested_at vaqtini yozamiz.
       */
 
-      if (!user.requested_at) {
+      if (
+        !user.requested_at
+      ) {
         await sql`
           UPDATE access_codes
           SET
-            requested_at = NOW()
-          WHERE id = ${userId}
+            requested_at =
+              NOW()
+          WHERE
+            id = ${userId}
         `;
       }
 
       const response =
         NextResponse.json({
           success: false,
-          status: "pending",
+          status:
+            "pending",
           message:
             "Kirish so‘rovingiz yuborildi. Administrator ruxsatini kuting.",
         });
@@ -274,15 +325,20 @@ export async function POST(
     const response =
       NextResponse.json({
         success: true,
-        status: "authenticated",
+        status:
+          "authenticated",
         role: "user",
+
+        userId,
+
         redirect: "/",
       });
 
     setSessionCookies(
       response,
       "user",
-      userName
+      userName,
+      userId
     );
 
     return response;
@@ -329,14 +385,30 @@ export async function GET(
         "qurbonov_role"
       )?.value;
 
+    const currentUserId =
+      request.cookies.get(
+        "qurbonov_user_id"
+      )?.value;
+
     if (session) {
       return NextResponse.json({
         success: true,
-        status: "authenticated",
+
+        status:
+          "authenticated",
+
         role:
           role === "admin"
             ? "admin"
             : "user",
+
+        userId:
+          currentUserId ||
+          (
+            role === "admin"
+              ? ADMIN_USER_ID
+              : null
+          ),
       });
     }
 
@@ -349,7 +421,9 @@ export async function GET(
         "qurbonov_pending"
       )?.value;
 
-    if (!pendingUserId) {
+    if (
+      !pendingUserId
+    ) {
       return NextResponse.json({
         success: false,
         status: "none",
@@ -373,15 +447,19 @@ export async function GET(
           approved_at,
           rejected_at
         FROM access_codes
-        WHERE id = ${pendingUserId}
+        WHERE id =
+          ${pendingUserId}
         LIMIT 1
       `;
 
-    if (users.length === 0) {
+    if (
+      users.length === 0
+    ) {
       const response =
         NextResponse.json({
           success: false,
-          status: "not-found",
+          status:
+            "not-found",
         });
 
       clearCookie(
@@ -389,11 +467,21 @@ export async function GET(
         "qurbonov_pending"
       );
 
+      clearCookie(
+        response,
+        "qurbonov_user_id"
+      );
+
       return response;
     }
 
     const user: any =
       users[0];
+
+    const userId =
+      String(
+        user.id
+      );
 
     const userName =
       String(
@@ -405,11 +493,14 @@ export async function GET(
        RAD ETILGAN
     ================================================= */
 
-    if (user.active !== true) {
+    if (
+      user.active !== true
+    ) {
       const response =
         NextResponse.json({
           success: false,
-          status: "rejected",
+          status:
+            "rejected",
           error:
             "Kirish so‘rovingiz rad etilgan.",
         });
@@ -419,6 +510,11 @@ export async function GET(
         "qurbonov_pending"
       );
 
+      clearCookie(
+        response,
+        "qurbonov_user_id"
+      );
+
       return response;
     }
 
@@ -426,10 +522,13 @@ export async function GET(
        HALI KUTILMOQDA
     ================================================= */
 
-    if (user.approved !== true) {
+    if (
+      user.approved !== true
+    ) {
       return NextResponse.json({
         success: false,
-        status: "pending",
+        status:
+          "pending",
         message:
           "Administrator ruxsati kutilmoqda...",
       });
@@ -445,15 +544,20 @@ export async function GET(
     const response =
       NextResponse.json({
         success: true,
-        status: "approved",
+        status:
+          "approved",
         role: "user",
+
+        userId,
+
         redirect: "/",
       });
 
     setSessionCookies(
       response,
       "user",
-      userName
+      userName,
+      userId
     );
 
     return response;
