@@ -3329,8 +3329,8 @@ function PageStyles() {
           "Times New Roman",
           serif;
 
-        font-size: 24px;
-        line-height: 1.5;
+        font-size: 28px;
+        line-height: 1.52;
         font-weight: 600;
 
         overflow-wrap: break-word;
@@ -3346,13 +3346,13 @@ function PageStyles() {
         Eski editor saqlagan <font size="..."> larni ham
         eski nisbatda qoldirib, faqat 1–2 px kattalashtiramiz.
       */
-      .questionText.htmlContent font[size="1"] { font-size: 15px !important; }
-      .questionText.htmlContent font[size="2"] { font-size: 17px !important; }
-      .questionText.htmlContent font[size="3"] { font-size: 20px !important; }
-      .questionText.htmlContent font[size="4"] { font-size: 23px !important; }
-      .questionText.htmlContent font[size="5"] { font-size: 27px !important; }
-      .questionText.htmlContent font[size="6"] { font-size: 34px !important; }
-      .questionText.htmlContent font[size="7"] { font-size: 40px !important; }
+      .questionText.htmlContent font[size="1"] { font-size: 17px !important; }
+      .questionText.htmlContent font[size="2"] { font-size: 19px !important; }
+      .questionText.htmlContent font[size="3"] { font-size: 23px !important; }
+      .questionText.htmlContent font[size="4"] { font-size: 26px !important; }
+      .questionText.htmlContent font[size="5"] { font-size: 30px !important; }
+      .questionText.htmlContent font[size="6"] { font-size: 36px !important; }
+      .questionText.htmlContent font[size="7"] { font-size: 42px !important; }
 
       /*
         MUHIM:
@@ -4155,15 +4155,15 @@ function PageStyles() {
         .questionText {
           margin-top: 20px;
           padding: 20px 17px 22px;
-          font-size: 20px;
+          font-size: 22px;
           line-height: 1.5;
           font-weight: 600;
           border-radius: 14px;
         }
 
-        .questionText.htmlContent font[size="3"] { font-size: 18px !important; }
-        .questionText.htmlContent font[size="4"] { font-size: 20px !important; }
-        .questionText.htmlContent font[size="5"] { font-size: 23px !important; }
+        .questionText.htmlContent font[size="3"] { font-size: 20px !important; }
+        .questionText.htmlContent font[size="4"] { font-size: 22px !important; }
+        .questionText.htmlContent font[size="5"] { font-size: 25px !important; }
 
         .questionText.htmlContent ol,
         .questionText.htmlContent ul {
