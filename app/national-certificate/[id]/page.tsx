@@ -222,6 +222,104 @@ export default function NationalCertificateTestPage() {
     let frame1 = 0;
     let frame2 = 0;
 
+    /*
+      Word/editor orqali saqlangan ayrim savollarda:
+      "1.     matn" ko‘rinishidagi ko‘p NBSP/tab/space qoladi.
+
+      Ular ko‘pincha haqiqiy <ol><li> emas, oddiy <p>/<div>.
+      Shu sabab faqat CSS list-style bilan tuzalmaydi.
+
+      Render bo‘lgandan keyin:
+      - NBSP/tab/ko‘p space -> bitta oddiy space;
+      - 1. 2. 3. ... bilan boshlanuvchi satrga maxsus class;
+      - keyingi qatorda matn raqam ostiga emas, matn ostiga tushadi.
+    */
+    const normalizeNumberedLines = () => {
+      const blocks =
+        root.querySelectorAll<HTMLElement>(
+          "p, div"
+        );
+
+      blocks.forEach((element) => {
+        /*
+          Katta wrapper div'larni o‘zgartirmaymiz.
+          Faqat bevosita matnli satr/bloklar.
+        */
+        if (
+          element.tagName === "DIV" &&
+          element.querySelector(
+            ":scope > div, :scope > p, :scope > ol, :scope > ul"
+          )
+        ) {
+          return;
+        }
+
+        if (
+          element.closest(
+            ".nc-object, .nc-venn2, [data-kind='venn2']"
+          )
+        ) {
+          return;
+        }
+
+        const walker =
+          document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT
+          );
+
+        let node =
+          walker.nextNode();
+
+        while (node) {
+          const textNode =
+            node as Text;
+
+          const original =
+            textNode.nodeValue || "";
+
+          /*
+            DOM’da &nbsp; = \u00A0.
+            Gorizontal bo‘shliqlarni bir dona space qilamiz.
+            Yangi qatorlarni buzmaymiz.
+          */
+          const normalized =
+            original
+              .replace(/\u00a0/g, " ")
+              .replace(/[\t\f\v ]{2,}/g, " ");
+
+          if (
+            normalized !== original
+          ) {
+            textNode.nodeValue =
+              normalized;
+          }
+
+          node =
+            walker.nextNode();
+        }
+
+        const visibleText =
+          (element.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .trim();
+
+        if (
+          /^\d{1,2}[.)]\s+/.test(
+            visibleText
+          )
+        ) {
+          element.classList.add(
+            "nc-numbered-line"
+          );
+        } else {
+          element.classList.remove(
+            "nc-numbered-line"
+          );
+        }
+      });
+    };
+
     const normalizeVenn = () => {
       const venns =
         root.querySelectorAll<HTMLElement>(
@@ -460,12 +558,16 @@ export default function NationalCertificateTestPage() {
         () => {
           frame2 =
             window.requestAnimationFrame(
-              normalizeVenn
+              () => {
+                normalizeNumberedLines();
+                normalizeVenn();
+              }
             );
         }
       );
 
     const onResize = () => {
+      normalizeNumberedLines();
       normalizeVenn();
     };
 
@@ -3416,6 +3518,27 @@ function PageStyles() {
       }
 
       /*
+        WORD/EDITOR'DAN KELGAN ODDIY RAQAMLI SATRLAR
+
+        Masalan:
+        1. muayyan hudud;
+        2. boshqaruv apparati;
+
+        Bu satrlar <ol><li> bo‘lmasa ham bir xil tizimli ko‘rinadi.
+        Birinchi qatorda raqam + bitta tabiiy space.
+        Qator o‘ralganda davomi matnning boshidan davom etadi.
+      */
+      .questionText.htmlContent .nc-numbered-line {
+        margin: 7px 0 !important;
+        padding-left: 1.10em !important;
+        text-indent: -1.10em !important;
+
+        font-size: 0.92em !important;
+        line-height: 1.42 !important;
+        font-weight: 700 !important;
+      }
+
+      /*
         1. 2. 3. 4. bandlar Word namunasidagidek:
         raqam va matn orasidagi masofa kichik va bir xil.
         Brauzerning standart outside-marker bo‘shlig‘idan foydalanmaymiz.
@@ -3430,7 +3553,7 @@ function PageStyles() {
       .questionText.htmlContent ol > li {
         position: relative;
         margin: 7px 0;
-        padding-left: 1.55em;
+        padding-left: 1.10em;
         text-indent: 0;
 
         font-size: 0.92em !important;
@@ -3447,7 +3570,7 @@ function PageStyles() {
         left: 0;
         top: 0;
 
-        width: 1.25em;
+        width: 0.90em;
 
         color: #101827;
         font-size: 0.96em;
@@ -4232,16 +4355,21 @@ function PageStyles() {
           border-radius: 14px;
         }
 
+        .questionText.htmlContent .nc-numbered-line {
+          padding-left: 1.05em !important;
+          text-indent: -1.05em !important;
+        }
+
         .questionText.htmlContent ol {
           padding-left: 0;
         }
 
         .questionText.htmlContent ol > li {
-          padding-left: 1.50em;
+          padding-left: 1.08em;
         }
 
         .questionText.htmlContent ol > li::before {
-          width: 1.20em;
+          width: 0.88em;
         }
 
         .questionText.htmlContent ul {
