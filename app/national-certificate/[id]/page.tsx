@@ -3416,20 +3416,58 @@ function PageStyles() {
       }
 
       /*
-        1. 2. 3. 4. bandlar Word namunasidagidek tizimli:
-        marker matndan uzoqlashib ketmaydi.
+        1. 2. 3. 4. bandlar Word namunasidagidek:
+        raqam va matn orasidagi masofa kichik va bir xil.
+        Brauzerning standart outside-marker bo‘shlig‘idan foydalanmaymiz.
       */
-      .questionText.htmlContent ol,
+      .questionText.htmlContent ol {
+        margin: 8px 0 0;
+        padding-left: 0;
+        list-style: none;
+        counter-reset: question-list;
+      }
+
+      .questionText.htmlContent ol > li {
+        position: relative;
+        margin: 7px 0;
+        padding-left: 1.55em;
+        text-indent: 0;
+
+        font-size: 0.92em !important;
+        line-height: 1.42 !important;
+        font-weight: 700 !important;
+
+        counter-increment: question-list;
+      }
+
+      .questionText.htmlContent ol > li::before {
+        content: counter(question-list) ".";
+
+        position: absolute;
+        left: 0;
+        top: 0;
+
+        width: 1.25em;
+
+        color: #101827;
+        font-size: 0.96em;
+        font-weight: 700;
+        line-height: 1.42;
+        text-align: left;
+      }
+
+      /*
+        Oddiy bullet ro‘yxatlar alohida saqlanadi.
+      */
       .questionText.htmlContent ul {
         margin: 8px 0 0;
-        padding-left: 1.45em;
+        padding-left: 1.25em;
         list-style-position: outside;
       }
 
-      .questionText.htmlContent ol > li,
       .questionText.htmlContent ul > li {
         margin: 7px 0;
-        padding-left: 0.10em;
+        padding-left: 0;
         text-indent: 0;
 
         font-size: 0.92em !important;
@@ -3437,9 +3475,8 @@ function PageStyles() {
         font-weight: 700 !important;
       }
 
-      .questionText.htmlContent ol > li::marker,
       .questionText.htmlContent ul > li::marker {
-        font-size: 0.96em;
+        font-size: 0.90em;
         font-weight: 700;
         color: #101827;
       }
@@ -4195,9 +4232,20 @@ function PageStyles() {
           border-radius: 14px;
         }
 
-        .questionText.htmlContent ol,
+        .questionText.htmlContent ol {
+          padding-left: 0;
+        }
+
+        .questionText.htmlContent ol > li {
+          padding-left: 1.50em;
+        }
+
+        .questionText.htmlContent ol > li::before {
+          width: 1.20em;
+        }
+
         .questionText.htmlContent ul {
-          padding-left: 1.40em;
+          padding-left: 1.20em;
         }
 
         .questionText.htmlContent > p:first-child,
