@@ -873,6 +873,7 @@ export default function NationalCertificateTestPage() {
                 body: JSON.stringify({
                   answers:
                     submittedAnswers,
+                  automatic,
                 }),
               }
             );
@@ -957,37 +958,49 @@ export default function NationalCertificateTestPage() {
           attempt.expiresAt
         ).getTime();
 
+      const remainingMs =
+        expiresAt - Date.now();
+
       const seconds =
-        Math.max(
-          0,
-          Math.ceil(
-            (expiresAt -
-              Date.now()) /
-              1000
-          )
-        );
+        remainingMs <= 0
+          ? 0
+          : Math.ceil(
+              remainingMs / 1000
+            );
 
       setRemainingSeconds(
         seconds
       );
 
       if (
-        seconds <= 0 &&
+        remainingMs <= 0 &&
         !autoSubmitStarted.current
       ) {
+        /*
+          00:00 ga yetgan zahoti UI to‘liq bloklanadi.
+          Modal ham yopiladi va test faqat bir marta
+          avtomatik yakunlashga yuboriladi.
+        */
         autoSubmitStarted.current =
           true;
 
-        submitTest(true);
+        setConfirmFinish(false);
+
+        void submitTest(true);
       }
     };
 
     updateTimer();
 
+    /*
+      250 ms interval taymerni server bergan expiresAt
+      vaqtiga aniqroq bog‘laydi. Qolgan vaqt baribir
+      sekund ko‘rinishida chiqadi.
+    */
     const interval =
       window.setInterval(
         updateTimer,
-        1000
+        250
       );
 
     return () => {
@@ -1062,7 +1075,12 @@ export default function NationalCertificateTestPage() {
   const goToQuestion = (
     index: number
   ) => {
-    if (!test) {
+    if (
+      !test ||
+      !attempt ||
+      submitting ||
+      remainingSeconds <= 0
+    ) {
       return;
     }
 
@@ -1590,6 +1608,10 @@ export default function NationalCertificateTestPage() {
                         index
                       )
                     }
+                    disabled={
+                      submitting ||
+                      remainingSeconds <= 0
+                    }
                     className={[
                       "navNumber",
                       answered
@@ -1817,7 +1839,8 @@ export default function NationalCertificateTestPage() {
                   disabled={
                     currentIndex ===
                       0 ||
-                    submitting
+                    submitting ||
+                    remainingSeconds <= 0
                   }
                 >
                   ← Oldingi
@@ -1845,7 +1868,8 @@ export default function NationalCertificateTestPage() {
                       )
                     }
                     disabled={
-                      submitting
+                      submitting ||
+                      remainingSeconds <= 0
                     }
                   >
                     Keyingi →
@@ -1860,7 +1884,8 @@ export default function NationalCertificateTestPage() {
                       )
                     }
                     disabled={
-                      submitting
+                      submitting ||
+                      remainingSeconds <= 0
                     }
                   >
                     Testni
@@ -1882,7 +1907,8 @@ export default function NationalCertificateTestPage() {
                   )
                 }
                 disabled={
-                  submitting
+                  submitting ||
+                  remainingSeconds <= 0
                 }
               >
                 Testni yakunlash
@@ -1891,6 +1917,30 @@ export default function NationalCertificateTestPage() {
           )}
         </section>
       </div>
+
+      {remainingSeconds <= 0 &&
+        !result && (
+        <div
+          className="timeExpiredOverlay"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="timeExpiredCard">
+            <div className="timeExpiredIcon">
+              00:00
+            </div>
+
+            <h2>Vaqt tugadi</h2>
+
+            <p>
+              Test avtomatik yakunlanmoqda.
+              Endi javoblarni o‘zgartirib bo‘lmaydi.
+            </p>
+
+            <div className="timeExpiredLoader" />
+          </div>
+        </div>
+      )}
 
       {confirmFinish && (
         <div
@@ -1954,7 +2004,8 @@ export default function NationalCertificateTestPage() {
                   )
                 }
                 disabled={
-                  submitting
+                  submitting ||
+                  remainingSeconds <= 0
                 }
               >
                 Testga qaytish
@@ -1969,7 +2020,8 @@ export default function NationalCertificateTestPage() {
                   )
                 }
                 disabled={
-                  submitting
+                  submitting ||
+                  remainingSeconds <= 0
                 }
               >
                 {submitting
@@ -3424,6 +3476,76 @@ function PageStyles() {
       }
 
       /* ===== MODAL ===== */
+
+      .timeExpiredOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: grid;
+        place-items: center;
+        padding: 22px;
+        background: rgba(13, 24, 36, 0.72);
+        backdrop-filter: blur(5px);
+      }
+
+      .timeExpiredCard {
+        width: min(92vw, 460px);
+        padding: 30px 26px;
+        border: 2px solid #4e5961;
+        border-radius: 20px;
+        background:
+          linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #edf1f4 58%,
+            #d2d8dd 100%
+          );
+        text-align: center;
+        box-shadow:
+          inset 0 2px 0 #fff,
+          0 7px 0 #59636a,
+          0 18px 40px rgba(0, 0, 0, 0.35);
+      }
+
+      .timeExpiredIcon {
+        width: max-content;
+        margin: 0 auto 16px;
+        padding: 10px 16px;
+        border: 2px solid #8b3030;
+        border-radius: 12px;
+        background:
+          linear-gradient(
+            180deg,
+            #fff1f1 0%,
+            #e8b8b8 100%
+          );
+        color: #8d2020;
+        font-size: 24px;
+        font-weight: 900;
+      }
+
+      .timeExpiredCard h2 {
+        margin: 0;
+        color: #152235;
+        font-size: 27px;
+      }
+
+      .timeExpiredCard p {
+        margin: 12px 0 0;
+        color: #536070;
+        line-height: 1.6;
+        font-weight: 700;
+      }
+
+      .timeExpiredLoader {
+        width: 38px;
+        height: 38px;
+        margin: 20px auto 0;
+        border: 4px solid #cbd3da;
+        border-top-color: #0c67c4;
+        border-radius: 50%;
+        animation: ncSpin 0.8s linear infinite;
+      }
 
       .modalOverlay {
         position: fixed;
