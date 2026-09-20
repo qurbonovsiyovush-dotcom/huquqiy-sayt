@@ -4,6 +4,16 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/*
+  Foydalanuvchi uchun qo‘shimcha vaqt EMAS.
+  UI 00:00 da bloklanadi.
+
+  Bu faqat 00:00 da brauzerdan jo‘natilgan avtomatik
+  yakunlash so‘rovi tarmoq orqali serverga yetib kelishi
+  uchun transport oynasi.
+*/
+const AUTO_SUBMIT_TRANSPORT_GRACE_MS = 5_000;
+
 type RawAnswer = {
   questionId?: unknown;
   selectedOptionId?: unknown;
@@ -149,18 +159,38 @@ export async function POST(
 
     const now = new Date();
 
+    const body =
+      await request.json().catch(
+        () => ({})
+      );
+
+    const automatic =
+      body?.automatic === true;
+
+    const isPastDeadline =
+      now.getTime() >=
+      expiresAt.getTime();
+
+    const isAutomaticTransportWindow =
+      automatic &&
+      now.getTime() <=
+        expiresAt.getTime() +
+          AUTO_SUBMIT_TRANSPORT_GRACE_MS;
+
     /*
-      QAT’IY SERVER VAQT NAZORATI
+      QAT’IY VAQT NAZORATI
 
-      expiresAt ga yetgan zahoti urinish tugaydi.
-      Hech qanday qo‘shimcha "grace" vaqt yo‘q.
+      Oddiy/manual submit expiresAt dan keyin mutlaqo
+      qabul qilinmaydi.
 
-      Frontend ham 00:00 da darhol bloklanishi kerak,
-      lekin asosiy himoya aynan serverda.
+      Faqat frontend 00:00 da allaqachon bloklangandan keyin
+      yuborgan automatic=true so‘rovi 5 soniyagacha serverga
+      yetib kelishi mumkin. Bu foydalanuvchiga test ishlash
+      uchun qo‘shimcha vaqt bermaydi.
     */
     if (
-      now.getTime() >=
-      expiresAt.getTime()
+      isPastDeadline &&
+      !isAutomaticTransportWindow
     ) {
       await sql`
         UPDATE national_certificate_attempts
@@ -191,8 +221,6 @@ export async function POST(
         { status: 409 }
       );
     }
-
-    const body = await request.json();
 
     const rawAnswers: unknown[] =
       Array.isArray(body?.answers)
