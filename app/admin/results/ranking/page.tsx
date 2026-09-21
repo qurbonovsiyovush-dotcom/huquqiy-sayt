@@ -184,6 +184,11 @@ export default function AdminRankingPage() {
     useState<SortMode>("rank");
 
   const [
+    selectionMode,
+    setSelectionMode,
+  ] = useState(false);
+
+  const [
     selectedIds,
     setSelectedIds,
   ] = useState<Set<string>>(
@@ -222,6 +227,10 @@ export default function AdminRankingPage() {
     );
 
     setShowSelectedOnly(
+      false
+    );
+
+    setSelectionMode(
       false
     );
 
@@ -585,6 +594,26 @@ export default function AdminRankingPage() {
     );
   }
 
+  function openSelectionMode() {
+    setSelectionMode(
+      true
+    );
+  }
+
+  function closeSelectionMode() {
+    clearSelection();
+
+    setSelectionMode(
+      false
+    );
+  }
+
+  function resetFilters() {
+    setSearch("");
+    setSortMode("rank");
+    setShowSelectedOnly(false);
+  }
+
   /* =====================================================
      DELETE ONE
   ===================================================== */
@@ -746,6 +775,7 @@ export default function AdminRankingPage() {
       }
 
       clearSelection();
+      setSelectionMode(false);
 
       await loadRanking();
     } catch (err) {
@@ -1142,17 +1172,13 @@ export default function AdminRankingPage() {
             <h1>
               Umumiy reyting
             </h1>
-
-            <p>
-              Barcha test turlari bo‘yicha yagona natijalar markazi
-            </p>
           </div>
         </div>
 
         <div className="headerButtons">
           <button
             type="button"
-            className="silverButton"
+            className="silverButton resultsNav"
             onClick={() =>
               router.push(
                 "/admin/results"
@@ -1164,7 +1190,7 @@ export default function AdminRankingPage() {
 
           <button
             type="button"
-            className="silverButton"
+            className="silverButton adminNav"
             onClick={() =>
               router.push(
                 "/admin"
@@ -1176,7 +1202,7 @@ export default function AdminRankingPage() {
 
           <button
             type="button"
-            className="silverButton"
+            className="silverButton homeNav"
             onClick={() =>
               router.push("/")
             }
@@ -1205,9 +1231,6 @@ export default function AdminRankingPage() {
               )
             }
           >
-            <span>
-              7 kunlik
-            </span>
             Haftalik
           </button>
 
@@ -1224,9 +1247,6 @@ export default function AdminRankingPage() {
               )
             }
           >
-            <span>
-              Joriy oy
-            </span>
             Oylik
           </button>
 
@@ -1243,9 +1263,6 @@ export default function AdminRankingPage() {
               )
             }
           >
-            <span>
-              Barcha vaqt
-            </span>
             Umumiy
           </button>
         </div>
@@ -1469,8 +1486,43 @@ export default function AdminRankingPage() {
                 Oxirgi faollik
               </option>
             </select>
+
+            <div className="filterActions">
+              <button
+                type="button"
+                className={
+                  selectionMode
+                    ? "selectModeButton activeSelectMode"
+                    : "selectModeButton"
+                }
+                onClick={() => {
+                  if (selectionMode) {
+                    closeSelectionMode();
+                  } else {
+                    openSelectionMode();
+                  }
+                }}
+              >
+                {selectionMode
+                  ? `Tanlash rejimi (${selectedIds.size})`
+                  : "☑ Tanlash"}
+              </button>
+
+              {(search ||
+                sortMode !== "rank" ||
+                showSelectedOnly) && (
+                <button
+                  type="button"
+                  className="resetFilterButton"
+                  onClick={resetFilters}
+                >
+                  Filtrlarni tozalash
+                </button>
+              )}
+            </div>
           </div>
 
+          {selectionMode && (
           <div className="selectionBar">
             <div className="selectionLeft">
               <label className="masterCheck">
@@ -1528,15 +1580,11 @@ export default function AdminRankingPage() {
               <button
                 type="button"
                 className="small3dButton"
-                disabled={
-                  selectedIds.size ===
-                  0
-                }
                 onClick={
-                  clearSelection
+                  closeSelectionMode
                 }
               >
-                Tanlovni bekor qilish
+                Tanlashni yopish
               </button>
 
               <button
@@ -1557,6 +1605,7 @@ export default function AdminRankingPage() {
               </button>
             </div>
           </div>
+          )}
 
           <div className="actionRow">
             <div className="periodInfo3d">
@@ -1579,13 +1628,15 @@ export default function AdminRankingPage() {
                     )}`}
               </span>
 
-              <small>
+              <span className="visibleCount">
                 Ko‘rsatilmoqda:{" "}
-                {
-                  visibleRanking.length
-                }{" "}
+                <strong>
+                  {
+                    visibleRanking.length
+                  }
+                </strong>{" "}
                 ta
-              </small>
+              </span>
             </div>
 
             <div className="toolButtons">
@@ -1665,10 +1716,6 @@ export default function AdminRankingPage() {
               <strong>
                 Foydalanuvchilar reytingi
               </strong>
-
-              <span>
-                Bir foydalanuvchini yoki bir nechta foydalanuvchini belgilab boshqarishingiz mumkin
-              </span>
             </div>
 
             <div className="tableCount">
@@ -1683,22 +1730,24 @@ export default function AdminRankingPage() {
             <table>
               <thead>
                 <tr>
-                  <th className="checkColumn">
-                    <input
-                      type="checkbox"
-                      checked={
-                        allVisibleSelected
-                      }
-                      onChange={
-                        toggleAllVisible
-                      }
-                      disabled={
-                        visibleRanking.length ===
-                        0
-                      }
-                      aria-label="Barchasini tanlash"
-                    />
-                  </th>
+                  {selectionMode && (
+                    <th className="checkColumn">
+                      <input
+                        type="checkbox"
+                        checked={
+                          allVisibleSelected
+                        }
+                        onChange={
+                          toggleAllVisible
+                        }
+                        disabled={
+                          visibleRanking.length ===
+                          0
+                        }
+                        aria-label="Barchasini tanlash"
+                      />
+                    </th>
+                  )}
 
                   <th>
                     O‘rin
@@ -1756,20 +1805,22 @@ export default function AdminRankingPage() {
                               : ""
                           }
                         >
-                          <td className="checkColumn">
-                            <input
-                              type="checkbox"
-                              checked={
-                                selected
-                              }
-                              onChange={() =>
-                                toggleUser(
-                                  item.userId
-                                )
-                              }
-                              aria-label={`${item.userName}ni tanlash`}
-                            />
-                          </td>
+                          {selectionMode && (
+                            <td className="checkColumn">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  selected
+                                }
+                                onChange={() =>
+                                  toggleUser(
+                                    item.userId
+                                  )
+                                }
+                                aria-label={`${item.userName}ni tanlash`}
+                              />
+                            </td>
+                          )}
 
                           <td>
                             <span className={`rankBadge rank${Math.min(item.rank, 4)}`}>
@@ -1787,12 +1838,6 @@ export default function AdminRankingPage() {
                               }
                             </strong>
 
-                            <small>
-                              ID:{" "}
-                              {
-                                item.userId
-                              }
-                            </small>
                           </td>
 
                           <td>
@@ -1899,7 +1944,9 @@ export default function AdminRankingPage() {
                     <tr>
                       <td
                         colSpan={
-                          12
+                          selectionMode
+                            ? 12
+                            : 11
                         }
                       >
                         <div className="emptyState">
@@ -1923,7 +1970,9 @@ export default function AdminRankingPage() {
                   <tr>
                     <td
                       colSpan={
-                        12
+                        selectionMode
+                          ? 12
+                          : 11
                       }
                     >
                       <div className="emptyState">
@@ -1967,15 +2016,11 @@ export default function AdminRankingPage() {
           position: relative;
           min-height: 100vh;
           overflow: hidden;
-          padding: 28px 22px 50px;
+          padding: 34px 24px 56px;
           background:
             linear-gradient(180deg, #eef9ff 0%, #f8fbfd 38%, #eaf3f7 100%);
           color: #0d2f43;
-          font-family:
-            "Bell MT",
-            Georgia,
-            "Times New Roman",
-            serif;
+          font-family: Arial, Helvetica, sans-serif;
         }
 
         .pageGlow {
@@ -2006,7 +2051,8 @@ export default function AdminRankingPage() {
         .mainPanel3d {
           position: relative;
           z-index: 1;
-          max-width: 1480px;
+          width: min(1760px, 100%);
+          max-width: 1760px;
           margin-left: auto;
           margin-right: auto;
         }
@@ -2016,8 +2062,8 @@ export default function AdminRankingPage() {
           align-items: center;
           justify-content: space-between;
           gap: 20px;
-          margin-bottom: 30px;
-          padding: 16px 18px;
+          margin-bottom: 32px;
+          padding: 20px 22px;
           border: 2px solid #6b8797;
           border-radius: 20px;
           background:
@@ -2039,8 +2085,8 @@ export default function AdminRankingPage() {
         .trophyBox {
           display: grid;
           place-items: center;
-          width: 70px;
-          height: 62px;
+          width: 78px;
+          height: 70px;
           flex: 0 0 auto;
           border: 2px solid #ba8200;
           border-radius: 16px;
@@ -2050,12 +2096,12 @@ export default function AdminRankingPage() {
             inset 0 2px 0 #fffde9,
             inset 0 -3px 0 rgba(129, 82, 0, 0.2),
             0 5px 0 #9c6c00;
-          font-size: 29px;
+          font-size: 33px;
         }
 
         .heroTitleWrap h1 {
           margin: 0;
-          font-size: clamp(25px, 3vw, 38px);
+          font-size: clamp(30px, 3vw, 44px);
           line-height: 1;
           color: #082b40;
           text-shadow: 0 1px 0 #fff;
@@ -2065,7 +2111,7 @@ export default function AdminRankingPage() {
           margin: 7px 0 0;
           color: #55707f;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 13px;
+          font-size: 17px;
           font-weight: 700;
         }
 
@@ -2091,10 +2137,10 @@ export default function AdminRankingPage() {
         .toolButtons button,
         .small3dButton,
         .bulkDeleteButton {
-          min-height: 42px;
+          min-height: 48px;
           border: 1px solid #71848e;
-          border-radius: 11px;
-          padding: 9px 14px;
+          border-radius: 12px;
+          padding: 11px 17px;
           background:
             linear-gradient(180deg, #ffffff 0%, #eef2f4 50%, #cbd6dc 100%);
           color: #0c3145;
@@ -2130,7 +2176,7 @@ export default function AdminRankingPage() {
         }
 
         .mainPanel3d {
-          padding: 42px 18px 24px;
+          padding: 48px 22px 30px;
           border: 2px solid #8399a6;
           border-radius: 23px;
           background:
@@ -2144,9 +2190,9 @@ export default function AdminRankingPage() {
 
         .floating3dLabel {
           position: absolute;
-          top: -22px;
-          left: 24px;
-          padding: 10px 24px;
+          top: -24px;
+          left: 28px;
+          padding: 11px 27px;
           border: 2px solid #1a6c92;
           border-radius: 14px;
           background:
@@ -2155,7 +2201,7 @@ export default function AdminRankingPage() {
           box-shadow:
             inset 0 2px 0 #f8feff,
             0 5px 0 #175b7a;
-          font-size: 18px;
+          font-size: 23px;
           font-weight: 900;
         }
 
@@ -2168,7 +2214,7 @@ export default function AdminRankingPage() {
         }
 
         .periodButton {
-          min-height: 64px;
+          min-height: 78px;
           border: 1px solid #7f909a;
           border-radius: 14px;
           background:
@@ -2181,16 +2227,6 @@ export default function AdminRankingPage() {
             0 5px 0 #71838d;
         }
 
-        .periodButton span {
-          display: block;
-          margin-bottom: 2px;
-          color: #71828c;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 10px;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-
         .periodButton.active {
           border-color: #a97800;
           background:
@@ -2201,16 +2237,12 @@ export default function AdminRankingPage() {
             0 5px 0 #9e7000;
         }
 
-        .periodButton.active span {
-          color: #785500;
-        }
-
         .statsGrid {
           display: grid;
           grid-template-columns:
             repeat(4, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 20px;
+          gap: 14px;
+          margin-bottom: 22px;
         }
 
         .stat3d {
@@ -2218,7 +2250,8 @@ export default function AdminRankingPage() {
           align-items: center;
           gap: 13px;
           min-width: 0;
-          padding: 14px;
+          min-height: 92px;
+          padding: 17px;
           border: 1px solid #aab8c0;
           border-radius: 16px;
           background:
@@ -2232,8 +2265,8 @@ export default function AdminRankingPage() {
         .statIcon {
           display: grid;
           place-items: center;
-          width: 48px;
-          height: 48px;
+          width: 56px;
+          height: 56px;
           flex: 0 0 auto;
           border: 1px solid #83a2b4;
           border-radius: 13px;
@@ -2244,7 +2277,7 @@ export default function AdminRankingPage() {
             inset 0 1px 0 #fff,
             0 3px 0 #83a9ba;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 20px;
+          font-size: 23px;
           font-weight: 900;
         }
 
@@ -2273,13 +2306,13 @@ export default function AdminRankingPage() {
           margin-bottom: 4px;
           color: #607684;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 700;
         }
 
         .stat3d strong {
           display: block;
-          font-size: 27px;
+          font-size: 32px;
           line-height: 1;
           color: #0c3247;
         }
@@ -2294,7 +2327,7 @@ export default function AdminRankingPage() {
 
         .podiumSection {
           margin-bottom: 20px;
-          padding: 15px;
+          padding: 18px;
           border: 1px solid #c4d0d6;
           border-radius: 17px;
           background:
@@ -2318,7 +2351,7 @@ export default function AdminRankingPage() {
 
         .sectionTitleRow h2 {
           margin: 0;
-          font-size: 17px;
+          font-size: 19px;
         }
 
         .sectionTitleRow span {
@@ -2334,15 +2367,15 @@ export default function AdminRankingPage() {
         .topThree {
           display: grid;
           grid-template-columns:
-            repeat(3, minmax(0, 1fr));
-          gap: 12px;
+            repeat(auto-fit, minmax(320px, 1fr));
+          gap: 14px;
         }
 
         .topCard {
           position: relative;
           min-width: 0;
-          min-height: 126px;
-          padding: 17px 17px 15px 74px;
+          min-height: 145px;
+          padding: 22px 22px 19px 84px;
           border: 1px solid #b8a15c;
           border-radius: 16px;
           box-shadow:
@@ -2375,25 +2408,25 @@ export default function AdminRankingPage() {
 
         .medal {
           position: absolute;
-          left: 17px;
-          top: 20px;
+          left: 20px;
+          top: 24px;
           display: grid;
           place-items: center;
-          width: 45px;
-          height: 45px;
+          width: 51px;
+          height: 51px;
           border-radius: 50%;
           background: rgba(255,255,255,0.62);
           box-shadow:
             inset 0 1px 0 #fff,
             0 3px 8px rgba(0,0,0,0.12);
-          font-size: 24px;
+          font-size: 27px;
         }
 
         .podiumRank {
           margin-bottom: 5px;
           color: #7a5b00;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 0.04em;
@@ -2404,7 +2437,7 @@ export default function AdminRankingPage() {
           overflow: hidden;
           text-overflow: ellipsis;
           margin-bottom: 10px;
-          font-size: 18px;
+          font-size: 21px;
           white-space: nowrap;
         }
 
@@ -2419,12 +2452,12 @@ export default function AdminRankingPage() {
           border-radius: 8px;
           background: rgba(255,255,255,0.55);
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
+          font-size: 12px;
         }
 
         .controlDeck {
           margin-bottom: 18px;
-          padding: 14px;
+          padding: 17px;
           border: 1px solid #aebdc5;
           border-radius: 17px;
           background:
@@ -2449,8 +2482,8 @@ export default function AdminRankingPage() {
 
         .searchGroup {
           position: relative;
-          flex: 1 1 420px;
-          min-width: 220px;
+          flex: 1 1 520px;
+          min-width: 260px;
         }
 
         .searchIcon {
@@ -2466,7 +2499,7 @@ export default function AdminRankingPage() {
 
         .searchGroup input,
         .sortSelect {
-          min-height: 45px;
+          min-height: 52px;
           border: 1px solid #8399a5;
           border-radius: 11px;
           background:
@@ -2477,7 +2510,7 @@ export default function AdminRankingPage() {
             inset 0 2px 5px rgba(25, 57, 72, 0.08),
             0 2px 0 #c1ccd2;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 14px;
+          font-size: 17px;
           font-weight: 600;
         }
 
@@ -2487,7 +2520,7 @@ export default function AdminRankingPage() {
         }
 
         .sortSelect {
-          flex: 0 0 245px;
+          flex: 0 0 280px;
           padding: 9px 12px;
           cursor: pointer;
         }
@@ -2512,14 +2545,14 @@ export default function AdminRankingPage() {
           color: #375565;
           cursor: pointer;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 20px;
+          font-size: 23px;
           font-weight: 900;
         }
 
         .selectionBar {
-          min-height: 56px;
-          margin-bottom: 12px;
-          padding: 10px 12px;
+          min-height: 66px;
+          margin-bottom: 14px;
+          padding: 12px 14px;
           border: 1px solid #bdcbd2;
           border-radius: 13px;
           background:
@@ -2540,7 +2573,7 @@ export default function AdminRankingPage() {
           gap: 8px;
           color: #294a5b;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 800;
           cursor: pointer;
         }
@@ -2567,10 +2600,10 @@ export default function AdminRankingPage() {
         }
 
         .small3dButton {
-          min-height: 36px;
-          padding: 7px 10px;
+          min-height: 40px;
+          padding: 8px 12px;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
+          font-size: 12px;
         }
 
         .activeSmall {
@@ -2583,8 +2616,8 @@ export default function AdminRankingPage() {
         }
 
         .bulkDeleteButton {
-          min-height: 36px;
-          padding: 7px 11px;
+          min-height: 40px;
+          padding: 8px 13px;
           border-color: #a12d2d;
           background:
             linear-gradient(180deg, #fff0f0, #efabab);
@@ -2593,7 +2626,7 @@ export default function AdminRankingPage() {
             inset 0 1px 0 #fff,
             0 4px 0 #a76262;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
+          font-size: 12px;
         }
 
         .actionRow {
@@ -2613,12 +2646,12 @@ export default function AdminRankingPage() {
           background: #fffbea;
           box-shadow: inset 0 1px 3px rgba(86, 66, 0, 0.06);
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
+          font-size: 12px;
         }
 
         .periodInfo3d strong {
           color: #0c3348;
-          font-size: 12px;
+          font-size: 13px;
         }
 
         .periodInfo3d span,
@@ -2631,9 +2664,9 @@ export default function AdminRankingPage() {
         }
 
         .toolButtons button {
-          min-height: 42px;
+          min-height: 47px;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 12px;
+          font-size: 13px;
         }
 
         .blueTool {
@@ -2707,7 +2740,7 @@ export default function AdminRankingPage() {
         }
 
         .tableTopBar {
-          padding: 12px 14px;
+          padding: 15px 16px;
           background:
             linear-gradient(180deg, #f9fdff, #e7f1f5);
           border-bottom: 1px solid #b9c8d0;
@@ -2718,20 +2751,10 @@ export default function AdminRankingPage() {
         }
 
         .tableTopBar strong,
-        .tableTopBar span {
-          display: block;
-        }
 
         .tableTopBar strong {
           margin-bottom: 3px;
-          font-size: 15px;
-        }
-
-        .tableTopBar span {
-          color: #6a7f8b;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 10px;
-          font-weight: 700;
+          font-size: 17px;
         }
 
         .tableWrap {
@@ -2741,19 +2764,19 @@ export default function AdminRankingPage() {
 
         table {
           width: 100%;
-          min-width: 1240px;
+          min-width: 1380px;
           border-collapse: collapse;
           background: #fff;
         }
 
         th,
         td {
-          padding: 11px 9px;
+          padding: 14px 11px;
           border-bottom: 1px solid #d8e1e6;
           text-align: center;
           vertical-align: middle;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 12px;
+          font-size: 13px;
         }
 
         th {
@@ -2764,7 +2787,7 @@ export default function AdminRankingPage() {
             linear-gradient(180deg, #2f708f 0%, #174760 55%, #10384d 100%);
           color: #ffffff;
           text-shadow: 0 1px 0 rgba(0,0,0,0.25);
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 900;
         }
 
@@ -2830,15 +2853,12 @@ export default function AdminRankingPage() {
         }
 
         .studentCell {
-          min-width: 225px;
-          max-width: 290px;
+          min-width: 255px;
+          max-width: 330px;
           text-align: left;
         }
 
         .studentCell strong,
-        .studentCell small {
-          display: block;
-        }
 
         .studentCell strong {
           color: #0a3349;
@@ -2846,16 +2866,7 @@ export default function AdminRankingPage() {
             "Bell MT",
             Georgia,
             serif;
-          font-size: 14px;
-        }
-
-        .studentCell small {
-          overflow: hidden;
-          margin-top: 4px;
-          color: #83939c;
-          text-overflow: ellipsis;
-          font-size: 9px;
-          white-space: nowrap;
+          font-size: 16px;
         }
 
         .metricChip {
@@ -2871,18 +2882,18 @@ export default function AdminRankingPage() {
 
         .correctValue {
           color: #13853b;
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 900;
         }
 
         .incorrectValue {
           color: #c02e2e;
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 900;
         }
 
         .accuracyCell {
-          min-width: 112px;
+          min-width: 128px;
         }
 
         .accuracyCell strong {
@@ -2907,14 +2918,14 @@ export default function AdminRankingPage() {
         }
 
         .dateCell {
-          min-width: 142px;
+          min-width: 155px;
           white-space: nowrap;
           color: #455f6d;
-          font-size: 10px;
+          font-size: 12px;
         }
 
         .deleteUserButton {
-          min-height: 34px;
+          min-height: 39px;
           border: 1px solid #b14a4a;
           border-radius: 9px;
           padding: 7px 10px;
@@ -2925,7 +2936,7 @@ export default function AdminRankingPage() {
             inset 0 1px 0 #fff,
             0 3px 0 #b76c6c;
           font-family: Arial, Helvetica, sans-serif;
-          font-size: 10px;
+          font-size: 12px;
           font-weight: 900;
           cursor: pointer;
         }
@@ -2945,17 +2956,17 @@ export default function AdminRankingPage() {
         }
 
         .emptyState span {
-          font-size: 11px;
+          font-size: 12px;
         }
 
         .emptyIcon {
           display: grid;
           place-items: center;
-          width: 48px;
-          height: 48px;
+          width: 56px;
+          height: 56px;
           border-radius: 14px;
           background: #edf4f7;
-          font-size: 24px;
+          font-size: 27px;
         }
 
         .loader3d {
@@ -3017,7 +3028,18 @@ export default function AdminRankingPage() {
           line-height: 1.55;
         }
 
-        @media (max-width: 1120px) {
+
+        @media (max-width: 1250px) {
+          .filterActions {
+            width: 100%;
+          }
+
+          .filterActions button {
+            flex: 1 1 auto;
+          }
+        }
+
+        @media (max-width: 1250px) {
           .hero3d,
           .filterRow,
           .selectionBar,
@@ -3075,14 +3097,15 @@ export default function AdminRankingPage() {
           }
 
           .heroTitleWrap h1 {
-            font-size: 24px;
+            font-size: 27px;
           }
 
           .heroTitleWrap p {
             font-size: 11px;
           }
 
-          .headerButtons {
+          .headerButtons,
+          .filterActions {
             display: grid;
             grid-template-columns: 1fr;
           }
@@ -3095,7 +3118,7 @@ export default function AdminRankingPage() {
           .floating3dLabel {
             left: 14px;
             padding: 9px 15px;
-            font-size: 15px;
+            font-size: 17px;
           }
 
           .periodTabs,
@@ -3128,6 +3151,282 @@ export default function AdminRankingPage() {
 
           .topCard {
             padding-left: 68px;
+          }
+        }
+
+
+
+        /* =====================================================
+           BIR XIL YOZUV + NAVIGATSIYA RANGLARI
+        ===================================================== */
+
+        .page,
+        .page * {
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
+
+        .heroTitleWrap h1,
+        .floating3dLabel,
+        .topCard strong,
+        .studentCell strong,
+        .tableTopBar strong {
+          letter-spacing: 0;
+        }
+
+        .resultsNav {
+          border-color: #2f82aa !important;
+          background:
+            linear-gradient(180deg, #f0fbff 0%, #9edcf3 52%, #56b7dc 100%) !important;
+          color: #082f43 !important;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 4px 0 #367f9e !important;
+        }
+
+        .adminNav {
+          border-color: #a97d17 !important;
+          background:
+            linear-gradient(180deg, #fff9d5 0%, #f4d36d 52%, #e5ad2e 100%) !important;
+          color: #302100 !important;
+          box-shadow:
+            inset 0 1px 0 #fffef0,
+            0 4px 0 #98701a !important;
+        }
+
+        .homeNav {
+          border-color: #4d8b5a !important;
+          background:
+            linear-gradient(180deg, #f3fff5 0%, #aee1b8 52%, #69bc7a 100%) !important;
+          color: #123d1c !important;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 4px 0 #4d8558 !important;
+        }
+
+        .filterRow {
+          align-items: stretch;
+        }
+
+        .filterActions {
+          display: flex;
+          flex: 0 0 auto;
+          align-items: stretch;
+          gap: 9px;
+        }
+
+        .selectModeButton,
+        .resetFilterButton {
+          min-height: 52px;
+          border: 1px solid #6d8796;
+          border-radius: 11px;
+          padding: 10px 15px;
+          color: #14394b;
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 4px 0 #79909c;
+        }
+
+        .selectModeButton {
+          background:
+            linear-gradient(180deg, #f4fcff 0%, #a9ddf0 52%, #72bdd9 100%);
+        }
+
+        .activeSelectMode {
+          border-color: #9b730d;
+          background:
+            linear-gradient(180deg, #fff9d4 0%, #f4d36d 52%, #e6af2f 100%);
+          color: #3d2a00;
+          box-shadow:
+            inset 0 1px 0 #fffef0,
+            0 4px 0 #947019;
+        }
+
+        .resetFilterButton {
+          background:
+            linear-gradient(180deg, #ffffff 0%, #e7ecef 52%, #cfd9de 100%);
+        }
+
+        .selectionBar {
+          animation: selectionOpen 160ms ease-out;
+        }
+
+        @keyframes selectionOpen {
+          from {
+            opacity: 0;
+            transform: translateY(-5px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .dangerTool {
+          color: #111111 !important;
+          text-shadow: none !important;
+        }
+
+        .visibleCount {
+          color: #405f70 !important;
+        }
+
+        .tableTopBar > div:first-child {
+          display: flex;
+          align-items: center;
+          min-height: 32px;
+        }
+
+        .studentCell strong {
+          margin: 0;
+        }
+
+
+        /* =====================================================
+           FINAL VISUAL TUNING
+           Katta ekranlarda matn mayda ko‘rinib qolmasligi uchun.
+        ===================================================== */
+
+        .hero3d,
+        .mainPanel3d {
+          box-sizing: border-box;
+        }
+
+        .headerButtons .silverButton {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 14px;
+        }
+
+        .periodButton {
+          font-size: 18px;
+        }
+
+        .topCard:only-child {
+          grid-column: 1 / -1;
+          display: grid;
+          grid-template-columns: 54px minmax(180px, 1fr) auto;
+          grid-template-areas:
+            "medal rank numbers"
+            "medal name numbers";
+          align-items: center;
+          column-gap: 16px;
+          min-height: 112px;
+          padding: 20px 24px;
+        }
+
+        .topCard:only-child .medal {
+          position: static;
+          grid-area: medal;
+        }
+
+        .topCard:only-child .podiumRank {
+          grid-area: rank;
+          align-self: end;
+          margin: 0 0 4px;
+        }
+
+        .topCard:only-child > strong {
+          grid-area: name;
+          align-self: start;
+          margin: 0;
+          font-size: 22px;
+        }
+
+        .topCard:only-child .podiumNumbers {
+          grid-area: numbers;
+          justify-content: flex-end;
+        }
+
+        .topCard:only-child .podiumNumbers span {
+          padding: 8px 11px;
+          font-size: 13px;
+        }
+
+        .controlDeck {
+          padding-top: 18px;
+          padding-bottom: 18px;
+        }
+
+        .searchGroup input::placeholder {
+          color: #708591;
+          opacity: 1;
+        }
+
+        .selectedBadge,
+        .tableCount {
+          font-size: 12px;
+        }
+
+        .tableShell3d {
+          margin-top: 4px;
+        }
+
+        tbody tr:nth-child(even):not(.selectedRow) {
+          background: #fbfdfe;
+        }
+
+        td {
+          color: #1d4052;
+        }
+
+        .rankBadge {
+          font-size: 12px;
+        }
+
+        .metricChip {
+          font-size: 13px;
+        }
+
+        .accuracyCell strong {
+          font-size: 13px;
+        }
+
+        .rankingRule3d {
+          padding: 16px 17px;
+        }
+
+        .rankingRule3d strong {
+          font-size: 15px;
+        }
+
+        .rankingRule3d p {
+          font-size: 12px;
+        }
+
+        @media (min-width: 1500px) {
+          .page {
+            padding-left: 34px;
+            padding-right: 34px;
+          }
+
+          .hero3d,
+          .mainPanel3d {
+            width: min(1760px, 96%);
+          }
+        }
+
+        @media (max-width: 900px) {
+          .topCard:only-child {
+            display: block;
+            min-height: 145px;
+            padding: 20px 20px 18px 82px;
+          }
+
+          .topCard:only-child .medal {
+            position: absolute;
+            left: 20px;
+            top: 24px;
+          }
+
+          .topCard:only-child > strong {
+            display: block;
+            margin-bottom: 10px;
+          }
+
+          .topCard:only-child .podiumNumbers {
+            justify-content: flex-start;
           }
         }
 
