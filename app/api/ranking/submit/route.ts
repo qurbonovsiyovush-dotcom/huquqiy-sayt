@@ -306,7 +306,7 @@ export async function POST(
         FROM thematic_questions
         WHERE test_id = ${testId}
         ORDER BY
-          question_order ASC,
+          question_number ASC,
           id ASC
       `;
 
@@ -807,4 +807,3 @@ export async function POST(
     );
   }
 }
-
