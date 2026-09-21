@@ -665,3 +665,216 @@ export async function GET(
   }
 }
 
+
+/* =========================================================
+   DELETE
+   Reytingni tozalash / bitta talabani o‘chirish
+
+   Body:
+   { action: "all" }
+
+   yoki:
+
+   {
+     action: "user",
+     userId: "..."
+   }
+========================================================= */
+
+export async function DELETE(
+  request: NextRequest
+) {
+  try {
+    const session =
+      request.cookies.get(
+        "qurbonov_session"
+      )?.value;
+
+    const role =
+      request.cookies.get(
+        "qurbonov_role"
+      )?.value;
+
+    if (
+      !session ||
+      role !== "admin"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Faqat administrator uchun.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    const body =
+      await request
+        .json()
+        .catch(() => ({}));
+
+    const action =
+      String(
+        body?.action || ""
+      ).trim();
+
+    /* =====================================================
+       HAMMA REYTINGNI O‘CHIRISH
+    ===================================================== */
+
+    if (action === "all") {
+      const before =
+        await sql`
+          SELECT
+            (
+              SELECT COUNT(*)
+              FROM ranking_attempts
+            )::int
+              AS attempts_count,
+
+            (
+              SELECT COUNT(*)
+              FROM ranking_question_results
+            )::int
+              AS question_results_count
+        `;
+
+      await sql`
+        TRUNCATE TABLE
+          ranking_question_results,
+          ranking_attempts
+        RESTART IDENTITY
+        CASCADE
+      `;
+
+      return NextResponse.json({
+        success: true,
+        action: "all",
+        deleted: {
+          attempts:
+            Number(
+              before[0]
+                ?.attempts_count || 0
+            ),
+          questionResults:
+            Number(
+              before[0]
+                ?.question_results_count || 0
+            ),
+        },
+        message:
+          "Umumiy reyting to‘liq tozalandi.",
+      });
+    }
+
+    /* =====================================================
+       BITTA TALABANI O‘CHIRISH
+    ===================================================== */
+
+    if (action === "user") {
+      const userId =
+        String(
+          body?.userId || ""
+        ).trim();
+
+      if (!userId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Foydalanuvchi ID topilmadi.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const before =
+        await sql`
+          SELECT
+            (
+              SELECT COUNT(*)
+              FROM ranking_attempts
+              WHERE user_id =
+                ${userId}
+            )::int
+              AS attempts_count,
+
+            (
+              SELECT COUNT(*)
+              FROM ranking_question_results
+              WHERE user_id =
+                ${userId}
+            )::int
+              AS question_results_count
+        `;
+
+      /*
+        ranking_question_results
+        ranking_attempts ga FK bilan
+        ON DELETE CASCADE ulangan.
+      */
+
+      await sql`
+        DELETE FROM
+          ranking_attempts
+        WHERE
+          user_id =
+            ${userId}
+      `;
+
+      return NextResponse.json({
+        success: true,
+        action: "user",
+        userId,
+        deleted: {
+          attempts:
+            Number(
+              before[0]
+                ?.attempts_count || 0
+            ),
+          questionResults:
+            Number(
+              before[0]
+                ?.question_results_count || 0
+            ),
+        },
+        message:
+          "Talabaning reyting ma’lumotlari o‘chirildi.",
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Noto‘g‘ri o‘chirish amali.",
+      },
+      {
+        status: 400,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "ADMIN RANKING DELETE ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Reytingni o‘chirishda server xatosi.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
