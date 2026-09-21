@@ -1414,9 +1414,14 @@ export default function AdminRankingPage() {
         <section className="controlDeck">
           <div className="filterRow">
             <div className="searchGroup">
-              <span className="searchIcon">
-                ⌕
-              </span>
+              <svg
+                className="searchSvg"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="M16 16l4 4" />
+              </svg>
 
               <input
                 type="search"
@@ -1503,9 +1508,24 @@ export default function AdminRankingPage() {
                   }
                 }}
               >
-                {selectionMode
-                  ? `Tanlash rejimi (${selectedIds.size})`
-                  : "☑ Tanlash"}
+                <span
+                  className={
+                    selectionMode
+                      ? "modernSelectIcon active"
+                      : "modernSelectIcon"
+                  }
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M5 12.5l4 4L19 7" />
+                  </svg>
+                </span>
+
+                <span>
+                  {selectionMode
+                    ? `Tanlash rejimi (${selectedIds.size})`
+                    : "Tanlash"}
+                </span>
               </button>
 
               {(search ||
@@ -1799,11 +1819,23 @@ export default function AdminRankingPage() {
                           key={
                             item.userId
                           }
-                          className={
+                          className={[
                             selected
                               ? "selectedRow"
-                              : ""
-                          }
+                              : "",
+                            selectionMode
+                              ? "selectionReadyRow"
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onClick={() => {
+                            if (selectionMode) {
+                              toggleUser(
+                                item.userId
+                              );
+                            }
+                          }}
                         >
                           {selectionMode && (
                             <td className="checkColumn">
@@ -1816,6 +1848,9 @@ export default function AdminRankingPage() {
                                   toggleUser(
                                     item.userId
                                   )
+                                }
+                                onClick={(event) =>
+                                  event.stopPropagation()
                                 }
                                 aria-label={`${item.userName}ni tanlash`}
                               />
@@ -1921,11 +1956,12 @@ export default function AdminRankingPage() {
                                 deletingUserId ===
                                 item.userId
                               }
-                              onClick={() =>
+                              onClick={(event) => {
+                                event.stopPropagation();
                                 void deleteUser(
                                   item
-                                )
-                              }
+                                );
+                              }}
                             >
                               {deletingUserId ===
                               item.userId
@@ -2486,14 +2522,19 @@ export default function AdminRankingPage() {
           min-width: 260px;
         }
 
-        .searchIcon {
+        .searchSvg {
           position: absolute;
           top: 50%;
-          left: 13px;
+          left: 17px;
+          z-index: 2;
+          width: 21px;
+          height: 21px;
           transform: translateY(-50%);
-          color: #5e7785;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 21px;
+          fill: none;
+          stroke: #466575;
+          stroke-width: 2;
+          stroke-linecap: round;
+          stroke-linejoin: round;
           pointer-events: none;
         }
 
@@ -2516,7 +2557,7 @@ export default function AdminRankingPage() {
 
         .searchGroup input {
           width: 100%;
-          padding: 10px 42px 10px 41px;
+          padding: 10px 44px 10px 50px;
         }
 
         .sortSelect {
@@ -3162,7 +3203,7 @@ export default function AdminRankingPage() {
 
         .page,
         .page * {
-          font-family: Arial, Helvetica, sans-serif !important;
+          font-family: "Times New Roman", Times, serif !important;
         }
 
         .heroTitleWrap h1,
@@ -3285,6 +3326,252 @@ export default function AdminRankingPage() {
 
 
         /* =====================================================
+           SAYT USLUBIGA MOS QIDIRUV + ZAMONAVIY TANLASH
+        ===================================================== */
+
+        @media (min-width: 1101px) {
+          .filterRow {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1fr)
+              285px
+              auto;
+            align-items: stretch;
+            gap: 12px;
+          }
+        }
+
+        .searchGroup {
+          min-width: 0;
+        }
+
+        .searchGroup input,
+        .sortSelect,
+        .selectModeButton,
+        .resetFilterButton {
+          min-height: 54px;
+          font-size: 16px;
+        }
+
+        .searchGroup input {
+          border: 2px solid #7b8991;
+          border-radius: 10px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #fbfbfb 58%, #f0f0f0 100%);
+          color: #111111;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            inset 0 2px 5px rgba(0, 0, 0, 0.06),
+            0 3px 0 #a4adb2;
+        }
+
+        .searchGroup input:focus {
+          border-color: #1f84af;
+          box-shadow:
+            0 0 0 3px rgba(31, 132, 175, 0.12),
+            inset 0 2px 5px rgba(0, 0, 0, 0.05),
+            0 3px 0 #6fa6bd;
+        }
+
+        .searchGroup input::placeholder {
+          color: #616b70;
+          font-style: normal;
+        }
+
+        .clearSearch {
+          top: 9px;
+          right: 9px;
+          width: 34px;
+          height: 34px;
+          border: 1px solid #a8b1b6;
+          border-radius: 8px;
+          background:
+            linear-gradient(180deg, #ffffff, #dfe5e8);
+          color: #263d49;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 2px 0 #a5afb4;
+        }
+
+        .sortSelect {
+          border: 2px solid #7b8991;
+          border-radius: 10px;
+          background-color: #ffffff;
+          color: #111111;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 3px 0 #a4adb2;
+          font-weight: 700;
+        }
+
+        .selectModeButton {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          min-width: 132px;
+          border: 2px solid #367e9d;
+          border-radius: 10px;
+          background:
+            linear-gradient(180deg, #eafaff 0%, #8fd1ec 55%, #54abd0 100%);
+          color: #082f43;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 4px 0 #347a98;
+        }
+
+        .modernSelectIcon {
+          display: inline-grid;
+          place-items: center;
+          width: 24px;
+          height: 24px;
+          flex: 0 0 24px;
+          border: 2px solid #2e708e;
+          border-radius: 7px;
+          background:
+            linear-gradient(180deg, #ffffff, #d8eef7);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 1px 0 rgba(0, 0, 0, 0.09);
+        }
+
+        .modernSelectIcon svg {
+          width: 16px;
+          height: 16px;
+          fill: none;
+          stroke: #1d6685;
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+
+        .modernSelectIcon.active {
+          border-color: #8c6600;
+          background:
+            linear-gradient(180deg, #fff9d8, #e9bd39);
+        }
+
+        .modernSelectIcon.active svg {
+          stroke: #4e3900;
+        }
+
+        /* Native checkbox o‘rniga saytdagi 3D uslubga mos zamonaviy belgi */
+        input[type="checkbox"] {
+          appearance: none;
+          -webkit-appearance: none;
+          display: inline-grid;
+          place-content: center;
+          width: 21px;
+          height: 21px;
+          margin: 0;
+          border: 2px solid #718995;
+          border-radius: 6px;
+          background:
+            linear-gradient(180deg, #ffffff, #e9eef1);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 2px 0 #aab6bc;
+          cursor: pointer;
+          transition:
+            transform 120ms ease,
+            border-color 120ms ease,
+            background 120ms ease;
+        }
+
+        input[type="checkbox"]::before {
+          content: "";
+          width: 10px;
+          height: 6px;
+          border-left: 3px solid #ffffff;
+          border-bottom: 3px solid #ffffff;
+          transform:
+            rotate(-45deg)
+            scale(0);
+          transform-origin: center;
+          transition: transform 120ms ease;
+        }
+
+        input[type="checkbox"]:checked {
+          border-color: #1e789e;
+          background:
+            linear-gradient(180deg, #63c9ed, #278eb7);
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.6),
+            0 2px 0 #1e6887;
+        }
+
+        input[type="checkbox"]:checked::before {
+          transform:
+            rotate(-45deg)
+            scale(1);
+        }
+
+        input[type="checkbox"]:focus-visible {
+          outline: 3px solid rgba(37, 137, 178, 0.2);
+          outline-offset: 2px;
+        }
+
+        .selectionReadyRow {
+          cursor: pointer;
+        }
+
+        .selectionReadyRow td {
+          user-select: none;
+        }
+
+        .selectionReadyRow:not(.selectedRow):hover {
+          background: #f2f9fc !important;
+        }
+
+        .selectedRow {
+          background:
+            linear-gradient(90deg, #fff8cf, #fffdf0) !important;
+        }
+
+        .filterActions {
+          align-items: stretch;
+        }
+
+        .resetFilterButton {
+          border: 2px solid #87949b;
+          background:
+            linear-gradient(180deg, #ffffff, #dde4e8);
+          color: #1a303b;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 4px 0 #89979e;
+        }
+
+        @media (max-width: 1100px) {
+          .filterRow {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .sortSelect {
+            width: 100%;
+            flex-basis: auto;
+          }
+
+          .filterActions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 620px) {
+          .filterActions {
+            grid-template-columns: 1fr;
+          }
+
+          .selectModeButton,
+          .resetFilterButton {
+            width: 100%;
+          }
+        }
+
+        /* =====================================================
            FINAL VISUAL TUNING
            Katta ekranlarda matn mayda ko‘rinib qolmasligi uchun.
         ===================================================== */
@@ -3295,8 +3582,8 @@ export default function AdminRankingPage() {
         }
 
         .headerButtons .silverButton {
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 14px;
+          font-family: "Times New Roman", Times, serif;
+          font-size: 15px;
         }
 
         .periodButton {
