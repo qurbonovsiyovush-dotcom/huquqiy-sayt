@@ -894,16 +894,50 @@ export async function POST(
       finishedAt,
     };
 
-    const results =
-      await readResults();
+    /*
+      Vercel Blob eski "Test natijalari" bo‘limi uchun
+      ishlatiladi. Blob vaqtincha suspend bo‘lsa ham
+      umumiy reyting Neon'ga yozilishi to‘xtamasligi kerak.
+    */
 
-    results.unshift(
-      result
-    );
+    let blobSaved =
+      false;
 
-    await writeResults(
-      results
-    );
+    let blobWarning:
+      string | null =
+        null;
+
+    try {
+      const results =
+        await readResults();
+
+      results.unshift(
+        result
+      );
+
+      await writeResults(
+        results
+      );
+
+      blobSaved =
+        true;
+    } catch (blobError) {
+      console.error(
+        "BLOB SAVE ERROR:",
+        blobError
+      );
+
+      blobWarning =
+        blobError instanceof Error
+          ? blobError.message
+          : "Vercel Blob'ga yozib bo‘lmadi.";
+
+      /*
+        MUHIM:
+        Bu xato reytingni to‘xtatmaydi.
+        Quyida Neon'ga yozishni davom ettiramiz.
+      */
+    }
 
     /* =====================================================
        REYTINGNI NEON'GA YOZISH
@@ -1099,6 +1133,8 @@ export async function POST(
         serverVerified,
 
         rankingSaved,
+
+        blobSaved,
       }
     );
 
@@ -1112,12 +1148,24 @@ export async function POST(
 
         message:
           rankingSaved
-            ? "Natija va reyting muvaffaqiyatli saqlandi."
-            : "Natija saqlandi.",
+            ? (
+                blobSaved
+                  ? "Natija va reyting muvaffaqiyatli saqlandi."
+                  : "Reyting Neon bazasiga saqlandi. Vercel Blob vaqtincha ishlamayapti."
+              )
+            : (
+                blobSaved
+                  ? "Natija saqlandi."
+                  : "Natijani Vercel Blob'ga saqlab bo‘lmadi."
+              ),
 
         serverVerified,
 
         rankingSaved,
+
+        blobSaved,
+
+        blobWarning,
 
         result: {
           id:
