@@ -160,6 +160,7 @@ export default function AdminPaymentsPage() {
     useState<
       "debt" |
       "payment" |
+      "period" |
       null
     >(null);
 
@@ -371,6 +372,28 @@ export default function AdminPaymentsPage() {
     );
   }
 
+  function openPeriod(
+    item: ProfileFinance
+  ) {
+    setSelected(item);
+
+    setAmount("");
+    setNote("");
+
+    setPeriodStart(
+      item.periodStart ||
+        todayInput()
+    );
+
+    setDueDate(
+      item.dueDate || ""
+    );
+
+    setModal(
+      "period"
+    );
+  }
+
   async function save(
     event:
       FormEvent<HTMLFormElement>
@@ -407,8 +430,6 @@ export default function AdminPaymentsPage() {
           amount:
             value,
           note,
-          periodStart,
-          dueDate,
         });
       } else if (
         modal ===
@@ -432,6 +453,40 @@ export default function AdminPaymentsPage() {
             selected.id,
           amount:
             value,
+          note,
+        });
+      } else if (
+        modal ===
+        "period"
+      ) {
+        if (!periodStart) {
+          throw new Error(
+            "Boshlanish sanasini tanlang."
+          );
+        }
+
+        if (!dueDate) {
+          throw new Error(
+            "To‘lov muddatini tanlang."
+          );
+        }
+
+        if (
+          dueDate <
+          periodStart
+        ) {
+          throw new Error(
+            "To‘lov muddati boshlanish sanasidan oldin bo‘lishi mumkin emas."
+          );
+        }
+
+        await post({
+          action:
+            "set-period",
+          profileId:
+            selected.id,
+          periodStart,
+          dueDate,
           note,
         });
       }
@@ -494,6 +549,11 @@ export default function AdminPaymentsPage() {
                 "advance" &&
               item.advance >
                 0
+            ) ||
+            (
+              filter ===
+                "overdue" &&
+              item.isOverdue
             );
 
           return (
@@ -510,23 +570,23 @@ export default function AdminPaymentsPage() {
 
   return (
     <main className="page">
-      <header className="hero">
-        <div>
-          <h1>
-            To‘lovlar boshqaruvi
-          </h1>
+      <header className="paymentsTopBar">
+        <button
+          type="button"
+          className="paymentsOwnerButton"
+          onClick={() =>
+            router.push("/")
+          }
+        >
+          Qurbonov Siyovush Jamaliddinzoda
+        </button>
 
-          <p>
-            Admin qarz va to‘lov summasini qo‘lda kiritadi
-          </p>
-        </div>
-
-        <div className="heroButtons">
+        <div className="paymentsTopButtons">
           <button
             type="button"
             onClick={() =>
               router.push(
-                "/admin/users"
+                "/admin/requests"
               )
             }
           >
@@ -554,6 +614,12 @@ export default function AdminPaymentsPage() {
           </button>
         </div>
       </header>
+
+      <section className="paymentsTitlePanel">
+        <div className="paymentsTitleTab">
+          To‘lovlar boshqaruvi
+        </div>
+      </section>
 
       <section className="stats">
         <article className="debtStat">
@@ -652,6 +718,10 @@ export default function AdminPaymentsPage() {
             <option value="advance">
               Avansi bor
             </option>
+
+            <option value="overdue">
+              Muddati o‘tgan
+            </option>
           </select>
 
           <button
@@ -684,7 +754,11 @@ export default function AdminPaymentsPage() {
                 key={
                   item.id
                 }
-                className="userCard"
+                className={`userCard ${
+                  item.isOverdue
+                    ? "overdueCard"
+                    : ""
+                }`}
               >
                 <div className="userTop">
                   <div>
@@ -837,6 +911,16 @@ export default function AdminPaymentsPage() {
                   >
                     To‘lov kiritish
                   </button>
+
+                  <button
+                    type="button"
+                    className="periodButton"
+                    onClick={() =>
+                      openPeriod(item)
+                    }
+                  >
+                    Muddat belgilash
+                  </button>
                 </div>
               </article>
             )
@@ -910,17 +994,26 @@ export default function AdminPaymentsPage() {
                   className={`entryAmount ${item.entryType}`}
                 >
                   {item.entryType ===
-                  "payment"
-                    ? "−"
-                    : item.amount >
-                        0
-                      ? "+"
-                      : ""}
-                  {money(
-                    Math.abs(
-                      item.amount
-                    )
-                  )}
+                  "period"
+                    ? dateOnly(
+                        item.dueDate
+                      )
+                    : (
+                      <>
+                        {item.entryType ===
+                        "payment"
+                          ? "−"
+                          : item.amount >
+                              0
+                            ? "+"
+                            : ""}
+                        {money(
+                          Math.abs(
+                            item.amount
+                          )
+                        )}
+                      </>
+                    )}
                 </div>
 
                 {!item.isVoided && (
@@ -979,7 +1072,10 @@ export default function AdminPaymentsPage() {
                 {modal ===
                 "debt"
                   ? "Qarzini belgilash"
-                  : "To‘lov kiritish"}
+                  : modal ===
+                      "payment"
+                    ? "To‘lov kiritish"
+                    : "Muddat belgilash"}
               </h2>
 
               <div className="selectedUser">
@@ -1008,34 +1104,49 @@ export default function AdminPaymentsPage() {
                 </div>
               )}
 
-              <label>
-                {modal ===
-                "debt"
-                  ? "Yangi qarz summasi"
-                  : "To‘langan summa"}
+              {modal ===
+                "period" && (
+                <div className="currentInfo">
+                  Hozirgi muddat:{" "}
+                  <strong>
+                    {dateOnly(
+                      selected.dueDate
+                    )}
+                  </strong>
+                </div>
+              )}
 
-                <input
-                  autoFocus
-                  required
-                  type="number"
-                  min={
-                    modal ===
-                    "debt"
-                      ? "0"
-                      : "1"
-                  }
-                  step="1"
-                  value={amount}
-                  onChange={(event) =>
-                    setAmount(
-                      event.target.value
-                    )
-                  }
-                />
-              </label>
+              {modal !==
+                "period" && (
+                <label>
+                  {modal ===
+                  "debt"
+                    ? "Yangi qarz summasi"
+                    : "To‘langan summa"}
+
+                  <input
+                    autoFocus
+                    required
+                    type="number"
+                    min={
+                      modal ===
+                      "debt"
+                        ? "0"
+                        : "1"
+                    }
+                    step="1"
+                    value={amount}
+                    onChange={(event) =>
+                      setAmount(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              )}
 
               {modal ===
-                "debt" && (
+                "period" && (
                 <div className="periodFields">
                   <label>
                     Boshlanish sanasi
@@ -1082,7 +1193,15 @@ export default function AdminPaymentsPage() {
                       event.target.value
                     )
                   }
-                  placeholder="Masalan: sentabr oyi uchun..."
+                  placeholder={
+                    modal ===
+                    "period"
+                      ? "Masalan: sentabr oyi uchun to‘lov muddati"
+                      : modal ===
+                          "payment"
+                        ? "Masalan: 21-sentabr kuni to‘landi"
+                        : "Masalan: sentabr oyi uchun"
+                  }
                 />
               </label>
 
@@ -1102,7 +1221,10 @@ export default function AdminPaymentsPage() {
                     modal ===
                     "debt"
                       ? "saveDebt"
-                      : "savePayment"
+                      : modal ===
+                          "payment"
+                        ? "savePayment"
+                        : "savePeriod"
                   }
                 >
                   Saqlash
@@ -1137,56 +1259,130 @@ export default function AdminPaymentsPage() {
           font-family: inherit;
         }
 
-        .hero {
-          max-width: 1580px;
-          margin: 0 auto 22px;
-          padding: 18px 20px;
-          border: 2px solid #184b63;
-          border-radius: 18px;
+        .paymentsTopBar {
+          width: min(1495px, calc(100% - 52px));
+          min-height: 94px;
+          margin: 0 auto 78px;
+          padding: 16px 28px;
+          border: 2px solid #183f53;
+          border-radius: 22px;
           background:
-            linear-gradient(180deg, #8cddfb, #4aaad4);
+            linear-gradient(
+              180deg,
+              #91ddfb 0%,
+              #55b8e4 56%,
+              #42a6d5 100%
+            );
           box-shadow:
-            inset 0 2px 0 #effcff,
-            0 7px 0 #143f53;
+            inset 0 3px 0 rgba(255,255,255,.68),
+            inset 0 -5px 0 rgba(25,91,126,.34),
+            0 7px 0 #163f53,
+            0 14px 25px rgba(0,0,0,.14);
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          gap: 20px;
         }
 
-        .hero h1 {
-          margin: 0;
-          font-size: 31px;
+        .paymentsOwnerButton {
+          min-width: 410px;
+          min-height: 58px;
+          padding: 10px 24px;
+          border: 2px solid #4d5a60;
+          border-radius: 13px;
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #f3f3f3 42%,
+              #c9c9c9 100%
+            );
+          color: #111;
+          box-shadow:
+            inset 0 3px 0 #fff,
+            inset 0 -3px 0 #999,
+            0 5px 0 #59676d;
+          font-size: 21px;
+          font-weight: 700;
+          cursor: pointer;
         }
 
-        .hero p {
-          margin: 5px 0 0;
-          color: #255266;
-          font-size: 13px;
-        }
-
-        .heroButtons {
+        .paymentsTopButtons {
           display: flex;
-          gap: 9px;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 13px;
           flex-wrap: wrap;
         }
 
-        .heroButtons button,
+        .paymentsTopButtons button,
         .tools button,
         .cardButtons button,
         .voidButton {
-          min-height: 41px;
-          padding: 8px 13px;
-          border: 1px solid #727c82;
-          border-radius: 9px;
+          min-height: 46px;
+          padding: 8px 16px;
+          border: 2px solid #586267;
+          border-radius: 10px;
           background:
-            linear-gradient(180deg, #fff, #ddd);
+            linear-gradient(
+              180deg,
+              #ffffff 0%,
+              #eeeeee 48%,
+              #c8c8c8 100%
+            );
           color: #111;
           box-shadow:
-            inset 0 1px 0 #fff,
-            0 4px 0 #7d8589;
+            inset 0 2px 0 #fff,
+            0 5px 0 #697276;
           font-weight: 700;
           cursor: pointer;
+        }
+
+        .paymentsTitlePanel {
+          position: relative;
+          max-width: 1020px;
+          min-height: 145px;
+          margin: 0 auto 68px;
+          border: 2px solid #252d31;
+          border-radius: 23px;
+          background:
+            linear-gradient(
+              180deg,
+              #666a6c 0%,
+              #55595b 50%,
+              #414547 100%
+            );
+          box-shadow:
+            inset 0 3px 0 rgba(255,255,255,.12),
+            inset 0 -4px 0 rgba(0,0,0,.25),
+            0 8px 0 #282e31,
+            0 17px 26px rgba(0,0,0,.17);
+        }
+
+        .paymentsTitleTab {
+          position: absolute;
+          left: 50%;
+          top: -31px;
+          transform: translateX(-50%);
+          min-width: 310px;
+          padding: 12px 28px;
+          border: 2px solid #174158;
+          border-radius: 15px;
+          background:
+            linear-gradient(
+              180deg,
+              #b6edff 0%,
+              #6dc9ef 52%,
+              #39a3d5 100%
+            );
+          color: #074c76;
+          box-shadow:
+            inset 0 3px 0 rgba(255,255,255,.72),
+            0 6px 0 #18516f;
+          text-align: center;
+          font-size: 27px;
+          font-weight: 700;
+          white-space: nowrap;
         }
 
         .stats {
@@ -1319,6 +1515,14 @@ export default function AdminPaymentsPage() {
             0 4px 0 #a4a4a4;
         }
 
+        .userCard.overdueCard {
+          border-color: #b84c4c;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 #8f4747,
+            0 10px 18px rgba(134, 39, 39, 0.16);
+        }
+
         .userTop {
           display: flex;
           align-items: flex-start;
@@ -1448,7 +1652,7 @@ export default function AdminPaymentsPage() {
         .cardButtons {
           display: grid;
           grid-template-columns:
-            1fr 1fr;
+            repeat(3, minmax(0, 1fr));
           gap: 8px;
         }
 
@@ -1468,6 +1672,16 @@ export default function AdminPaymentsPage() {
           box-shadow:
             inset 0 1px 0 #fff,
             0 4px 0 #6c9a76;
+        }
+
+        .cardButtons .periodButton {
+          border-color: #527f99;
+          background:
+            linear-gradient(180deg, #eefaff, #aedbef);
+          color: #124d6e;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 4px 0 #6f9db5;
         }
 
         .historyPanel {
@@ -1675,10 +1889,20 @@ export default function AdminPaymentsPage() {
             0 4px 0 #6c9b76;
         }
 
+        .modalActions .savePeriod {
+          border-color: #527f99;
+          background:
+            linear-gradient(180deg, #eefaff, #aedbef);
+          color: #124d6e;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 4px 0 #6f9db5;
+        }
+
         @media (
           max-width: 950px
         ) {
-          .hero {
+          .paymentsTopBar {
             align-items: stretch;
             flex-direction: column;
           }
@@ -1687,6 +1911,10 @@ export default function AdminPaymentsPage() {
           .userGrid {
             grid-template-columns:
               repeat(2, minmax(0, 1fr));
+          }
+
+          .cardButtons {
+            grid-template-columns: 1fr;
           }
 
           .periodFields,
@@ -1725,7 +1953,7 @@ export default function AdminPaymentsPage() {
               1fr;
           }
 
-          .heroButtons {
+          .paymentsTopButtons {
             display: grid;
             grid-template-columns:
               1fr;
