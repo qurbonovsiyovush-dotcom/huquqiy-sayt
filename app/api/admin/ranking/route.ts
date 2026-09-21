@@ -771,6 +771,91 @@ export async function DELETE(
     }
 
     /* =====================================================
+       TANLANGAN TALABALARNI BIR YO‘LA O‘CHIRISH
+    ===================================================== */
+
+    if (action === "users") {
+      const rawUserIds =
+        Array.isArray(body?.userIds)
+          ? body.userIds
+          : [];
+
+      const userIds =
+        Array.from(
+          new Set(
+            rawUserIds
+              .map((value: unknown) =>
+                String(value || "").trim()
+              )
+              .filter(Boolean)
+          )
+        ).slice(0, 500);
+
+      if (userIds.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "O‘chirish uchun foydalanuvchilar tanlanmagan.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const before =
+        await sql`
+          SELECT
+            (
+              SELECT COUNT(*)
+              FROM ranking_attempts
+              WHERE user_id =
+                ANY(${userIds}::text[])
+            )::int
+              AS attempts_count,
+
+            (
+              SELECT COUNT(*)
+              FROM ranking_question_results
+              WHERE user_id =
+                ANY(${userIds}::text[])
+            )::int
+              AS question_results_count
+        `;
+
+      await sql`
+        DELETE FROM
+          ranking_attempts
+        WHERE
+          user_id =
+            ANY(${userIds}::text[])
+      `;
+
+      return NextResponse.json({
+        success: true,
+        action: "users",
+        userIds,
+        deletedUsers:
+          userIds.length,
+        deleted: {
+          attempts:
+            Number(
+              before[0]
+                ?.attempts_count || 0
+            ),
+          questionResults:
+            Number(
+              before[0]
+                ?.question_results_count || 0
+            ),
+        },
+        message:
+          `${userIds.length} ta foydalanuvchining reyting ma’lumotlari o‘chirildi.`,
+      });
+    }
+
+    /* =====================================================
        BITTA TALABANI O‘CHIRISH
     ===================================================== */
 
