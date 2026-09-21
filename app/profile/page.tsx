@@ -49,11 +49,21 @@ type ProfileResponse = {
   }>;
 };
 
+type PaymentPeriod = {
+  startDate: string | null;
+  endDate: string | null;
+  dueDate: string | null;
+  months: number | null;
+  daysLeft: number | null;
+  isOverdue: boolean;
+};
+
 type FinanceSummary = {
   currentDebt: number;
   advance: number;
   totalPaid: number;
   totalDebtAdded: number;
+  period: PaymentPeriod | null;
 };
 
 type FinanceEntry = {
@@ -63,6 +73,10 @@ type FinanceEntry = {
   note: string | null;
   occurredAt: string | null;
   isVoided: boolean;
+  periodStart: string | null;
+  periodEnd: string | null;
+  dueDate: string | null;
+  periodMonths: number | null;
 };
 
 function money(value: number) {
@@ -134,6 +148,7 @@ export default function ProfilePage() {
       advance: 0,
       totalPaid: 0,
       totalDebtAdded: 0,
+      period: null,
     });
 
   const [financeEntries, setFinanceEntries] =
@@ -202,6 +217,47 @@ export default function ProfilePage() {
           totalDebtAdded: Number(
             financeJson?.summary?.totalDebtAdded || 0
           ),
+
+          period:
+            financeJson?.summary?.period
+              ? {
+                  startDate:
+                    financeJson.summary.period
+                      .startDate || null,
+
+                  endDate:
+                    financeJson.summary.period
+                      .endDate || null,
+
+                  dueDate:
+                    financeJson.summary.period
+                      .dueDate || null,
+
+                  months:
+                    financeJson.summary.period
+                      .months == null
+                      ? null
+                      : Number(
+                          financeJson.summary.period
+                            .months
+                        ),
+
+                  daysLeft:
+                    financeJson.summary.period
+                      .daysLeft === null ||
+                    financeJson.summary.period
+                      .daysLeft === undefined
+                      ? null
+                      : Number(
+                          financeJson.summary.period
+                            .daysLeft
+                        ),
+
+                  isOverdue:
+                    financeJson.summary.period
+                      .isOverdue === true,
+                }
+              : null,
         });
 
         setFinanceEntries(
@@ -256,6 +312,9 @@ export default function ProfilePage() {
   const financeTotal =
     financeSummary.totalPaid +
     financeSummary.currentDebt;
+
+  const paymentPeriod =
+    financeSummary.period;
 
   const paidPercent =
     financeTotal > 0
@@ -571,9 +630,52 @@ export default function ProfilePage() {
                 {money(financeSummary.advance)}
               </strong>
             </article>
+
+            <article
+              className={`paymentCard deadline ${
+                paymentPeriod?.isOverdue
+                  ? "deadlineOverdue"
+                  : ""
+              }`}
+            >
+              <span>To‘lov muddati</span>
+
+              <strong>
+                {paymentPeriod?.dueDate
+                  ? formatDate(
+                      `${paymentPeriod.dueDate}T00:00:00`
+                    ).split(",")[0]
+                  : "Belgilanmagan"}
+              </strong>
+
+              <small>
+                {paymentPeriod?.daysLeft === null ||
+                paymentPeriod?.daysLeft ===
+                  undefined
+                  ? ""
+                  : paymentPeriod.daysLeft < 0
+                    ? `${Math.abs(
+                        paymentPeriod.daysLeft
+                      )} kun o‘tgan`
+                    : `${paymentPeriod.daysLeft} kun qoldi`}
+              </small>
+            </article>
           </div>
 
           <div className="paymentProgressBox">
+            {paymentPeriod && (
+              <div className="periodLine">
+                <span>
+                  To‘lov davri
+                </span>
+
+                <strong>
+                  {paymentPeriod.startDate || "—"} —{" "}
+                  {paymentPeriod.dueDate || "—"}
+                </strong>
+              </div>
+            )}
+
             <div className="progressLabels">
               <span>
                 To‘lov holati
@@ -1244,7 +1346,7 @@ export default function ProfilePage() {
         .paymentTop {
           display: grid;
           grid-template-columns:
-            repeat(3, minmax(0, 1fr));
+            repeat(4, minmax(0, 1fr));
           gap: 14px;
         }
 
@@ -1304,6 +1406,35 @@ export default function ProfilePage() {
           color: #175b80;
         }
 
+        .paymentCard.deadline {
+          border: 1px solid #b99744;
+          background:
+            linear-gradient(
+              180deg,
+              #fff8d9,
+              #efd785
+            );
+          color: #6d5311;
+        }
+
+        .paymentCard.deadline small {
+          display: block;
+          margin-top: 6px;
+          color: #7a651f;
+          font-size: 11px;
+        }
+
+        .paymentCard.deadlineOverdue {
+          border-color: #ad6b6b;
+          background:
+            linear-gradient(
+              180deg,
+              #fff1f1,
+              #efb2b2
+            );
+          color: #9d2727;
+        }
+
         .paymentProgressBox {
           margin-top: 16px;
           padding: 15px;
@@ -1317,6 +1448,24 @@ export default function ProfilePage() {
             );
           box-shadow:
             inset 0 2px 0 #fff;
+        }
+
+        .periodLine {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+          padding-bottom: 11px;
+          border-bottom: 1px solid #c4c4c4;
+        }
+
+        .periodLine span {
+          color: #555;
+        }
+
+        .periodLine strong {
+          color: #0b527b;
         }
 
         .progressLabels {
