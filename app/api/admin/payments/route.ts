@@ -529,8 +529,7 @@ export async function POST(
       );
 
     if (
-      action === "set-debt" ||
-      action === "add-debt"
+      action === "set-debt"
     ) {
       const profileId =
         cleanText(
@@ -547,44 +546,9 @@ export async function POST(
           body?.note
         );
 
-      const periodStart =
-        isoDateOnly(
-          body?.periodStart
-        );
-
-      const dueDateRaw =
-        String(
-          body?.dueDate || ""
-        ).trim();
-
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          dueDateRaw
-        )
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "To‘lov muddatini tanlang.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const dueDate =
-        dueDateRaw;
-
-      const periodEnd =
-        dueDate;
-
       if (
         !profileId ||
-        (
-          action === "set-debt"
-            ? requestedAmount < 0
-            : requestedAmount <= 0
-        )
+        requestedAmount < 0
       ) {
         return NextResponse.json(
           {
@@ -618,50 +582,6 @@ export async function POST(
         );
       }
 
-      if (
-        action === "add-debt"
-      ) {
-        await sql`
-          INSERT INTO profile_finance_entries (
-            id,
-            profile_id,
-            entry_type,
-            amount,
-            note,
-            occurred_at,
-            period_start,
-            period_end,
-            due_date,
-            period_months,
-            created_by,
-            created_at
-          )
-          VALUES (
-            ${crypto.randomUUID()},
-            ${profileId},
-            'debt',
-            ${requestedAmount},
-            ${note || null},
-            NOW(),
-            ${periodStart}::date,
-            ${periodEnd}::date,
-            ${dueDate}::date,
-            NULL,
-            ${adminId},
-            NOW()
-          )
-        `;
-
-        return NextResponse.json({
-          success: true,
-          message:
-            "Qarz va to‘lov muddati qo‘shildi.",
-          periodStart,
-          periodEnd,
-          dueDate,
-        });
-      }
-
       const currentBalance =
         await getProfileBalance(
           profileId
@@ -671,9 +591,159 @@ export async function POST(
         requestedAmount -
         currentBalance;
 
-      const isOnlyPeriodUpdate =
+      if (
         Math.abs(delta) <
-        0.005;
+        0.005
+      ) {
+        return NextResponse.json({
+          success: true,
+          message:
+            "Qarz summasi o‘zgarmadi.",
+          currentDebt:
+            Math.max(
+              0,
+              currentBalance
+            ),
+          advance:
+            Math.max(
+              0,
+              -currentBalance
+            ),
+        });
+      }
+
+      const entryType =
+        delta > 0
+          ? "debt"
+          : "adjustment";
+
+      await sql`
+        INSERT INTO profile_finance_entries (
+          id,
+          profile_id,
+          entry_type,
+          amount,
+          note,
+          occurred_at,
+          created_by,
+          created_at
+        )
+        VALUES (
+          ${crypto.randomUUID()},
+          ${profileId},
+          ${entryType},
+          ${delta},
+          ${
+            note ||
+            `Qarz ${requestedAmount} so‘m qilib belgilandi`
+          },
+          NOW(),
+          ${adminId},
+          NOW()
+        )
+      `;
+
+      const balance =
+        await getProfileBalance(
+          profileId
+        );
+
+      return NextResponse.json({
+        success: true,
+        message:
+          "Qarz summasi yangilandi.",
+        currentDebt:
+          Math.max(
+            0,
+            balance
+          ),
+        advance:
+          Math.max(
+            0,
+            -balance
+          ),
+      });
+    }
+
+    if (
+      action === "set-period"
+    ) {
+      const profileId =
+        cleanText(
+          body?.profileId
+        );
+
+      const note =
+        cleanText(
+          body?.note
+        );
+
+      const periodStartRaw =
+        String(
+          body?.periodStart ||
+            ""
+        ).trim();
+
+      const dueDateRaw =
+        String(
+          body?.dueDate ||
+            ""
+        ).trim();
+
+      if (
+        !profileId ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          periodStartRaw
+        ) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          dueDateRaw
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Boshlanish sanasi va to‘lov muddatini to‘g‘ri tanlang.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        dueDateRaw <
+        periodStartRaw
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "To‘lov muddati boshlanish sanasidan oldin bo‘lishi mumkin emas.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const profileRows =
+        await sql`
+          SELECT id
+          FROM user_profiles
+          WHERE id =
+            ${profileId}
+          LIMIT 1
+        `;
+
+      if (
+        profileRows.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Profil topilmadi.",
+          },
+          { status: 404 }
+        );
+      }
 
       await sql`
         INSERT INTO profile_finance_entries (
@@ -693,28 +763,16 @@ export async function POST(
         VALUES (
           ${crypto.randomUUID()},
           ${profileId},
-          ${
-            isOnlyPeriodUpdate
-              ? "period"
-              : "adjustment"
-          },
-          ${
-            isOnlyPeriodUpdate
-              ? 0
-              : delta
-          },
+          'period',
+          0,
           ${
             note ||
-            (
-              isOnlyPeriodUpdate
-                ? `To‘lov muddati ${dueDate} qilib belgilandi`
-                : `Qarz ${requestedAmount} so‘m qilib belgilandi`
-            )
+            `To‘lov muddati ${dueDateRaw} qilib belgilandi`
           },
           NOW(),
-          ${periodStart}::date,
-          ${periodEnd}::date,
-          ${dueDate}::date,
+          ${periodStartRaw}::date,
+          ${dueDateRaw}::date,
+          ${dueDateRaw}::date,
           NULL,
           ${adminId},
           NOW()
@@ -724,12 +782,11 @@ export async function POST(
       return NextResponse.json({
         success: true,
         message:
-          "Qarz va to‘lov muddati yangilandi.",
-        currentDebt:
-          requestedAmount,
-        periodStart,
-        periodEnd,
-        dueDate,
+          "To‘lov muddati saqlandi.",
+        periodStart:
+          periodStartRaw,
+        dueDate:
+          dueDateRaw,
       });
     }
 
