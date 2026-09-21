@@ -770,8 +770,378 @@ export async function POST(
     const finalAttempt =
       finalized[0];
 
+    /* =====================================================
+       UMUMIY REYTING
+       Milliy sertifikat ham shu umumiy reytingga kiradi.
+    ===================================================== */
+
+    let rankingSaved = false;
+
+    const rankingUserId =
+      String(
+        request.cookies.get(
+          "qurbonov_user_id"
+        )?.value || ""
+      ).trim();
+
+    if (rankingUserId) {
+      let rankingUserName =
+        "Foydalanuvchi";
+
+      try {
+        const rawName =
+          request.cookies.get(
+            "qurbonov_name"
+          )?.value;
+
+        if (rawName) {
+          try {
+            rankingUserName =
+              decodeURIComponent(
+                rawName
+              );
+          } catch {
+            rankingUserName =
+              rawName;
+          }
+        }
+
+        const role =
+          request.cookies.get(
+            "qurbonov_role"
+          )?.value;
+
+        if (
+          role !== "admin"
+        ) {
+          const userRows =
+            await sql`
+              SELECT
+                name,
+                active,
+                approved
+              FROM access_codes
+              WHERE id =
+                ${rankingUserId}
+              LIMIT 1
+            `;
+
+          if (
+            userRows.length >
+              0 &&
+            userRows[0]
+              .active ===
+              true &&
+            userRows[0]
+              .approved ===
+              true
+          ) {
+            rankingUserName =
+              String(
+                userRows[0]
+                  .name ||
+                  rankingUserName
+              );
+          }
+        }
+
+        /*
+          Shu Milliy sertifikat attempt oldin
+          reytingga yozilgan bo‘lsa takror yozmaymiz.
+        */
+        const existingRanking =
+          await sql`
+            SELECT id
+            FROM ranking_attempts
+            WHERE
+              source =
+                'national-certificate'
+              AND
+              source_attempt_id =
+                ${attemptId}
+            LIMIT 1
+          `;
+
+        if (
+          existingRanking.length >
+            0
+        ) {
+          rankingSaved = true;
+        } else {
+          const startedAt =
+            new Date(
+              String(
+                finalAttempt
+                  .started_at
+              )
+            );
+
+          const submittedAt =
+            new Date(
+              String(
+                finalAttempt
+                  .submitted_at
+              )
+            );
+
+          const spentSeconds =
+            Math.max(
+              0,
+              Math.floor(
+                (
+                  submittedAt.getTime() -
+                  startedAt.getTime()
+                ) /
+                  1000
+              )
+            );
+
+          const rankingAttempts =
+            await sql`
+              INSERT INTO ranking_attempts (
+                user_id,
+                user_name,
+                source,
+                test_type,
+                test_id,
+                test_title,
+                subject,
+                total_questions,
+                correct_count,
+                incorrect_count,
+                unanswered_count,
+                percentage,
+                earned_points,
+                total_points,
+                spent_seconds,
+                source_attempt_id,
+                started_at,
+                finished_at,
+                created_at
+              )
+              VALUES (
+                ${rankingUserId},
+                ${rankingUserName},
+                'national-certificate',
+                'national-certificate',
+                ${testId},
+                ${String(
+                  attempt.title ||
+                    "Milliy sertifikat"
+                )},
+                'Milliy sertifikat',
+                45,
+                ${Number(
+                  finalAttempt
+                    .correct_count
+                )},
+                ${Number(
+                  finalAttempt
+                    .incorrect_count
+                )},
+                ${Number(
+                  finalAttempt
+                    .unanswered_count
+                )},
+                ${Number(
+                  finalAttempt
+                    .percentage
+                )},
+                ${Number(
+                  finalAttempt
+                    .raw_score
+                )},
+                ${maximumScore},
+                ${spentSeconds},
+                ${attemptId},
+                ${startedAt.toISOString()}::timestamptz,
+                ${submittedAt.toISOString()}::timestamptz,
+                NOW()
+              )
+              RETURNING id
+            `;
+
+          const rankingAttemptId =
+            String(
+              rankingAttempts[0]
+                ?.id || ""
+            );
+
+          if (
+            !rankingAttemptId
+          ) {
+            throw new Error(
+              "Milliy sertifikat ranking attempt yaratilmadi."
+            );
+          }
+
+          try {
+            const numberByQuestion =
+              new Map<
+                string,
+                number
+              >();
+
+            for (
+              const question of
+                questions
+            ) {
+              numberByQuestion.set(
+                String(
+                  question.id
+                ),
+                Number(
+                  question
+                    .question_number
+                ) || 0
+              );
+            }
+
+            /*
+              Reytingda faqat real javob berilgan
+              savollar saqlanadi.
+            */
+            const rankingQuestionRows =
+              rows
+                .filter(
+                  (row) =>
+                    row.is_correct !==
+                    null
+                )
+                .map(
+                  (row) => ({
+                    question_id:
+                      String(
+                        row.question_id
+                      ),
+
+                    question_number:
+                      numberByQuestion.get(
+                        String(
+                          row.question_id
+                        )
+                      ) || 0,
+
+                    answer_status:
+                      row.is_correct ===
+                      true
+                        ? "correct"
+                        : "incorrect",
+
+                    selected_answer:
+                      row.selected_option_id ||
+                      row.open_answer_text ||
+                      null,
+
+                    correct_answer:
+                      null,
+
+                    points:
+                      Number(
+                        row.awarded_points
+                      ) || 0,
+                  })
+                );
+
+            if (
+              rankingQuestionRows.length >
+              0
+            ) {
+              const rankingJson =
+                JSON.stringify(
+                  rankingQuestionRows
+                );
+
+              await sql`
+                INSERT INTO ranking_question_results (
+                  ranking_attempt_id,
+                  user_id,
+                  user_name,
+                  source,
+                  test_type,
+                  test_id,
+                  test_title,
+                  question_id,
+                  question_number,
+                  answer_status,
+                  selected_answer,
+                  correct_answer,
+                  points,
+                  answered_at,
+                  created_at
+                )
+                SELECT
+                  ${rankingAttemptId}::bigint,
+                  ${rankingUserId},
+                  ${rankingUserName},
+                  'national-certificate',
+                  'national-certificate',
+                  ${testId},
+                  ${String(
+                    attempt.title ||
+                      "Milliy sertifikat"
+                  )},
+                  x.question_id,
+                  x.question_number,
+                  x.answer_status,
+                  x.selected_answer,
+                  x.correct_answer,
+                  x.points,
+                  ${submittedAt.toISOString()}::timestamptz,
+                  NOW()
+                FROM jsonb_to_recordset(
+                  ${rankingJson}::jsonb
+                ) AS x(
+                  question_id text,
+                  question_number integer,
+                  answer_status text,
+                  selected_answer text,
+                  correct_answer text,
+                  points numeric
+                )
+              `;
+            }
+
+            rankingSaved =
+              true;
+          } catch (
+            rankingQuestionError
+          ) {
+            /*
+              Savollar yozilmasa yarim ranking attempt
+              qolib ketmasin.
+            */
+            await sql`
+              DELETE FROM
+                ranking_attempts
+              WHERE id =
+                ${rankingAttemptId}
+            `;
+
+            throw rankingQuestionError;
+          }
+        }
+      } catch (
+        rankingError
+      ) {
+        /*
+          Reyting xatosi Milliy sertifikatning
+          asosiy natijasini bekor qilmaydi.
+        */
+        console.error(
+          "NATIONAL CERTIFICATE RANKING ERROR:",
+          rankingError
+        );
+      }
+    } else {
+      console.error(
+        "NATIONAL CERTIFICATE RANKING: qurbonov_user_id cookie topilmadi."
+      );
+    }
+
     return NextResponse.json({
       success: true,
+      rankingSaved,
 
       message:
         "Test muvaffaqiyatli yakunlandi.",
