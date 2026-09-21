@@ -1344,14 +1344,6 @@ export default function AdminRankingPage() {
               <h2>
                 Eng yuqori natijalar
               </h2>
-
-              <span>
-                {
-                  periodTitle(
-                    period
-                  )
-                }
-              </span>
             </div>
 
             <div className="topThree">
@@ -1523,7 +1515,7 @@ export default function AdminRankingPage() {
 
                 <span>
                   {selectionMode
-                    ? `Tanlash rejimi (${selectedIds.size})`
+                    ? `Tanlash (${selectedIds.size})`
                     : "Tanlash"}
                 </span>
               </button>
@@ -1730,301 +1722,304 @@ export default function AdminRankingPage() {
           </div>
         )}
 
-        <div className="tableShell3d">
-          <div className="tableTopBar">
-            <div>
+        <section className="rankingBoard">
+          <div className="rankingBoardHeader">
+            <div className="rankingBoardTitle">
+              <div className="rankingBoardIcon">
+                ≡
+              </div>
+
               <strong>
                 Foydalanuvchilar reytingi
               </strong>
             </div>
 
-            <div className="tableCount">
-              {
-                visibleRanking.length
-              }{" "}
-              ta
+            <div className="rankingBoardRight">
+              {selectionMode && (
+                <label className="boardSelectAll">
+                  <input
+                    type="checkbox"
+                    checked={
+                      allVisibleSelected
+                    }
+                    onChange={
+                      toggleAllVisible
+                    }
+                    disabled={
+                      visibleRanking.length ===
+                      0
+                    }
+                  />
+
+                  <span>
+                    Barchasini tanlash
+                  </span>
+                </label>
+              )}
+
+              <div className="tableCount">
+                {
+                  visibleRanking.length
+                }{" "}
+                ta
+              </div>
             </div>
           </div>
 
-          <div className="tableWrap">
-            <table>
-              <thead>
-                <tr>
-                  {selectionMode && (
-                    <th className="checkColumn">
-                      <input
-                        type="checkbox"
-                        checked={
-                          allVisibleSelected
-                        }
-                        onChange={
-                          toggleAllVisible
-                        }
-                        disabled={
-                          visibleRanking.length ===
-                          0
-                        }
-                        aria-label="Barchasini tanlash"
-                      />
-                    </th>
-                  )}
+          <div className="rankingList">
+            {!loading &&
+              visibleRanking.map(
+                (item) => {
+                  const selected =
+                    selectedIds.has(
+                      item.userId
+                    );
 
-                  <th>
-                    O‘rin
-                  </th>
-                  <th>
-                    Foydalanuvchi
-                  </th>
-                  <th>
-                    Ishlangan
-                  </th>
-                  <th>
-                    To‘g‘ri
-                  </th>
-                  <th>
-                    Noto‘g‘ri
-                  </th>
-                  <th>
-                    Aniqlik
-                  </th>
-                  <th>
-                    Testlar
-                  </th>
-                  <th>
-                    Urinish
-                  </th>
-                  <th>
-                    Ball
-                  </th>
-                  <th>
-                    Oxirgi faollik
-                  </th>
-                  <th>
-                    Amal
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {!loading &&
-                  visibleRanking.map(
-                    (item) => {
-                      const selected =
-                        selectedIds.has(
-                          item.userId
-                        );
-
-                      return (
-                        <tr
-                          key={
+                  return (
+                    <article
+                      key={
+                        item.userId
+                      }
+                      className={[
+                        "rankingUserCard",
+                        selected
+                          ? "selectedRankingCard"
+                          : "",
+                        selectionMode
+                          ? "selectableRankingCard"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => {
+                        if (
+                          selectionMode
+                        ) {
+                          toggleUser(
                             item.userId
-                          }
-                          className={[
-                            selected
-                              ? "selectedRow"
-                              : "",
-                            selectionMode
-                              ? "selectionReadyRow"
-                              : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          onClick={() => {
-                            if (selectionMode) {
+                          );
+                        }
+                      }}
+                    >
+                      {selectionMode && (
+                        <div className="rankingSelectBox">
+                          <input
+                            type="checkbox"
+                            checked={
+                              selected
+                            }
+                            onChange={() =>
                               toggleUser(
                                 item.userId
-                              );
+                              )
                             }
-                          }}
+                            onClick={(event) =>
+                              event.stopPropagation()
+                            }
+                            aria-label={`${item.userName}ni tanlash`}
+                          />
+                        </div>
+                      )}
+
+                      <div className="rankingIdentity">
+                        <span
+                          className={`rankMedal rankMedal${Math.min(
+                            item.rank,
+                            4
+                          )}`}
                         >
-                          {selectionMode && (
-                            <td className="checkColumn">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  selected
-                                }
-                                onChange={() =>
-                                  toggleUser(
-                                    item.userId
-                                  )
-                                }
-                                onClick={(event) =>
-                                  event.stopPropagation()
-                                }
-                                aria-label={`${item.userName}ni tanlash`}
-                              />
-                            </td>
-                          )}
+                          {item.rank <= 3
+                            ? item.rank === 1
+                              ? "🥇"
+                              : item.rank === 2
+                                ? "🥈"
+                                : "🥉"
+                            : `#${item.rank}`}
+                        </span>
 
-                          <td>
-                            <span className={`rankBadge rank${Math.min(item.rank, 4)}`}>
-                              #
-                              {
-                                item.rank
-                              }
-                            </span>
-                          </td>
+                        <div className="rankingUserName">
+                          <strong>
+                            {
+                              item.userName
+                            }
+                          </strong>
 
-                          <td className="studentCell">
-                            <strong>
-                              {
-                                item.userName
-                              }
-                            </strong>
+                          <span className="rankingPositionText">
+                            {item.rank}-o‘rin
+                          </span>
+                        </div>
+                      </div>
 
-                          </td>
+                      <div className="rankingMetrics">
+                        <div className="rankingMetric">
+                          <span>
+                            Ishlangan
+                          </span>
 
-                          <td>
-                            <span className="metricChip">
-                              {
-                                item.workedQuestions
-                              }
-                            </span>
-                          </td>
+                          <strong>
+                            {
+                              item.workedQuestions
+                            }
+                          </strong>
+                        </div>
 
-                          <td className="correctValue">
+                        <div className="rankingMetric successMetric">
+                          <span>
+                            To‘g‘ri
+                          </span>
+
+                          <strong>
                             {
                               item.correct
                             }
-                          </td>
+                          </strong>
+                        </div>
 
-                          <td className="incorrectValue">
+                        <div className="rankingMetric dangerMetric">
+                          <span>
+                            Noto‘g‘ri
+                          </span>
+
+                          <strong>
                             {
                               item.incorrect
                             }
-                          </td>
+                          </strong>
+                        </div>
 
-                          <td>
-                            <div className="accuracyCell">
-                              <strong>
-                                {
-                                  item.accuracy
-                                }
-                                %
-                              </strong>
+                        <div className="rankingMetric accuracyMetricCard">
+                          <span>
+                            Aniqlik
+                          </span>
 
-                              <div className="accuracyTrack">
-                                <div
-                                  className="accuracyBar"
-                                  style={{
-                                    width:
-                                      `${Math.max(
-                                        0,
-                                        Math.min(
-                                          100,
-                                          item.accuracy
-                                        )
-                                      )}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </td>
+                          <strong>
+                            {
+                              item.accuracy
+                            }
+                            %
+                          </strong>
 
-                          <td>
+                          <div className="cardAccuracyTrack">
+                            <div
+                              className="cardAccuracyBar"
+                              style={{
+                                width:
+                                  `${Math.max(
+                                    0,
+                                    Math.min(
+                                      100,
+                                      item.accuracy
+                                    )
+                                  )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rankingMetric">
+                          <span>
+                            Testlar
+                          </span>
+
+                          <strong>
                             {
                               item.testsWorked
                             }
-                          </td>
+                          </strong>
+                        </div>
 
-                          <td>
+                        <div className="rankingMetric">
+                          <span>
+                            Urinish
+                          </span>
+
+                          <strong>
                             {
                               item.attempts
                             }
-                          </td>
+                          </strong>
+                        </div>
 
-                          <td>
-                            <strong>
-                              {
-                                item.earnedPoints
-                              }
-                            </strong>
-                          </td>
+                        <div className="rankingMetric scoreMetric">
+                          <span>
+                            Ball
+                          </span>
 
-                          <td className="dateCell">
+                          <strong>
+                            {
+                              item.earnedPoints
+                            }
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="rankingSide">
+                        <div className="rankingActivity">
+                          <span>
+                            Oxirgi faollik
+                          </span>
+
+                          <strong>
                             {formatDate(
                               item.lastActivityAt
                             )}
-                          </td>
-
-                          <td>
-                            <button
-                              type="button"
-                              className="deleteUserButton"
-                              disabled={
-                                deletingUserId ===
-                                item.userId
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void deleteUser(
-                                  item
-                                );
-                              }}
-                            >
-                              {deletingUserId ===
-                              item.userId
-                                ? "..."
-                                : "O‘chirish"}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-
-                {!loading &&
-                  visibleRanking.length ===
-                    0 && (
-                    <tr>
-                      <td
-                        colSpan={
-                          selectionMode
-                            ? 12
-                            : 11
-                        }
-                      >
-                        <div className="emptyState">
-                          <div className="emptyIcon">
-                            ⌕
-                          </div>
-
-                          <strong>
-                            Natija topilmadi
                           </strong>
-
-                          <span>
-                            Qidiruv yoki filtrni o‘zgartirib ko‘ring.
-                          </span>
                         </div>
-                      </td>
-                    </tr>
-                  )}
 
-                {loading && (
-                  <tr>
-                    <td
-                      colSpan={
-                        selectionMode
-                          ? 12
-                          : 11
-                      }
-                    >
-                      <div className="emptyState">
-                        <div className="loader3d" />
-
-                        <strong>
-                          Reyting yuklanmoqda...
-                        </strong>
+                        <button
+                          type="button"
+                          className="deleteUserButton rankingDeleteButton"
+                          disabled={
+                            deletingUserId ===
+                            item.userId
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void deleteUser(
+                              item
+                            );
+                          }}
+                        >
+                          {deletingUserId ===
+                          item.userId
+                            ? "..."
+                            : "O‘chirish"}
+                        </button>
                       </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    </article>
+                  );
+                }
+              )}
+
+            {!loading &&
+              visibleRanking.length ===
+                0 && (
+                <div className="rankingEmptyState">
+                  <div className="rankingEmptyIcon">
+                    ⌕
+                  </div>
+
+                  <strong>
+                    Natija topilmadi
+                  </strong>
+
+                  <span>
+                    Qidiruv yoki saralashni o‘zgartirib ko‘ring.
+                  </span>
+                </div>
+              )}
+
+            {loading && (
+              <div className="rankingEmptyState">
+                <div className="loader3d" />
+
+                <strong>
+                  Reyting yuklanmoqda...
+                </strong>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
 
         <div className="rankingRule3d">
           <div className="ruleIcon">
@@ -2037,7 +2032,7 @@ export default function AdminRankingPage() {
             </strong>
 
             <p>
-              Avval to‘g‘ri javoblar soni, keyin aniqlik foizi, undan keyin ishlangan noyob savollar soni hisobga olinadi. Bir xil savol tanlangan davr ichida qayta ishlansa, reytingga bir marta hisoblanadi.
+              To‘g‘ri javoblar → aniqlik → ishlangan noyob savollar. Bir xil savol tanlangan davr ichida reytingga bir marta hisoblanadi.
             </p>
           </div>
         </div>
@@ -3716,6 +3711,1716 @@ export default function AdminRankingPage() {
             justify-content: flex-start;
           }
         }
+
+
+        /* =====================================================
+           FINAL DESIGN SYSTEM — QURBONOVV.UZ ADMIN USLUBI
+        ===================================================== */
+
+        :global(body) {
+          margin: 0;
+          background: #f7fafc;
+        }
+
+        .page {
+          min-height: 100vh;
+          overflow-x: hidden;
+          padding: 28px 16px 48px;
+          background:
+            radial-gradient(circle at 88% 5%, rgba(85, 194, 242, 0.16), transparent 28%),
+            linear-gradient(180deg, #ffffff 0%, #f5f8fa 54%, #edf3f6 100%);
+          color: #071c2a;
+          font-family: "Bell MT", Georgia, "Times New Roman", serif;
+        }
+
+        .page,
+        .page button,
+        .page input,
+        .page select,
+        .page table,
+        .page th,
+        .page td {
+          font-family: "Bell MT", Georgia, "Times New Roman", serif !important;
+        }
+
+        .pageGlow {
+          display: none;
+        }
+
+        .hero3d,
+        .mainPanel3d {
+          width: min(1600px, 100%);
+          max-width: 1600px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        /* ---------- TOP HEADER ---------- */
+
+        .hero3d {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 72px;
+          padding: 16px 22px;
+          border: 2px solid #18485f;
+          border-radius: 19px;
+          background:
+            linear-gradient(180deg, #89d8f8 0%, #64bee8 48%, #3b9dcc 100%);
+          box-shadow:
+            inset 0 2px 0 rgba(255, 255, 255, 0.92),
+            inset 0 -2px 0 rgba(0, 59, 91, 0.18),
+            0 7px 0 #123d52,
+            0 14px 24px rgba(0, 45, 67, 0.16);
+        }
+
+        .heroTitleWrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 330px;
+          padding: 10px 22px 10px 12px;
+          border: 2px solid #5d656a;
+          border-radius: 13px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #f4f4f4 48%, #d6d6d6 100%);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 5px 0 #596166;
+        }
+
+        .trophyBox {
+          display: grid;
+          place-items: center;
+          width: 46px;
+          height: 46px;
+          flex: 0 0 auto;
+          border: 1px solid #a16d00;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #fff6c4 0%, #ffd767 48%, #eeb326 100%);
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,0.9),
+            0 3px 0 #9b6900;
+          font-size: 23px;
+        }
+
+        .heroTitleWrap h1 {
+          margin: 0;
+          color: #071c2a;
+          font-size: clamp(25px, 2.2vw, 34px);
+          font-weight: 700;
+          line-height: 1;
+          letter-spacing: 0;
+          text-shadow: 0 1px 0 #fff;
+        }
+
+        .headerButtons {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+
+        .silverButton {
+          min-height: 46px;
+          min-width: 122px;
+          padding: 9px 15px;
+          border-radius: 10px;
+          color: #071c2a;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,0.8),
+            0 4px 0 rgba(27, 63, 79, 0.62);
+        }
+
+        .resultsNav {
+          border: 1px solid #24799f;
+          background: linear-gradient(180deg, #eefbff, #8bd8f3 55%, #52b5de);
+        }
+
+        .adminNav {
+          border: 1px solid #a47713;
+          background: linear-gradient(180deg, #fff9dc, #f6d260 55%, #e5aa1f);
+        }
+
+        .homeNav {
+          border: 1px solid #4b8b57;
+          background: linear-gradient(180deg, #f2fff4, #a9e0af 55%, #69bc78);
+        }
+
+        /* ---------- MAIN PANEL ---------- */
+
+        .mainPanel3d {
+          position: relative;
+          padding: 54px 26px 28px;
+          border: 2px solid #293235;
+          border-radius: 20px;
+          background:
+            linear-gradient(180deg, #606466 0%, #55595b 48%, #45494b 100%);
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,0.12),
+            0 8px 0 #252c2f,
+            0 18px 34px rgba(20, 28, 32, 0.20);
+        }
+
+        .floating3dLabel {
+          position: absolute;
+          top: -31px;
+          left: 50%;
+          transform: translateX(-50%);
+          min-width: 310px;
+          padding: 12px 26px;
+          border: 2px solid #1b5068;
+          border-radius: 14px;
+          background:
+            linear-gradient(180deg, #b8eaff 0%, #74c9ee 52%, #3aa5d1 100%);
+          color: #0b3245;
+          box-shadow:
+            inset 0 2px 0 #effbff,
+            0 5px 0 #174c63;
+          text-align: center;
+          font-size: 24px;
+          font-weight: 700;
+        }
+
+        /* ---------- PERIOD TABS ---------- */
+
+        .periodTabs {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+          margin-bottom: 20px;
+        }
+
+        .periodButton {
+          min-height: 72px;
+          padding: 12px 18px;
+          border: 2px solid #71808a;
+          border-radius: 14px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #f5f5f5 52%, #d8dde0 100%);
+          color: #111;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 6px 0 #52646e;
+          font-size: 22px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .periodButton.active {
+          border-color: #a87900;
+          background:
+            linear-gradient(180deg, #fff8d3 0%, #ffe27a 50%, #efb926 100%);
+          color: #111;
+          box-shadow:
+            inset 0 2px 0 #fff9df,
+            0 6px 0 #906600;
+        }
+
+        /* ---------- STATS ---------- */
+
+        .statsGrid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 15px;
+          margin-bottom: 22px;
+        }
+
+        .stat3d {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          min-height: 105px;
+          padding: 16px 18px;
+          border: 1px solid #d4d4d4;
+          border-radius: 13px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #fbfbfb 55%, #e9e9e9 100%);
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 #a9a9a9;
+        }
+
+        .statIcon {
+          display: grid;
+          place-items: center;
+          width: 52px;
+          height: 52px;
+          flex: 0 0 auto;
+          border: 1px solid #6199b1;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #effaff, #9edcf3);
+          color: #0a536f;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #5e8fa4;
+          font-size: 23px;
+          font-weight: 700;
+        }
+
+        .greenStat .statIcon {
+          border-color: #61986b;
+          background: linear-gradient(180deg, #f3fff4, #aee4b7);
+          color: #146629;
+          box-shadow: inset 0 2px 0 #fff, 0 3px 0 #65976d;
+        }
+
+        .redStat .statIcon {
+          border-color: #b36363;
+          background: linear-gradient(180deg, #fff4f4, #efb1b1);
+          color: #a41818;
+          box-shadow: inset 0 2px 0 #fff, 0 3px 0 #a96262;
+        }
+
+        .stat3d span {
+          display: block;
+          margin: 0 0 4px;
+          color: #222;
+          font-size: 17px;
+          font-weight: 400;
+        }
+
+        .stat3d strong {
+          display: block;
+          color: #07547a;
+          font-size: 29px;
+          line-height: 1;
+        }
+
+        .greenStat strong {
+          color: #08752c;
+        }
+
+        .redStat strong {
+          color: #b31313;
+        }
+
+        /* ---------- PODIUM ---------- */
+
+        .podiumSection {
+          margin-bottom: 22px;
+          padding: 18px;
+          border: 1px solid #d0d0d0;
+          border-radius: 14px;
+          background: #f7f7f7;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 #b4b4b4;
+        }
+
+        .sectionTitleRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 13px;
+        }
+
+        .sectionTitleRow h2 {
+          margin: 0;
+          color: #111;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+        .topThree {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .topCard {
+          position: relative;
+          min-height: 132px;
+          padding: 20px 20px 18px 78px;
+          border-radius: 14px;
+          color: #111;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.75),
+            0 5px 0 rgba(74,74,74,.46);
+        }
+
+        .top1 {
+          border: 1px solid #b98a16;
+          background: linear-gradient(135deg, #fff8d5, #ffe594 48%, #efbd32);
+        }
+
+        .top2 {
+          border: 1px solid #929ca2;
+          background: linear-gradient(135deg, #fff, #e9ecee 48%, #c8d0d4);
+        }
+
+        .top3 {
+          border: 1px solid #a97c5a;
+          background: linear-gradient(135deg, #fff7ed, #eac3a4 48%, #c98a5e);
+        }
+
+        .medal {
+          position: absolute;
+          left: 18px;
+          top: 23px;
+          display: grid;
+          place-items: center;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: rgba(255,255,255,.76);
+          box-shadow: 0 3px 7px rgba(0,0,0,.12);
+          font-size: 25px;
+        }
+
+        .podiumRank {
+          margin-bottom: 5px;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .topCard > strong {
+          display: block;
+          margin-bottom: 12px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 20px;
+        }
+
+        .podiumNumbers {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .podiumNumbers span {
+          padding: 6px 10px;
+          border-radius: 9px;
+          background: rgba(255,255,255,.70);
+          font-size: 15px;
+        }
+
+        .topCard:only-child {
+          grid-column: 1 / -1;
+          min-height: 115px;
+        }
+
+        /* ---------- CONTROL DECK ---------- */
+
+        .controlDeck {
+          margin-bottom: 22px;
+          padding: 17px;
+          border: 1px solid #d3d3d3;
+          border-radius: 13px;
+          background: #f7f7f7;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 #b6b6b6;
+        }
+
+        .filterRow {
+          display: grid;
+          grid-template-columns: minmax(300px, 1fr) 260px auto;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 13px;
+        }
+
+        .searchGroup {
+          position: relative;
+          min-width: 0;
+        }
+
+        .searchSvg {
+          position: absolute;
+          left: 17px;
+          top: 50%;
+          width: 20px;
+          height: 20px;
+          transform: translateY(-50%);
+          fill: none;
+          stroke: #375564;
+          stroke-width: 2;
+          stroke-linecap: round;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        .searchGroup input,
+        .sortSelect {
+          width: 100%;
+          min-height: 50px;
+          border: 2px solid #777;
+          border-radius: 8px;
+          background: #fff;
+          color: #111;
+          outline: none;
+          box-shadow:
+            inset 0 2px 4px rgba(0,0,0,.05),
+            0 2px 0 #b8b8b8;
+          font-size: 17px;
+          font-weight: 400;
+        }
+
+        .searchGroup input {
+          padding: 10px 46px 10px 50px;
+        }
+
+        .searchGroup input::-webkit-search-cancel-button {
+          display: none;
+        }
+
+        .searchGroup input::placeholder {
+          color: #6e6e6e;
+          opacity: 1;
+        }
+
+        .sortSelect {
+          padding: 9px 12px;
+          cursor: pointer;
+        }
+
+        .searchGroup input:focus,
+        .sortSelect:focus {
+          border-color: #2d9bcb;
+          box-shadow: 0 0 0 3px rgba(45,155,203,.15);
+        }
+
+        .clearSearch {
+          position: absolute;
+          right: 9px;
+          top: 50%;
+          width: 31px;
+          height: 31px;
+          transform: translateY(-50%);
+          border: 1px solid #a0a0a0;
+          border-radius: 50%;
+          background: linear-gradient(180deg, #fff, #e4e4e4);
+          color: #333;
+          font-size: 20px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .filterActions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 9px;
+        }
+
+        .selectModeButton,
+        .resetFilterButton {
+          min-height: 50px;
+          border-radius: 9px;
+          color: #111;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .selectModeButton {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          min-width: 132px;
+          justify-content: center;
+          padding: 8px 13px;
+          border: 1px solid #26779a;
+          background: linear-gradient(180deg, #effaff, #9eddf4 58%, #64b9dc);
+          box-shadow: inset 0 2px 0 #fff, 0 4px 0 #4c8ea8;
+        }
+
+        .modernSelectIcon {
+          position: relative;
+          display: grid;
+          place-items: center;
+          width: 25px;
+          height: 25px;
+          flex: 0 0 auto;
+          border: 2px solid #2b6c86;
+          border-radius: 7px;
+          background: linear-gradient(180deg, #fff, #dceaf0);
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 2px 0 rgba(33, 85, 108, .48);
+        }
+
+        .modernSelectIcon svg {
+          width: 16px;
+          height: 16px;
+          fill: none;
+          stroke: #1f607b;
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+
+        .activeSelectMode {
+          border-color: #146b32;
+          background: linear-gradient(180deg, #f2fff4, #a8e1b2 58%, #69bc78);
+          box-shadow: inset 0 2px 0 #fff, 0 4px 0 #4b8f58;
+        }
+
+        .activeSelectMode .modernSelectIcon {
+          border-color: #26743a;
+          background: linear-gradient(180deg, #eaffed, #80d58f);
+          box-shadow: inset 0 1px 0 #fff, 0 2px 0 #397b45;
+        }
+
+        .activeSelectMode .modernSelectIcon svg {
+          stroke: #0b5e22;
+        }
+
+        .resetFilterButton {
+          padding: 8px 13px;
+          border: 1px solid #777;
+          background: linear-gradient(180deg, #fff, #ddd);
+          box-shadow: inset 0 2px 0 #fff, 0 4px 0 #888;
+        }
+
+        /* ---------- MODERN CHECKBOX ---------- */
+
+        .masterCheck input[type="checkbox"],
+        .checkColumn input[type="checkbox"] {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 24px;
+          height: 24px;
+          margin: 0;
+          border: 2px solid #4c7182;
+          border-radius: 7px;
+          background: linear-gradient(180deg, #fff, #dfe9ed);
+          box-shadow: inset 0 1px 0 #fff, 0 2px 0 #89a1ac;
+          cursor: pointer;
+          vertical-align: middle;
+        }
+
+        .masterCheck input[type="checkbox"]:checked,
+        .checkColumn input[type="checkbox"]:checked {
+          border-color: #1e6f8e;
+          background:
+            linear-gradient(180deg, #8ad9f5, #3ba8d2);
+          box-shadow: inset 0 1px 0 #dff8ff, 0 2px 0 #246f8d;
+          background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4 4L19 7' fill='none' stroke='%23ffffff' stroke-width='3.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-size: 17px 17px;
+          background-position: center;
+          background-repeat: no-repeat;
+        }
+
+        .selectionBar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: 0 0 13px;
+          padding: 11px 13px;
+          border: 1px solid #78a8bd;
+          border-radius: 10px;
+          background: linear-gradient(180deg, #eefaff, #d9f1fb);
+          box-shadow: inset 0 2px 0 #fff, 0 3px 0 #85aab9;
+        }
+
+        .selectionLeft,
+        .selectionActions {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .masterCheck {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          color: #111;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .selectedBadge {
+          padding: 7px 11px;
+          border: 1px solid #af871e;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #fff7d0, #f2d36a);
+          color: #111;
+          font-size: 15px;
+          box-shadow: inset 0 1px 0 #fff;
+        }
+
+        .small3dButton,
+        .bulkDeleteButton {
+          min-height: 39px;
+          padding: 7px 12px;
+          border-radius: 8px;
+          color: #111;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .small3dButton {
+          border: 1px solid #777;
+          background: linear-gradient(180deg, #fff, #ddd);
+          box-shadow: inset 0 1px 0 #fff, 0 3px 0 #888;
+        }
+
+        .activeSmall {
+          border-color: #257999;
+          background: linear-gradient(180deg, #effaff, #a5dff5);
+          box-shadow: inset 0 1px 0 #fff, 0 3px 0 #659eb5;
+        }
+
+        .bulkDeleteButton {
+          border: 1px solid #a24444;
+          background: linear-gradient(180deg, #fff2f2, #efb1b1);
+          box-shadow: inset 0 1px 0 #fff, 0 3px 0 #a96666;
+        }
+
+        /* ---------- ACTION BAR ---------- */
+
+        .actionRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding-top: 1px;
+        }
+
+        .periodInfo3d {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          flex-wrap: wrap;
+          flex: 1 1 auto;
+          min-height: 49px;
+          padding: 9px 13px;
+          border-left: 5px solid #d6aa21;
+          border-radius: 8px;
+          background: #fffbea;
+          color: #111;
+          font-size: 15px;
+        }
+
+        .periodInfo3d strong {
+          font-size: 16px;
+        }
+
+        .visibleCount {
+          margin-left: auto;
+        }
+
+        .toolButtons {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          flex-wrap: wrap;
+          gap: 9px;
+        }
+
+        .toolButtons button {
+          min-height: 45px;
+          padding: 9px 14px;
+          border-radius: 8px;
+          color: #111 !important;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .blueTool {
+          border: 1px solid #267a9e !important;
+          background: linear-gradient(180deg, #effbff, #9eddf4) !important;
+          box-shadow: inset 0 2px 0 #fff, 0 4px 0 #5f99b0 !important;
+        }
+
+        .pdfTool {
+          border: 1px solid #aa6969 !important;
+          background: linear-gradient(180deg, #fff2f2, #efb1b1) !important;
+          box-shadow: inset 0 2px 0 #fff, 0 4px 0 #a96d6d !important;
+        }
+
+        .csvTool {
+          border: 1px solid #66956e !important;
+          background: linear-gradient(180deg, #f2fff4, #afe0b6) !important;
+          box-shadow: inset 0 2px 0 #fff, 0 4px 0 #76a47d !important;
+        }
+
+        .dangerTool {
+          border: 1px solid #9b2424 !important;
+          background: linear-gradient(180deg, #f36d6d, #d32626) !important;
+          color: #000 !important;
+          text-shadow: 0 1px 0 rgba(255,255,255,.30);
+          box-shadow: inset 0 2px 0 rgba(255,255,255,.42), 0 4px 0 #861919 !important;
+        }
+
+        /* ---------- TABLE ---------- */
+
+        .tableShell3d {
+          overflow: hidden;
+          border: 1px solid #cecece;
+          border-radius: 13px;
+          background: #fff;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 #ababab;
+        }
+
+        .tableTopBar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 13px 15px;
+          background: linear-gradient(180deg, #f8f8f8, #e5e5e5);
+          border-bottom: 1px solid #c8c8c8;
+        }
+
+        .tableTopBar strong {
+          color: #111;
+          font-size: 19px;
+        }
+
+        .tableCount {
+          padding: 6px 11px;
+          border: 1px solid #b88e22;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #fff7d2, #f0cf62);
+          color: #111;
+          font-size: 15px;
+        }
+
+        .tableWrap {
+          overflow-x: auto;
+        }
+
+        table {
+          width: 100%;
+          min-width: 1350px;
+          border-collapse: collapse;
+          background: #fff;
+        }
+
+        th,
+        td {
+          padding: 13px 10px;
+          border-bottom: 1px solid #dedede;
+          color: #111;
+          text-align: center;
+          vertical-align: middle;
+          font-size: 15px;
+        }
+
+        th {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background:
+            linear-gradient(180deg, #2a6e8d 0%, #18506a 52%, #103b50 100%);
+          color: #fff;
+          font-size: 14px;
+          font-weight: 700;
+          text-shadow: 0 1px 0 rgba(0,0,0,.28);
+        }
+
+        tbody tr:nth-child(even):not(.selectedRow) {
+          background: #fafafa;
+        }
+
+        tbody tr.selectedRow {
+          background: linear-gradient(90deg, #fff8d8, #fffdf1);
+          box-shadow: inset 5px 0 0 #d5aa26;
+        }
+
+        .selectionReadyRow {
+          cursor: pointer;
+        }
+
+        .checkColumn {
+          width: 52px;
+          min-width: 52px;
+        }
+
+        .rankBadge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 45px;
+          padding: 6px 9px;
+          border: 1px solid #b4b4b4;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #fff, #e2e2e2);
+          color: #111;
+          box-shadow: inset 0 1px 0 #fff, 0 2px 0 #b2b2b2;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .rank1 {
+          border-color: #b48919;
+          background: linear-gradient(180deg, #fff7cd, #efc64d);
+        }
+
+        .rank2 {
+          border-color: #969fa4;
+          background: linear-gradient(180deg, #fff, #d7dcdf);
+        }
+
+        .rank3 {
+          border-color: #ae7d59;
+          background: linear-gradient(180deg, #fff5e9, #dbab86);
+        }
+
+        .studentCell {
+          min-width: 260px;
+          text-align: left;
+        }
+
+        .studentCell strong {
+          display: block;
+          color: #111;
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .metricChip {
+          display: inline-flex;
+          min-width: 39px;
+          justify-content: center;
+          padding: 5px 7px;
+          border-radius: 7px;
+          background: #eaf3f7;
+          color: #164a60;
+          font-size: 15px;
+          font-weight: 700;
+        }
+
+        .correctValue {
+          color: #087e2d;
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .incorrectValue {
+          color: #be1616;
+          font-size: 17px;
+          font-weight: 700;
+        }
+
+        .accuracyCell {
+          min-width: 120px;
+        }
+
+        .accuracyCell strong {
+          display: block;
+          margin-bottom: 5px;
+          font-size: 15px;
+        }
+
+        .accuracyTrack {
+          height: 7px;
+          overflow: hidden;
+          border-radius: 999px;
+          background: #d8d8d8;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,.14);
+        }
+
+        .accuracyBar {
+          height: 100%;
+          border-radius: inherit;
+          background: linear-gradient(90deg, #36add8, #15789f);
+        }
+
+        .dateCell {
+          min-width: 160px;
+          white-space: nowrap;
+          font-size: 14px;
+        }
+
+        .deleteUserButton {
+          min-height: 37px;
+          padding: 7px 12px;
+          border: 1px solid #a84848;
+          border-radius: 8px;
+          background: linear-gradient(180deg, #fff2f2, #efb1b1);
+          color: #111;
+          box-shadow: inset 0 1px 0 #fff, 0 3px 0 #a76363;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        /* ---------- RULE ---------- */
+
+        .rankingRule3d {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 18px;
+          padding: 13px 15px;
+          border: 1px solid #7aafc5;
+          border-radius: 11px;
+          background: linear-gradient(180deg, #eefdff, #d8f2fc);
+          color: #111;
+          box-shadow: inset 0 1px 0 #fff, 0 4px 0 #8db3c2;
+        }
+
+        .ruleIcon {
+          display: grid;
+          place-items: center;
+          width: 34px;
+          height: 34px;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          background: linear-gradient(180deg, #67caee, #268bb1);
+          color: #fff;
+          box-shadow: 0 3px 0 #1d6581;
+          font-size: 18px;
+          font-weight: 700;
+        }
+
+        .rankingRule3d strong {
+          display: block;
+          margin-bottom: 2px;
+          font-size: 16px;
+        }
+
+        .rankingRule3d p {
+          margin: 0;
+          color: #111;
+          font-size: 14px;
+          line-height: 1.35;
+        }
+
+        .emptyState {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          padding: 40px 16px;
+          color: #333;
+        }
+
+        .emptyState strong {
+          font-size: 19px;
+        }
+
+        .emptyState span {
+          font-size: 15px;
+        }
+
+        .errorBox {
+          margin-bottom: 14px;
+          padding: 12px 14px;
+          border: 1px solid #a94646;
+          border-radius: 10px;
+          background: #fff1f1;
+          color: #8c1717;
+          font-size: 16px;
+        }
+
+        .loader3d {
+          width: 35px;
+          height: 35px;
+          border: 4px solid #d7e6ed;
+          border-top-color: #1b789e;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        /* ---------- PRESS EFFECTS ---------- */
+
+        @media (hover: hover) and (pointer: fine) {
+          .silverButton:hover,
+          .periodButton:hover,
+          .selectModeButton:hover,
+          .resetFilterButton:hover,
+          .small3dButton:hover,
+          .bulkDeleteButton:hover,
+          .toolButtons button:hover,
+          .deleteUserButton:hover {
+            filter: brightness(1.035);
+          }
+        }
+
+        .silverButton:active,
+        .periodButton:active,
+        .selectModeButton:active,
+        .resetFilterButton:active,
+        .small3dButton:active,
+        .bulkDeleteButton:active,
+        .toolButtons button:active,
+        .deleteUserButton:active {
+          transform: translateY(3px);
+          box-shadow: 0 1px 0 rgba(70,70,70,.55) !important;
+        }
+
+        button:disabled {
+          opacity: .48;
+          cursor: not-allowed;
+          filter: grayscale(.18);
+        }
+
+        /* ---------- RESPONSIVE ---------- */
+
+        @media (max-width: 1180px) {
+          .hero3d,
+          .actionRow,
+          .selectionBar {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .headerButtons,
+          .toolButtons,
+          .selectionActions {
+            justify-content: stretch;
+          }
+
+          .headerButtons button,
+          .toolButtons button {
+            flex: 1 1 160px;
+          }
+
+          .filterRow {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .searchGroup {
+            grid-column: 1 / -1;
+          }
+
+          .filterActions {
+            justify-content: stretch;
+          }
+
+          .filterActions button {
+            flex: 1;
+          }
+
+          .statsGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .topThree {
+            grid-template-columns: 1fr;
+          }
+
+          .visibleCount {
+            margin-left: 0;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .page {
+            padding: 20px 9px 36px;
+          }
+
+          .hero3d {
+            margin-bottom: 66px;
+            padding: 12px;
+          }
+
+          .heroTitleWrap {
+            min-width: 0;
+            width: 100%;
+          }
+
+          .heroTitleWrap h1 {
+            font-size: 24px;
+          }
+
+          .headerButtons {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+          }
+
+          .mainPanel3d {
+            padding: 48px 9px 19px;
+          }
+
+          .floating3dLabel {
+            min-width: 240px;
+            font-size: 20px;
+          }
+
+          .periodTabs,
+          .statsGrid,
+          .filterRow {
+            grid-template-columns: 1fr;
+          }
+
+          .searchGroup {
+            grid-column: auto;
+          }
+
+          .filterActions,
+          .toolButtons,
+          .selectionActions {
+            display: grid;
+            grid-template-columns: 1fr;
+            width: 100%;
+          }
+
+          .filterActions button,
+          .toolButtons button,
+          .selectionActions button {
+            width: 100%;
+          }
+
+          .periodInfo3d {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+        }
+
+
+
+        /* =====================================================
+           FOYDALANUVCHILAR REYTINGI — ZAMONAVIY 3D KARTALAR
+        ===================================================== */
+
+        .rankingBoard {
+          overflow: hidden;
+          border: 2px solid #737b7f;
+          border-radius: 15px;
+          background:
+            linear-gradient(180deg, #f7f7f7 0%, #ececec 100%);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 6px 0 #555e62,
+            0 12px 24px rgba(0, 0, 0, 0.14);
+        }
+
+        .rankingBoardHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          min-height: 62px;
+          padding: 11px 16px;
+          border-bottom: 2px solid #16485f;
+          background:
+            linear-gradient(180deg, #8edcf9 0%, #58b8e0 54%, #2c8fbb 100%);
+          box-shadow:
+            inset 0 2px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .rankingBoardTitle {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          min-width: 0;
+        }
+
+        .rankingBoardIcon {
+          display: grid;
+          place-items: center;
+          width: 38px;
+          height: 38px;
+          flex: 0 0 auto;
+          border: 1px solid #1d6787;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #f2fbff, #a8def2);
+          color: #0b425b;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 3px 0 #397e9b;
+          font-size: 19px;
+          font-weight: 700;
+        }
+
+        .rankingBoardTitle strong {
+          color: #072b3d;
+          font-size: 22px;
+          font-weight: 700;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .rankingBoardRight {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+
+        .boardSelectAll {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 38px;
+          padding: 6px 11px;
+          border: 1px solid #5a7d8d;
+          border-radius: 9px;
+          background:
+            linear-gradient(180deg, #ffffff, #dce9ef);
+          color: #112f3d;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 3px 0 #65838f;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .boardSelectAll input,
+        .rankingSelectBox input {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 24px;
+          height: 24px;
+          margin: 0;
+          border: 2px solid #4c7182;
+          border-radius: 7px;
+          background:
+            linear-gradient(180deg, #ffffff, #dfe9ed);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 2px 0 #89a1ac;
+          cursor: pointer;
+        }
+
+        .boardSelectAll input:checked,
+        .rankingSelectBox input:checked {
+          border-color: #1d6886;
+          background:
+            linear-gradient(180deg, #82d7f4, #2b9fcb);
+          background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4 4L19 7' fill='none' stroke='%23ffffff' stroke-width='3.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-position: center;
+          background-repeat: no-repeat;
+          background-size: 17px 17px;
+          box-shadow:
+            inset 0 1px 0 #dcf8ff,
+            0 2px 0 #246f8d;
+        }
+
+        .rankingBoard .tableCount {
+          min-width: 54px;
+          text-align: center;
+          font-size: 15px;
+        }
+
+        .rankingList {
+          display: grid;
+          gap: 12px;
+          padding: 14px;
+          background:
+            linear-gradient(180deg, #ededed 0%, #e1e1e1 100%);
+        }
+
+        .rankingUserCard {
+          display: grid;
+          grid-template-columns:
+            minmax(260px, 1.15fr)
+            minmax(620px, 2.7fr)
+            minmax(170px, 0.8fr);
+          align-items: stretch;
+          gap: 12px;
+          min-width: 0;
+          padding: 13px;
+          border: 1px solid #b7b7b7;
+          border-radius: 13px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #f8f8f8 58%, #ececec 100%);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 4px 0 #a7a7a7,
+            0 7px 14px rgba(0, 0, 0, 0.08);
+          transition:
+            transform 120ms ease,
+            box-shadow 120ms ease,
+            border-color 120ms ease,
+            background 120ms ease;
+        }
+
+        .selectableRankingCard {
+          grid-template-columns:
+            42px
+            minmax(240px, 1.1fr)
+            minmax(600px, 2.6fr)
+            minmax(170px, 0.8fr);
+          cursor: pointer;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          .rankingUserCard:hover {
+            transform: translateY(-1px);
+            border-color: #8fa8b3;
+            box-shadow:
+              inset 0 2px 0 #ffffff,
+              0 5px 0 #94a4aa,
+              0 10px 18px rgba(0, 0, 0, 0.10);
+          }
+        }
+
+        .selectedRankingCard {
+          border-color: #c39519;
+          background:
+            linear-gradient(90deg, #fff8d8 0%, #fffdf5 42%, #fff9df 100%);
+          box-shadow:
+            inset 5px 0 0 #d4a61f,
+            inset 0 2px 0 #ffffff,
+            0 4px 0 #b39b5a;
+        }
+
+        .rankingSelectBox {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .rankingIdentity {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          min-width: 0;
+          padding: 6px 4px;
+        }
+
+        .rankMedal {
+          display: grid;
+          place-items: center;
+          width: 54px;
+          height: 54px;
+          flex: 0 0 auto;
+          border: 1px solid #a8a8a8;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #ffffff, #e1e1e1);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #a0a0a0;
+          color: #111111;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+        .rankMedal1 {
+          border-color: #b48817;
+          background:
+            linear-gradient(180deg, #fff8ce, #f2ca53);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #a87b0b;
+        }
+
+        .rankMedal2 {
+          border-color: #929da3;
+          background:
+            linear-gradient(180deg, #ffffff, #d6dde1);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #8a979e;
+        }
+
+        .rankMedal3 {
+          border-color: #aa7854;
+          background:
+            linear-gradient(180deg, #fff4e8, #d9a67e);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #9b6b49;
+        }
+
+        .rankingUserName {
+          min-width: 0;
+        }
+
+        .rankingUserName strong {
+          display: block;
+          overflow: hidden;
+          color: #101010;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+        .rankingPositionText {
+          display: inline-block;
+          margin-top: 6px;
+          padding: 4px 9px;
+          border: 1px solid #c0c0c0;
+          border-radius: 999px;
+          background: #f2f2f2;
+          color: #444444;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .rankingMetrics {
+          display: grid;
+          grid-template-columns:
+            repeat(7, minmax(82px, 1fr));
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .rankingMetric {
+          display: flex;
+          min-width: 0;
+          min-height: 76px;
+          padding: 9px 7px;
+          border: 1px solid #c9c9c9;
+          border-radius: 10px;
+          background:
+            linear-gradient(180deg, #ffffff, #f0f0f0);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 3px 0 #b7b7b7;
+          text-align: center;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .rankingMetric span {
+          display: block;
+          margin-bottom: 4px;
+          color: #444444;
+          font-size: 13px;
+          font-weight: 400;
+          white-space: nowrap;
+        }
+
+        .rankingMetric strong {
+          display: block;
+          color: #0c4c69;
+          font-size: 20px;
+          line-height: 1;
+          font-weight: 700;
+        }
+
+        .successMetric strong {
+          color: #087c2d;
+        }
+
+        .dangerMetric strong {
+          color: #bd1616;
+        }
+
+        .scoreMetric {
+          border-color: #b89a49;
+          background:
+            linear-gradient(180deg, #fffbea, #f4e5aa);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 3px 0 #b19a58;
+        }
+
+        .scoreMetric strong {
+          color: #6d5100;
+        }
+
+        .accuracyMetricCard {
+          min-width: 105px;
+        }
+
+        .cardAccuracyTrack {
+          width: 100%;
+          height: 6px;
+          margin-top: 7px;
+          overflow: hidden;
+          border-radius: 999px;
+          background: #d4d4d4;
+          box-shadow:
+            inset 0 1px 2px rgba(0,0,0,0.13);
+        }
+
+        .cardAccuracyBar {
+          height: 100%;
+          border-radius: inherit;
+          background:
+            linear-gradient(90deg, #44b7df, #147ba4);
+        }
+
+        .rankingSide {
+          display: flex;
+          min-width: 0;
+          padding-left: 2px;
+          border-left: 1px solid #d0d0d0;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 9px;
+        }
+
+        .rankingActivity {
+          padding: 8px 9px;
+          border: 1px solid #c7c7c7;
+          border-radius: 9px;
+          background:
+            linear-gradient(180deg, #fafafa, #e7e7e7);
+          text-align: center;
+        }
+
+        .rankingActivity span {
+          display: block;
+          margin-bottom: 5px;
+          color: #555555;
+          font-size: 12px;
+        }
+
+        .rankingActivity strong {
+          display: block;
+          color: #111111;
+          font-size: 13px;
+          line-height: 1.35;
+        }
+
+        .rankingDeleteButton {
+          width: 100%;
+          min-height: 39px;
+          font-size: 14px;
+        }
+
+        .rankingEmptyState {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 9px;
+          min-height: 170px;
+          padding: 30px 16px;
+          border: 1px solid #bdbdbd;
+          border-radius: 12px;
+          background:
+            linear-gradient(180deg, #ffffff, #efefef);
+          color: #333333;
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 4px 0 #b1b1b1;
+          text-align: center;
+        }
+
+        .rankingEmptyIcon {
+          display: grid;
+          place-items: center;
+          width: 48px;
+          height: 48px;
+          border: 1px solid #7ea0af;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #f3fbff, #b8e2f2);
+          color: #1b5d78;
+          font-size: 23px;
+        }
+
+        .rankingEmptyState strong {
+          color: #111111;
+          font-size: 19px;
+        }
+
+        .rankingEmptyState span {
+          color: #555555;
+          font-size: 15px;
+        }
+
+        @media (max-width: 1450px) {
+          .rankingUserCard {
+            grid-template-columns:
+              minmax(230px, 1fr)
+              minmax(520px, 2.4fr)
+              minmax(155px, .75fr);
+          }
+
+          .selectableRankingCard {
+            grid-template-columns:
+              40px
+              minmax(220px, 1fr)
+              minmax(500px, 2.3fr)
+              minmax(155px, .75fr);
+          }
+
+          .rankingMetrics {
+            grid-template-columns:
+              repeat(4, minmax(90px, 1fr));
+          }
+
+          .rankingMetric:last-child {
+            grid-column: auto;
+          }
+        }
+
+        @media (max-width: 1050px) {
+          .rankingUserCard,
+          .selectableRankingCard {
+            grid-template-columns: 1fr;
+          }
+
+          .rankingSelectBox {
+            justify-content: flex-start;
+          }
+
+          .rankingSide {
+            padding-left: 0;
+            border-left: 0;
+            border-top: 1px solid #d0d0d0;
+            padding-top: 10px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+          }
+
+          .rankingDeleteButton {
+            width: auto;
+            min-width: 120px;
+          }
+
+          .rankingMetrics {
+            grid-template-columns:
+              repeat(4, minmax(100px, 1fr));
+          }
+        }
+
+        @media (max-width: 680px) {
+          .rankingBoardHeader {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .rankingBoardRight {
+            justify-content: space-between;
+          }
+
+          .rankingBoardTitle strong {
+            font-size: 19px;
+          }
+
+          .rankingList {
+            padding: 10px;
+          }
+
+          .rankingUserCard {
+            padding: 10px;
+          }
+
+          .rankingUserName strong {
+            font-size: 18px;
+          }
+
+          .rankingMetrics {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+
+          .rankingSide {
+            grid-template-columns: 1fr;
+          }
+
+          .rankingDeleteButton {
+            width: 100%;
+          }
+        }
+
 
         @media (prefers-reduced-motion: reduce) {
           *,
