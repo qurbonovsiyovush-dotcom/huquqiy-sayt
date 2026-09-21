@@ -659,6 +659,55 @@ export default function TestSolvePage() {
       }
       setSubmitDetails(detailMap);
 
+      /*
+        UMUMIY REYTING
+
+        Mavzulashtirilgan test o‘zining server submit route'ida
+        tekshirilgandan keyin, reyting endpoint'i ham javoblarni
+        Neon bazadagi haqiqiy javob kaliti bilan qayta tekshiradi.
+      */
+      try {
+        const rankingResponse = await fetch(
+          "/api/ranking/submit",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              source: "thematic",
+              testId: test.id,
+              answers,
+              spentSeconds,
+            }),
+          }
+        );
+
+        const rankingData =
+          await readJson(
+            rankingResponse
+          );
+
+        if (
+          !rankingResponse.ok ||
+          !rankingData?.success
+        ) {
+          console.error(
+            "THEMATIC RANKING SAVE ERROR:",
+            rankingData
+          );
+        }
+      } catch (rankingError) {
+        /*
+          Reyting serverida xato bo‘lsa ham
+          testning asosiy natijasi foydalanuvchiga ko‘rsatiladi.
+        */
+        console.error(
+          "THEMATIC RANKING SAVE ERROR:",
+          rankingError
+        );
+      }
+
       setFinished(true);
       setStarted(false);
       setZoomQuestionId(null);
