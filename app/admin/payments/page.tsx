@@ -1735,4 +1735,3 @@ export default function AdminPaymentsPage() {
     </main>
   );
 }
-
