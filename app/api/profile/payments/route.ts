@@ -15,6 +15,35 @@ function toNumber(
   return Number.isFinite(n) ? n : 0;
 }
 
+function daysFromToday(
+  dateValue: unknown
+) {
+  if (!dateValue) return null;
+
+  const target =
+    new Date(
+      `${String(
+        dateValue
+      ).slice(0, 10)}T00:00:00Z`
+    );
+
+  const todayText =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
+
+  const today =
+    new Date(
+      `${todayText}T00:00:00Z`
+    );
+
+  return Math.ceil(
+    (target.getTime() -
+      today.getTime()) /
+      86400000
+  );
+}
+
 export async function GET(
   request: NextRequest
 ) {
@@ -88,6 +117,25 @@ export async function GET(
           ${profileId}
       `;
 
+    const periodRows =
+      await sql`
+        SELECT
+          period_start,
+          period_end,
+          due_date,
+          period_months
+        FROM profile_finance_entries
+        WHERE
+          profile_id =
+            ${profileId}
+          AND is_voided = FALSE
+          AND due_date IS NOT NULL
+        ORDER BY
+          occurred_at DESC,
+          created_at DESC
+        LIMIT 1
+      `;
+
     const entryRows =
       await sql`
         SELECT
@@ -96,6 +144,10 @@ export async function GET(
           amount,
           note,
           occurred_at,
+          period_start,
+          period_end,
+          due_date,
+          period_months,
           is_voided
         FROM profile_finance_entries
         WHERE profile_id =
@@ -111,6 +163,16 @@ export async function GET(
         summaryRows[0]
           ?.balance
       );
+
+    const period =
+      periodRows[0] || null;
+
+    const daysLeft =
+      period
+        ? daysFromToday(
+            period.due_date
+          )
+        : null;
 
     return NextResponse.json({
       success: true,
@@ -139,6 +201,45 @@ export async function GET(
             summaryRows[0]
               ?.total_debt_added
           ),
+
+        period: period
+          ? {
+              startDate:
+                period.period_start
+                  ? String(
+                      period.period_start
+                    ).slice(0, 10)
+                  : null,
+
+              endDate:
+                period.period_end
+                  ? String(
+                      period.period_end
+                    ).slice(0, 10)
+                  : null,
+
+              dueDate:
+                period.due_date
+                  ? String(
+                      period.due_date
+                    ).slice(0, 10)
+                  : null,
+
+              months:
+                period.period_months
+                  ? Number(
+                      period.period_months
+                    )
+                  : null,
+
+              daysLeft,
+
+              isOverdue:
+                balance > 0 &&
+                daysLeft !== null &&
+                daysLeft < 0,
+            }
+          : null,
       },
 
       entries:
@@ -171,6 +272,34 @@ export async function GET(
                   ).toISOString()
                 : null,
 
+            periodStart:
+              row.period_start
+                ? String(
+                    row.period_start
+                  ).slice(0, 10)
+                : null,
+
+            periodEnd:
+              row.period_end
+                ? String(
+                    row.period_end
+                  ).slice(0, 10)
+                : null,
+
+            dueDate:
+              row.due_date
+                ? String(
+                    row.due_date
+                  ).slice(0, 10)
+                : null,
+
+            periodMonths:
+              row.period_months
+                ? Number(
+                    row.period_months
+                  )
+                : null,
+
             isVoided:
               row.is_voided === true,
           })
@@ -194,4 +323,3 @@ export async function GET(
     );
   }
 }
-
