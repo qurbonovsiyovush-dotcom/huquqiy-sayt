@@ -30,6 +30,12 @@ export default function AdminPage() {
       className: "resultsCard",
       icon: "≡",
     },
+    {
+      title: "To‘lovlar boshqaruvi",
+      href: "/admin/payments",
+      className: "paymentsCard",
+      icon: "₸",
+    },
   ];
 
   /* =====================================================
@@ -933,6 +939,67 @@ export default function AdminPage() {
               #69528f;
         }
 
+        .paymentsCard {
+          grid-column: 1 / -1;
+
+          border-color: #8a5a12;
+
+          background:
+            linear-gradient(
+              180deg,
+              #fffaf0 0%,
+              #f6e2b3 45%,
+              #e0b65f 100%
+            );
+
+          box-shadow:
+            inset 0 9px 8px
+              rgba(
+                255,
+                255,
+                255,
+                0.95
+              ),
+
+            0 9px 0
+              #8a5a12,
+
+            0 16px 22px
+              rgba(
+                0,
+                0,
+                0,
+                0.24
+              );
+        }
+
+        .paymentsCard
+        .cardIcon {
+          border-color: #8a5a12;
+
+          color: #704507;
+
+          background:
+            radial-gradient(
+              circle at 35% 25%,
+              #fffdf5,
+              #f8df9a,
+              #d7a73f
+            );
+
+          box-shadow:
+            inset 0 7px 6px
+              rgba(
+                255,
+                255,
+                255,
+                0.85
+              ),
+
+            0 6px 0
+              #8a5a12;
+        }
+
         /* =====================================================
            TABLET
         ===================================================== */
@@ -963,6 +1030,10 @@ export default function AdminPage() {
           .cardsGrid {
             grid-template-columns:
               1fr;
+          }
+
+          .paymentsCard {
+            grid-column: auto;
           }
         }
 
