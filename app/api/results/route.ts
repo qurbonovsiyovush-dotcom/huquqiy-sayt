@@ -1020,14 +1020,70 @@ export async function POST(
         }
 
         /*
-          Har bir savol natijasini
-          alohida yozamiz.
+          MUHIM OPTIMIZATSIYA:
+
+          Masalan KONS 840 testida foydalanuvchi
+          faqat 5 ta savol ishlasa, 840 ta qator
+          yozish shart emas.
+
+          Reyting uchun faqat real javob berilgan
+          savollarni saqlaymiz:
+          - correct
+          - incorrect
+
+          unanswered soni ranking_attempts ichida
+          baribir saqlanadi.
         */
 
-        for (
-          const question of
-            verifiedQuestions
+        const answeredQuestions =
+          verifiedQuestions.filter(
+            (question) =>
+              question.answerStatus !==
+              "unanswered"
+          );
+
+        if (
+          answeredQuestions.length >
+          0
         ) {
+          /*
+            Barcha savollarni bitta SQL query bilan
+            Neon'ga yuboramiz.
+
+            Oldingi variant 840 ta savol bo‘lsa
+            840 ta alohida query yuborardi.
+            Shu sabab request uzoq "pending"
+            holatda qolishi mumkin edi.
+          */
+
+          const bulkQuestionResults =
+            answeredQuestions.map(
+              (question) => ({
+                question_id:
+                  question.questionId,
+
+                question_number:
+                  question.questionNumber,
+
+                answer_status:
+                  question.answerStatus,
+
+                selected_answer:
+                  question.selectedAnswer,
+
+                correct_answer:
+                  question.correctAnswer,
+
+                points:
+                  question.points,
+              })
+            );
+
+          const bulkJson =
+            JSON.stringify(
+              bulkQuestionResults
+            );
+
           await sql`
             INSERT INTO ranking_question_results (
               ranking_attempt_id,
@@ -1046,22 +1102,31 @@ export async function POST(
               answered_at,
               created_at
             )
-            VALUES (
-              ${rankingAttemptId},
+            SELECT
+              ${rankingAttemptId}::bigint,
               ${userId},
               ${userName},
               'legacy',
               ${testType},
               ${testId},
               ${testTitle},
-              ${question.questionId},
-              ${question.questionNumber},
-              ${question.answerStatus},
-              ${question.selectedAnswer},
-              ${question.correctAnswer},
-              ${question.points},
+              x.question_id,
+              x.question_number,
+              x.answer_status,
+              x.selected_answer,
+              x.correct_answer,
+              x.points,
               ${finishedAt}::timestamptz,
               NOW()
+            FROM jsonb_to_recordset(
+              ${bulkJson}::jsonb
+            ) AS x(
+              question_id text,
+              question_number integer,
+              answer_status text,
+              selected_answer text,
+              correct_answer text,
+              points numeric
             )
           `;
         }
