@@ -595,6 +595,8 @@ export default function AdminRankingPage() {
   }
 
   function openSelectionMode() {
+    clearSelection();
+
     setSelectionMode(
       true
     );
@@ -1537,25 +1539,37 @@ export default function AdminRankingPage() {
           {selectionMode && (
           <div className="selectionBar">
             <div className="selectionLeft">
-              <label className="masterCheck">
-                <input
-                  type="checkbox"
-                  checked={
+              <button
+                type="button"
+                className="masterCheckButton"
+                onClick={
+                  toggleAllVisible
+                }
+                disabled={
+                  visibleRanking.length ===
+                  0
+                }
+                aria-pressed={
+                  allVisibleSelected
+                }
+              >
+                <span
+                  className={
                     allVisibleSelected
+                      ? "roundSelectCheck checked"
+                      : "roundSelectCheck"
                   }
-                  onChange={
-                    toggleAllVisible
-                  }
-                  disabled={
-                    visibleRanking.length ===
-                    0
-                  }
-                />
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M5 12.5l4 4L19 7" />
+                  </svg>
+                </span>
 
                 <span>
                   Ko‘rinib turganlarning barchasini tanlash
                 </span>
-              </label>
+              </button>
 
               <div className="selectedBadge">
                 Tanlangan:{" "}
@@ -1736,25 +1750,37 @@ export default function AdminRankingPage() {
 
             <div className="rankingBoardRight">
               {selectionMode && (
-                <label className="boardSelectAll">
-                  <input
-                    type="checkbox"
-                    checked={
+                <button
+                  type="button"
+                  className="boardSelectAll"
+                  onClick={
+                    toggleAllVisible
+                  }
+                  disabled={
+                    visibleRanking.length ===
+                    0
+                  }
+                  aria-pressed={
+                    allVisibleSelected
+                  }
+                >
+                  <span
+                    className={
                       allVisibleSelected
+                        ? "roundSelectCheck checked"
+                        : "roundSelectCheck"
                     }
-                    onChange={
-                      toggleAllVisible
-                    }
-                    disabled={
-                      visibleRanking.length ===
-                      0
-                    }
-                  />
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 24 24">
+                      <path d="M5 12.5l4 4L19 7" />
+                    </svg>
+                  </span>
 
                   <span>
                     Barchasini tanlash
                   </span>
-                </label>
+                </button>
               )}
 
               <div className="tableCount">
@@ -1803,21 +1829,38 @@ export default function AdminRankingPage() {
                     >
                       {selectionMode && (
                         <div className="rankingSelectBox">
-                          <input
-                            type="checkbox"
-                            checked={
+                          <button
+                            type="button"
+                            className={
+                              selected
+                                ? "userSelectButton selected"
+                                : "userSelectButton"
+                            }
+                            aria-pressed={
                               selected
                             }
-                            onChange={() =>
+                            aria-label={`${item.userName}ni tanlash`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+
                               toggleUser(
                                 item.userId
-                              )
-                            }
-                            onClick={(event) =>
-                              event.stopPropagation()
-                            }
-                            aria-label={`${item.userName}ni tanlash`}
-                          />
+                              );
+                            }}
+                          >
+                            <span
+                              className={
+                                selected
+                                  ? "roundSelectCheck userRoundCheck checked"
+                                  : "roundSelectCheck userRoundCheck"
+                              }
+                              aria-hidden="true"
+                            >
+                              <svg viewBox="0 0 24 24">
+                                <path d="M5 12.5l4 4L19 7" />
+                              </svg>
+                            </span>
+                          </button>
                         </div>
                       )}
 
@@ -5419,6 +5462,186 @@ export default function AdminRankingPage() {
           .rankingDeleteButton {
             width: 100%;
           }
+        }
+
+
+
+        /* =====================================================
+           TANLASH — ISHONCHLI VA ZAMONAVIY YASHIL PTICHKA
+        ===================================================== */
+
+        .masterCheckButton,
+        .boardSelectAll,
+        .userSelectButton {
+          appearance: none;
+          -webkit-appearance: none;
+          border: 0;
+          font-family: "Bell MT", Georgia, "Times New Roman", serif !important;
+        }
+
+        .masterCheckButton {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          min-height: 43px;
+          padding: 7px 12px;
+          border: 1px solid #6594a8;
+          border-radius: 10px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #e8f5fa 58%, #d3eaf3 100%);
+          color: #111111;
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #78a2b3;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .boardSelectAll {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          min-height: 43px;
+          padding: 6px 12px;
+          border: 1px solid #5f8392;
+          border-radius: 10px;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #e7f2f6 58%, #d2e3ea 100%);
+          color: #111111;
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #698b99;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .roundSelectCheck {
+          display: inline-grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          flex: 0 0 auto;
+          border: 1px solid #8ea4ac;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #ffffff 0%, #edf3f5 100%);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 2px 0 #9caeb5,
+            0 3px 8px rgba(0, 0, 0, 0.08);
+          transition:
+            transform 120ms ease,
+            background 120ms ease,
+            border-color 120ms ease,
+            box-shadow 120ms ease;
+        }
+
+        .roundSelectCheck svg {
+          width: 19px;
+          height: 19px;
+          fill: none;
+          stroke: transparent;
+          stroke-width: 3.2;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          transition:
+            stroke 120ms ease,
+            transform 120ms ease;
+        }
+
+        .roundSelectCheck.checked {
+          border-color: #438e54;
+          background:
+            linear-gradient(180deg, #effff2 0%, #bce8c5 48%, #82ca90 100%);
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,0.92),
+            0 3px 0 #5b9c69,
+            0 5px 12px rgba(55, 139, 73, 0.20);
+        }
+
+        .roundSelectCheck.checked svg {
+          stroke: #176b2c;
+          transform: scale(1.05);
+        }
+
+        .userSelectButton {
+          display: grid;
+          place-items: center;
+          width: 48px;
+          height: 48px;
+          padding: 0;
+          border-radius: 50%;
+          background: transparent;
+          cursor: pointer;
+        }
+
+        .userRoundCheck {
+          width: 38px;
+          height: 38px;
+          border-width: 1px;
+        }
+
+        .userRoundCheck svg {
+          width: 24px;
+          height: 24px;
+        }
+
+        .userSelectButton.selected .userRoundCheck {
+          border-color: #3f8a50;
+          background:
+            linear-gradient(180deg, #f1fff4 0%, #b9e9c2 47%, #7fca8d 100%);
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,0.95),
+            0 4px 0 #579865,
+            0 6px 14px rgba(49, 132, 67, 0.22);
+        }
+
+        .userSelectButton.selected .userRoundCheck svg {
+          stroke: #16672a;
+        }
+
+        .userSelectButton:focus-visible,
+        .masterCheckButton:focus-visible,
+        .boardSelectAll:focus-visible {
+          outline: 3px solid rgba(44, 151, 197, 0.28);
+          outline-offset: 3px;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          .userSelectButton:hover .roundSelectCheck,
+          .masterCheckButton:hover .roundSelectCheck,
+          .boardSelectAll:hover .roundSelectCheck {
+            transform: translateY(-1px);
+            filter: brightness(1.03);
+          }
+        }
+
+        .userSelectButton:active .roundSelectCheck,
+        .masterCheckButton:active .roundSelectCheck,
+        .boardSelectAll:active .roundSelectCheck {
+          transform: translateY(2px);
+        }
+
+        .selectedRankingCard .rankingIdentity {
+          position: relative;
+        }
+
+        .selectedRankingCard .rankingIdentity::after {
+          content: "Tanlandi";
+          display: inline-flex;
+          align-items: center;
+          margin-left: auto;
+          padding: 4px 8px;
+          border: 1px solid #6fa379;
+          border-radius: 999px;
+          background:
+            linear-gradient(180deg, #f0fff3, #c5ebcc);
+          color: #19662c;
+          font-size: 12px;
+          font-weight: 700;
+          white-space: nowrap;
         }
 
 
