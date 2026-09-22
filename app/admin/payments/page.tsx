@@ -213,6 +213,52 @@ function todayInput() {
   return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 }
 
+function dateTimeInput(
+  value: string | null
+) {
+  if (!value) {
+    return "";
+  }
+
+  const parsed =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return "";
+  }
+
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          "Asia/Tashkent",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }
+    ).formatToParts(
+      parsed
+    );
+
+  const getPart = (
+    type: Intl.DateTimeFormatPartTypes
+  ) =>
+    parts.find(
+      (part) =>
+        part.type === type
+    )?.value || "";
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}T${getPart("hour")}:${getPart("minute")}`;
+}
+
 export default function AdminPaymentsPage() {
   const router =
     useRouter();
@@ -269,6 +315,52 @@ export default function AdminPaymentsPage() {
 
   const [dueDate, setDueDate] =
     useState("");
+
+  const [
+    editingEntry,
+    setEditingEntry,
+  ] =
+    useState<FinanceEntry | null>(
+      null
+    );
+
+  const [
+    editAmount,
+    setEditAmount,
+  ] =
+    useState("");
+
+  const [
+    editNote,
+    setEditNote,
+  ] =
+    useState("");
+
+  const [
+    editOccurredAt,
+    setEditOccurredAt,
+  ] =
+    useState("");
+
+  const [
+    editPeriodStart,
+    setEditPeriodStart,
+  ] =
+    useState("");
+
+  const [
+    editDueDate,
+    setEditDueDate,
+  ] =
+    useState("");
+
+  const [
+    historyProfileId,
+    setHistoryProfileId,
+  ] =
+    useState<string | null>(
+      null
+    );
 
   useEffect(() => {
     void load();
@@ -594,6 +686,192 @@ export default function AdminPaymentsPage() {
       );
     }
   }
+
+  function openEditEntry(
+    item: FinanceEntry
+  ) {
+    setEditingEntry(item);
+
+    setEditAmount(
+      item.entryType ===
+        "period"
+        ? ""
+        : String(
+            item.amount
+          )
+    );
+
+    setEditNote(
+      item.note || ""
+    );
+
+    setEditOccurredAt(
+      dateTimeInput(
+        item.occurredAt
+      )
+    );
+
+    setEditPeriodStart(
+      item.periodStart || ""
+    );
+
+    setEditDueDate(
+      item.dueDate || ""
+    );
+  }
+
+  async function saveEditEntry(
+    event:
+      FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!editingEntry) {
+      return;
+    }
+
+    try {
+      if (
+        editingEntry.entryType ===
+        "period"
+      ) {
+        if (
+          !editPeriodStart ||
+          !editDueDate
+        ) {
+          throw new Error(
+            "Boshlanish sanasi va to‘lov muddatini kiriting."
+          );
+        }
+
+        if (
+          editDueDate <
+          editPeriodStart
+        ) {
+          throw new Error(
+            "To‘lov muddati boshlanish sanasidan oldin bo‘lishi mumkin emas."
+          );
+        }
+
+        await post({
+          action:
+            "edit-entry",
+          entryId:
+            editingEntry.id,
+          periodStart:
+            editPeriodStart,
+          dueDate:
+            editDueDate,
+          occurredAt:
+            editOccurredAt,
+          note:
+            editNote,
+        });
+      } else {
+        const value =
+          Number(
+            editAmount
+          );
+
+        if (
+          !Number.isFinite(
+            value
+          )
+        ) {
+          throw new Error(
+            "Summani to‘g‘ri kiriting."
+          );
+        }
+
+        if (
+          (
+            editingEntry.entryType ===
+              "payment" ||
+            editingEntry.entryType ===
+              "debt"
+          ) &&
+          value <= 0
+        ) {
+          throw new Error(
+            "Summa 0 dan katta bo‘lishi kerak."
+          );
+        }
+
+        if (
+          editingEntry.entryType ===
+            "adjustment" &&
+          value === 0
+        ) {
+          throw new Error(
+            "Tuzatish summasi 0 bo‘lishi mumkin emas."
+          );
+        }
+
+        await post({
+          action:
+            "edit-entry",
+          entryId:
+            editingEntry.id,
+          amount:
+            value,
+          occurredAt:
+            editOccurredAt,
+          note:
+            editNote,
+        });
+      }
+
+      setEditingEntry(
+        null
+      );
+
+      await load();
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Tahrirlashda xatolik."
+      );
+    }
+  }
+
+  function showUserHistory(
+    item: ProfileFinance
+  ) {
+    setHistoryProfileId(
+      item.id
+    );
+
+    window.setTimeout(
+      () => {
+        document
+          .getElementById(
+            "finance-history"
+          )
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      },
+      50
+    );
+  }
+
+  const visibleHistoryEntries =
+    useMemo(
+      () =>
+        historyProfileId
+          ? entries.filter(
+              (item) =>
+                item.profileId ===
+                historyProfileId
+            )
+          : entries,
+      [
+        entries,
+        historyProfileId,
+      ]
+    );
 
   const visible =
     useMemo(() => {
@@ -1010,6 +1288,18 @@ export default function AdminPaymentsPage() {
                   >
                     Muddat belgilash
                   </button>
+
+                  <button
+                    type="button"
+                    className="historyButton"
+                    onClick={() =>
+                      showUserHistory(
+                        item
+                      )
+                    }
+                  >
+                    ✎ To‘lovlar tarixini tahrirlash
+                  </button>
                 </div>
               </article>
             )
@@ -1031,22 +1321,47 @@ export default function AdminPaymentsPage() {
         </div>
       </section>
 
-      <section className="panel historyPanel">
-        <div className="sectionTitle">
+      <section className="panel historyPanel" id="finance-history">
+        <div className="sectionTitle historyTitleRow">
           <h2>
-            Moliyaviy tarix
+            {historyProfileId
+              ? `${
+                  profiles.find(
+                    (item) =>
+                      item.id ===
+                      historyProfileId
+                  )?.fullName ||
+                  "Foydalanuvchi"
+                } — to‘lovlar tarixi`
+              : "Moliyaviy tarix"}
           </h2>
 
-          <span>
-            {
-              entries.length
-            }{" "}
-            ta
-          </span>
+          <div className="historyTitleActions">
+            <span>
+              {
+                visibleHistoryEntries.length
+              }{" "}
+              ta
+            </span>
+
+            {historyProfileId && (
+              <button
+                type="button"
+                className="showAllHistoryButton"
+                onClick={() =>
+                  setHistoryProfileId(
+                    null
+                  )
+                }
+              >
+                Barcha tarix
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="historyList">
-          {entries.map(
+          {visibleHistoryEntries.map(
             (item) => (
               <article
                 key={
@@ -1106,29 +1421,43 @@ export default function AdminPaymentsPage() {
                 </div>
 
                 {!item.isVoided && (
-                  <button
-                    type="button"
-                    className="voidButton"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Xato kiritilgan yozuvni bekor qilasizmi? Tarixdan o‘chmaydi."
+                  <div className="entryButtons">
+                    <button
+                      type="button"
+                      className="editEntryButton"
+                      onClick={() =>
+                        openEditEntry(
+                          item
                         )
-                      ) {
-                        void post({
-                          action:
-                            "void-entry",
-                          entryId:
-                            item.id,
-                        }).then(
-                          () =>
-                            load()
-                        );
                       }
-                    }}
-                  >
-                    Bekor qilish
-                  </button>
+                    >
+                      ✎ Tahrirlash
+                    </button>
+
+                    <button
+                      type="button"
+                      className="voidButton"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Xato kiritilgan yozuvni bekor qilasizmi? Tarixdan o‘chmaydi."
+                          )
+                        ) {
+                          void post({
+                            action:
+                              "void-entry",
+                            entryId:
+                              item.id,
+                          }).then(
+                            () =>
+                              load()
+                          );
+                        }
+                      }}
+                    >
+                      Bekor qilish
+                    </button>
+                  </div>
                 )}
 
                 {item.isVoided && (
@@ -1323,6 +1652,173 @@ export default function AdminPaymentsPage() {
           </div>
         )}
 
+      {editingEntry && (
+        <div
+          className="modalBackdrop"
+          onMouseDown={() =>
+            setEditingEntry(
+              null
+            )
+          }
+        >
+          <form
+            className="modal editModal"
+            onSubmit={
+              saveEditEntry
+            }
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <h2>
+              To‘lov yozuvini tahrirlash
+            </h2>
+
+            <div className="selectedUser">
+              <strong>
+                {
+                  editingEntry.fullName
+                }
+              </strong>
+
+              <span>
+                {
+                  editingEntry.profileCode
+                }
+              </span>
+            </div>
+
+            <div className="editTypeInfo">
+              <span>Yozuv turi</span>
+              <strong>
+                {entryText(
+                  editingEntry.entryType
+                )}
+              </strong>
+            </div>
+
+            {editingEntry.entryType !==
+              "period" && (
+              <label>
+                Summa
+                <input
+                  autoFocus
+                  required
+                  type="number"
+                  step="1"
+                  value={
+                    editAmount
+                  }
+                  onChange={(event) =>
+                    setEditAmount(
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+            )}
+
+            {editingEntry.entryType ===
+              "period" && (
+              <div className="periodFields">
+                <label>
+                  Boshlanish sanasi
+                  <input
+                    type="date"
+                    required
+                    value={
+                      editPeriodStart
+                    }
+                    onChange={(event) =>
+                      setEditPeriodStart(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+
+                <label>
+                  To‘lov muddati
+                  <input
+                    type="date"
+                    required
+                    min={
+                      editPeriodStart ||
+                      undefined
+                    }
+                    value={
+                      editDueDate
+                    }
+                    onChange={(event) =>
+                      setEditDueDate(
+                        event.target.value
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            )}
+
+            <label>
+              Sana va vaqt
+              <input
+                type="datetime-local"
+                required
+                value={
+                  editOccurredAt
+                }
+                onChange={(event) =>
+                  setEditOccurredAt(
+                    event.target.value
+                  )
+                }
+              />
+            </label>
+
+            <label>
+              Izoh
+              <textarea
+                value={
+                  editNote
+                }
+                onChange={(event) =>
+                  setEditNote(
+                    event.target.value
+                  )
+                }
+                placeholder="Izoh ixtiyoriy"
+              />
+            </label>
+
+            <div className="editWarning">
+              Tahrirlashda eski yozuv o‘chirilmaydi:
+              u “Bekor qilingan” holatda tarixda saqlanadi,
+              yangi to‘g‘rilangan yozuv esa hisob-kitobga kiradi.
+            </div>
+
+            <div className="modalActions">
+              <button
+                type="button"
+                onClick={() =>
+                  setEditingEntry(
+                    null
+                  )
+                }
+              >
+                Bekor qilish
+              </button>
+
+              <button
+                type="submit"
+                className="saveEdit"
+              >
+                O‘zgarishni saqlash
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <style jsx>{`
         * {
           box-sizing: border-box;
@@ -1407,7 +1903,9 @@ export default function AdminPaymentsPage() {
         .paymentsTopButtons button,
         .tools button,
         .cardButtons button,
-        .voidButton {
+        .voidButton,
+        .editEntryButton,
+        .showAllHistoryButton {
           min-height: 46px;
           padding: 8px 16px;
           border: 2px solid #586267;
@@ -1773,6 +2271,45 @@ export default function AdminPaymentsPage() {
             0 4px 0 #6f9db5;
         }
 
+        .cardButtons .historyButton {
+          grid-column: 1 / -1;
+          border-color: #7a6a9d;
+          background:
+            linear-gradient(180deg, #faf6ff, #d9c9ef);
+          color: #4f3778;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 4px 0 #7b6a9c;
+        }
+
+        .historyTitleRow {
+          align-items: center;
+        }
+
+        .historyTitleActions {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .historyTitleActions > span {
+          min-width: 44px;
+        }
+
+        .showAllHistoryButton {
+          min-height: 30px !important;
+          padding: 5px 10px !important;
+          border-color: #527f99 !important;
+          background:
+            linear-gradient(180deg, #eefaff, #aedbef) !important;
+          color: #124d6e !important;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 3px 0 #6f9db5 !important;
+          font-size: 10px;
+        }
+
+
         .historyPanel {
           background:
             linear-gradient(180deg, #5d6163, #494d4f);
@@ -1826,6 +2363,28 @@ export default function AdminPaymentsPage() {
         .entryAmount.debt,
         .entryAmount.adjustment {
           color: #b42828;
+        }
+
+        .entryButtons {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+
+        .editEntryButton {
+          min-height: 34px;
+          padding: 6px 10px;
+          border: 2px solid #4f8d67;
+          border-radius: 9px;
+          background:
+            linear-gradient(180deg, #effff3, #b7e7c3);
+          color: #155e32;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 4px 0 #5f9c72;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
         }
 
         .voidButton {
@@ -1938,6 +2497,46 @@ export default function AdminPaymentsPage() {
           resize: vertical;
         }
 
+        .editTypeInfo {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 10px 12px;
+          border: 1px solid #bfc9ce;
+          border-radius: 9px;
+          background: #f4f9fb;
+        }
+
+        .editTypeInfo span {
+          color: #68767d;
+          font-size: 11px;
+        }
+
+        .editTypeInfo strong {
+          color: #164e6c;
+        }
+
+        .editWarning {
+          padding: 10px 12px;
+          border: 1px solid #d6bd78;
+          border-radius: 9px;
+          background: #fff8df;
+          color: #6f581e;
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
+        .modalActions .saveEdit {
+          border-color: #4f8d67;
+          background:
+            linear-gradient(180deg, #effff3, #b7e7c3);
+          color: #155e32;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 4px 0 #5f9c72;
+        }
+
         .modalActions {
           display: flex;
           justify-content: flex-end;
@@ -2024,6 +2623,11 @@ export default function AdminPaymentsPage() {
 
           .entryAmount {
             text-align: left;
+          }
+
+          .entryButtons {
+            align-items: stretch;
+            flex-direction: column;
           }
         }
 
