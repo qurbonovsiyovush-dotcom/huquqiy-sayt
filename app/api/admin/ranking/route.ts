@@ -642,6 +642,29 @@ export async function GET(
       summaryRows[0] || {};
 
     /* =====================================================
+       REYTINGGA KIRITISH / CHIQARISH BOSHQARUVI
+
+       Barcha profillar qaytariladi.
+       ranking_enabled = TRUE bo'lsa reytingda hisoblanadi.
+       FALSE bo'lsa natijalari saqlanadi, lekin reytingga kirmaydi.
+    ===================================================== */
+
+    const profileRows =
+      await sql`
+        SELECT
+          id::text AS id,
+          profile_code,
+          full_name,
+          ranking_enabled,
+          created_at
+        FROM
+          user_profiles
+        ORDER BY
+          full_name ASC,
+          profile_code ASC
+      `;
+
+    /* =====================================================
        RESPONSE
     ===================================================== */
 
@@ -678,6 +701,39 @@ export async function GET(
               summary.incorrect_answers
             ),
         },
+
+        profiles:
+          profileRows.map(
+            (row: any) => ({
+              id:
+                String(
+                  row.id || ""
+                ),
+
+              profileCode:
+                String(
+                  row.profile_code ||
+                    ""
+                ),
+
+              fullName:
+                String(
+                  row.full_name ||
+                    "Foydalanuvchi"
+                ),
+
+              rankingEnabled:
+                row.ranking_enabled ===
+                true,
+
+              createdAt:
+                row.created_at
+                  ? new Date(
+                      row.created_at
+                    ).toISOString()
+                  : null,
+            })
+          ),
 
         ranking:
           rows.map(
@@ -846,6 +902,176 @@ export async function GET(
           error instanceof Error
             ? error.message
             : "Reytingni yuklashda server xatosi.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+
+/* =========================================================
+   PATCH
+   Foydalanuvchini reytingga kiritish / reytingdan chiqarish
+
+   Body:
+   {
+     action: "ranking_enabled",
+     profileId: "...",
+     enabled: true | false
+   }
+========================================================= */
+
+export async function PATCH(
+  request: NextRequest
+) {
+  try {
+    const session =
+      request.cookies.get(
+        "qurbonov_session"
+      )?.value;
+
+    const role =
+      request.cookies.get(
+        "qurbonov_role"
+      )?.value;
+
+    if (
+      !session ||
+      role !== "admin"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Faqat administrator uchun.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    const body =
+      await request
+        .json()
+        .catch(() => ({}));
+
+    const action =
+      String(
+        body?.action || ""
+      ).trim();
+
+    if (
+      action !==
+      "ranking_enabled"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Noto‘g‘ri amal.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const profileId =
+      String(
+        body?.profileId || ""
+      ).trim();
+
+    const enabled =
+      body?.enabled === true;
+
+    if (!profileId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Profil ID topilmadi.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const updated =
+      await sql`
+        UPDATE
+          user_profiles
+        SET
+          ranking_enabled =
+            ${enabled}
+        WHERE
+          id::text =
+            ${profileId}
+        RETURNING
+          id::text AS id,
+          profile_code,
+          full_name,
+          ranking_enabled
+      `;
+
+    if (updated.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Profil topilmadi.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const row: any =
+      updated[0];
+
+    return NextResponse.json({
+      success: true,
+      profile: {
+        id:
+          String(
+            row.id || ""
+          ),
+        profileCode:
+          String(
+            row.profile_code ||
+              ""
+          ),
+        fullName:
+          String(
+            row.full_name ||
+              "Foydalanuvchi"
+          ),
+        rankingEnabled:
+          row.ranking_enabled ===
+          true,
+      },
+      message:
+        enabled
+          ? "Foydalanuvchi reytingga qo‘shildi."
+          : "Foydalanuvchi reytingdan chiqarildi.",
+    });
+  } catch (error) {
+    console.error(
+      "ADMIN RANKING PATCH ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Reyting holatini o‘zgartirishda server xatosi.",
       },
       {
         status: 500,
