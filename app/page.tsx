@@ -963,6 +963,16 @@ export default function Home() {
             Talabalar
           </a>
 
+          <button
+            type="button"
+            className="menuButton"
+            onClick={() =>
+              router.push("/profile")
+            }
+          >
+            Profil
+          </button>
+
           <a
             href="#abituriyent"
             className="menuButton"
