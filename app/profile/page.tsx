@@ -354,6 +354,37 @@ function financeAmountText(
   )}`;
 }
 
+function financeNoteText(
+  item: FinanceEntry
+) {
+  const raw =
+    String(
+      item.note || ""
+    ).trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  if (
+    /^Qarz\s+[\d\s.,]+\s*so['‘’]?m\s+qilib\s+belgilandi$/i.test(
+      raw
+    )
+  ) {
+    return "";
+  }
+
+  if (
+    /^To['‘’]?lov\s+muddati\s+\d{4}-\d{2}-\d{2}\s+qilib\s+belgilandi$/i.test(
+      raw
+    )
+  ) {
+    return "";
+  }
+
+  return raw;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
 
@@ -611,7 +642,17 @@ export default function ProfilePage() {
             )
           )
         )
-      : 100;
+      : 0;
+
+  const paymentStateLabel =
+    financeSummary.currentDebt > 0
+      ? "Qarz mavjud"
+      : financeSummary.advance > 0
+        ? "Ortiqcha to‘lov mavjud"
+        : totalAmount > 0 &&
+            financeSummary.totalPaid >= totalAmount
+          ? "To‘liq to‘langan"
+          : "To‘lov belgilanmagan";
 
   if (loading) {
     return (
@@ -911,14 +952,26 @@ export default function ProfilePage() {
             </article>
 
             <article className="paymentCard debt">
-              <span>Qoldiq</span>
+              <span>Qarz</span>
               <strong>
                 {money(
                   financeSummary.currentDebt
                 )}
               </strong>
               <small>
-                To‘lanishi kerak
+                Hali to‘lanishi kerak
+              </small>
+            </article>
+
+            <article className="paymentCard advance">
+              <span>Ortiqcha to‘langan</span>
+              <strong>
+                {money(
+                  financeSummary.advance
+                )}
+              </strong>
+              <small>
+                Me’yordan ortiq to‘lov
               </small>
             </article>
 
@@ -948,65 +1001,38 @@ export default function ProfilePage() {
                     ? `${Math.abs(
                         paymentPeriod.daysLeft
                       )} kun o‘tgan`
-                    : `${paymentPeriod.daysLeft} kun qoldi`}
+                    : paymentPeriod.daysLeft === 0
+                      ? "Bugun oxirgi kun"
+                      : `${paymentPeriod.daysLeft} kun qoldi`}
               </small>
             </article>
           </div>
 
-          {financeSummary.advance > 0 && (
-            <div className="advanceNotice">
-              <span>Avans</span>
-              <strong>
-                {money(financeSummary.advance)}
-              </strong>
-            </div>
-          )}
-
           <div className="paymentProgressBox">
-            {paymentPeriod && (
-              <div className="periodLine">
-                <span>
-                  To‘lov davri
-                </span>
-
+            <div className="paymentProgressHeader">
+              <div>
+                <span>To‘lov davri</span>
                 <strong>
-                  {formatDateOnly(
-                    paymentPeriod.startDate
-                  )} —{" "}
-                  {formatDateOnly(
-                    paymentPeriod.dueDate
-                  )}
-                </strong>
-              </div>
-            )}
-
-            <div className="paymentEquation">
-              <div>
-                <span>Umumiy</span>
-                <strong>{money(totalAmount)}</strong>
-              </div>
-
-              <b>−</b>
-
-              <div>
-                <span>To‘langan</span>
-                <strong className="paidEquation">
-                  {money(financeSummary.totalPaid)}
+                  {paymentPeriod
+                    ? `${formatDateOnly(
+                        paymentPeriod.startDate
+                      )} — ${formatDateOnly(
+                        paymentPeriod.dueDate
+                      )}`
+                    : "Belgilanmagan"}
                 </strong>
               </div>
 
-              <b>=</b>
-
-              <div>
-                <span>Qoldiq</span>
-                <strong className="debtEquation">
-                  {money(financeSummary.currentDebt)}
+              <div className="paymentState">
+                <span>Holat</span>
+                <strong>
+                  {paymentStateLabel}
                 </strong>
               </div>
             </div>
 
             <div className="progressLabels">
-              <span>To‘lov holati</span>
+              <span>To‘lov bajarilishi</span>
               <strong>{paidPercent}%</strong>
             </div>
 
@@ -1082,23 +1108,28 @@ export default function ProfilePage() {
                           </strong>
                         </div>
 
-                        <div className="historyDetails">
-                          {periodEntry && (
-                            <div className="historyDetail periodDetail">
-                              <span>Davr / muddat</span>
-                              <strong>
-                                {financePeriodText(item)}
-                              </strong>
-                            </div>
-                          )}
+                        {(periodEntry ||
+                          financeNoteText(item)) && (
+                          <div className="historyDetails">
+                            {periodEntry && (
+                              <div className="historyDetail periodDetail">
+                                <span>Davr / muddat</span>
+                                <strong>
+                                  {financePeriodText(item)}
+                                </strong>
+                              </div>
+                            )}
 
-                          <div className="historyDetail">
-                            <span>Izoh</span>
-                            <strong>
-                              {item.note || "—"}
-                            </strong>
+                            {financeNoteText(item) && (
+                              <div className="historyDetail">
+                                <span>Izoh</span>
+                                <strong>
+                                  {financeNoteText(item)}
+                                </strong>
+                              </div>
+                            )}
                           </div>
-                        </div>
+                        )}
                       </div>
                     </article>
                   );
@@ -1694,16 +1725,18 @@ export default function ProfilePage() {
         .paymentTop {
           display: grid;
           grid-template-columns:
-            repeat(4, minmax(0, 1fr));
-          gap: 14px;
+            repeat(5, minmax(0, 1fr));
+          gap: 12px;
         }
 
         .paymentCard {
-          padding: 18px;
+          min-width: 0;
+          min-height: 112px;
+          padding: 16px;
           border-radius: 14px;
           box-shadow:
-            inset 0 2px 0 rgba(255,255,255,.75),
-            0 5px 0 rgba(0,0,0,.24);
+            inset 0 2px 0 rgba(255,255,255,.78),
+            0 5px 0 rgba(0,0,0,.23);
         }
 
         .paymentCard span,
@@ -1714,18 +1747,20 @@ export default function ProfilePage() {
 
         .paymentCard span {
           margin-bottom: 7px;
-          color: #555;
-          font-size: 13px;
+          color: #4f5d66;
+          font-size: 12px;
+          font-weight: 700;
         }
 
         .paymentCard strong {
-          font-size: 24px;
+          font-size: 21px;
+          line-height: 1.15;
         }
 
         .paymentCard small {
-          margin-top: 7px;
+          margin-top: 8px;
           color: rgba(35, 49, 58, .72);
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
         }
 
@@ -1785,10 +1820,7 @@ export default function ProfilePage() {
         }
 
         .paymentCard.deadline small {
-          display: block;
-          margin-top: 6px;
           color: #7a651f;
-          font-size: 11px;
         }
 
         .paymentCard.deadlineOverdue {
@@ -1802,30 +1834,9 @@ export default function ProfilePage() {
           color: #9d2727;
         }
 
-        .advanceNotice {
-          margin-top: 14px;
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-          border: 1px solid #6e93aa;
-          border-radius: 12px;
-          background:
-            linear-gradient(180deg, #eef9ff, #c5e5f4);
-          color: #175b80;
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 4px 0 rgba(40, 92, 121, .25);
-        }
-
-        .advanceNotice strong {
-          font-size: 18px;
-        }
-
         .paymentProgressBox {
           margin-top: 16px;
-          padding: 15px;
+          padding: 14px 16px 16px;
           border: 1px solid #91989b;
           border-radius: 12px;
           background:
@@ -1835,93 +1846,80 @@ export default function ProfilePage() {
               #d8d8d8
             );
           box-shadow:
-            inset 0 2px 0 #fff;
+            inset 0 2px 0 #fff,
+            0 4px 0 rgba(0,0,0,.20);
         }
 
-        .periodLine {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+        .paymentProgressHeader {
+          display: grid;
+          grid-template-columns:
+            minmax(0, 1fr)
+            minmax(220px, .55fr);
           gap: 12px;
-          margin-bottom: 12px;
-          padding-bottom: 11px;
+          margin-bottom: 13px;
+          padding-bottom: 12px;
           border-bottom: 1px solid #c4c4c4;
         }
 
-        .periodLine span {
-          color: #555;
-        }
-
-        .periodLine strong {
-          color: #0b527b;
-        }
-
-        .paymentEquation {
-          display: grid;
-          grid-template-columns:
-            1fr auto 1fr auto 1fr;
-          align-items: center;
-          gap: 12px;
-          margin: 2px 0 16px;
-        }
-
-        .paymentEquation > div {
+        .paymentProgressHeader > div {
           min-width: 0;
-          padding: 11px 12px;
-          border: 1px solid #b9bec0;
-          border-radius: 10px;
-          background: rgba(255,255,255,.72);
-          text-align: center;
         }
 
-        .paymentEquation span,
-        .paymentEquation strong {
+        .paymentProgressHeader span,
+        .paymentProgressHeader strong {
           display: block;
         }
 
-        .paymentEquation span {
+        .paymentProgressHeader span {
           margin-bottom: 4px;
-          color: #666;
+          color: #5c666c;
           font-size: 11px;
+          font-weight: 700;
         }
 
-        .paymentEquation strong {
-          color: #154f70;
-          font-size: 17px;
+        .paymentProgressHeader strong {
+          color: #0b527b;
+          font-size: 14px;
         }
 
-        .paymentEquation .paidEquation {
-          color: #14783a;
+        .paymentState {
+          text-align: right;
         }
 
-        .paymentEquation .debtEquation {
-          color: #b12828;
-        }
-
-        .paymentEquation > b {
-          color: #4d5559;
-          font-size: 22px;
+        .paymentState strong {
+          color: #243d4a;
         }
 
         .progressLabels {
           display: flex;
+          align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
+          font-weight: 700;
+        }
+
+        .progressLabels span {
+          color: #344c59;
         }
 
         .progressLabels strong {
-          color: #07527d;
+          color: #0b527b;
         }
 
         .progressTrack {
-          height: 14px;
+          height: 13px;
           overflow: hidden;
-          border: 1px solid #9fa4a6;
+          border: 1px solid #99a6ad;
           border-radius: 999px;
-          background: #c4c7c8;
+          background:
+            linear-gradient(
+              180deg,
+              #d5d9db,
+              #b9c0c4
+            );
           box-shadow:
-            inset 0 2px 3px rgba(0,0,0,.25);
+            inset 0 2px 3px rgba(0,0,0,.18);
         }
 
         .progressFill {
@@ -1929,10 +1927,13 @@ export default function ProfilePage() {
           border-radius: inherit;
           background:
             linear-gradient(
-              90deg,
-              #38b7ee,
-              #1b85bf
+              180deg,
+              #45c0ee,
+              #168fbd
             );
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.55);
+          transition: width .25s ease;
         }
 
         .historyBlock {
@@ -2350,6 +2351,15 @@ export default function ProfilePage() {
         }
 
         @media (max-width: 1200px) {
+          .paymentTop {
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+          }
+
+          .paymentCard.deadline {
+            grid-column: span 2;
+          }
+
           .siteHeader {
             align-items: stretch;
             flex-direction: column;
@@ -2401,6 +2411,18 @@ export default function ProfilePage() {
           .rankRow,
           .twoColumns {
             grid-template-columns: 1fr;
+          }
+
+          .paymentCard.deadline {
+            grid-column: auto;
+          }
+
+          .paymentProgressHeader {
+            grid-template-columns: 1fr;
+          }
+
+          .paymentState {
+            text-align: left;
           }
 
           .navButtons {
