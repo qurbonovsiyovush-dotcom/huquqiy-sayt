@@ -37,6 +37,14 @@ type RankingTestItem = {
   lastActivityAt: string | null;
 };
 
+type RankingProfile = {
+  id: string;
+  profileCode: string;
+  fullName: string;
+  rankingEnabled: boolean;
+  createdAt: string | null;
+};
+
 type RankingItem = {
   rank: number;
   userId: string;
@@ -66,6 +74,7 @@ type RankingResponse = {
     incorrectAnswers: number;
   };
   ranking?: RankingItem[];
+  profiles?: RankingProfile[];
   message?: string;
 };
 
@@ -238,6 +247,26 @@ export default function AdminRankingPage() {
     new Set()
   );
 
+  const [
+    rankingProfiles,
+    setRankingProfiles,
+  ] = useState<RankingProfile[]>([]);
+
+  const [
+    showRankingManager,
+    setShowRankingManager,
+  ] = useState(false);
+
+  const [
+    profileSearch,
+    setProfileSearch,
+  ] = useState("");
+
+  const [
+    updatingProfileId,
+    setUpdatingProfileId,
+  ] = useState<string | null>(null);
+
   /* =====================================================
      LOAD
   ===================================================== */
@@ -318,6 +347,14 @@ export default function AdminRankingPage() {
 
       setRanking(
         nextRanking
+      );
+
+      setRankingProfiles(
+        Array.isArray(
+          data?.profiles
+        )
+          ? data.profiles
+          : []
       );
 
       setSelectedIds(
@@ -510,6 +547,38 @@ export default function AdminRankingPage() {
       showSelectedOnly,
     ]);
 
+  const visibleProfiles =
+    useMemo(() => {
+      const needle =
+        profileSearch
+          .trim()
+          .toLowerCase();
+
+      return rankingProfiles.filter(
+        (profile) =>
+          !needle ||
+          profile.fullName
+            .toLowerCase()
+            .includes(needle) ||
+          profile.profileCode
+            .toLowerCase()
+            .includes(needle)
+      );
+    }, [
+      rankingProfiles,
+      profileSearch,
+    ]);
+
+  const rankingEnabledCount =
+    rankingProfiles.filter(
+      (profile) =>
+        profile.rankingEnabled
+    ).length;
+
+  const rankingDisabledCount =
+    rankingProfiles.length -
+    rankingEnabledCount;
+
   const topThree =
     ranking.slice(
       0,
@@ -662,6 +731,79 @@ export default function AdminRankingPage() {
         return next;
       }
     );
+  }
+
+  /* =====================================================
+     REYTING ON / OFF
+  ===================================================== */
+
+  async function toggleRankingProfile(
+    profile: RankingProfile
+  ) {
+    const nextEnabled =
+      !profile.rankingEnabled;
+
+    const ok =
+      window.confirm(
+        nextEnabled
+          ? `${profile.fullName} reytingda HISOBLANSINMI?`
+          : `${profile.fullName} reytingdan chiqarilsinmi?\n\nTest natijalari o‘chmaydi. Faqat reytingda hisoblanmaydi.`
+      );
+
+    if (!ok) {
+      return;
+    }
+
+    setUpdatingProfileId(
+      profile.id
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin/ranking",
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                action:
+                  "ranking_enabled",
+                profileId:
+                  profile.id,
+                enabled:
+                  nextEnabled,
+              }),
+          }
+        );
+
+      const data =
+        await readJson(
+          response
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            "Reyting holatini o‘zgartirib bo‘lmadi."
+        );
+      }
+
+      await loadRanking();
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "Reyting holatini o‘zgartirishda xatolik."
+      );
+    } finally {
+      setUpdatingProfileId(
+        null
+      );
+    }
   }
 
   /* =====================================================
@@ -1570,6 +1712,23 @@ export default function AdminRankingPage() {
                 </span>
               </button>
 
+              <button
+                type="button"
+                className={
+                  showRankingManager
+                    ? "rankingManagerButton activeRankingManager"
+                    : "rankingManagerButton"
+                }
+                onClick={() =>
+                  setShowRankingManager(
+                    (current) =>
+                      !current
+                  )
+                }
+              >
+                ⚙ Reyting boshqaruvi
+              </button>
+
               {(search ||
                 sortMode !== "rank" ||
                 showSelectedOnly) && (
@@ -1583,6 +1742,114 @@ export default function AdminRankingPage() {
               )}
             </div>
           </div>
+
+          {showRankingManager && (
+            <section className="rankingManagerPanel">
+              <div className="rankingManagerTop">
+                <div>
+                  <strong>
+                    Reytingda hisoblash
+                  </strong>
+
+                  <span>
+                    Faqat ON qilingan foydalanuvchilar haftalik, oylik va umumiy reytingga kiradi.
+                  </span>
+                </div>
+
+                <div className="rankingManagerStats">
+                  <span className="managerOnBadge">
+                    ON: {rankingEnabledCount}
+                  </span>
+
+                  <span className="managerOffBadge">
+                    OFF: {rankingDisabledCount}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rankingManagerSearch">
+                <input
+                  type="search"
+                  value={profileSearch}
+                  onChange={(event) =>
+                    setProfileSearch(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Profil ismi yoki profil ID bo‘yicha qidirish..."
+                />
+              </div>
+
+              <div className="rankingProfileList">
+                {visibleProfiles.map(
+                  (profile) => (
+                    <article
+                      className={
+                        profile.rankingEnabled
+                          ? "rankingProfileRow profileRankingOn"
+                          : "rankingProfileRow profileRankingOff"
+                      }
+                      key={profile.id}
+                    >
+                      <div className="rankingProfileIdentity">
+                        <strong>
+                          {profile.fullName}
+                        </strong>
+
+                        <span>
+                          {profile.profileCode || profile.id}
+                        </span>
+                      </div>
+
+                      <div className="rankingProfileState">
+                        <span>
+                          {profile.rankingEnabled
+                            ? "Reytingda hisoblanadi"
+                            : "Reytingda hisoblanmaydi"}
+                        </span>
+
+                        <button
+                          type="button"
+                          className={
+                            profile.rankingEnabled
+                              ? "rankingToggle rankingToggleOn"
+                              : "rankingToggle rankingToggleOff"
+                          }
+                          disabled={
+                            updatingProfileId ===
+                            profile.id
+                          }
+                          onClick={() =>
+                            void toggleRankingProfile(
+                              profile
+                            )
+                          }
+                        >
+                          <span className="rankingToggleKnob" />
+
+                          <strong>
+                            {updatingProfileId ===
+                            profile.id
+                              ? "..."
+                              : profile.rankingEnabled
+                                ? "ON"
+                                : "OFF"}
+                          </strong>
+                        </button>
+                      </div>
+                    </article>
+                  )
+                )}
+
+                {visibleProfiles.length ===
+                  0 && (
+                  <div className="rankingManagerEmpty">
+                    Profil topilmadi.
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           {selectionMode && (
           <div className="selectionBar">
@@ -5846,6 +6113,327 @@ export default function AdminRankingPage() {
           }
         }
 
+
+        .rankingManagerButton {
+          min-height: 44px;
+          padding: 0 16px;
+          border: 1px solid #8a711d;
+          border-radius: 9px;
+          background:
+            linear-gradient(
+              180deg,
+              #fff8ca,
+              #e6c85b
+            );
+          color: #4e3c05;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.82),
+            0 4px 0 #987c27;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .rankingManagerButton:hover {
+          filter: brightness(1.03);
+          transform: translateY(-1px);
+        }
+
+        .rankingManagerButton.activeRankingManager {
+          background:
+            linear-gradient(
+              180deg,
+              #dff7ff,
+              #69c4e8
+            );
+          border-color: #267da1;
+          color: #124e6a;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.86),
+            0 4px 0 #367d98;
+        }
+
+        .rankingManagerPanel {
+          margin-top: 14px;
+          padding: 14px;
+          border: 1px solid #7c888e;
+          border-radius: 13px;
+          background:
+            linear-gradient(
+              180deg,
+              #f7f9fa,
+              #d9dddf
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 5px 0 rgba(0,0,0,.22);
+        }
+
+        .rankingManagerTop {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 12px;
+        }
+
+        .rankingManagerTop > div:first-child {
+          min-width: 0;
+        }
+
+        .rankingManagerTop strong,
+        .rankingManagerTop span {
+          display: block;
+        }
+
+        .rankingManagerTop > div:first-child > strong {
+          color: #124f70;
+          font-size: 18px;
+        }
+
+        .rankingManagerTop > div:first-child > span {
+          margin-top: 4px;
+          color: #58666d;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .rankingManagerStats {
+          display: flex;
+          gap: 8px;
+          flex: 0 0 auto;
+        }
+
+        .rankingManagerStats span {
+          padding: 7px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .managerOnBadge {
+          border: 1px solid #68a37b;
+          background: #e3f7e8;
+          color: #176c38;
+        }
+
+        .managerOffBadge {
+          border: 1px solid #bc8585;
+          background: #fbe8e8;
+          color: #8e2929;
+        }
+
+        .rankingManagerSearch {
+          margin-bottom: 12px;
+        }
+
+        .rankingManagerSearch input {
+          width: 100%;
+          min-height: 42px;
+          padding: 0 13px;
+          border: 1px solid #919a9e;
+          border-radius: 9px;
+          background: #fff;
+          color: #183d51;
+          outline: none;
+          box-shadow:
+            inset 0 2px 3px rgba(0,0,0,.08),
+            0 2px 0 rgba(255,255,255,.75);
+          font-family: inherit;
+        }
+
+        .rankingProfileList {
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .rankingProfileRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          min-width: 0;
+          padding: 11px 12px;
+          border-radius: 11px;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.82),
+            0 3px 0 rgba(0,0,0,.16);
+        }
+
+        .profileRankingOn {
+          border: 1px solid #70a981;
+          background:
+            linear-gradient(
+              180deg,
+              #f2fff5,
+              #d7f1df
+            );
+        }
+
+        .profileRankingOff {
+          border: 1px solid #bd8b8b;
+          background:
+            linear-gradient(
+              180deg,
+              #fff7f7,
+              #f3dede
+            );
+        }
+
+        .rankingProfileIdentity {
+          min-width: 0;
+        }
+
+        .rankingProfileIdentity strong,
+        .rankingProfileIdentity span {
+          display: block;
+        }
+
+        .rankingProfileIdentity strong {
+          overflow: hidden;
+          color: #163c50;
+          font-size: 14px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .rankingProfileIdentity span {
+          margin-top: 4px;
+          color: #69757b;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+        }
+
+        .rankingProfileState {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 0 0 auto;
+        }
+
+        .rankingProfileState > span {
+          max-width: 145px;
+          color: #536068;
+          font-size: 10px;
+          font-weight: 800;
+          text-align: right;
+        }
+
+        .rankingToggle {
+          position: relative;
+          width: 82px;
+          height: 34px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          padding: 0 10px;
+          border-radius: 999px;
+          cursor: pointer;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+          font-weight: 900;
+          transition: .18s ease;
+        }
+
+        .rankingToggle:disabled {
+          opacity: .65;
+          cursor: wait;
+        }
+
+        .rankingToggleKnob {
+          position: absolute;
+          top: 4px;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #fff;
+          box-shadow:
+            0 2px 4px rgba(0,0,0,.28),
+            inset 0 1px 0 #fff;
+          transition: .18s ease;
+        }
+
+        .rankingToggle strong {
+          position: relative;
+          z-index: 1;
+        }
+
+        .rankingToggleOn {
+          border: 1px solid #3d8b58;
+          background:
+            linear-gradient(
+              180deg,
+              #71dc93,
+              #36a85c
+            );
+          color: #fff;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.34),
+            0 3px 0 #2b7443;
+        }
+
+        .rankingToggleOn .rankingToggleKnob {
+          left: 4px;
+        }
+
+        .rankingToggleOff {
+          justify-content: flex-start;
+          border: 1px solid #a35050;
+          background:
+            linear-gradient(
+              180deg,
+              #ee9b9b,
+              #cc5e5e
+            );
+          color: #fff;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.30),
+            0 3px 0 #8f4242;
+        }
+
+        .rankingToggleOff .rankingToggleKnob {
+          right: 4px;
+        }
+
+        .rankingManagerEmpty {
+          grid-column: 1 / -1;
+          padding: 18px;
+          border: 1px dashed #9ca8ad;
+          border-radius: 10px;
+          background: rgba(255,255,255,.55);
+          color: #66737a;
+          text-align: center;
+          font-weight: 700;
+        }
+
+        @media (max-width: 900px) {
+          .rankingProfileList {
+            grid-template-columns: 1fr;
+          }
+
+          .rankingManagerTop {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .rankingProfileRow {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .rankingProfileState {
+            width: 100%;
+            justify-content: space-between;
+          }
+
+          .rankingProfileState > span {
+            max-width: none;
+            text-align: left;
+          }
+        }
 
         @media (prefers-reduced-motion: reduce) {
           *,
