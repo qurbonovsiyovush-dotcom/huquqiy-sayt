@@ -980,7 +980,7 @@ export async function POST(
         );
 
       let occurredAtValue:
-        string | null = null;
+        string;
 
       if (occurredAtRaw) {
         if (
@@ -1023,9 +1023,6 @@ export async function POST(
             : new Date()
                 .toISOString();
       }
-
-      const replacementId =
-        crypto.randomUUID();
 
       if (
         entryType ===
@@ -1075,59 +1072,30 @@ export async function POST(
           );
         }
 
-        const changed =
+        const updated =
           await sql`
-            WITH voided AS (
-              UPDATE
-                profile_finance_entries
-              SET
-                is_voided = TRUE,
-                voided_at = NOW(),
-                voided_by =
-                  ${adminId}
-              WHERE
-                id = ${entryId}
-                AND is_voided = FALSE
-              RETURNING
-                profile_id
-            )
-            INSERT INTO
-              profile_finance_entries (
-                id,
-                profile_id,
-                entry_type,
-                amount,
-                note,
-                occurred_at,
-                period_start,
-                period_end,
-                due_date,
-                period_months,
-                created_by,
-                created_at
-              )
-            SELECT
-              ${replacementId},
-              profile_id,
-              'period',
-              0,
-              ${
+            UPDATE profile_finance_entries
+            SET
+              note = ${
                 note ||
                 `To‘lov muddati ${dueDateRaw} qilib belgilandi`
               },
-              ${occurredAtValue}::timestamptz,
-              ${periodStartRaw}::date,
-              ${dueDateRaw}::date,
-              ${dueDateRaw}::date,
-              NULL,
-              ${adminId},
-              NOW()
-            FROM voided
+              occurred_at =
+                ${occurredAtValue}::timestamptz,
+              period_start =
+                ${periodStartRaw}::date,
+              period_end =
+                ${dueDateRaw}::date,
+              due_date =
+                ${dueDateRaw}::date
+            WHERE
+              id = ${entryId}
+              AND is_voided = FALSE
             RETURNING id
           `;
 
         if (
-          changed.length === 0
+          updated.length === 0
         ) {
           return NextResponse.json(
             {
@@ -1142,9 +1110,8 @@ export async function POST(
         return NextResponse.json({
           success: true,
           message:
-            "To‘lov muddati tahrirlandi. Eski yozuv tarixda saqlandi.",
-          entryId:
-            replacementId,
+            "To‘lov muddati yangilandi.",
+          entryId,
         });
       }
 
@@ -1207,48 +1174,22 @@ export async function POST(
         );
       }
 
-      const changed =
+      const updated =
         await sql`
-          WITH voided AS (
-            UPDATE
-              profile_finance_entries
-            SET
-              is_voided = TRUE,
-              voided_at = NOW(),
-              voided_by =
-                ${adminId}
-            WHERE
-              id = ${entryId}
-              AND is_voided = FALSE
-            RETURNING
-              profile_id
-          )
-          INSERT INTO
-            profile_finance_entries (
-              id,
-              profile_id,
-              entry_type,
-              amount,
-              note,
-              occurred_at,
-              created_by,
-              created_at
-            )
-          SELECT
-            ${replacementId},
-            profile_id,
-            ${entryType},
-            ${amount},
-            ${note || null},
-            ${occurredAtValue}::timestamptz,
-            ${adminId},
-            NOW()
-          FROM voided
+          UPDATE profile_finance_entries
+          SET
+            amount = ${amount},
+            note = ${note || null},
+            occurred_at =
+              ${occurredAtValue}::timestamptz
+          WHERE
+            id = ${entryId}
+            AND is_voided = FALSE
           RETURNING id
         `;
 
       if (
-        changed.length === 0
+        updated.length === 0
       ) {
         return NextResponse.json(
           {
@@ -1268,9 +1209,8 @@ export async function POST(
       return NextResponse.json({
         success: true,
         message:
-          "Moliyaviy yozuv tahrirlandi. Eski yozuv tarixda saqlandi.",
-        entryId:
-          replacementId,
+          "Moliyaviy yozuv yangilandi.",
+        entryId,
         currentDebt:
           Math.max(
             0,
