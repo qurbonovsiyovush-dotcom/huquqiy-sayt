@@ -9,6 +9,33 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function toDateOnly(
+  value: unknown
+) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(value.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  const raw = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    return raw.slice(0, 10);
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const y = parsed.getUTCFullYear();
+  const m = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function toNumber(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -309,25 +336,19 @@ export async function GET(
                 : null,
 
             periodStart:
-              row.period_start
-                ? String(
-                    row.period_start
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.period_start
+              ),
 
             periodEnd:
-              row.period_end
-                ? String(
-                    row.period_end
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.period_end
+              ),
 
             dueDate:
-              row.due_date
-                ? String(
-                    row.due_date
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.due_date
+              ),
 
             periodMonths:
               row.period_months
@@ -435,25 +456,19 @@ export async function GET(
                 : null,
 
             periodStart:
-              row.period_start
-                ? String(
-                    row.period_start
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.period_start
+              ),
 
             periodEnd:
-              row.period_end
-                ? String(
-                    row.period_end
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.period_end
+              ),
 
             dueDate:
-              row.due_date
-                ? String(
-                    row.due_date
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.due_date
+              ),
 
             periodMonths:
               row.period_months
@@ -876,6 +891,386 @@ export async function POST(
         success: true,
         message:
           "To‘lov yozildi.",
+        currentDebt:
+          Math.max(
+            0,
+            balance
+          ),
+        advance:
+          Math.max(
+            0,
+            -balance
+          ),
+      });
+    }
+
+    if (
+      action === "edit-entry"
+    ) {
+      const entryId =
+        cleanText(
+          body?.entryId
+        );
+
+      if (!entryId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Tahrirlanadigan yozuv ID topilmadi.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const oldRows =
+        await sql`
+          SELECT
+            id,
+            profile_id,
+            entry_type,
+            amount,
+            note,
+            occurred_at,
+            period_start,
+            period_end,
+            due_date,
+            period_months
+          FROM profile_finance_entries
+          WHERE
+            id = ${entryId}
+            AND is_voided = FALSE
+          LIMIT 1
+        `;
+
+      if (
+        oldRows.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Yozuv topilmadi yoki oldin bekor qilingan.",
+          },
+          { status: 404 }
+        );
+      }
+
+      const old: any =
+        oldRows[0];
+
+      const profileId =
+        String(
+          old.profile_id
+        );
+
+      const entryType =
+        String(
+          old.entry_type
+        );
+
+      const note =
+        cleanText(
+          body?.note
+        );
+
+      const occurredAtRaw =
+        cleanText(
+          body?.occurredAt
+        );
+
+      let occurredAtValue:
+        string | null = null;
+
+      if (occurredAtRaw) {
+        if (
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(
+            occurredAtRaw
+          )
+        ) {
+          occurredAtValue =
+            `${occurredAtRaw}:00+05:00`;
+        } else {
+          const parsed =
+            new Date(
+              occurredAtRaw
+            );
+
+          if (
+            Number.isNaN(
+              parsed.getTime()
+            )
+          ) {
+            return NextResponse.json(
+              {
+                success: false,
+                message:
+                  "Sana va vaqt noto‘g‘ri.",
+              },
+              { status: 400 }
+            );
+          }
+
+          occurredAtValue =
+            parsed.toISOString();
+        }
+      } else {
+        occurredAtValue =
+          old.occurred_at
+            ? new Date(
+                old.occurred_at
+              ).toISOString()
+            : new Date()
+                .toISOString();
+      }
+
+      const replacementId =
+        crypto.randomUUID();
+
+      if (
+        entryType ===
+        "period"
+      ) {
+        const periodStartRaw =
+          String(
+            body?.periodStart ||
+              ""
+          ).trim();
+
+        const dueDateRaw =
+          String(
+            body?.dueDate ||
+              ""
+          ).trim();
+
+        if (
+          !/^\d{4}-\d{2}-\d{2}$/.test(
+            periodStartRaw
+          ) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(
+            dueDateRaw
+          )
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "Boshlanish sanasi va to‘lov muddatini to‘g‘ri tanlang.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (
+          dueDateRaw <
+          periodStartRaw
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "To‘lov muddati boshlanish sanasidan oldin bo‘lishi mumkin emas.",
+            },
+            { status: 400 }
+          );
+        }
+
+        const changed =
+          await sql`
+            WITH voided AS (
+              UPDATE
+                profile_finance_entries
+              SET
+                is_voided = TRUE,
+                voided_at = NOW(),
+                voided_by =
+                  ${adminId}
+              WHERE
+                id = ${entryId}
+                AND is_voided = FALSE
+              RETURNING
+                profile_id
+            )
+            INSERT INTO
+              profile_finance_entries (
+                id,
+                profile_id,
+                entry_type,
+                amount,
+                note,
+                occurred_at,
+                period_start,
+                period_end,
+                due_date,
+                period_months,
+                created_by,
+                created_at
+              )
+            SELECT
+              ${replacementId},
+              profile_id,
+              'period',
+              0,
+              ${
+                note ||
+                `To‘lov muddati ${dueDateRaw} qilib belgilandi`
+              },
+              ${occurredAtValue}::timestamptz,
+              ${periodStartRaw}::date,
+              ${dueDateRaw}::date,
+              ${dueDateRaw}::date,
+              NULL,
+              ${adminId},
+              NOW()
+            FROM voided
+            RETURNING id
+          `;
+
+        if (
+          changed.length === 0
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "Muddat yozuvini tahrirlab bo‘lmadi.",
+            },
+            { status: 409 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          message:
+            "To‘lov muddati tahrirlandi. Eski yozuv tarixda saqlandi.",
+          entryId:
+            replacementId,
+        });
+      }
+
+      const amount =
+        toNumber(
+          body?.amount
+        );
+
+      if (
+        (
+          entryType ===
+            "payment" ||
+          entryType ===
+            "debt"
+        ) &&
+        amount <= 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Summani 0 dan katta kiriting.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        entryType ===
+          "adjustment" &&
+        Math.abs(amount) <
+          0.005
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Tuzatish summasi 0 bo‘lishi mumkin emas.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        ![
+          "payment",
+          "debt",
+          "adjustment",
+        ].includes(
+          entryType
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Bu turdagi yozuvni tahrirlab bo‘lmaydi.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const changed =
+        await sql`
+          WITH voided AS (
+            UPDATE
+              profile_finance_entries
+            SET
+              is_voided = TRUE,
+              voided_at = NOW(),
+              voided_by =
+                ${adminId}
+            WHERE
+              id = ${entryId}
+              AND is_voided = FALSE
+            RETURNING
+              profile_id
+          )
+          INSERT INTO
+            profile_finance_entries (
+              id,
+              profile_id,
+              entry_type,
+              amount,
+              note,
+              occurred_at,
+              created_by,
+              created_at
+            )
+          SELECT
+            ${replacementId},
+            profile_id,
+            ${entryType},
+            ${amount},
+            ${note || null},
+            ${occurredAtValue}::timestamptz,
+            ${adminId},
+            NOW()
+          FROM voided
+          RETURNING id
+        `;
+
+      if (
+        changed.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Yozuvni tahrirlab bo‘lmadi.",
+          },
+          { status: 409 }
+        );
+      }
+
+      const balance =
+        await getProfileBalance(
+          profileId
+        );
+
+      return NextResponse.json({
+        success: true,
+        message:
+          "Moliyaviy yozuv tahrirlandi. Eski yozuv tarixda saqlandi.",
+        entryId:
+          replacementId,
         currentDebt:
           Math.max(
             0,
