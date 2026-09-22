@@ -230,6 +230,7 @@ export async function GET(
               SELECT id
               FROM user_profiles
               WHERE ranking_enabled = TRUE
+                AND status = 'active'
             )
             AND (
               ${period} = 'all'
@@ -553,6 +554,7 @@ export async function GET(
               SELECT id
               FROM user_profiles
               WHERE ranking_enabled = TRUE
+                AND status = 'active'
             )
             AND (
               ${period} = 'all'
@@ -659,6 +661,8 @@ export async function GET(
           created_at
         FROM
           user_profiles
+        WHERE
+          status <> 'archived'
         ORDER BY
           full_name ASC,
           profile_code ASC
