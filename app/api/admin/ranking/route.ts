@@ -967,102 +967,296 @@ export async function PATCH(
         body?.action || ""
       ).trim();
 
+    /* =====================================================
+       REYTING ON / OFF
+    ===================================================== */
+
     if (
-      action !==
+      action ===
       "ranking_enabled"
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Noto‘g‘ri amal.",
+      const profileId =
+        String(
+          body?.profileId || ""
+        ).trim();
+
+      const enabled =
+        body?.enabled === true;
+
+      if (!profileId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Profil ID topilmadi.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const updated =
+        await sql`
+          UPDATE
+            user_profiles
+          SET
+            ranking_enabled =
+              ${enabled},
+            updated_at = NOW()
+          WHERE
+            id::text =
+              ${profileId}
+            AND status <> 'archived'
+          RETURNING
+            id::text AS id,
+            profile_code,
+            full_name,
+            ranking_enabled
+        `;
+
+      if (updated.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Profil topilmadi yoki arxivlangan.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      const row: any =
+        updated[0];
+
+      return NextResponse.json({
+        success: true,
+        profile: {
+          id:
+            String(
+              row.id || ""
+            ),
+          profileCode:
+            String(
+              row.profile_code ||
+                ""
+            ),
+          fullName:
+            String(
+              row.full_name ||
+                "Foydalanuvchi"
+            ),
+          rankingEnabled:
+            row.ranking_enabled ===
+            true,
         },
-        {
-          status: 400,
-        }
-      );
+        message:
+          enabled
+            ? "Foydalanuvchi reytingga qo‘shildi."
+            : "Foydalanuvchi reytingdan chiqarildi.",
+      });
     }
 
-    const profileId =
-      String(
-        body?.profileId || ""
-      ).trim();
+    /* =====================================================
+       BITTA PROFILNI RO‘YXATDAN CHIQARISH
 
-    const enabled =
-      body?.enabled === true;
+       Muhim:
+       - profil fizik o‘chirilmaydi;
+       - status = archived;
+       - ranking_enabled = false;
+       - kirish kodlari faolsizlanadi;
+       - test va to‘lov tarixi saqlanadi.
+    ===================================================== */
 
-    if (!profileId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Profil ID topilmadi.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+    if (
+      action ===
+      "archive_profile"
+    ) {
+      const profileId =
+        String(
+          body?.profileId || ""
+        ).trim();
 
-    const updated =
+      if (!profileId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Profil ID topilmadi.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const archived =
+        await sql`
+          UPDATE user_profiles
+          SET
+            status = 'archived',
+            ranking_enabled = FALSE,
+            updated_at = NOW()
+          WHERE
+            id::text = ${profileId}
+            AND status <> 'archived'
+          RETURNING
+            id::text AS id,
+            full_name
+        `;
+
+      if (archived.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Profil topilmadi yoki oldin ro‘yxatdan chiqarilgan.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
       await sql`
-        UPDATE
-          user_profiles
+        UPDATE access_codes
         SET
-          ranking_enabled =
-            ${enabled}
+          active = FALSE,
+          approved = FALSE,
+          approved_at = NULL,
+          rejected_at = NOW()
         WHERE
-          id::text =
+          profile_id::text =
             ${profileId}
-        RETURNING
-          id::text AS id,
-          profile_code,
-          full_name,
-          ranking_enabled
       `;
 
-    if (updated.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Profil topilmadi.",
-        },
-        {
-          status: 404,
-        }
-      );
+      return NextResponse.json({
+        success: true,
+        archivedCount: 1,
+        message:
+          "Profil ro‘yxatdan chiqarildi. Test va to‘lov tarixi saqlandi.",
+      });
     }
 
-    const row: any =
-      updated[0];
+    /* =====================================================
+       TANLANGAN PROFILLARNI RO‘YXATDAN CHIQARISH
+    ===================================================== */
 
-    return NextResponse.json({
-      success: true,
-      profile: {
-        id:
-          String(
-            row.id || ""
-          ),
-        profileCode:
-          String(
-            row.profile_code ||
-              ""
-          ),
-        fullName:
-          String(
-            row.full_name ||
-              "Foydalanuvchi"
-          ),
-        rankingEnabled:
-          row.ranking_enabled ===
-          true,
+    if (
+      action ===
+      "archive_profiles"
+    ) {
+      const profileIds =
+        Array.isArray(
+          body?.profileIds
+        )
+          ? Array.from(
+              new Set(
+                body.profileIds
+                  .map(
+                    (value: unknown) =>
+                      String(
+                        value || ""
+                      ).trim()
+                  )
+                  .filter(Boolean)
+              )
+            )
+          : [];
+
+      if (
+        profileIds.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Ro‘yxatdan chiqariladigan profillar tanlanmagan.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (
+        profileIds.length > 500
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Bir martada 500 tadan ko‘p profilni tanlab bo‘lmaydi.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      const profileIdsJson =
+        JSON.stringify(
+          profileIds
+        );
+
+      const archived =
+        await sql`
+          UPDATE user_profiles
+          SET
+            status = 'archived',
+            ranking_enabled = FALSE,
+            updated_at = NOW()
+          WHERE
+            id::text IN (
+              SELECT
+                jsonb_array_elements_text(
+                  ${profileIdsJson}::jsonb
+                )
+            )
+            AND status <> 'archived'
+          RETURNING
+            id::text AS id
+        `;
+
+      await sql`
+        UPDATE access_codes
+        SET
+          active = FALSE,
+          approved = FALSE,
+          approved_at = NULL,
+          rejected_at = NOW()
+        WHERE
+          profile_id::text IN (
+            SELECT
+              jsonb_array_elements_text(
+                ${profileIdsJson}::jsonb
+              )
+          )
+      `;
+
+      return NextResponse.json({
+        success: true,
+        archivedCount:
+          archived.length,
+        requestedCount:
+          profileIds.length,
+        message:
+          `${archived.length} ta profil ro‘yxatdan chiqarildi. Test va to‘lov tarixi saqlandi.`,
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Noto‘g‘ri amal.",
       },
-      message:
-        enabled
-          ? "Foydalanuvchi reytingga qo‘shildi."
-          : "Foydalanuvchi reytingdan chiqarildi.",
-    });
+      {
+        status: 400,
+      }
+    );
   } catch (error) {
     console.error(
       "ADMIN RANKING PATCH ERROR:",
@@ -1075,7 +1269,7 @@ export async function PATCH(
         message:
           error instanceof Error
             ? error.message
-            : "Reyting holatini o‘zgartirishda server xatosi.",
+            : "Reyting boshqaruvida server xatosi.",
       },
       {
         status: 500,
