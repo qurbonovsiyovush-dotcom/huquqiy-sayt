@@ -566,6 +566,257 @@ export async function POST(
       );
 
     if (
+      action === "reset-finance"
+    ) {
+      const profileId =
+        cleanText(
+          body?.profileId
+        );
+
+      const totalAmount =
+        toNumber(
+          body?.totalAmount
+        );
+
+      const paidAmount =
+        toNumber(
+          body?.paidAmount
+        );
+
+      const note =
+        cleanText(
+          body?.note
+        );
+
+      const periodStartRaw =
+        String(
+          body?.periodStart || ""
+        ).trim();
+
+      const dueDateRaw =
+        String(
+          body?.dueDate || ""
+        ).trim();
+
+      if (
+        !profileId ||
+        totalAmount < 0 ||
+        paidAmount < 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Umumiy summa va to‘langan summani to‘g‘ri kiriting.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        Boolean(periodStartRaw) !==
+        Boolean(dueDateRaw)
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Muddat kiritilsa, boshlanish sanasi va oxirgi sana ikkalasi ham tanlanishi kerak.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        periodStartRaw &&
+        (
+          !/^\d{4}-\d{2}-\d{2}$/.test(
+            periodStartRaw
+          ) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(
+            dueDateRaw
+          ) ||
+          dueDateRaw < periodStartRaw
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "To‘lov davri sanalarini to‘g‘ri tanlang.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const profileRows =
+        await sql`
+          SELECT p.id
+          FROM user_profiles p
+          WHERE
+            p.id = ${profileId}
+            AND p.status = 'active'
+            AND EXISTS (
+              SELECT 1
+              FROM access_codes ac
+              WHERE
+                ac.profile_id = p.id
+                AND ac.active = TRUE
+                AND ac.approved = TRUE
+            )
+          LIMIT 1
+        `;
+
+      if (
+        profileRows.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Ruxsat berilgan faol profil topilmadi.",
+          },
+          { status: 404 }
+        );
+      }
+
+      const newEntries: Array<{
+        id: string;
+        entry_type: string;
+        amount: number;
+        note: string | null;
+        period_start: string | null;
+        period_end: string | null;
+        due_date: string | null;
+      }> = [];
+
+      if (totalAmount > 0) {
+        newEntries.push({
+          id: crypto.randomUUID(),
+          entry_type: "debt",
+          amount: totalAmount,
+          note:
+            note ||
+            "Hisob 0 dan qayta belgilandi",
+          period_start: null,
+          period_end: null,
+          due_date: null,
+        });
+      }
+
+      if (paidAmount > 0) {
+        newEntries.push({
+          id: crypto.randomUUID(),
+          entry_type: "payment",
+          amount: paidAmount,
+          note:
+            note ||
+            "Boshlang‘ich to‘langan summa",
+          period_start: null,
+          period_end: null,
+          due_date: null,
+        });
+      }
+
+      if (
+        periodStartRaw &&
+        dueDateRaw
+      ) {
+        newEntries.push({
+          id: crypto.randomUUID(),
+          entry_type: "period",
+          amount: 0,
+          note:
+            `To‘lov muddati ${dueDateRaw} qilib belgilandi`,
+          period_start:
+            periodStartRaw,
+          period_end:
+            dueDateRaw,
+          due_date:
+            dueDateRaw,
+        });
+      }
+
+      const payload =
+        JSON.stringify(
+          newEntries
+        );
+
+      await sql`
+        WITH voided AS (
+          UPDATE profile_finance_entries
+          SET
+            is_voided = TRUE,
+            voided_at = NOW(),
+            voided_by = ${adminId}
+          WHERE
+            profile_id = ${profileId}
+            AND is_voided = FALSE
+          RETURNING id
+        )
+        INSERT INTO profile_finance_entries (
+          id,
+          profile_id,
+          entry_type,
+          amount,
+          note,
+          occurred_at,
+          period_start,
+          period_end,
+          due_date,
+          created_by,
+          created_at
+        )
+        SELECT
+          x.id,
+          ${profileId},
+          x.entry_type,
+          x.amount,
+          x.note,
+          NOW(),
+          x.period_start::date,
+          x.period_end::date,
+          x.due_date::date,
+          ${adminId},
+          NOW()
+        FROM jsonb_to_recordset(
+          ${payload}::jsonb
+        ) AS x(
+          id text,
+          entry_type text,
+          amount numeric,
+          note text,
+          period_start text,
+          period_end text,
+          due_date text
+        )
+      `;
+
+      const balance =
+        totalAmount -
+        paidAmount;
+
+      return NextResponse.json({
+        success: true,
+        message:
+          "To‘lov hisobi 0 dan qayta belgilandi.",
+        totalAmount,
+        totalPaid:
+          paidAmount,
+        currentDebt:
+          Math.max(
+            0,
+            balance
+          ),
+        advance:
+          Math.max(
+            0,
+            -balance
+          ),
+      });
+    }
+
+    if (
       action === "set-debt"
     ) {
       const profileId =
