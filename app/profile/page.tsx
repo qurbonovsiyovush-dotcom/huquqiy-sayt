@@ -150,38 +150,29 @@ function formatDateTime(
 ) {
   if (!value) return "—";
 
-  const parsed =
-    new Date(value);
+  const raw =
+    String(value).trim();
 
-  if (
-    Number.isNaN(
-      parsed.getTime()
-    )
-  ) {
-    return formatDateOnly(value);
+  const dateOnly =
+    extractIsoDate(raw);
+
+  if (!dateOnly) {
+    return "—";
   }
 
-  const date =
-    new Intl.DateTimeFormat(
-      "uz-UZ",
-      {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }
-    ).format(parsed);
+  const [year, month, day] =
+    dateOnly.split("-");
 
-  const time =
-    new Intl.DateTimeFormat(
-      "uz-UZ",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }
-    ).format(parsed);
+  const timeMatch =
+    raw.match(
+      /(?:T|\s)(\d{2}):(\d{2})/
+    );
 
-  return `${date} ${time}`;
+  if (!timeMatch) {
+    return `${day}.${month}.${year}`;
+  }
+
+  return `${day}.${month}.${year} ${timeMatch[1]}:${timeMatch[2]}`;
 }
 
 function extractDateFromText(
@@ -571,22 +562,26 @@ export default function ProfilePage() {
     ).size;
   }, [attempts]);
 
-  const financeTotal =
-    financeSummary.totalPaid +
-    financeSummary.currentDebt;
+  const totalAmount =
+    Math.max(
+      0,
+      financeSummary.totalPaid +
+        financeSummary.currentDebt -
+        financeSummary.advance
+    );
 
   const paymentPeriod =
     financeSummary.period;
 
   const paidPercent =
-    financeTotal > 0
+    totalAmount > 0
       ? Math.max(
           0,
           Math.min(
             100,
             Math.round(
               (financeSummary.totalPaid /
-                financeTotal) *
+                totalAmount) *
                 100
             )
           )
@@ -870,27 +865,36 @@ export default function ProfilePage() {
           </div>
 
           <div className="paymentTop">
+            <article className="paymentCard total">
+              <span>Umumiy summa</span>
+              <strong>
+                {money(totalAmount)}
+              </strong>
+              <small>
+                Belgilangan jami to‘lov
+              </small>
+            </article>
+
             <article className="paymentCard paid">
-              <span>Jami to‘langan</span>
+              <span>To‘langan</span>
               <strong>
                 {money(financeSummary.totalPaid)}
               </strong>
+              <small>
+                Amalga oshirilgan to‘lov
+              </small>
             </article>
 
             <article className="paymentCard debt">
-              <span>Hozirgi qarz</span>
+              <span>Qoldiq</span>
               <strong>
                 {money(
                   financeSummary.currentDebt
                 )}
               </strong>
-            </article>
-
-            <article className="paymentCard advance">
-              <span>Avans</span>
-              <strong>
-                {money(financeSummary.advance)}
-              </strong>
+              <small>
+                To‘lanishi kerak
+              </small>
             </article>
 
             <article
@@ -924,6 +928,15 @@ export default function ProfilePage() {
             </article>
           </div>
 
+          {financeSummary.advance > 0 && (
+            <div className="advanceNotice">
+              <span>Avans</span>
+              <strong>
+                {money(financeSummary.advance)}
+              </strong>
+            </div>
+          )}
+
           <div className="paymentProgressBox">
             {paymentPeriod && (
               <div className="periodLine">
@@ -942,14 +955,34 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="progressLabels">
-              <span>
-                To‘lov holati
-              </span>
+            <div className="paymentEquation">
+              <div>
+                <span>Umumiy</span>
+                <strong>{money(totalAmount)}</strong>
+              </div>
 
-              <strong>
-                {paidPercent}%
-              </strong>
+              <b>−</b>
+
+              <div>
+                <span>To‘langan</span>
+                <strong className="paidEquation">
+                  {money(financeSummary.totalPaid)}
+                </strong>
+              </div>
+
+              <b>=</b>
+
+              <div>
+                <span>Qoldiq</span>
+                <strong className="debtEquation">
+                  {money(financeSummary.currentDebt)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="progressLabels">
+              <span>To‘lov holati</span>
+              <strong>{paidPercent}%</strong>
             </div>
 
             <div className="progressTrack">
@@ -967,23 +1000,23 @@ export default function ProfilePage() {
               To‘lovlar tarixi
             </h2>
 
-            <div className="historyTable">
-              <div className="historyRow head">
-                <span>#</span>
-                <span>Sana</span>
-                <span>Amal</span>
-                <span>Davr / muddat</span>
-                <span>Izoh</span>
-                <span>Summa</span>
-              </div>
-
+            <div className="historyTimeline">
               {activeFinanceEntries
                 .slice(0, 10)
                 .map((item, index) => {
                   const periodEntry =
-                    isPeriodEntry(
-                      item
-                    );
+                    isPeriodEntry(item);
+
+                  const kind =
+                    periodEntry
+                      ? "period"
+                      : item.entryType ===
+                          "payment"
+                        ? "payment"
+                        : item.entryType ===
+                            "debt"
+                          ? "debt"
+                          : "adjustment";
 
                   const amountClass =
                     item.entryType ===
@@ -996,63 +1029,59 @@ export default function ProfilePage() {
                           : "redText";
 
                   return (
-                    <div
-                      className="historyRow"
+                    <article
+                      className={`historyItem ${kind}`}
                       key={item.id}
                     >
-                      <span>
+                      <div className="historyIndex">
                         {index + 1}
-                      </span>
+                      </div>
 
-                      <span>
-                        {formatDateTime(
-                          item.occurredAt
-                        )}
-                      </span>
+                      <div className="historyContent">
+                        <div className="historyItemTop">
+                          <div>
+                            <strong className="historyAction">
+                              {financeName(item)}
+                            </strong>
+                            <span className="historyDate">
+                              {formatDateTime(
+                                item.occurredAt
+                              )}
+                            </span>
+                          </div>
 
-                      <strong
-                        className={
-                          periodEntry
-                            ? "periodAction"
-                            : ""
-                        }
-                      >
-                        {financeName(
-                          item
-                        )}
-                      </strong>
+                          <strong
+                            className={`historyAmount ${amountClass}`}
+                          >
+                            {financeAmountText(item)}
+                          </strong>
+                        </div>
 
-                      <span
-                        className="periodCell"
-                      >
-                        {financePeriodText(
-                          item
-                        )}
-                      </span>
+                        <div className="historyDetails">
+                          {periodEntry && (
+                            <div className="historyDetail periodDetail">
+                              <span>Davr / muddat</span>
+                              <strong>
+                                {financePeriodText(item)}
+                              </strong>
+                            </div>
+                          )}
 
-                      <span>
-                        {item.note ||
-                          "—"}
-                      </span>
-
-                      <strong
-                        className={
-                          amountClass
-                        }
-                      >
-                        {financeAmountText(
-                          item
-                        )}
-                      </strong>
-                    </div>
+                          <div className="historyDetail">
+                            <span>Izoh</span>
+                            <strong>
+                              {item.note || "—"}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
                   );
                 })}
 
-              {activeFinanceEntries.length ===
-                0 && (
+              {activeFinanceEntries.length === 0 && (
                 <div className="emptyRow">
-                  Hozircha to‘lov ma’lumoti
-                  mavjud emas.
+                  Hozircha to‘lov ma’lumoti mavjud emas.
                 </div>
               )}
             </div>
@@ -1653,7 +1682,8 @@ export default function ProfilePage() {
         }
 
         .paymentCard span,
-        .paymentCard strong {
+        .paymentCard strong,
+        .paymentCard small {
           display: block;
         }
 
@@ -1665,6 +1695,24 @@ export default function ProfilePage() {
 
         .paymentCard strong {
           font-size: 24px;
+        }
+
+        .paymentCard small {
+          margin-top: 7px;
+          color: rgba(35, 49, 58, .72);
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .paymentCard.total {
+          border: 1px solid #6f8fa4;
+          background:
+            linear-gradient(
+              180deg,
+              #f0faff,
+              #bddff0
+            );
+          color: #154f70;
         }
 
         .paymentCard.paid {
@@ -1729,6 +1777,27 @@ export default function ProfilePage() {
           color: #9d2727;
         }
 
+        .advanceNotice {
+          margin-top: 14px;
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          border: 1px solid #6e93aa;
+          border-radius: 12px;
+          background:
+            linear-gradient(180deg, #eef9ff, #c5e5f4);
+          color: #175b80;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 rgba(40, 92, 121, .25);
+        }
+
+        .advanceNotice strong {
+          font-size: 18px;
+        }
+
         .paymentProgressBox {
           margin-top: 16px;
           padding: 15px;
@@ -1760,6 +1829,53 @@ export default function ProfilePage() {
 
         .periodLine strong {
           color: #0b527b;
+        }
+
+        .paymentEquation {
+          display: grid;
+          grid-template-columns:
+            1fr auto 1fr auto 1fr;
+          align-items: center;
+          gap: 12px;
+          margin: 2px 0 16px;
+        }
+
+        .paymentEquation > div {
+          min-width: 0;
+          padding: 11px 12px;
+          border: 1px solid #b9bec0;
+          border-radius: 10px;
+          background: rgba(255,255,255,.72);
+          text-align: center;
+        }
+
+        .paymentEquation span,
+        .paymentEquation strong {
+          display: block;
+        }
+
+        .paymentEquation span {
+          margin-bottom: 4px;
+          color: #666;
+          font-size: 11px;
+        }
+
+        .paymentEquation strong {
+          color: #154f70;
+          font-size: 17px;
+        }
+
+        .paymentEquation .paidEquation {
+          color: #14783a;
+        }
+
+        .paymentEquation .debtEquation {
+          color: #b12828;
+        }
+
+        .paymentEquation > b {
+          color: #4d5559;
+          font-size: 22px;
         }
 
         .progressLabels {
@@ -1806,50 +1922,137 @@ export default function ProfilePage() {
             0 1px 0 rgba(0,0,0,.35);
         }
 
-        .historyTable {
-          overflow: hidden;
-          border: 1px solid #8c9295;
-          border-radius: 12px;
-          background: #fff;
+        .historyTimeline {
+          display: grid;
+          gap: 12px;
         }
 
-        .historyRow {
+        .historyItem {
+          display: grid;
+          grid-template-columns: 46px minmax(0, 1fr);
+          gap: 12px;
+          padding: 13px;
+          border: 1px solid #a8afb2;
+          border-left-width: 5px;
+          border-radius: 13px;
+          background:
+            linear-gradient(180deg, #ffffff, #ededed);
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 rgba(61, 68, 72, .30);
+        }
+
+        .historyItem.payment {
+          border-left-color: #2f9d59;
+        }
+
+        .historyItem.debt {
+          border-left-color: #d14b4b;
+        }
+
+        .historyItem.period {
+          border-left-color: #2a8fbd;
+        }
+
+        .historyItem.adjustment {
+          border-left-color: #b58b2c;
+        }
+
+        .historyIndex {
+          width: 38px;
+          height: 38px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          align-self: start;
+          border: 1px solid #71818a;
+          border-radius: 50%;
+          background:
+            linear-gradient(180deg, #fff, #cfd8dc);
+          color: #183f55;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #727d82;
+          font-weight: 900;
+        }
+
+        .historyContent {
+          min-width: 0;
+        }
+
+        .historyItemTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          padding-bottom: 10px;
+          border-bottom: 1px solid #d5d9db;
+        }
+
+        .historyAction,
+        .historyDate {
+          display: block;
+        }
+
+        .historyAction {
+          color: #183f55;
+          font-size: 15px;
+        }
+
+        .historyDate {
+          margin-top: 4px;
+          color: #6a6f72;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 11px;
+        }
+
+        .historyAmount {
+          flex: 0 0 auto;
+          padding: 7px 10px;
+          border-radius: 8px;
+          background: rgba(255,255,255,.75);
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 13px;
+          white-space: nowrap;
+        }
+
+        .historyDetails {
           display: grid;
           grid-template-columns:
-            50px
-            165px
-            150px
-            210px
-            minmax(240px, 1fr)
-            165px;
-          align-items: center;
-          min-height: 52px;
-          border-bottom: 1px solid #d2d2d2;
+            repeat(2, minmax(0, 1fr));
+          gap: 10px;
+          padding-top: 10px;
         }
 
-        .historyRow:last-child {
-          border-bottom: 0;
+        .historyDetail {
+          min-width: 0;
+          padding: 9px 10px;
+          border: 1px solid #d1d5d7;
+          border-radius: 9px;
+          background: rgba(255,255,255,.55);
         }
 
-        .historyRow > * {
-          padding: 10px 12px;
-          font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
+        .historyDetail span,
+        .historyDetail strong {
+          display: block;
+        }
+
+        .historyDetail span {
+          margin-bottom: 4px;
+          color: #6b6f71;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+        }
+
+        .historyDetail strong {
+          color: #223d4c;
+          font-family: Arial, Helvetica, sans-serif;
           font-size: 12px;
+          line-height: 1.35;
         }
 
-        .historyRow.head {
-          min-height: 44px;
-          background:
-            linear-gradient(
-              180deg,
-              #2d7599,
-              #155474
-            );
-          color: #fff;
-          font-weight: 700;
+        .periodDetail strong {
+          color: #17648a;
         }
 
         .greenText {
@@ -1862,15 +2065,6 @@ export default function ProfilePage() {
 
         .neutralText {
           color: #285a78;
-        }
-
-        .periodAction {
-          color: #175f89;
-        }
-
-        .periodCell {
-          color: #174f70;
-          font-weight: 700;
         }
 
         .emptyRow {
@@ -2062,12 +2256,16 @@ export default function ProfilePage() {
             grid-column: 1 / -1;
           }
 
-          .historyTable {
-            overflow-x: auto;
+          .paymentEquation {
+            grid-template-columns: 1fr;
           }
 
-          .historyRow {
-            min-width: 1040px;
+          .paymentEquation > b {
+            display: none;
+          }
+
+          .historyDetails {
+            grid-template-columns: 1fr;
           }
         }
 
@@ -2088,6 +2286,14 @@ export default function ProfilePage() {
 
           .navButtons .exitButton {
             grid-column: auto;
+          }
+
+          .historyItemTop {
+            flex-direction: column;
+          }
+
+          .historyAmount {
+            align-self: flex-start;
           }
 
           .content {
