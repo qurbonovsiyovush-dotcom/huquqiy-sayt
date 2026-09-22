@@ -150,29 +150,54 @@ function formatDateTime(
 ) {
   if (!value) return "—";
 
-  const raw =
-    String(value).trim();
+  const parsed =
+    new Date(value);
 
-  const dateOnly =
-    extractIsoDate(raw);
-
-  if (!dateOnly) {
-    return "—";
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return formatDateOnly(value);
   }
 
-  const [year, month, day] =
-    dateOnly.split("-");
-
-  const timeMatch =
-    raw.match(
-      /(?:T|\s)(\d{2}):(\d{2})/
+  const parts =
+    new Intl.DateTimeFormat(
+      "uz-UZ",
+      {
+        timeZone:
+          "Asia/Tashkent",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }
+    ).formatToParts(
+      parsed
     );
 
-  if (!timeMatch) {
-    return `${day}.${month}.${year}`;
-  }
+  const getPart = (
+    type: Intl.DateTimeFormatPartTypes
+  ) =>
+    parts.find(
+      (part) =>
+        part.type === type
+    )?.value || "";
 
-  return `${day}.${month}.${year} ${timeMatch[1]}:${timeMatch[2]}`;
+  const day =
+    getPart("day");
+  const month =
+    getPart("month");
+  const year =
+    getPart("year");
+  const hour =
+    getPart("hour");
+  const minute =
+    getPart("minute");
+
+  return `${day}.${month}.${year} ${hour}:${minute}`;
 }
 
 function extractDateFromText(
