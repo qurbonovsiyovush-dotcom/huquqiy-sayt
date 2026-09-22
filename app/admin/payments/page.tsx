@@ -61,22 +61,55 @@ function dateTime(
     return "—";
   }
 
-  try {
-    return new Intl.DateTimeFormat(
+  const raw =
+    String(value).trim();
+
+  const parsed =
+    new Date(raw);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return raw;
+  }
+
+  const parts =
+    new Intl.DateTimeFormat(
       "uz-UZ",
       {
+        timeZone:
+          "Asia/Tashkent",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       }
-    ).format(
-      new Date(value)
-    );
-  } catch {
-    return value;
-  }
+    ).formatToParts(parsed);
+
+  const getPart = (
+    type: Intl.DateTimeFormatPartTypes
+  ) =>
+    parts.find(
+      (part) =>
+        part.type === type
+    )?.value || "";
+
+  const day =
+    getPart("day");
+  const month =
+    getPart("month");
+  const year =
+    getPart("year");
+  const hour =
+    getPart("hour");
+  const minute =
+    getPart("minute");
+
+  return `${day}.${month}.${year} ${hour}:${minute}`;
 }
 
 function entryText(
@@ -108,20 +141,76 @@ function dateOnly(
 ) {
   if (!value) return "—";
 
-  const parts =
-    value.split("-");
+  const raw =
+    String(value).trim();
 
-  if (parts.length !== 3) {
-    return value;
+  const isoMatch =
+    raw.match(
+      /(\\d{4})-(\\d{2})-(\\d{2})/
+    );
+
+  if (isoMatch) {
+    return `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
   }
 
-  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  const parsed =
+    new Date(raw);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return raw;
+  }
+
+  const parts =
+    new Intl.DateTimeFormat(
+      "uz-UZ",
+      {
+        timeZone:
+          "Asia/Tashkent",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).formatToParts(parsed);
+
+  const getPart = (
+    type: Intl.DateTimeFormatPartTypes
+  ) =>
+    parts.find(
+      (part) =>
+        part.type === type
+    )?.value || "";
+
+  return `${getPart("day")}.${getPart("month")}.${getPart("year")}`;
 }
 
 function todayInput() {
-  return new Date()
-    .toISOString()
-    .slice(0, 10);
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          "Asia/Tashkent",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).formatToParts(
+      new Date()
+    );
+
+  const getPart = (
+    type: Intl.DateTimeFormatPartTypes
+  ) =>
+    parts.find(
+      (part) =>
+        part.type === type
+    )?.value || "";
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 }
 
 export default function AdminPaymentsPage() {
