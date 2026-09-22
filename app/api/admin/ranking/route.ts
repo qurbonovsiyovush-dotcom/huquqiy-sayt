@@ -226,6 +226,11 @@ export async function GET(
               'correct',
               'incorrect'
             )
+            AND user_id IN (
+              SELECT id
+              FROM user_profiles
+              WHERE ranking_enabled = TRUE
+            )
             AND (
               ${period} = 'all'
               OR answered_at >=
@@ -287,6 +292,57 @@ export async function GET(
             question_id,
             answered_at ASC,
             id ASC
+        ),
+
+        test_breakdown AS (
+          SELECT
+            user_id,
+            source,
+            test_id,
+
+            (
+              ARRAY_AGG(
+                test_title
+                ORDER BY
+                  answered_at DESC
+              )
+            )[1]
+              AS test_title,
+
+            COUNT(*)::int
+              AS worked_questions,
+
+            COUNT(*) FILTER (
+              WHERE
+                answer_status =
+                  'correct'
+            )::int
+              AS correct_count,
+
+            COUNT(*) FILTER (
+              WHERE
+                answer_status =
+                  'incorrect'
+            )::int
+              AS incorrect_count,
+
+            COUNT(
+              DISTINCT
+              ranking_attempt_id
+            )::int
+              AS attempts_count,
+
+            MIN(answered_at)
+              AS first_activity_at,
+
+            MAX(answered_at)
+              AS last_activity_at
+          FROM
+            first_answers
+          GROUP BY
+            user_id,
+            source,
+            test_id
         ),
 
         aggregated AS (
@@ -403,7 +459,60 @@ export async function GET(
           attempts_count,
           earned_points,
           first_activity_at,
-          last_activity_at
+          last_activity_at,
+
+          COALESCE(
+            (
+              SELECT
+                JSON_AGG(
+                  JSON_BUILD_OBJECT(
+                    'source',
+                      tb.source,
+                    'testId',
+                      tb.test_id,
+                    'testTitle',
+                      tb.test_title,
+                    'workedQuestions',
+                      tb.worked_questions,
+                    'correct',
+                      tb.correct_count,
+                    'incorrect',
+                      tb.incorrect_count,
+                    'accuracy',
+                      CASE
+                        WHEN
+                          tb.worked_questions > 0
+                        THEN
+                          ROUND(
+                            (
+                              tb.correct_count::numeric /
+                              tb.worked_questions::numeric
+                            ) * 100,
+                            2
+                          )
+                        ELSE
+                          0
+                      END,
+                    'attempts',
+                      tb.attempts_count,
+                    'firstActivityAt',
+                      tb.first_activity_at,
+                    'lastActivityAt',
+                      tb.last_activity_at
+                  )
+                  ORDER BY
+                    tb.last_activity_at DESC,
+                    tb.test_title ASC
+                )
+              FROM
+                test_breakdown tb
+              WHERE
+                tb.user_id =
+                  scored.user_id
+            ),
+            '[]'::json
+          )
+            AS tests
 
         FROM
           scored
@@ -439,6 +548,11 @@ export async function GET(
             answer_status IN (
               'correct',
               'incorrect'
+            )
+            AND user_id IN (
+              SELECT id
+              FROM user_profiles
+              WHERE ranking_enabled = TRUE
             )
             AND (
               ${period} = 'all'
@@ -633,6 +747,81 @@ export async function GET(
                       row.last_activity_at
                     ).toISOString()
                   : null,
+
+              tests:
+                Array.isArray(
+                  row.tests
+                )
+                  ? row.tests.map(
+                      (
+                        test: any
+                      ) => ({
+                        source:
+                          String(
+                            test?.source ||
+                              ""
+                          ),
+
+                        testId:
+                          String(
+                            test?.testId ||
+                              test?.testid ||
+                              ""
+                          ),
+
+                        testTitle:
+                          String(
+                            test?.testTitle ||
+                              test?.testtitle ||
+                              "Nomsiz test"
+                          ),
+
+                        workedQuestions:
+                          toNumber(
+                            test?.workedQuestions ??
+                              test?.workedquestions
+                          ),
+
+                        correct:
+                          toNumber(
+                            test?.correct
+                          ),
+
+                        incorrect:
+                          toNumber(
+                            test?.incorrect
+                          ),
+
+                        accuracy:
+                          toNumber(
+                            test?.accuracy
+                          ),
+
+                        attempts:
+                          toNumber(
+                            test?.attempts
+                          ),
+
+                        firstActivityAt:
+                          test?.firstActivityAt ||
+                          test?.firstactivityat
+                            ? new Date(
+                                test?.firstActivityAt ||
+                                  test?.firstactivityat
+                              ).toISOString()
+                            : null,
+
+                        lastActivityAt:
+                          test?.lastActivityAt ||
+                          test?.lastactivityat
+                            ? new Date(
+                                test?.lastActivityAt ||
+                                  test?.lastactivityat
+                              ).toISOString()
+                            : null,
+                      })
+                    )
+                  : [],
             })
           ),
       },
@@ -776,7 +965,9 @@ export async function DELETE(
 
     if (action === "users") {
       const rawUserIds =
-        Array.isArray(body?.userIds)
+        Array.isArray(
+          body?.userIds
+        )
           ? body.userIds
           : [];
 
@@ -784,14 +975,24 @@ export async function DELETE(
         Array.from(
           new Set(
             rawUserIds
-              .map((value: unknown) =>
-                String(value || "").trim()
+              .map(
+                (
+                  value: unknown
+                ) =>
+                  String(
+                    value || ""
+                  ).trim()
               )
               .filter(Boolean)
           )
-        ).slice(0, 500);
+        ).slice(
+          0,
+          500
+        );
 
-      if (userIds.length === 0) {
+      if (
+        userIds.length === 0
+      ) {
         return NextResponse.json(
           {
             success: false,
@@ -809,17 +1010,21 @@ export async function DELETE(
           SELECT
             (
               SELECT COUNT(*)
-              FROM ranking_attempts
-              WHERE user_id =
-                ANY(${userIds}::text[])
+              FROM
+                ranking_attempts
+              WHERE
+                user_id =
+                  ANY(${userIds}::text[])
             )::int
               AS attempts_count,
 
             (
               SELECT COUNT(*)
-              FROM ranking_question_results
-              WHERE user_id =
-                ANY(${userIds}::text[])
+              FROM
+                ranking_question_results
+              WHERE
+                user_id =
+                  ANY(${userIds}::text[])
             )::int
               AS question_results_count
         `;
@@ -834,7 +1039,8 @@ export async function DELETE(
 
       return NextResponse.json({
         success: true,
-        action: "users",
+        action:
+          "users",
         userIds,
         deletedUsers:
           userIds.length,
