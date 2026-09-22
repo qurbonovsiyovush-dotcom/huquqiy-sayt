@@ -1968,19 +1968,151 @@ export default function ProfilePage() {
         }
 
         .historyItem.payment {
+          border-color: #72b88a;
           border-left-color: #2f9d59;
+          background:
+            linear-gradient(
+              180deg,
+              #f4fff7 0%,
+              #e3f7e9 100%
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 #6ca27b;
         }
 
         .historyItem.debt {
+          border-color: #d99a9a;
           border-left-color: #d14b4b;
+          background:
+            linear-gradient(
+              180deg,
+              #fff8f8 0%,
+              #f8e4e4 100%
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 #ad7474;
         }
 
         .historyItem.period {
+          border-color: #88bad1;
           border-left-color: #2a8fbd;
+          background:
+            linear-gradient(
+              180deg,
+              #f5fbff 0%,
+              #e3f2f9 100%
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 #6f9daf;
         }
 
         .historyItem.adjustment {
+          border-color: #d6bd78;
           border-left-color: #b58b2c;
+          background:
+            linear-gradient(
+              180deg,
+              #fffdf6 0%,
+              #f5ecd3 100%
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 #a99561;
+        }
+
+        .historyItem.payment .historyIndex {
+          border-color: #3f945b;
+          color: #176d37;
+          background:
+            linear-gradient(
+              180deg,
+              #effff3,
+              #aee3bc
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #5b9270;
+        }
+
+        .historyItem.debt .historyIndex {
+          border-color: #b95555;
+          color: #9e2525;
+          background:
+            linear-gradient(
+              180deg,
+              #fff3f3,
+              #efb6b6
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #a76a6a;
+        }
+
+        .historyItem.period .historyIndex {
+          border-color: #3f8fb2;
+          color: #155f83;
+          background:
+            linear-gradient(
+              180deg,
+              #eefaff,
+              #b6dff1
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #688fa1;
+        }
+
+        .historyItem.adjustment .historyIndex {
+          border-color: #9b7928;
+          color: #795b13;
+          background:
+            linear-gradient(
+              180deg,
+              #fffbed,
+              #ead490
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #9b8751;
+        }
+
+        .historyItem.payment .historyAction {
+          color: #16723a;
+        }
+
+        .historyItem.debt .historyAction {
+          color: #a12d2d;
+        }
+
+        .historyItem.period .historyAction {
+          color: #17658b;
+        }
+
+        .historyItem.adjustment .historyAction {
+          color: #795b13;
+        }
+
+        .historyItem.payment .historyAmount {
+          border: 1px solid #96cda6;
+          background: #e8f8ed;
+        }
+
+        .historyItem.debt .historyAmount {
+          border: 1px solid #e0a5a5;
+          background: #fdecec;
+        }
+
+        .historyItem.period .historyAmount {
+          border: 1px solid #a8cfe0;
+          background: #ecf8fd;
+        }
+
+        .historyItem.adjustment .historyAmount {
+          border: 1px solid #dccb96;
+          background: #fff8df;
         }
 
         .historyIndex {
