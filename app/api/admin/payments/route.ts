@@ -224,6 +224,17 @@ export async function GET(
         ) period
           ON TRUE
 
+        WHERE
+          p.status = 'active'
+          AND EXISTS (
+            SELECT 1
+            FROM access_codes ac
+            WHERE
+              ac.profile_id = p.id
+              AND ac.active = TRUE
+              AND ac.approved = TRUE
+          )
+
         GROUP BY
           p.id,
           p.profile_code,
@@ -267,6 +278,17 @@ export async function GET(
 
         JOIN user_profiles p
           ON p.id = e.profile_id
+
+        WHERE
+          p.status = 'active'
+          AND EXISTS (
+            SELECT 1
+            FROM access_codes ac
+            WHERE
+              ac.profile_id = p.id
+              AND ac.active = TRUE
+              AND ac.approved = TRUE
+          )
 
         ORDER BY
           e.occurred_at DESC,
