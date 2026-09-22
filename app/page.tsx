@@ -963,15 +963,17 @@ export default function Home() {
             Talabalar
           </a>
 
-          <button
-            type="button"
-            className="menuButton"
-            onClick={() =>
-              router.push("/profile")
-            }
-          >
-            Profil
-          </button>
+          {!isAdmin && (
+            <button
+              type="button"
+              className="menuButton"
+              onClick={() =>
+                router.push("/profile")
+              }
+            >
+              Profil
+            </button>
+          )}
 
           <a
             href="#abituriyent"
@@ -1000,34 +1002,19 @@ export default function Home() {
           </button>
 
           {isAdmin && (
-            <>
-              <button
-                type="button"
-                className="menuButton"
-                onClick={() =>
-                  router.push(
-                    "/admin/requests"
-                  )
-                }
-              >
-                Admin
-              </button>
-
-              <button
-                type="button"
-                className="menuButton"
-                onClick={() =>
-                  router.push(
-                    "/admin/bulk-codes"
-                  )
-                }
-              >
-                Ommaviy kodlar
-              </button>
-            </>
+            <button
+              type="button"
+              className="menuButton"
+              onClick={() =>
+                router.push("/admin")
+              }
+            >
+              Admin
+            </button>
           )}
 
           <button
+            type="button"
             className="exitButton"
             onClick={logout}
           >
