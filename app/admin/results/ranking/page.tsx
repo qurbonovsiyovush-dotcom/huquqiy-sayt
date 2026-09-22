@@ -267,6 +267,28 @@ export default function AdminRankingPage() {
     setUpdatingProfileId,
   ] = useState<string | null>(null);
 
+  const [
+    managerSelectionMode,
+    setManagerSelectionMode,
+  ] = useState(false);
+
+  const [
+    managerSelectedIds,
+    setManagerSelectedIds,
+  ] = useState<Set<string>>(
+    new Set()
+  );
+
+  const [
+    archivingProfileId,
+    setArchivingProfileId,
+  ] = useState<string | null>(null);
+
+  const [
+    archivingSelected,
+    setArchivingSelected,
+  ] = useState(false);
+
   /* =====================================================
      LOAD
   ===================================================== */
@@ -579,6 +601,23 @@ export default function AdminRankingPage() {
     rankingProfiles.length -
     rankingEnabledCount;
 
+  const allVisibleManagerSelected =
+    visibleProfiles.length > 0 &&
+    visibleProfiles.every(
+      (profile) =>
+        managerSelectedIds.has(
+          profile.id
+        )
+    );
+
+  const selectedManagerProfiles =
+    visibleProfiles.filter(
+      (profile) =>
+        managerSelectedIds.has(
+          profile.id
+        )
+    );
+
   const topThree =
     ranking.slice(
       0,
@@ -731,6 +770,239 @@ export default function AdminRankingPage() {
         return next;
       }
     );
+  }
+
+
+  /* =====================================================
+     REYTING BOSHQARUVI — PROFIL TANLASH / ARXIV
+  ===================================================== */
+
+  function toggleManagerProfile(
+    profileId: string
+  ) {
+    setManagerSelectedIds(
+      (current) => {
+        const next =
+          new Set(current);
+
+        if (
+          next.has(profileId)
+        ) {
+          next.delete(
+            profileId
+          );
+        } else {
+          next.add(
+            profileId
+          );
+        }
+
+        return next;
+      }
+    );
+  }
+
+  function toggleAllManagerVisible() {
+    setManagerSelectedIds(
+      (current) => {
+        const next =
+          new Set(current);
+
+        if (
+          allVisibleManagerSelected
+        ) {
+          for (
+            const profile of
+            visibleProfiles
+          ) {
+            next.delete(
+              profile.id
+            );
+          }
+        } else {
+          for (
+            const profile of
+            visibleProfiles
+          ) {
+            next.add(
+              profile.id
+            );
+          }
+        }
+
+        return next;
+      }
+    );
+  }
+
+  function closeManagerSelection() {
+    setManagerSelectedIds(
+      new Set()
+    );
+    setManagerSelectionMode(
+      false
+    );
+  }
+
+  async function archiveProfileRequest(
+    profileId: string
+  ) {
+    const response =
+      await fetch(
+        "/api/admin/profiles",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body:
+            JSON.stringify({
+              action:
+                "archive",
+              profileId,
+            }),
+        }
+      );
+
+    const data =
+      await readJson(
+        response
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          "Profilni ro‘yxatdan chiqarib bo‘lmadi."
+      );
+    }
+
+    return data;
+  }
+
+  async function archiveRankingProfile(
+    profile: RankingProfile
+  ) {
+    const first =
+      window.confirm(
+        `${profile.fullName} profilini ro‘yxatdan chiqarasizmi?\n\nProfil reyting boshqaruvidan yo‘qoladi va kirish kodlari faolsizlanadi. Test hamda to‘lov tarixi saqlanadi.`
+      );
+
+    if (!first) {
+      return;
+    }
+
+    const second =
+      window.confirm(
+        `Oxirgi tasdiq:\n\n${profile.fullName} profilini ro‘yxatdan chiqarishni tasdiqlaysizmi?`
+      );
+
+    if (!second) {
+      return;
+    }
+
+    setArchivingProfileId(
+      profile.id
+    );
+
+    try {
+      await archiveProfileRequest(
+        profile.id
+      );
+
+      setManagerSelectedIds(
+        (current) => {
+          const next =
+            new Set(current);
+
+          next.delete(
+            profile.id
+          );
+
+          return next;
+        }
+      );
+
+      await loadRanking();
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "Profilni ro‘yxatdan chiqarishda xatolik."
+      );
+    } finally {
+      setArchivingProfileId(
+        null
+      );
+    }
+  }
+
+  async function archiveSelectedProfiles() {
+    if (
+      managerSelectedIds.size === 0
+    ) {
+      window.alert(
+        "Avval ro‘yxatdan chiqariladigan profillarni tanlang."
+      );
+      return;
+    }
+
+    const profiles =
+      rankingProfiles.filter(
+        (profile) =>
+          managerSelectedIds.has(
+            profile.id
+          )
+      );
+
+    const first =
+      window.confirm(
+        `${profiles.length} ta profilni ro‘yxatdan chiqarasizmi?\n\nUlarning kirish kodlari faolsizlanadi. Test natijalari va to‘lov tarixi saqlanadi.`
+      );
+
+    if (!first) {
+      return;
+    }
+
+    const second =
+      window.confirm(
+        `Oxirgi tasdiq:\n\nTanlangan ${profiles.length} ta profilni ro‘yxatdan chiqarish tasdiqlansinmi?`
+      );
+
+    if (!second) {
+      return;
+    }
+
+    setArchivingSelected(
+      true
+    );
+
+    try {
+      for (
+        const profile of
+        profiles
+      ) {
+        await archiveProfileRequest(
+          profile.id
+        );
+      }
+
+      closeManagerSelection();
+
+      await loadRanking();
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "Tanlangan profillarni ro‘yxatdan chiqarishda xatolik."
+      );
+
+      await loadRanking();
+    } finally {
+      setArchivingSelected(
+        false
+      );
+    }
   }
 
   /* =====================================================
@@ -1756,14 +2028,40 @@ export default function AdminRankingPage() {
                   </span>
                 </div>
 
-                <div className="rankingManagerStats">
-                  <span className="managerOnBadge">
-                    ON: {rankingEnabledCount}
-                  </span>
+                <div className="rankingManagerTopRight">
+                  <div className="rankingManagerStats">
+                    <span className="managerOnBadge">
+                      ON: {rankingEnabledCount}
+                    </span>
 
-                  <span className="managerOffBadge">
-                    OFF: {rankingDisabledCount}
-                  </span>
+                    <span className="managerOffBadge">
+                      OFF: {rankingDisabledCount}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={
+                      managerSelectionMode
+                        ? "managerSelectButton activeManagerSelect"
+                        : "managerSelectButton"
+                    }
+                    onClick={() => {
+                      if (
+                        managerSelectionMode
+                      ) {
+                        closeManagerSelection();
+                      } else {
+                        setManagerSelectionMode(
+                          true
+                        );
+                      }
+                    }}
+                  >
+                    {managerSelectionMode
+                      ? `Tanlash (${managerSelectedIds.size})`
+                      : "Profillarni tanlash"}
+                  </button>
                 </div>
               </div>
 
@@ -1780,6 +2078,55 @@ export default function AdminRankingPage() {
                 />
               </div>
 
+              {managerSelectionMode && (
+                <div className="managerSelectionBar">
+                  <label className="managerMasterCheck">
+                    <input
+                      type="checkbox"
+                      checked={
+                        allVisibleManagerSelected
+                      }
+                      onChange={
+                        toggleAllManagerVisible
+                      }
+                    />
+
+                    <span>
+                      Ko‘rinib turganlarning barchasini tanlash
+                    </span>
+                  </label>
+
+                  <div className="managerSelectionActions">
+                    <button
+                      type="button"
+                      className="managerCancelSelectButton"
+                      onClick={
+                        closeManagerSelection
+                      }
+                    >
+                      Bekor qilish
+                    </button>
+
+                    <button
+                      type="button"
+                      className="managerBulkArchiveButton"
+                      disabled={
+                        managerSelectedIds.size ===
+                          0 ||
+                        archivingSelected
+                      }
+                      onClick={() =>
+                        void archiveSelectedProfiles()
+                      }
+                    >
+                      {archivingSelected
+                        ? "O‘chirilmoqda..."
+                        : `Tanlanganlarni o‘chirish (${managerSelectedIds.size})`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="rankingProfileList">
                 {visibleProfiles.map(
                   (profile) => (
@@ -1791,14 +2138,34 @@ export default function AdminRankingPage() {
                       }
                       key={profile.id}
                     >
-                      <div className="rankingProfileIdentity">
-                        <strong>
-                          {profile.fullName}
-                        </strong>
+                      <div className="rankingProfileLeft">
+                        {managerSelectionMode && (
+                          <label className="managerProfileCheck">
+                            <input
+                              type="checkbox"
+                              checked={
+                                managerSelectedIds.has(
+                                  profile.id
+                                )
+                              }
+                              onChange={() =>
+                                toggleManagerProfile(
+                                  profile.id
+                                )
+                              }
+                            />
+                          </label>
+                        )}
 
-                        <span>
-                          {profile.profileCode || profile.id}
-                        </span>
+                        <div className="rankingProfileIdentity">
+                          <strong>
+                            {profile.fullName}
+                          </strong>
+
+                          <span>
+                            {profile.profileCode || profile.id}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="rankingProfileState">
@@ -1817,7 +2184,9 @@ export default function AdminRankingPage() {
                           }
                           disabled={
                             updatingProfileId ===
-                            profile.id
+                              profile.id ||
+                            archivingProfileId ===
+                              profile.id
                           }
                           onClick={() =>
                             void toggleRankingProfile(
@@ -1836,6 +2205,29 @@ export default function AdminRankingPage() {
                                 : "OFF"}
                           </strong>
                         </button>
+
+                        {!managerSelectionMode && (
+                          <button
+                            type="button"
+                            className="profileArchiveButton"
+                            title="Ro‘yxatdan chiqarish"
+                            aria-label={`${profile.fullName} profilini ro‘yxatdan chiqarish`}
+                            disabled={
+                              archivingProfileId ===
+                              profile.id
+                            }
+                            onClick={() =>
+                              void archiveRankingProfile(
+                                profile
+                              )
+                            }
+                          >
+                            {archivingProfileId ===
+                            profile.id
+                              ? "…"
+                              : "✕"}
+                          </button>
+                        )}
                       </div>
                     </article>
                   )
@@ -6396,6 +6788,184 @@ export default function AdminRankingPage() {
           right: 4px;
         }
 
+
+        .rankingManagerTopRight {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 0 0 auto;
+        }
+
+        .managerSelectButton {
+          min-height: 34px;
+          padding: 0 13px;
+          border: 1px solid #4c879f;
+          border-radius: 9px;
+          background:
+            linear-gradient(
+              180deg,
+              #eefbff,
+              #9ed7ee
+            );
+          color: #154f6a;
+          cursor: pointer;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #5f94a8;
+          font-family: inherit;
+          font-weight: 900;
+        }
+
+        .managerSelectButton.activeManagerSelect {
+          border-color: #9b6a1e;
+          background:
+            linear-gradient(
+              180deg,
+              #fff7d6,
+              #efce70
+            );
+          color: #6a4b0e;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #a17c31;
+        }
+
+        .managerSelectionBar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: -2px 0 12px;
+          padding: 10px 12px;
+          border: 1px solid #a8afb3;
+          border-radius: 10px;
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #e7eaec
+            );
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 rgba(0,0,0,.14);
+        }
+
+        .managerMasterCheck,
+        .managerProfileCheck {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #304b59;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .managerMasterCheck input,
+        .managerProfileCheck input {
+          width: 18px;
+          height: 18px;
+          accent-color: #2694bd;
+          cursor: pointer;
+        }
+
+        .managerSelectionActions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .managerCancelSelectButton,
+        .managerBulkArchiveButton {
+          min-height: 34px;
+          padding: 0 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .managerCancelSelectButton {
+          border: 1px solid #78868c;
+          background:
+            linear-gradient(
+              180deg,
+              #fff,
+              #d9dfe2
+            );
+          color: #354952;
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 3px 0 #879399;
+        }
+
+        .managerBulkArchiveButton {
+          border: 1px solid #aa4f4f;
+          background:
+            linear-gradient(
+              180deg,
+              #ffb7b7,
+              #df6f6f
+            );
+          color: #7c1d1d;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.72),
+            0 3px 0 #9e5151;
+        }
+
+        .managerBulkArchiveButton:disabled {
+          opacity: .55;
+          cursor: not-allowed;
+        }
+
+        .rankingProfileLeft {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .managerProfileCheck {
+          flex: 0 0 auto;
+        }
+
+        .profileArchiveButton {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 34px;
+          border: 1px solid #aa4f4f;
+          border-radius: 9px;
+          background:
+            linear-gradient(
+              180deg,
+              #fff1f1,
+              #e98d8d
+            );
+          color: #9b2020;
+          cursor: pointer;
+          box-shadow:
+            inset 0 2px 0 rgba(255,255,255,.84),
+            0 3px 0 #a45b5b;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .profileArchiveButton:hover {
+          transform: translateY(-1px);
+        }
+
+        .profileArchiveButton:disabled {
+          opacity: .55;
+          cursor: wait;
+          transform: none;
+        }
+
         .rankingManagerEmpty {
           grid-column: 1 / -1;
           padding: 18px;
@@ -6408,6 +6978,26 @@ export default function AdminRankingPage() {
         }
 
         @media (max-width: 900px) {
+          .rankingManagerTopRight {
+            width: 100%;
+            justify-content: space-between;
+            flex-wrap: wrap;
+          }
+
+          .managerSelectionBar {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .managerSelectionActions {
+            width: 100%;
+          }
+
+          .managerCancelSelectButton,
+          .managerBulkArchiveButton {
+            flex: 1 1 auto;
+          }
+
           .rankingProfileList {
             grid-template-columns: 1fr;
           }
@@ -6426,7 +7016,12 @@ export default function AdminRankingPage() {
 
           .rankingProfileState {
             width: 100%;
-            justify-content: space-between;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+          }
+
+          .rankingProfileLeft {
+            width: 100%;
           }
 
           .rankingProfileState > span {
