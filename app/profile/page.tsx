@@ -275,14 +275,14 @@ function financeName(
     item.entryType ===
     "debt"
   ) {
-    return "Qarz belgilandi";
+    return "To‘lov summasi belgilandi";
   }
 
   if (
     item.entryType ===
     "adjustment"
   ) {
-    return "Qarz tuzatildi";
+    return "To‘lov summasi tuzatildi";
   }
 
   return "Moliyaviy o‘zgarish";
@@ -338,6 +338,15 @@ function financeAmountText(
     return `− ${money(
       Math.abs(item.amount)
     )}`;
+  }
+
+  if (
+    item.entryType ===
+    "debt"
+  ) {
+    return money(
+      Math.abs(item.amount)
+    );
   }
 
   const sign =
@@ -932,47 +941,47 @@ export default function ProfilePage() {
 
           <div className="paymentTop">
             <article className="paymentCard total">
-              <span>Umumiy summa</span>
+              <div className="paymentCardHead">
+                <span className="paymentCardIcon">Σ</span>
+                <span>Umumiy summa</span>
+              </div>
               <strong>
                 {money(totalAmount)}
               </strong>
-              <small>
-                Belgilangan jami to‘lov
-              </small>
             </article>
 
             <article className="paymentCard paid">
-              <span>To‘langan</span>
+              <div className="paymentCardHead">
+                <span className="paymentCardIcon">✓</span>
+                <span>To‘langan</span>
+              </div>
               <strong>
                 {money(financeSummary.totalPaid)}
               </strong>
-              <small>
-                Amalga oshirilgan to‘lov
-              </small>
             </article>
 
             <article className="paymentCard debt">
-              <span>Qarz</span>
+              <div className="paymentCardHead">
+                <span className="paymentCardIcon">−</span>
+                <span>Qarz</span>
+              </div>
               <strong>
                 {money(
                   financeSummary.currentDebt
                 )}
               </strong>
-              <small>
-                Hali to‘lanishi kerak
-              </small>
             </article>
 
             <article className="paymentCard advance">
-              <span>Ortiqcha to‘langan</span>
+              <div className="paymentCardHead">
+                <span className="paymentCardIcon">+</span>
+                <span>Ortiqcha to‘langan</span>
+              </div>
               <strong>
                 {money(
                   financeSummary.advance
                 )}
               </strong>
-              <small>
-                Me’yordan ortiq to‘lov
-              </small>
             </article>
 
             <article
@@ -982,7 +991,10 @@ export default function ProfilePage() {
                   : ""
               }`}
             >
-              <span>To‘lov muddati</span>
+              <div className="paymentCardHead">
+                <span className="paymentCardIcon">▣</span>
+                <span>To‘lov muddati</span>
+              </div>
 
               <strong>
                 {paymentPeriod?.dueDate
@@ -991,35 +1003,30 @@ export default function ProfilePage() {
                     )
                   : "Belgilanmagan"}
               </strong>
-
-              <small>
-                {paymentPeriod?.daysLeft === null ||
-                paymentPeriod?.daysLeft ===
-                  undefined
-                  ? ""
-                  : paymentPeriod.daysLeft < 0
-                    ? `${Math.abs(
-                        paymentPeriod.daysLeft
-                      )} kun o‘tgan`
-                    : paymentPeriod.daysLeft === 0
-                      ? "Bugun oxirgi kun"
-                      : `${paymentPeriod.daysLeft} kun qoldi`}
-              </small>
             </article>
           </div>
 
           <div className="paymentProgressBox">
             <div className="paymentProgressHeader">
-              <div>
-                <span>To‘lov davri</span>
+              <div className="currentPeriodRoute">
                 <strong>
-                  {paymentPeriod
-                    ? `${formatDateOnly(
+                  {paymentPeriod?.startDate
+                    ? formatDateOnly(
                         paymentPeriod.startDate
-                      )} — ${formatDateOnly(
+                      )
+                    : "—"}
+                </strong>
+
+                <div className="currentPeriodLine">
+                  <span />
+                </div>
+
+                <strong>
+                  {paymentPeriod?.dueDate
+                    ? formatDateOnly(
                         paymentPeriod.dueDate
-                      )}`
-                    : "Belgilanmagan"}
+                      )
+                    : "—"}
                 </strong>
               </div>
 
@@ -1077,11 +1084,46 @@ export default function ProfilePage() {
                         ? "neutralText"
                         : item.amount < 0
                           ? "greenText"
-                          : "redText";
+                          : "chargeText";
+
+                  const periodStart =
+                    item.periodStart
+                      ? formatDateOnly(
+                          item.periodStart
+                        )
+                      : "—";
+
+                  const periodEnd =
+                    item.dueDate
+                      ? formatDateOnly(
+                          item.dueDate
+                        )
+                      : extractDateFromText(
+                            item.note
+                          )
+                        ? formatDateOnly(
+                            extractDateFromText(
+                              item.note
+                            )
+                          )
+                        : "—";
+
+                  const chargeSettled =
+                    item.entryType ===
+                      "debt" &&
+                    totalAmount > 0 &&
+                    financeSummary.currentDebt <=
+                      0 &&
+                    financeSummary.totalPaid >=
+                      totalAmount;
 
                   return (
                     <article
-                      className={`historyItem ${kind}`}
+                      className={`historyItem ${kind} ${
+                        chargeSettled
+                          ? "settledCharge"
+                          : ""
+                      }`}
                       key={item.id}
                     >
                       <div className="historyIndex">
@@ -1090,10 +1132,17 @@ export default function ProfilePage() {
 
                       <div className="historyContent">
                         <div className="historyItemTop">
-                          <div>
+                          <div className="historyTitleGroup">
                             <strong className="historyAction">
                               {financeName(item)}
                             </strong>
+
+                            {chargeSettled && (
+                              <span className="settledBadge">
+                                To‘liq to‘langan
+                              </span>
+                            )}
+
                             <span className="historyDate">
                               {formatDateTime(
                                 item.occurredAt
@@ -1108,26 +1157,40 @@ export default function ProfilePage() {
                           </strong>
                         </div>
 
-                        {(periodEntry ||
-                          financeNoteText(item)) && (
-                          <div className="historyDetails">
-                            {periodEntry && (
-                              <div className="historyDetail periodDetail">
-                                <span>Davr / muddat</span>
-                                <strong>
-                                  {financePeriodText(item)}
-                                </strong>
-                              </div>
-                            )}
+                        {periodEntry && (
+                          <div className="creativePeriod">
+                            <div className="periodDatePoint start">
+                              <span className="periodDot" />
+                              <strong>
+                                {periodStart}
+                              </strong>
+                              <small>
+                                Boshlanish
+                              </small>
+                            </div>
 
-                            {financeNoteText(item) && (
-                              <div className="historyDetail">
-                                <span>Izoh</span>
-                                <strong>
-                                  {financeNoteText(item)}
-                                </strong>
-                              </div>
-                            )}
+                            <div className="periodConnector">
+                              <span className="connectorLine" />
+                              <span className="connectorArrow">
+                                →
+                              </span>
+                            </div>
+
+                            <div className="periodDatePoint end">
+                              <span className="periodDot" />
+                              <strong>
+                                {periodEnd}
+                              </strong>
+                              <small>
+                                Muddat
+                              </small>
+                            </div>
+                          </div>
+                        )}
+
+                        {financeNoteText(item) && (
+                          <div className="historyNote">
+                            {financeNoteText(item)}
                           </div>
                         )}
                       </div>
@@ -1730,121 +1793,118 @@ export default function ProfilePage() {
         }
 
         .paymentCard {
+          position: relative;
           min-width: 0;
-          min-height: 112px;
-          padding: 16px;
-          border-radius: 14px;
+          min-height: 104px;
+          padding: 14px 15px;
+          overflow: hidden;
+          border-radius: 15px;
           box-shadow:
-            inset 0 2px 0 rgba(255,255,255,.78),
-            0 5px 0 rgba(0,0,0,.23);
+            inset 0 2px 0 rgba(255,255,255,.88),
+            0 5px 0 rgba(0,0,0,.24),
+            0 10px 20px rgba(0,0,0,.08);
         }
 
-        .paymentCard span,
-        .paymentCard strong,
-        .paymentCard small {
-          display: block;
+        .paymentCard::after {
+          content: "";
+          position: absolute;
+          right: -25px;
+          bottom: -38px;
+          width: 105px;
+          height: 105px;
+          border-radius: 50%;
+          background: rgba(255,255,255,.18);
+          pointer-events: none;
         }
 
-        .paymentCard span {
-          margin-bottom: 7px;
-          color: #4f5d66;
+        .paymentCardHead {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          color: #334b59;
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 800;
+        }
+
+        .paymentCardIcon {
+          width: 28px;
+          height: 28px;
+          display: inline-flex !important;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 28px;
+          margin: 0 !important;
+          border: 1px solid currentColor;
+          border-radius: 50%;
+          background: rgba(255,255,255,.58);
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 2px 0 rgba(0,0,0,.16);
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 15px;
+          font-weight: 900;
         }
 
         .paymentCard strong {
-          font-size: 21px;
+          position: relative;
+          z-index: 1;
+          display: block;
+          font-size: 22px;
           line-height: 1.15;
-        }
-
-        .paymentCard small {
-          margin-top: 8px;
-          color: rgba(35, 49, 58, .72);
-          font-size: 10px;
-          font-weight: 700;
         }
 
         .paymentCard.total {
           border: 1px solid #6f8fa4;
           background:
-            linear-gradient(
-              180deg,
-              #f0faff,
-              #bddff0
-            );
+            linear-gradient(145deg, #f5fcff, #add9ee);
           color: #154f70;
         }
 
         .paymentCard.paid {
           border: 1px solid #6fa17d;
           background:
-            linear-gradient(
-              180deg,
-              #ecfff0,
-              #afe2bb
-            );
+            linear-gradient(145deg, #f1fff4, #a7deb5);
           color: #166337;
         }
 
         .paymentCard.debt {
           border: 1px solid #ad6b6b;
           background:
-            linear-gradient(
-              180deg,
-              #fff1f1,
-              #efb2b2
-            );
+            linear-gradient(145deg, #fff5f5, #efb0b0);
           color: #9d2727;
         }
 
         .paymentCard.advance {
           border: 1px solid #6e93aa;
           background:
-            linear-gradient(
-              180deg,
-              #eef9ff,
-              #b7dff2
-            );
+            linear-gradient(145deg, #f4fbff, #acd9ee);
           color: #175b80;
         }
 
         .paymentCard.deadline {
           border: 1px solid #b99744;
           background:
-            linear-gradient(
-              180deg,
-              #fff8d9,
-              #efd785
-            );
+            linear-gradient(145deg, #fff9df, #ecd176);
           color: #6d5311;
-        }
-
-        .paymentCard.deadline small {
-          color: #7a651f;
         }
 
         .paymentCard.deadlineOverdue {
           border-color: #ad6b6b;
           background:
-            linear-gradient(
-              180deg,
-              #fff1f1,
-              #efb2b2
-            );
+            linear-gradient(145deg, #fff2f2, #efa9a9);
           color: #9d2727;
         }
 
         .paymentProgressBox {
           margin-top: 16px;
-          padding: 14px 16px 16px;
-          border: 1px solid #91989b;
-          border-radius: 12px;
+          padding: 13px 16px 15px;
+          border: 1px solid #90999d;
+          border-radius: 13px;
           background:
-            linear-gradient(
-              180deg,
-              #f9f9f9,
-              #d8d8d8
-            );
+            linear-gradient(180deg, #fafafa, #d7d7d7);
           box-shadow:
             inset 0 2px 0 #fff,
             0 4px 0 rgba(0,0,0,.20);
@@ -1854,40 +1914,86 @@ export default function ProfilePage() {
           display: grid;
           grid-template-columns:
             minmax(0, 1fr)
-            minmax(220px, .55fr);
+            minmax(180px, .34fr);
+          gap: 16px;
+          align-items: center;
+          margin-bottom: 12px;
+          padding-bottom: 11px;
+          border-bottom: 1px solid #c3c3c3;
+        }
+
+        .currentPeriodRoute {
+          display: grid;
+          grid-template-columns:
+            auto minmax(80px, 1fr) auto;
           gap: 12px;
-          margin-bottom: 13px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid #c4c4c4;
+          align-items: center;
         }
 
-        .paymentProgressHeader > div {
-          min-width: 0;
+        .currentPeriodRoute strong {
+          color: #0d567c;
+          font-size: 13px;
+          white-space: nowrap;
         }
 
-        .paymentProgressHeader span,
-        .paymentProgressHeader strong {
-          display: block;
+        .currentPeriodLine {
+          position: relative;
+          height: 8px;
+          border-radius: 999px;
+          background:
+            linear-gradient(
+              180deg,
+              #89d8f3,
+              #239cc8
+            );
+          box-shadow:
+            inset 0 1px 1px rgba(0,0,0,.18),
+            0 1px 0 #fff;
         }
 
-        .paymentProgressHeader span {
-          margin-bottom: 4px;
-          color: #5c666c;
-          font-size: 11px;
-          font-weight: 700;
+        .currentPeriodLine::before,
+        .currentPeriodLine::after {
+          content: "";
+          position: absolute;
+          top: 50%;
+          width: 14px;
+          height: 14px;
+          transform: translateY(-50%);
+          border: 2px solid #176f96;
+          border-radius: 50%;
+          background: #eaf9ff;
+          box-shadow:
+            inset 0 1px 0 #fff,
+            0 2px 0 rgba(0,0,0,.15);
         }
 
-        .paymentProgressHeader strong {
-          color: #0b527b;
-          font-size: 14px;
+        .currentPeriodLine::before {
+          left: -3px;
+        }
+
+        .currentPeriodLine::after {
+          right: -3px;
         }
 
         .paymentState {
           text-align: right;
         }
 
+        .paymentState span,
         .paymentState strong {
-          color: #243d4a;
+          display: block;
+        }
+
+        .paymentState span {
+          margin-bottom: 3px;
+          color: #6b7174;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .paymentState strong {
+          color: #253e4a;
+          font-size: 13px;
         }
 
         .progressLabels {
@@ -1913,11 +2019,7 @@ export default function ProfilePage() {
           border: 1px solid #99a6ad;
           border-radius: 999px;
           background:
-            linear-gradient(
-              180deg,
-              #d5d9db,
-              #b9c0c4
-            );
+            linear-gradient(180deg, #d5d9db, #b9c0c4);
           box-shadow:
             inset 0 2px 3px rgba(0,0,0,.18);
         }
@@ -1926,41 +2028,37 @@ export default function ProfilePage() {
           height: 100%;
           border-radius: inherit;
           background:
-            linear-gradient(
-              180deg,
-              #45c0ee,
-              #168fbd
-            );
+            linear-gradient(180deg, #45c0ee, #168fbd);
           box-shadow:
             inset 0 1px 0 rgba(255,255,255,.55);
           transition: width .25s ease;
         }
 
         .historyBlock {
-          margin-top: 20px;
+          margin-top: 22px;
         }
 
         .historyBlock h2 {
-          margin: 0 0 12px;
+          margin: 0 0 13px;
           color: #fff;
-          font-size: 20px;
-          text-shadow:
-            0 1px 0 rgba(0,0,0,.35);
+          font-size: 21px;
+          letter-spacing: .2px;
+          text-shadow: 0 1px 0 rgba(0,0,0,.40);
         }
 
         .historyTimeline {
           display: grid;
-          gap: 12px;
+          gap: 13px;
         }
 
         .historyItem {
           display: grid;
-          grid-template-columns: 46px minmax(0, 1fr);
+          grid-template-columns: 48px minmax(0, 1fr);
           gap: 12px;
-          padding: 13px;
+          padding: 13px 14px;
           border: 1px solid #a8afb2;
           border-left-width: 5px;
-          border-radius: 13px;
+          border-radius: 14px;
           background:
             linear-gradient(180deg, #ffffff, #ededed);
           box-shadow:
@@ -1972,39 +2070,37 @@ export default function ProfilePage() {
           border-color: #72b88a;
           border-left-color: #2f9d59;
           background:
-            linear-gradient(
-              180deg,
-              #f4fff7 0%,
-              #e3f7e9 100%
-            );
+            linear-gradient(145deg, #f7fff8, #dff6e6);
           box-shadow:
             inset 0 2px 0 #fff,
             0 4px 0 #6ca27b;
         }
 
         .historyItem.debt {
-          border-color: #d99a9a;
-          border-left-color: #d14b4b;
+          border-color: #d3b36d;
+          border-left-color: #b88a25;
           background:
-            linear-gradient(
-              180deg,
-              #fff8f8 0%,
-              #f8e4e4 100%
-            );
+            linear-gradient(145deg, #fffdf5, #f4e6bd);
           box-shadow:
             inset 0 2px 0 #fff,
-            0 4px 0 #ad7474;
+            0 4px 0 #a99561;
+        }
+
+        .historyItem.debt.settledCharge {
+          border-color: #8db39a;
+          border-left-color: #4f9d68;
+          background:
+            linear-gradient(145deg, #fbfffc, #e0f2e5);
+          box-shadow:
+            inset 0 2px 0 #fff,
+            0 4px 0 #769f82;
         }
 
         .historyItem.period {
           border-color: #88bad1;
           border-left-color: #2a8fbd;
           background:
-            linear-gradient(
-              180deg,
-              #f5fbff 0%,
-              #e3f2f9 100%
-            );
+            linear-gradient(145deg, #f7fcff, #dceff8);
           box-shadow:
             inset 0 2px 0 #fff,
             0 4px 0 #6f9daf;
@@ -2014,111 +2110,15 @@ export default function ProfilePage() {
           border-color: #d6bd78;
           border-left-color: #b58b2c;
           background:
-            linear-gradient(
-              180deg,
-              #fffdf6 0%,
-              #f5ecd3 100%
-            );
+            linear-gradient(145deg, #fffdf6, #f5ecd3);
           box-shadow:
             inset 0 2px 0 #fff,
             0 4px 0 #a99561;
         }
 
-        .historyItem.payment .historyIndex {
-          border-color: #3f945b;
-          color: #176d37;
-          background:
-            linear-gradient(
-              180deg,
-              #effff3,
-              #aee3bc
-            );
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 3px 0 #5b9270;
-        }
-
-        .historyItem.debt .historyIndex {
-          border-color: #b95555;
-          color: #9e2525;
-          background:
-            linear-gradient(
-              180deg,
-              #fff3f3,
-              #efb6b6
-            );
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 3px 0 #a76a6a;
-        }
-
-        .historyItem.period .historyIndex {
-          border-color: #3f8fb2;
-          color: #155f83;
-          background:
-            linear-gradient(
-              180deg,
-              #eefaff,
-              #b6dff1
-            );
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 3px 0 #688fa1;
-        }
-
-        .historyItem.adjustment .historyIndex {
-          border-color: #9b7928;
-          color: #795b13;
-          background:
-            linear-gradient(
-              180deg,
-              #fffbed,
-              #ead490
-            );
-          box-shadow:
-            inset 0 2px 0 #fff,
-            0 3px 0 #9b8751;
-        }
-
-        .historyItem.payment .historyAction {
-          color: #16723a;
-        }
-
-        .historyItem.debt .historyAction {
-          color: #a12d2d;
-        }
-
-        .historyItem.period .historyAction {
-          color: #17658b;
-        }
-
-        .historyItem.adjustment .historyAction {
-          color: #795b13;
-        }
-
-        .historyItem.payment .historyAmount {
-          border: 1px solid #96cda6;
-          background: #e8f8ed;
-        }
-
-        .historyItem.debt .historyAmount {
-          border: 1px solid #e0a5a5;
-          background: #fdecec;
-        }
-
-        .historyItem.period .historyAmount {
-          border: 1px solid #a8cfe0;
-          background: #ecf8fd;
-        }
-
-        .historyItem.adjustment .historyAmount {
-          border: 1px solid #dccb96;
-          background: #fff8df;
-        }
-
         .historyIndex {
-          width: 38px;
-          height: 38px;
+          width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2134,6 +2134,27 @@ export default function ProfilePage() {
           font-weight: 900;
         }
 
+        .historyItem.payment .historyIndex {
+          border-color: #3f945b;
+          color: #176d37;
+          background:
+            linear-gradient(180deg, #effff3, #aee3bc);
+        }
+
+        .historyItem.debt .historyIndex {
+          border-color: #9b7928;
+          color: #795b13;
+          background:
+            linear-gradient(180deg, #fffbed, #ead490);
+        }
+
+        .historyItem.period .historyIndex {
+          border-color: #3f8fb2;
+          color: #155f83;
+          background:
+            linear-gradient(180deg, #eefaff, #b6dff1);
+        }
+
         .historyContent {
           min-width: 0;
         }
@@ -2144,7 +2165,11 @@ export default function ProfilePage() {
           justify-content: space-between;
           gap: 16px;
           padding-bottom: 10px;
-          border-bottom: 1px solid #d5d9db;
+          border-bottom: 1px solid rgba(110,120,125,.24);
+        }
+
+        .historyTitleGroup {
+          min-width: 0;
         }
 
         .historyAction,
@@ -2154,7 +2179,19 @@ export default function ProfilePage() {
 
         .historyAction {
           color: #183f55;
-          font-size: 15px;
+          font-size: 16px;
+        }
+
+        .historyItem.payment .historyAction {
+          color: #16723a;
+        }
+
+        .historyItem.debt .historyAction {
+          color: #765814;
+        }
+
+        .historyItem.period .historyAction {
+          color: #17658b;
         }
 
         .historyDate {
@@ -2164,65 +2201,158 @@ export default function ProfilePage() {
           font-size: 11px;
         }
 
+        .settledBadge {
+          display: inline-flex;
+          align-items: center;
+          margin-top: 7px;
+          padding: 4px 8px;
+          border: 1px solid #6fa17d;
+          border-radius: 999px;
+          background: #e9f8ed;
+          color: #176d37;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+          font-weight: 800;
+        }
+
         .historyAmount {
           flex: 0 0 auto;
           padding: 7px 10px;
-          border-radius: 8px;
-          background: rgba(255,255,255,.75);
+          border-radius: 9px;
+          background: rgba(255,255,255,.76);
           font-family: Arial, Helvetica, sans-serif;
           font-size: 13px;
           white-space: nowrap;
         }
 
-        .historyDetails {
-          display: grid;
-          grid-template-columns:
-            repeat(2, minmax(0, 1fr));
-          gap: 10px;
-          padding-top: 10px;
+        .historyItem.payment .historyAmount {
+          border: 1px solid #96cda6;
+          background: #e8f8ed;
         }
 
-        .historyDetail {
-          min-width: 0;
-          padding: 9px 10px;
-          border: 1px solid #d1d5d7;
-          border-radius: 9px;
-          background: rgba(255,255,255,.55);
+        .historyItem.debt .historyAmount {
+          border: 1px solid #d8bd79;
+          background: #fff7de;
         }
 
-        .historyDetail span,
-        .historyDetail strong {
-          display: block;
-        }
-
-        .historyDetail span {
-          margin-bottom: 4px;
-          color: #6b6f71;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 10px;
-        }
-
-        .historyDetail strong {
-          color: #223d4c;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 12px;
-          line-height: 1.35;
-        }
-
-        .periodDetail strong {
-          color: #17648a;
+        .historyItem.period .historyAmount {
+          border: 1px solid #a8cfe0;
+          background: #ecf8fd;
         }
 
         .greenText {
-          color: #14783a;
-        }
-
-        .redText {
-          color: #b12828;
+          color: #178243;
         }
 
         .neutralText {
           color: #285a78;
+        }
+
+        .chargeText {
+          color: #765814;
+        }
+
+        .creativePeriod {
+          display: grid;
+          grid-template-columns:
+            minmax(115px, auto)
+            minmax(100px, 1fr)
+            minmax(115px, auto);
+          gap: 12px;
+          align-items: center;
+          margin-top: 12px;
+          padding: 13px 14px;
+          border: 1px solid #b6d4e2;
+          border-radius: 12px;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,.72), rgba(231,246,252,.80));
+          box-shadow:
+            inset 0 1px 0 #fff;
+        }
+
+        .periodDatePoint {
+          position: relative;
+          text-align: center;
+        }
+
+        .periodDatePoint strong,
+        .periodDatePoint small {
+          display: block;
+        }
+
+        .periodDatePoint strong {
+          color: #0f5f87;
+          font-size: 14px;
+        }
+
+        .periodDatePoint small {
+          margin-top: 4px;
+          color: #66808d;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: .4px;
+        }
+
+        .periodDot {
+          width: 17px;
+          height: 17px;
+          display: block;
+          margin: 0 auto 7px;
+          border: 3px solid #2a8fbd;
+          border-radius: 50%;
+          background: #fff;
+          box-shadow:
+            0 0 0 4px rgba(42,143,189,.14),
+            inset 0 1px 0 #fff;
+        }
+
+        .periodConnector {
+          position: relative;
+          height: 20px;
+        }
+
+        .connectorLine {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
+          height: 4px;
+          transform: translateY(-50%);
+          border-radius: 999px;
+          background:
+            repeating-linear-gradient(
+              90deg,
+              #2a8fbd 0 16px,
+              #8ed0ea 16px 26px
+            );
+          box-shadow:
+            0 1px 0 #fff;
+        }
+
+        .connectorArrow {
+          position: absolute;
+          top: 50%;
+          right: -2px;
+          transform: translateY(-54%);
+          color: #17658b;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 22px;
+          font-weight: 900;
+          background: #e8f7fd;
+          padding-left: 4px;
+        }
+
+        .historyNote {
+          margin-top: 10px;
+          padding: 8px 10px;
+          border: 1px solid rgba(105,113,118,.24);
+          border-radius: 9px;
+          background: rgba(255,255,255,.48);
+          color: #344b57;
+          font-size: 12px;
+          font-weight: 700;
         }
 
         .emptyRow {
@@ -2360,6 +2490,13 @@ export default function ProfilePage() {
             grid-column: span 2;
           }
 
+          .creativePeriod {
+            grid-template-columns:
+              minmax(105px, auto)
+              minmax(70px, 1fr)
+              minmax(105px, auto);
+          }
+
           .siteHeader {
             align-items: stretch;
             flex-direction: column;
@@ -2423,6 +2560,39 @@ export default function ProfilePage() {
 
           .paymentState {
             text-align: left;
+          }
+
+          .creativePeriod {
+            grid-template-columns: 1fr;
+          }
+
+          .periodConnector {
+            height: 42px;
+          }
+
+          .connectorLine {
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            right: auto;
+            width: 4px;
+            height: auto;
+            transform: translateX(-50%);
+            background:
+              repeating-linear-gradient(
+                180deg,
+                #2a8fbd 0 16px,
+                #8ed0ea 16px 26px
+              );
+          }
+
+          .connectorArrow {
+            top: auto;
+            right: 50%;
+            bottom: -4px;
+            transform:
+              translateX(50%)
+              rotate(90deg);
           }
 
           .navButtons {
