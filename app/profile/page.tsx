@@ -757,7 +757,7 @@ export default function ProfilePage() {
                 <div>
                   <span>Oxirgi kirish</span>
                   <strong>
-                    {formatDate(
+                    {formatDateTime(
                       profile?.lastLoginAt
                     )}
                   </strong>
@@ -1083,7 +1083,7 @@ export default function ProfilePage() {
                       </strong>
 
                       <small>
-                        {formatDate(
+                        {formatDateTime(
                           item.finishedAt
                         )}
                       </small>
