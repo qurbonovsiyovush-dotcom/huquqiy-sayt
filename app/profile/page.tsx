@@ -87,22 +87,116 @@ function money(value: number) {
   );
 }
 
-function formatDate(
+function extractIsoDate(
+  value: string | null | undefined
+) {
+  if (!value) return null;
+
+  const raw =
+    String(value).trim();
+
+  const isoMatch =
+    raw.match(
+      /(\d{4})-(\d{2})-(\d{2})/
+    );
+
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const parsed =
+    new Date(raw);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  const year =
+    parsed.getFullYear();
+
+  const month =
+    String(
+      parsed.getMonth() + 1
+    ).padStart(2, "0");
+
+  const day =
+    String(
+      parsed.getDate()
+    ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateOnly(
+  value: string | null | undefined
+) {
+  const iso =
+    extractIsoDate(value);
+
+  if (!iso) return "—";
+
+  const [year, month, day] =
+    iso.split("-");
+
+  return `${day}.${month}.${year}`;
+}
+
+function formatDateTime(
   value: string | null | undefined
 ) {
   if (!value) return "—";
 
-  try {
-    return new Intl.DateTimeFormat("uz-UZ", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
-  } catch {
-    return value;
+  const parsed =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return formatDateOnly(value);
   }
+
+  const date =
+    new Intl.DateTimeFormat(
+      "uz-UZ",
+      {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).format(parsed);
+
+  const time =
+    new Intl.DateTimeFormat(
+      "uz-UZ",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }
+    ).format(parsed);
+
+  return `${date} ${time}`;
+}
+
+function extractDateFromText(
+  value: string | null | undefined
+) {
+  if (!value) return null;
+
+  const match =
+    String(value).match(
+      /(\d{4})-(\d{2})-(\d{2})/
+    );
+
+  return match
+    ? `${match[1]}-${match[2]}-${match[3]}`
+    : null;
 }
 
 function initials(name: string) {
@@ -130,10 +224,118 @@ function sourceName(source: string) {
   return source || "Test";
 }
 
-function financeName(type: string) {
-  if (type === "payment") return "To‘lov";
-  if (type === "debt") return "Qarz";
-  return "Qarz yangilandi";
+function isPeriodEntry(
+  item: FinanceEntry
+) {
+  const note =
+    String(
+      item.note || ""
+    ).toLowerCase();
+
+  return (
+    item.entryType === "period" ||
+    (
+      Math.abs(item.amount) < 0.005 &&
+      note.includes("muddat")
+    )
+  );
+}
+
+function financeName(
+  item: FinanceEntry
+) {
+  if (isPeriodEntry(item)) {
+    return "Muddat belgilandi";
+  }
+
+  if (
+    item.entryType ===
+    "payment"
+  ) {
+    return "To‘lov qilindi";
+  }
+
+  if (
+    item.entryType ===
+    "debt"
+  ) {
+    return "Qarz belgilandi";
+  }
+
+  if (
+    item.entryType ===
+    "adjustment"
+  ) {
+    return "Qarz tuzatildi";
+  }
+
+  return "Moliyaviy o‘zgarish";
+}
+
+function financePeriodText(
+  item: FinanceEntry
+) {
+  if (!isPeriodEntry(item)) {
+    return "—";
+  }
+
+  const start =
+    item.periodStart;
+
+  const deadline =
+    item.dueDate ||
+    extractDateFromText(
+      item.note
+    );
+
+  if (
+    start &&
+    deadline
+  ) {
+    return `${formatDateOnly(
+      start
+    )} — ${formatDateOnly(
+      deadline
+    )}`;
+  }
+
+  if (deadline) {
+    return formatDateOnly(
+      deadline
+    );
+  }
+
+  return "—";
+}
+
+function financeAmountText(
+  item: FinanceEntry
+) {
+  if (isPeriodEntry(item)) {
+    return "—";
+  }
+
+  if (
+    item.entryType ===
+    "payment"
+  ) {
+    return `− ${money(
+      Math.abs(item.amount)
+    )}`;
+  }
+
+  const sign =
+    item.amount > 0
+      ? "+"
+      : item.amount < 0
+        ? "−"
+        : "";
+
+  return `${sign}${
+    sign ? " " : ""
+  }${money(
+    Math.abs(item.amount)
+  )}`;
 }
 
 export default function ProfilePage() {
@@ -296,9 +498,69 @@ export default function ProfilePage() {
     profileData?.recentAttempts || [];
 
   const activeFinanceEntries =
-    financeEntries.filter(
-      (item) => !item.isVoided
-    );
+    useMemo(() => {
+      const seen =
+        new Set<string>();
+
+      return financeEntries
+        .filter(
+          (item) =>
+            !item.isVoided
+        )
+        .filter((item) => {
+          const canonicalType =
+            isPeriodEntry(item)
+              ? "period"
+              : item.entryType;
+
+          const deadline =
+            item.dueDate ||
+            extractDateFromText(
+              item.note
+            ) ||
+            "";
+
+          const minute =
+            item.occurredAt
+              ? item.occurredAt.slice(
+                  0,
+                  16
+                )
+              : "";
+
+          const noteKey =
+            String(
+              item.note || ""
+            )
+              .trim()
+              .toLowerCase()
+              .replace(
+                /\s+/g,
+                " "
+              );
+
+          const signature =
+            [
+              canonicalType,
+              minute,
+              deadline,
+              Math.round(
+                item.amount * 100
+              ),
+              noteKey,
+            ].join("|");
+
+          if (
+            seen.has(signature)
+          ) {
+            return false;
+          }
+
+          seen.add(signature);
+
+          return true;
+        });
+    }, [financeEntries]);
 
   const totalTests = useMemo(() => {
     return new Set(
@@ -642,9 +904,9 @@ export default function ProfilePage() {
 
               <strong>
                 {paymentPeriod?.dueDate
-                  ? formatDate(
-                      `${paymentPeriod.dueDate}T00:00:00`
-                    ).split(",")[0]
+                  ? formatDateOnly(
+                      paymentPeriod.dueDate
+                    )
                   : "Belgilanmagan"}
               </strong>
 
@@ -670,8 +932,12 @@ export default function ProfilePage() {
                 </span>
 
                 <strong>
-                  {paymentPeriod.startDate || "—"} —{" "}
-                  {paymentPeriod.dueDate || "—"}
+                  {formatDateOnly(
+                    paymentPeriod.startDate
+                  )} —{" "}
+                  {formatDateOnly(
+                    paymentPeriod.dueDate
+                  )}
                 </strong>
               </div>
             )}
@@ -705,54 +971,82 @@ export default function ProfilePage() {
               <div className="historyRow head">
                 <span>#</span>
                 <span>Sana</span>
-                <span>Holat</span>
+                <span>Amal</span>
+                <span>Davr / muddat</span>
                 <span>Izoh</span>
                 <span>Summa</span>
               </div>
 
               {activeFinanceEntries
-                .slice(0, 8)
-                .map((item, index) => (
-                  <div
-                    className="historyRow"
-                    key={item.id}
-                  >
-                    <span>{index + 1}</span>
+                .slice(0, 10)
+                .map((item, index) => {
+                  const periodEntry =
+                    isPeriodEntry(
+                      item
+                    );
 
-                    <span>
-                      {formatDate(
-                        item.occurredAt
-                      )}
-                    </span>
-
-                    <span>
-                      {financeName(
-                        item.entryType
-                      )}
-                    </span>
-
-                    <span>
-                      {item.note || "—"}
-                    </span>
-
-                    <strong
-                      className={
-                        item.entryType ===
-                        "payment"
+                  const amountClass =
+                    item.entryType ===
+                    "payment"
+                      ? "greenText"
+                      : periodEntry
+                        ? "neutralText"
+                        : item.amount < 0
                           ? "greenText"
-                          : "redText"
-                      }
+                          : "redText";
+
+                  return (
+                    <div
+                      className="historyRow"
+                      key={item.id}
                     >
-                      {item.entryType ===
-                      "payment"
-                        ? "− "
-                        : "+ "}
-                      {money(
-                        Math.abs(item.amount)
-                      )}
-                    </strong>
-                  </div>
-                ))}
+                      <span>
+                        {index + 1}
+                      </span>
+
+                      <span>
+                        {formatDateTime(
+                          item.occurredAt
+                        )}
+                      </span>
+
+                      <strong
+                        className={
+                          periodEntry
+                            ? "periodAction"
+                            : ""
+                        }
+                      >
+                        {financeName(
+                          item
+                        )}
+                      </strong>
+
+                      <span
+                        className="periodCell"
+                      >
+                        {financePeriodText(
+                          item
+                        )}
+                      </span>
+
+                      <span>
+                        {item.note ||
+                          "—"}
+                      </span>
+
+                      <strong
+                        className={
+                          amountClass
+                        }
+                      >
+                        {financeAmountText(
+                          item
+                        )}
+                      </strong>
+                    </div>
+                  );
+                })}
 
               {activeFinanceEntries.length ===
                 0 && (
@@ -1522,13 +1816,14 @@ export default function ProfilePage() {
         .historyRow {
           display: grid;
           grid-template-columns:
-            55px
-            180px
-            145px
-            minmax(220px, 1fr)
-            170px;
+            50px
+            165px
+            150px
+            210px
+            minmax(240px, 1fr)
+            165px;
           align-items: center;
-          min-height: 50px;
+          min-height: 52px;
           border-bottom: 1px solid #d2d2d2;
         }
 
@@ -1563,6 +1858,19 @@ export default function ProfilePage() {
 
         .redText {
           color: #b12828;
+        }
+
+        .neutralText {
+          color: #285a78;
+        }
+
+        .periodAction {
+          color: #175f89;
+        }
+
+        .periodCell {
+          color: #174f70;
+          font-weight: 700;
         }
 
         .emptyRow {
@@ -1759,7 +2067,7 @@ export default function ProfilePage() {
           }
 
           .historyRow {
-            min-width: 850px;
+            min-width: 1040px;
           }
         }
 
