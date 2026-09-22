@@ -24,6 +24,19 @@ type SortMode =
   | "name"
   | "activity";
 
+type RankingTestItem = {
+  source: string;
+  testId: string;
+  testTitle: string;
+  workedQuestions: number;
+  correct: number;
+  incorrect: number;
+  accuracy: number;
+  attempts: number;
+  firstActivityAt: string | null;
+  lastActivityAt: string | null;
+};
+
 type RankingItem = {
   rank: number;
   userId: string;
@@ -37,6 +50,7 @@ type RankingItem = {
   earnedPoints: number;
   firstActivityAt: string | null;
   lastActivityAt: string | null;
+  tests: RankingTestItem[];
 };
 
 type RankingResponse = {
@@ -217,6 +231,13 @@ export default function AdminRankingPage() {
     setClearingAll,
   ] = useState(false);
 
+  const [
+    expandedUsers,
+    setExpandedUsers,
+  ] = useState<Set<string>>(
+    new Set()
+  );
+
   /* =====================================================
      LOAD
   ===================================================== */
@@ -232,6 +253,10 @@ export default function AdminRankingPage() {
 
     setSelectionMode(
       false
+    );
+
+    setExpandedUsers(
+      new Set()
     );
 
     void loadRanking();
@@ -595,8 +620,6 @@ export default function AdminRankingPage() {
   }
 
   function openSelectionMode() {
-    clearSelection();
-
     setSelectionMode(
       true
     );
@@ -614,6 +637,31 @@ export default function AdminRankingPage() {
     setSearch("");
     setSortMode("rank");
     setShowSelectedOnly(false);
+  }
+
+  function toggleTests(
+    userId: string
+  ) {
+    setExpandedUsers(
+      (current) => {
+        const next =
+          new Set(current);
+
+        if (
+          next.has(userId)
+        ) {
+          next.delete(
+            userId
+          );
+        } else {
+          next.add(
+            userId
+          );
+        }
+
+        return next;
+      }
+    );
   }
 
   /* =====================================================
@@ -1539,37 +1587,25 @@ export default function AdminRankingPage() {
           {selectionMode && (
           <div className="selectionBar">
             <div className="selectionLeft">
-              <button
-                type="button"
-                className="masterCheckButton"
-                onClick={
-                  toggleAllVisible
-                }
-                disabled={
-                  visibleRanking.length ===
-                  0
-                }
-                aria-pressed={
-                  allVisibleSelected
-                }
-              >
-                <span
-                  className={
+              <label className="masterCheck">
+                <input
+                  type="checkbox"
+                  checked={
                     allVisibleSelected
-                      ? "roundSelectCheck checked"
-                      : "roundSelectCheck"
                   }
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 24 24">
-                    <path d="M5 12.5l4 4L19 7" />
-                  </svg>
-                </span>
+                  onChange={
+                    toggleAllVisible
+                  }
+                  disabled={
+                    visibleRanking.length ===
+                    0
+                  }
+                />
 
                 <span>
                   Ko‘rinib turganlarning barchasini tanlash
                 </span>
-              </button>
+              </label>
 
               <div className="selectedBadge">
                 Tanlangan:{" "}
@@ -1750,37 +1786,25 @@ export default function AdminRankingPage() {
 
             <div className="rankingBoardRight">
               {selectionMode && (
-                <button
-                  type="button"
-                  className="boardSelectAll"
-                  onClick={
-                    toggleAllVisible
-                  }
-                  disabled={
-                    visibleRanking.length ===
-                    0
-                  }
-                  aria-pressed={
-                    allVisibleSelected
-                  }
-                >
-                  <span
-                    className={
+                <label className="boardSelectAll">
+                  <input
+                    type="checkbox"
+                    checked={
                       allVisibleSelected
-                        ? "roundSelectCheck checked"
-                        : "roundSelectCheck"
                     }
-                    aria-hidden="true"
-                  >
-                    <svg viewBox="0 0 24 24">
-                      <path d="M5 12.5l4 4L19 7" />
-                    </svg>
-                  </span>
+                    onChange={
+                      toggleAllVisible
+                    }
+                    disabled={
+                      visibleRanking.length ===
+                      0
+                    }
+                  />
 
                   <span>
                     Barchasini tanlash
                   </span>
-                </button>
+                </label>
               )}
 
               <div className="tableCount">
@@ -1829,38 +1853,21 @@ export default function AdminRankingPage() {
                     >
                       {selectionMode && (
                         <div className="rankingSelectBox">
-                          <button
-                            type="button"
-                            className={
-                              selected
-                                ? "userSelectButton selected"
-                                : "userSelectButton"
-                            }
-                            aria-pressed={
+                          <input
+                            type="checkbox"
+                            checked={
                               selected
                             }
-                            aria-label={`${item.userName}ni tanlash`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-
+                            onChange={() =>
                               toggleUser(
                                 item.userId
-                              );
-                            }}
-                          >
-                            <span
-                              className={
-                                selected
-                                  ? "roundSelectCheck userRoundCheck checked"
-                                  : "roundSelectCheck userRoundCheck"
-                              }
-                              aria-hidden="true"
-                            >
-                              <svg viewBox="0 0 24 24">
-                                <path d="M5 12.5l4 4L19 7" />
-                              </svg>
-                            </span>
-                          </button>
+                              )
+                            }
+                            onClick={(event) =>
+                              event.stopPropagation()
+                            }
+                            aria-label={`${item.userName}ni tanlash`}
+                          />
                         </div>
                       )}
 
@@ -1959,7 +1966,24 @@ export default function AdminRankingPage() {
                           </div>
                         </div>
 
-                        <div className="rankingMetric">
+                        <button
+                          type="button"
+                          className="rankingMetric testMetricButton"
+                          disabled={
+                            selectionMode
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleTests(
+                              item.userId
+                            );
+                          }}
+                          title={
+                            selectionMode
+                              ? "Tanlash rejimida test tafsilotlari yopiq"
+                              : "Ishlangan testlarni ko‘rish"
+                          }
+                        >
                           <span>
                             Testlar
                           </span>
@@ -1969,7 +1993,15 @@ export default function AdminRankingPage() {
                               item.testsWorked
                             }
                           </strong>
-                        </div>
+
+                          <small>
+                            {expandedUsers.has(
+                              item.userId
+                            )
+                              ? "Yopish"
+                              : "Ko‘rish"}
+                          </small>
+                        </button>
 
                         <div className="rankingMetric">
                           <span>
@@ -2029,6 +2061,140 @@ export default function AdminRankingPage() {
                             : "O‘chirish"}
                         </button>
                       </div>
+
+                      {expandedUsers.has(
+                        item.userId
+                      ) && (
+                        <div
+                          className="rankingTestsPanel"
+                          onClick={(event) =>
+                            event.stopPropagation()
+                          }
+                        >
+                          <div className="rankingTestsHeader">
+                            <div>
+                              <strong>
+                                Ishlangan testlar
+                              </strong>
+
+                              <span>
+                                {periodTitle(
+                                  period
+                                )} bo‘yicha
+                              </span>
+                            </div>
+
+                            <div className="rankingTestsCount">
+                              {
+                                item.tests.length
+                              }{" "}
+                              ta test
+                            </div>
+                          </div>
+
+                          {item.tests.length >
+                          0 ? (
+                            <div className="rankingTestsList">
+                              {item.tests.map(
+                                (
+                                  test
+                                ) => (
+                                  <article
+                                    className="rankingTestRow"
+                                    key={`${test.source}:${test.testId}`}
+                                  >
+                                    <div className="rankingTestMain">
+                                      <strong>
+                                        {
+                                          test.testTitle
+                                        }
+                                      </strong>
+
+                                      <span>
+                                        ID:{" "}
+                                        {
+                                          test.testId
+                                        }
+                                      </span>
+                                    </div>
+
+                                    <div className="rankingTestStat">
+                                      <span>
+                                        Ishlangan
+                                      </span>
+                                      <strong>
+                                        {
+                                          test.workedQuestions
+                                        }
+                                      </strong>
+                                    </div>
+
+                                    <div className="rankingTestStat correctTestStat">
+                                      <span>
+                                        To‘g‘ri
+                                      </span>
+                                      <strong>
+                                        {
+                                          test.correct
+                                        }
+                                      </strong>
+                                    </div>
+
+                                    <div className="rankingTestStat incorrectTestStat">
+                                      <span>
+                                        Noto‘g‘ri
+                                      </span>
+                                      <strong>
+                                        {
+                                          test.incorrect
+                                        }
+                                      </strong>
+                                    </div>
+
+                                    <div className="rankingTestStat">
+                                      <span>
+                                        Aniqlik
+                                      </span>
+                                      <strong>
+                                        {
+                                          test.accuracy
+                                        }
+                                        %
+                                      </strong>
+                                    </div>
+
+                                    <div className="rankingTestStat">
+                                      <span>
+                                        Urinish
+                                      </span>
+                                      <strong>
+                                        {
+                                          test.attempts
+                                        }
+                                      </strong>
+                                    </div>
+
+                                    <div className="rankingTestDate">
+                                      <span>
+                                        Oxirgi ishlangan
+                                      </span>
+                                      <strong>
+                                        {formatDate(
+                                          test.lastActivityAt
+                                        )}
+                                      </strong>
+                                    </div>
+                                  </article>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            <div className="rankingTestsEmpty">
+                              Test ma’lumoti topilmadi.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </article>
                   );
                 }
@@ -4860,6 +5026,21 @@ export default function AdminRankingPage() {
         }
 
         @media (max-width: 700px) {
+          .rankingTestRow {
+            grid-template-columns: 1fr;
+          }
+
+          .rankingTestMain,
+          .rankingTestDate {
+            grid-column: auto;
+          }
+
+          .rankingTestsHeader {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+
           .page {
             padding: 20px 9px 36px;
           }
@@ -5243,6 +5424,39 @@ export default function AdminRankingPage() {
           font-weight: 700;
         }
 
+        .testMetricButton {
+          width: 100%;
+          font-family: inherit;
+          cursor: pointer;
+          transition:
+            transform 120ms ease,
+            border-color 120ms ease,
+            box-shadow 120ms ease;
+        }
+
+        .testMetricButton small {
+          display: block;
+          margin-top: 5px;
+          color: #1b6787;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .testMetricButton:not(:disabled):hover {
+          transform: translateY(-1px);
+          border-color: #74aac1;
+          background:
+            linear-gradient(180deg, #f6fcff, #d9edf5);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 4px 0 #90aebc;
+        }
+
+        .testMetricButton:disabled {
+          cursor: default;
+          opacity: .72;
+        }
+
         .successMetric strong {
           color: #087c2d;
         }
@@ -5323,6 +5537,161 @@ export default function AdminRankingPage() {
           width: 100%;
           min-height: 39px;
           font-size: 14px;
+        }
+
+        .rankingTestsPanel {
+          grid-column: 1 / -1;
+          margin-top: 2px;
+          padding: 13px;
+          border: 1px solid #8baab8;
+          border-radius: 12px;
+          background:
+            linear-gradient(180deg, #edf9fe 0%, #dbeef6 100%);
+          box-shadow:
+            inset 0 2px 0 #ffffff,
+            0 3px 0 #7696a4;
+        }
+
+        .rankingTestsHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 10px;
+          padding-bottom: 10px;
+          border-bottom: 1px solid #b5ced8;
+        }
+
+        .rankingTestsHeader strong,
+        .rankingTestsHeader span {
+          display: block;
+        }
+
+        .rankingTestsHeader strong {
+          color: #0d4f6c;
+          font-size: 17px;
+        }
+
+        .rankingTestsHeader span {
+          margin-top: 3px;
+          color: #57737f;
+          font-size: 11px;
+        }
+
+        .rankingTestsCount {
+          flex: 0 0 auto;
+          padding: 6px 10px;
+          border: 1px solid #7da5b6;
+          border-radius: 999px;
+          background:
+            linear-gradient(180deg, #ffffff, #cfe8f2);
+          color: #155a77;
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 2px 0 #86a4b0;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .rankingTestsList {
+          display: grid;
+          gap: 8px;
+        }
+
+        .rankingTestRow {
+          display: grid;
+          grid-template-columns:
+            minmax(240px, 2fr)
+            repeat(5, minmax(78px, .62fr))
+            minmax(150px, 1fr);
+          align-items: stretch;
+          gap: 7px;
+          padding: 8px;
+          border: 1px solid #bdcdd4;
+          border-radius: 10px;
+          background:
+            linear-gradient(180deg, #ffffff, #f1f5f7);
+          box-shadow:
+            inset 0 1px 0 #ffffff,
+            0 2px 0 #afc1c9;
+        }
+
+        .rankingTestMain,
+        .rankingTestStat,
+        .rankingTestDate {
+          min-width: 0;
+          padding: 7px 8px;
+          border: 1px solid #d0dade;
+          border-radius: 8px;
+          background: rgba(255,255,255,.75);
+        }
+
+        .rankingTestMain {
+          display: flex;
+          justify-content: center;
+          flex-direction: column;
+        }
+
+        .rankingTestMain strong {
+          overflow: hidden;
+          color: #111111;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 14px;
+        }
+
+        .rankingTestMain span {
+          margin-top: 4px;
+          overflow: hidden;
+          color: #70777a;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 9px;
+        }
+
+        .rankingTestStat,
+        .rankingTestDate {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          text-align: center;
+        }
+
+        .rankingTestStat span,
+        .rankingTestDate span {
+          margin-bottom: 4px;
+          color: #606a6e;
+          font-size: 10px;
+        }
+
+        .rankingTestStat strong {
+          color: #0e5675;
+          font-size: 16px;
+        }
+
+        .correctTestStat strong {
+          color: #087c2d;
+        }
+
+        .incorrectTestStat strong {
+          color: #bd1616;
+        }
+
+        .rankingTestDate strong {
+          color: #222222;
+          font-size: 10px;
+          line-height: 1.3;
+        }
+
+        .rankingTestsEmpty {
+          padding: 18px;
+          border: 1px dashed #9fb9c4;
+          border-radius: 9px;
+          background: rgba(255,255,255,.60);
+          color: #546c77;
+          text-align: center;
+          font-weight: 700;
         }
 
         .rankingEmptyState {
@@ -5418,6 +5787,19 @@ export default function AdminRankingPage() {
             min-width: 120px;
           }
 
+          .rankingTestRow {
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+          }
+
+          .rankingTestMain {
+            grid-column: 1 / -1;
+          }
+
+          .rankingTestDate {
+            grid-column: span 2;
+          }
+
           .rankingMetrics {
             grid-template-columns:
               repeat(4, minmax(100px, 1fr));
@@ -5462,186 +5844,6 @@ export default function AdminRankingPage() {
           .rankingDeleteButton {
             width: 100%;
           }
-        }
-
-
-
-        /* =====================================================
-           TANLASH — ISHONCHLI VA ZAMONAVIY YASHIL PTICHKA
-        ===================================================== */
-
-        .masterCheckButton,
-        .boardSelectAll,
-        .userSelectButton {
-          appearance: none;
-          -webkit-appearance: none;
-          border: 0;
-          font-family: "Bell MT", Georgia, "Times New Roman", serif !important;
-        }
-
-        .masterCheckButton {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          min-height: 43px;
-          padding: 7px 12px;
-          border: 1px solid #6594a8;
-          border-radius: 10px;
-          background:
-            linear-gradient(180deg, #ffffff 0%, #e8f5fa 58%, #d3eaf3 100%);
-          color: #111111;
-          box-shadow:
-            inset 0 2px 0 #ffffff,
-            0 3px 0 #78a2b3;
-          font-size: 16px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .boardSelectAll {
-          display: inline-flex;
-          align-items: center;
-          gap: 9px;
-          min-height: 43px;
-          padding: 6px 12px;
-          border: 1px solid #5f8392;
-          border-radius: 10px;
-          background:
-            linear-gradient(180deg, #ffffff 0%, #e7f2f6 58%, #d2e3ea 100%);
-          color: #111111;
-          box-shadow:
-            inset 0 2px 0 #ffffff,
-            0 3px 0 #698b99;
-          font-size: 15px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .roundSelectCheck {
-          display: inline-grid;
-          place-items: center;
-          width: 30px;
-          height: 30px;
-          flex: 0 0 auto;
-          border: 1px solid #8ea4ac;
-          border-radius: 50%;
-          background:
-            linear-gradient(180deg, #ffffff 0%, #edf3f5 100%);
-          box-shadow:
-            inset 0 2px 0 #ffffff,
-            0 2px 0 #9caeb5,
-            0 3px 8px rgba(0, 0, 0, 0.08);
-          transition:
-            transform 120ms ease,
-            background 120ms ease,
-            border-color 120ms ease,
-            box-shadow 120ms ease;
-        }
-
-        .roundSelectCheck svg {
-          width: 19px;
-          height: 19px;
-          fill: none;
-          stroke: transparent;
-          stroke-width: 3.2;
-          stroke-linecap: round;
-          stroke-linejoin: round;
-          transition:
-            stroke 120ms ease,
-            transform 120ms ease;
-        }
-
-        .roundSelectCheck.checked {
-          border-color: #438e54;
-          background:
-            linear-gradient(180deg, #effff2 0%, #bce8c5 48%, #82ca90 100%);
-          box-shadow:
-            inset 0 2px 0 rgba(255,255,255,0.92),
-            0 3px 0 #5b9c69,
-            0 5px 12px rgba(55, 139, 73, 0.20);
-        }
-
-        .roundSelectCheck.checked svg {
-          stroke: #176b2c;
-          transform: scale(1.05);
-        }
-
-        .userSelectButton {
-          display: grid;
-          place-items: center;
-          width: 48px;
-          height: 48px;
-          padding: 0;
-          border-radius: 50%;
-          background: transparent;
-          cursor: pointer;
-        }
-
-        .userRoundCheck {
-          width: 38px;
-          height: 38px;
-          border-width: 1px;
-        }
-
-        .userRoundCheck svg {
-          width: 24px;
-          height: 24px;
-        }
-
-        .userSelectButton.selected .userRoundCheck {
-          border-color: #3f8a50;
-          background:
-            linear-gradient(180deg, #f1fff4 0%, #b9e9c2 47%, #7fca8d 100%);
-          box-shadow:
-            inset 0 2px 0 rgba(255,255,255,0.95),
-            0 4px 0 #579865,
-            0 6px 14px rgba(49, 132, 67, 0.22);
-        }
-
-        .userSelectButton.selected .userRoundCheck svg {
-          stroke: #16672a;
-        }
-
-        .userSelectButton:focus-visible,
-        .masterCheckButton:focus-visible,
-        .boardSelectAll:focus-visible {
-          outline: 3px solid rgba(44, 151, 197, 0.28);
-          outline-offset: 3px;
-        }
-
-        @media (hover: hover) and (pointer: fine) {
-          .userSelectButton:hover .roundSelectCheck,
-          .masterCheckButton:hover .roundSelectCheck,
-          .boardSelectAll:hover .roundSelectCheck {
-            transform: translateY(-1px);
-            filter: brightness(1.03);
-          }
-        }
-
-        .userSelectButton:active .roundSelectCheck,
-        .masterCheckButton:active .roundSelectCheck,
-        .boardSelectAll:active .roundSelectCheck {
-          transform: translateY(2px);
-        }
-
-        .selectedRankingCard .rankingIdentity {
-          position: relative;
-        }
-
-        .selectedRankingCard .rankingIdentity::after {
-          content: "Tanlandi";
-          display: inline-flex;
-          align-items: center;
-          margin-left: auto;
-          padding: 4px 8px;
-          border: 1px solid #6fa379;
-          border-radius: 999px;
-          background:
-            linear-gradient(180deg, #f0fff3, #c5ebcc);
-          color: #19662c;
-          font-size: 12px;
-          font-weight: 700;
-          white-space: nowrap;
         }
 
 
