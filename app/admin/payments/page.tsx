@@ -54,6 +54,23 @@ function money(
   ) + " so‘m";
 }
 
+function parseMoneyInput(
+  value: string
+) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[^0-9-]/g, "");
+
+  if (
+    !normalized ||
+    normalized === "-"
+  ) {
+    return Number.NaN;
+  }
+
+  return Number(normalized);
+}
+
 function dateTime(
   value: string | null
 ) {
@@ -586,7 +603,7 @@ export default function AdminPaymentsPage() {
     }
 
     const value =
-      Number(amount);
+      parseMoneyInput(amount);
 
     try {
       if (
@@ -690,6 +707,7 @@ export default function AdminPaymentsPage() {
   function openEditEntry(
     item: FinanceEntry
   ) {
+    setHistoryProfileId(null);
     setEditingEntry(item);
 
     setEditAmount(
@@ -769,7 +787,7 @@ export default function AdminPaymentsPage() {
         });
       } else {
         const value =
-          Number(
+          parseMoneyInput(
             editAmount
           );
 
@@ -841,20 +859,6 @@ export default function AdminPaymentsPage() {
     setHistoryProfileId(
       item.id
     );
-
-    window.setTimeout(
-      () => {
-        document
-          .getElementById(
-            "finance-history"
-          )
-          ?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-      },
-      50
-    );
   }
 
   const visibleHistoryEntries =
@@ -866,7 +870,7 @@ export default function AdminPaymentsPage() {
                 item.profileId ===
                 historyProfileId
             )
-          : entries,
+          : [],
       [
         entries,
         historyProfileId,
@@ -1298,7 +1302,7 @@ export default function AdminPaymentsPage() {
                       )
                     }
                   >
-                    ✎ To‘lovlar tarixini tahrirlash
+                    ✎ To‘lovlarni tahrirlash
                   </button>
                 </div>
               </article>
@@ -1321,155 +1325,163 @@ export default function AdminPaymentsPage() {
         </div>
       </section>
 
-      <section className="panel historyPanel" id="finance-history">
-        <div className="sectionTitle historyTitleRow">
-          <h2>
-            {historyProfileId
-              ? `${
-                  profiles.find(
-                    (item) =>
-                      item.id ===
-                      historyProfileId
-                  )?.fullName ||
-                  "Foydalanuvchi"
-                } — to‘lovlar tarixi`
-              : "Moliyaviy tarix"}
-          </h2>
+      {historyProfileId && (
+        <div
+          className="modalBackdrop"
+          onMouseDown={() =>
+            setHistoryProfileId(null)
+          }
+        >
+          <div
+            className="modal historyModal"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="historyModalHeader">
+              <div>
+                <h2>
+                  To‘lovlarni tahrirlash
+                </h2>
+                <div className="selectedUser compactUser">
+                  <strong>
+                    {profiles.find(
+                      (item) =>
+                        item.id ===
+                        historyProfileId
+                    )?.fullName ||
+                      "Foydalanuvchi"}
+                  </strong>
+                  <span>
+                    {profiles.find(
+                      (item) =>
+                        item.id ===
+                        historyProfileId
+                    )?.profileCode ||
+                      ""}
+                  </span>
+                </div>
+              </div>
 
-          <div className="historyTitleActions">
-            <span>
-              {
-                visibleHistoryEntries.length
-              }{" "}
-              ta
-            </span>
-
-            {historyProfileId && (
               <button
                 type="button"
-                className="showAllHistoryButton"
+                className="closeHistoryButton"
                 onClick={() =>
-                  setHistoryProfileId(
-                    null
-                  )
+                  setHistoryProfileId(null)
                 }
               >
-                Barcha tarix
+                ✕
               </button>
-            )}
+            </div>
+
+            <div className="historyModalList">
+              {visibleHistoryEntries.length === 0 && (
+                <div className="empty compactEmpty">
+                  Hozircha to‘lov yozuvlari yo‘q.
+                </div>
+              )}
+
+              {visibleHistoryEntries.map(
+                (item) => (
+                  <article
+                    key={item.id}
+                    className={
+                      item.isVoided
+                        ? "historyRow voided"
+                        : "historyRow"
+                    }
+                  >
+                    <div className="historyRowMain">
+                      <strong>
+                        {entryText(
+                          item.entryType
+                        )}
+                      </strong>
+                      <span>
+                        {dateTime(
+                          item.occurredAt
+                        )}
+                        {item.note
+                          ? ` • ${item.note}`
+                          : ""}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`entryAmount ${item.entryType}`}
+                    >
+                      {item.entryType ===
+                      "period"
+                        ? dateOnly(
+                            item.dueDate
+                          )
+                        : (
+                          <>
+                            {item.entryType ===
+                            "payment"
+                              ? "− "
+                              : item.amount > 0
+                                ? "+ "
+                                : ""}
+                            {money(
+                              Math.abs(
+                                item.amount
+                              )
+                            )}
+                          </>
+                        )}
+                    </div>
+
+                    {!item.isVoided ? (
+                      <div className="entryButtons">
+                        <button
+                          type="button"
+                          className="editEntryButton"
+                          onClick={() =>
+                            openEditEntry(
+                              item
+                            )
+                          }
+                        >
+                          ✎ Tahrirlash
+                        </button>
+
+                        <button
+                          type="button"
+                          className="voidButton"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Ushbu yozuvni bekor qilasizmi?"
+                              )
+                            ) {
+                              void post({
+                                action:
+                                  "void-entry",
+                                entryId:
+                                  item.id,
+                              }).then(
+                                () =>
+                                  load()
+                              );
+                            }
+                          }}
+                        >
+                          Bekor qilish
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="voidLabel">
+                        Bekor qilingan
+                      </span>
+                    )}
+                  </article>
+                )
+              )}
+            </div>
           </div>
         </div>
-
-        <div className="historyList">
-          {visibleHistoryEntries.map(
-            (item) => (
-              <article
-                key={
-                  item.id
-                }
-                className={
-                  item.isVoided
-                    ? "voided"
-                    : ""
-                }
-              >
-                <div>
-                  <strong>
-                    {
-                      item.fullName
-                    }
-                  </strong>
-
-                  <span>
-                    {entryText(
-                      item.entryType
-                    )}{" "}
-                    •{" "}
-                    {dateTime(
-                      item.occurredAt
-                    )}
-                    {item.note
-                      ? ` • ${item.note}`
-                      : ""}
-                  </span>
-                </div>
-
-                <div
-                  className={`entryAmount ${item.entryType}`}
-                >
-                  {item.entryType ===
-                  "period"
-                    ? dateOnly(
-                        item.dueDate
-                      )
-                    : (
-                      <>
-                        {item.entryType ===
-                        "payment"
-                          ? "−"
-                          : item.amount >
-                              0
-                            ? "+"
-                            : ""}
-                        {money(
-                          Math.abs(
-                            item.amount
-                          )
-                        )}
-                      </>
-                    )}
-                </div>
-
-                {!item.isVoided && (
-                  <div className="entryButtons">
-                    <button
-                      type="button"
-                      className="editEntryButton"
-                      onClick={() =>
-                        openEditEntry(
-                          item
-                        )
-                      }
-                    >
-                      ✎ Tahrirlash
-                    </button>
-
-                    <button
-                      type="button"
-                      className="voidButton"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Xato kiritilgan yozuvni bekor qilasizmi? Tarixdan o‘chmaydi."
-                          )
-                        ) {
-                          void post({
-                            action:
-                              "void-entry",
-                            entryId:
-                              item.id,
-                          }).then(
-                            () =>
-                              load()
-                          );
-                        }
-                      }}
-                    >
-                      Bekor qilish
-                    </button>
-                  </div>
-                )}
-
-                {item.isVoided && (
-                  <span className="voidLabel">
-                    Bekor qilingan
-                  </span>
-                )}
-              </article>
-            )
-          )}
-        </div>
-      </section>
+      )}
 
       {modal &&
         selected && (
@@ -1545,14 +1557,9 @@ export default function AdminPaymentsPage() {
                   <input
                     autoFocus
                     required
-                    type="number"
-                    min={
-                      modal ===
-                      "debt"
-                        ? "0"
-                        : "1"
-                    }
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Masalan: 329.000"
                     value={amount}
                     onChange={(event) =>
                       setAmount(
@@ -1704,8 +1711,9 @@ export default function AdminPaymentsPage() {
                 <input
                   autoFocus
                   required
-                  type="number"
-                  step="1"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Masalan: 329.000"
                   value={
                     editAmount
                   }
@@ -1791,9 +1799,8 @@ export default function AdminPaymentsPage() {
             </label>
 
             <div className="editWarning">
-              Tahrirlashda eski yozuv o‘chirilmaydi:
-              u “Bekor qilingan” holatda tarixda saqlanadi,
-              yangi to‘g‘rilangan yozuv esa hisob-kitobga kiradi.
+              Saqlanganda aynan shu yozuv yangilanadi.
+              Summa ustiga qo‘shilmaydi.
             </div>
 
             <div className="modalActions">
@@ -2280,6 +2287,73 @@ export default function AdminPaymentsPage() {
           box-shadow:
             inset 0 1px 0 #fff,
             0 4px 0 #7b6a9c;
+        }
+
+        .historyModal {
+          width: min(920px, calc(100vw - 32px));
+          max-height: 82vh;
+          overflow: auto;
+        }
+
+        .historyModalHeader {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 14px;
+        }
+
+        .compactUser {
+          margin-top: 8px;
+          margin-bottom: 0;
+        }
+
+        .closeHistoryButton {
+          width: 42px;
+          height: 42px;
+          min-width: 42px;
+          border: 2px solid #a83a3a;
+          border-radius: 10px;
+          background: linear-gradient(180deg, #fff5f5, #efb7b7);
+          color: #8a2020;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .historyModalList {
+          display: grid;
+          gap: 10px;
+        }
+
+        .historyRow {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 13px;
+          border: 1px solid #d5dde1;
+          border-radius: 11px;
+          background: #fff;
+        }
+
+        .historyRow.voided {
+          opacity: .55;
+          text-decoration: line-through;
+        }
+
+        .historyRowMain strong,
+        .historyRowMain span {
+          display: block;
+        }
+
+        .historyRowMain span {
+          margin-top: 4px;
+          color: #6f777b;
+          font-size: 11px;
+        }
+
+        .compactEmpty {
+          min-height: 90px;
         }
 
         .historyTitleRow {
