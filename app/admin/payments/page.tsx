@@ -379,6 +379,40 @@ export default function AdminPaymentsPage() {
       null
     );
 
+
+  const [
+    resetProfile,
+    setResetProfile,
+  ] =
+    useState<ProfileFinance | null>(
+      null
+    );
+
+  const [
+    resetTotalAmount,
+    setResetTotalAmount,
+  ] = useState("");
+
+  const [
+    resetPaidAmount,
+    setResetPaidAmount,
+  ] = useState("");
+
+  const [
+    resetPeriodStart,
+    setResetPeriodStart,
+  ] = useState("");
+
+  const [
+    resetDueDate,
+    setResetDueDate,
+  ] = useState("");
+
+  const [
+    resetNote,
+    setResetNote,
+  ] = useState("");
+
   useEffect(() => {
     void load();
 
@@ -853,6 +887,134 @@ export default function AdminPaymentsPage() {
     }
   }
 
+  function openResetFinance(
+    item: ProfileFinance
+  ) {
+    setResetProfile(item);
+
+    setResetTotalAmount(
+      String(
+        Math.round(
+          item.totalDebtAdded
+        )
+      )
+    );
+
+    setResetPaidAmount(
+      String(
+        Math.round(
+          item.totalPaid
+        )
+      )
+    );
+
+    setResetPeriodStart(
+      item.periodStart || ""
+    );
+
+    setResetDueDate(
+      item.dueDate || ""
+    );
+
+    setResetNote("");
+  }
+
+  async function saveResetFinance(
+    event:
+      FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!resetProfile) {
+      return;
+    }
+
+    const total =
+      parseMoneyInput(
+        resetTotalAmount
+      );
+
+    const paid =
+      parseMoneyInput(
+        resetPaidAmount
+      );
+
+    try {
+      if (
+        !Number.isFinite(total) ||
+        total < 0
+      ) {
+        throw new Error(
+          "Umumiy summani to‘g‘ri kiriting."
+        );
+      }
+
+      if (
+        !Number.isFinite(paid) ||
+        paid < 0
+      ) {
+        throw new Error(
+          "To‘langan summani to‘g‘ri kiriting."
+        );
+      }
+
+      if (
+        Boolean(
+          resetPeriodStart
+        ) !==
+        Boolean(
+          resetDueDate
+        )
+      ) {
+        throw new Error(
+          "Muddat kiritilsa, boshlanish sanasi va oxirgi muddat ikkalasi ham tanlanishi kerak."
+        );
+      }
+
+      if (
+        resetPeriodStart &&
+        resetDueDate <
+          resetPeriodStart
+      ) {
+        throw new Error(
+          "To‘lov muddati boshlanish sanasidan oldin bo‘lishi mumkin emas."
+        );
+      }
+
+      await post({
+        action:
+          "reset-finance",
+        profileId:
+          resetProfile.id,
+        totalAmount:
+          total,
+        paidAmount:
+          paid,
+        periodStart:
+          resetPeriodStart || null,
+        dueDate:
+          resetDueDate || null,
+        note:
+          resetNote,
+      });
+
+      setResetProfile(null);
+      setResetTotalAmount("");
+      setResetPaidAmount("");
+      setResetPeriodStart("");
+      setResetDueDate("");
+      setResetNote("");
+
+      await load();
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Tahrirlashda xatolik."
+      );
+    }
+  }
+
   function showUserHistory(
     item: ProfileFinance
   ) {
@@ -1297,12 +1459,12 @@ export default function AdminPaymentsPage() {
                     type="button"
                     className="historyButton"
                     onClick={() =>
-                      showUserHistory(
+                      openResetFinance(
                         item
                       )
                     }
                   >
-                    ✎ To‘lovlarni tahrirlash
+                    ✎ To‘lovni tahrirlash
                   </button>
                 </div>
               </article>
@@ -1324,6 +1486,261 @@ export default function AdminPaymentsPage() {
           )}
         </div>
       </section>
+
+      {resetProfile && (
+        <div
+          className="modalBackdrop"
+          onMouseDown={() =>
+            setResetProfile(null)
+          }
+        >
+          <form
+            className="modal resetFinanceModal"
+            onSubmit={
+              saveResetFinance
+            }
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <h2>
+              To‘lovni boshidan tahrirlash
+            </h2>
+
+            <div className="selectedUser">
+              <strong>
+                {resetProfile.fullName}
+              </strong>
+              <span>
+                {resetProfile.profileCode}
+              </span>
+            </div>
+
+            <div className="resetWarning">
+              Bu yerda saqlangan qiymatlar eski faol hisob-kitobni bekor qilib,
+              hisobni <strong>0 dan qayta boshlaydi</strong>.
+            </div>
+
+            <div className="resetMoneyGrid">
+              <label>
+                Umumiy summa
+                <input
+                  autoFocus
+                  required
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Masalan: 500.000"
+                  value={
+                    resetTotalAmount
+                  }
+                  onChange={(event) =>
+                    setResetTotalAmount(
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                To‘langan summa
+                <input
+                  required
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Masalan: 100.000"
+                  value={
+                    resetPaidAmount
+                  }
+                  onChange={(event) =>
+                    setResetPaidAmount(
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="resetPreview">
+              <div>
+                <span>Umumiy</span>
+                <strong>
+                  {money(
+                    Number.isFinite(
+                      parseMoneyInput(
+                        resetTotalAmount
+                      )
+                    )
+                      ? Math.max(
+                          0,
+                          parseMoneyInput(
+                            resetTotalAmount
+                          )
+                        )
+                      : 0
+                  )}
+                </strong>
+              </div>
+
+              <b>−</b>
+
+              <div>
+                <span>To‘langan</span>
+                <strong>
+                  {money(
+                    Number.isFinite(
+                      parseMoneyInput(
+                        resetPaidAmount
+                      )
+                    )
+                      ? Math.max(
+                          0,
+                          parseMoneyInput(
+                            resetPaidAmount
+                          )
+                        )
+                      : 0
+                  )}
+                </strong>
+              </div>
+
+              <b>=</b>
+
+              <div>
+                <span>Qarz</span>
+                <strong>
+                  {money(
+                    Math.max(
+                      0,
+                      (
+                        Number.isFinite(
+                          parseMoneyInput(
+                            resetTotalAmount
+                          )
+                        )
+                          ? parseMoneyInput(
+                              resetTotalAmount
+                            )
+                          : 0
+                      ) -
+                        (
+                          Number.isFinite(
+                            parseMoneyInput(
+                              resetPaidAmount
+                            )
+                          )
+                            ? parseMoneyInput(
+                                resetPaidAmount
+                              )
+                            : 0
+                        )
+                    )
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>Ortiqcha</span>
+                <strong>
+                  {money(
+                    Math.max(
+                      0,
+                      (
+                        Number.isFinite(
+                          parseMoneyInput(
+                            resetPaidAmount
+                          )
+                        )
+                          ? parseMoneyInput(
+                              resetPaidAmount
+                            )
+                          : 0
+                      ) -
+                        (
+                          Number.isFinite(
+                            parseMoneyInput(
+                              resetTotalAmount
+                            )
+                          )
+                            ? parseMoneyInput(
+                                resetTotalAmount
+                              )
+                            : 0
+                        )
+                    )
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <div className="periodFields">
+              <label>
+                Boshlanish sanasi
+                <input
+                  type="date"
+                  value={
+                    resetPeriodStart
+                  }
+                  onChange={(event) =>
+                    setResetPeriodStart(
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label>
+                To‘lov muddati
+                <input
+                  type="date"
+                  min={
+                    resetPeriodStart ||
+                    undefined
+                  }
+                  value={
+                    resetDueDate
+                  }
+                  onChange={(event) =>
+                    setResetDueDate(
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+            </div>
+
+            <label>
+              Izoh
+              <textarea
+                value={resetNote}
+                onChange={(event) =>
+                  setResetNote(
+                    event.target.value
+                  )
+                }
+                placeholder="Ixtiyoriy izoh"
+              />
+            </label>
+
+            <div className="modalActions">
+              <button
+                type="button"
+                onClick={() =>
+                  setResetProfile(null)
+                }
+              >
+                Bekor qilish
+              </button>
+
+              <button
+                type="submit"
+                className="savePayment"
+              >
+                0 dan saqlash
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {historyProfileId && (
         <div
@@ -2609,6 +3026,72 @@ export default function AdminPaymentsPage() {
           box-shadow:
             inset 0 1px 0 #fff,
             0 4px 0 #5f9c72;
+        }
+
+        .resetFinanceModal {
+          width: min(760px, calc(100vw - 28px));
+        }
+
+        .resetWarning {
+          margin: 12px 0 16px;
+          padding: 12px 14px;
+          border: 1px solid #e0b34b;
+          border-radius: 12px;
+          background: #fff7d9;
+          color: #5d4511;
+          line-height: 1.5;
+        }
+
+        .resetMoneyGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .resetPreview {
+          margin: 14px 0;
+          display: grid;
+          grid-template-columns: 1fr auto 1fr auto 1fr 1fr;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          border: 1px solid #cbd6df;
+          border-radius: 12px;
+          background: #f4f8fb;
+        }
+
+        .resetPreview > div {
+          min-width: 0;
+          padding: 10px;
+          border: 1px solid #d7dfe5;
+          border-radius: 10px;
+          background: white;
+          text-align: center;
+        }
+
+        .resetPreview span {
+          display: block;
+          font-size: 12px;
+          color: #5f6d77;
+          margin-bottom: 4px;
+        }
+
+        .resetPreview strong {
+          color: #073e60;
+        }
+
+        @media (max-width: 760px) {
+          .resetMoneyGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .resetPreview {
+            grid-template-columns: 1fr;
+          }
+
+          .resetPreview > b {
+            display: none;
+          }
         }
 
         .modalActions {
