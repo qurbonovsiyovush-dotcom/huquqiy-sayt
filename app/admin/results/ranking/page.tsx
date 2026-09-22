@@ -849,9 +849,9 @@ export default function AdminRankingPage() {
   ) {
     const response =
       await fetch(
-        "/api/admin/profiles",
+        "/api/admin/ranking",
         {
-          method: "POST",
+          method: "PATCH",
           headers: {
             "Content-Type":
               "application/json",
@@ -859,7 +859,7 @@ export default function AdminRankingPage() {
           body:
             JSON.stringify({
               action:
-                "archive",
+                "archive_profile",
               profileId,
             }),
         }
@@ -874,6 +874,42 @@ export default function AdminRankingPage() {
       throw new Error(
         data?.message ||
           "Profilni ro‘yxatdan chiqarib bo‘lmadi."
+      );
+    }
+
+    return data;
+  }
+
+  async function archiveProfilesRequest(
+    profileIds: string[]
+  ) {
+    const response =
+      await fetch(
+        "/api/admin/ranking",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body:
+            JSON.stringify({
+              action:
+                "archive_profiles",
+              profileIds,
+            }),
+        }
+      );
+
+    const data =
+      await readJson(
+        response
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          "Tanlangan profillarni ro‘yxatdan chiqarib bo‘lmadi."
       );
     }
 
@@ -978,14 +1014,12 @@ export default function AdminRankingPage() {
     );
 
     try {
-      for (
-        const profile of
-        profiles
-      ) {
-        await archiveProfileRequest(
-          profile.id
-        );
-      }
+      await archiveProfilesRequest(
+        profiles.map(
+          (profile) =>
+            profile.id
+        )
+      );
 
       closeManagerSelection();
 
