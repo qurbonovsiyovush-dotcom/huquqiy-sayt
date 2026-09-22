@@ -8,6 +8,33 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function toDateOnly(
+  value: unknown
+) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(value.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  const raw = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    return raw.slice(0, 10);
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const y = parsed.getUTCFullYear();
+  const m = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function toNumber(
   value: unknown
 ) {
@@ -205,25 +232,19 @@ export async function GET(
         period: period
           ? {
               startDate:
-                period.period_start
-                  ? String(
-                      period.period_start
-                    ).slice(0, 10)
-                  : null,
+                toDateOnly(
+                  period.period_start
+                ),
 
               endDate:
-                period.period_end
-                  ? String(
-                      period.period_end
-                    ).slice(0, 10)
-                  : null,
+                toDateOnly(
+                  period.period_end
+                ),
 
               dueDate:
-                period.due_date
-                  ? String(
-                      period.due_date
-                    ).slice(0, 10)
-                  : null,
+                toDateOnly(
+                  period.due_date
+                ),
 
               months:
                 period.period_months
@@ -273,25 +294,19 @@ export async function GET(
                 : null,
 
             periodStart:
-              row.period_start
-                ? String(
-                    row.period_start
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.period_start
+              ),
 
             periodEnd:
-              row.period_end
-                ? String(
-                    row.period_end
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.period_end
+              ),
 
             dueDate:
-              row.due_date
-                ? String(
-                    row.due_date
-                  ).slice(0, 10)
-                : null,
+              toDateOnly(
+                row.due_date
+              ),
 
             periodMonths:
               row.period_months
