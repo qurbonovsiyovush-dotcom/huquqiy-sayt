@@ -143,14 +143,73 @@ function makeId(prefix: string) {
     .slice(2, 10)}`;
 }
 
-function normalizeText(value: string) {
-  return value
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
+function cleanPdfInlineNoise(
+  value: string
+) {
+  let result =
+    String(value || "");
+
+  /*
+    PDF sahifa footerlari savol yoki D variantining oxiriga
+    yopishib qolmasligi kerak.
+
+    Faqat aniq footer ko‘rinishlarini olib tashlaymiz;
+    oddiy "Milliy sertifikat" iborasi savol ichida qolishi mumkin.
+  */
+  result = result
+    .replace(
+      /\s*milliy\s+sertifikat\s+\d+\s*[-–—]?\s*yakshanba(?:\s+qurbonov\s+s\.?\s*j\.?)?\s*$/iu,
+      ""
+    )
+    .replace(
+      /\s*qurbonov\s+s\.?\s*j\.?\s*$/iu,
+      ""
+    );
+
+  return result;
+}
+
+function stripTrailingAnswerBlank(
+  value: string
+) {
+  /*
+    Ochiq savoldagi javob chizig‘i savol matnining qismi emas:
+      Savol ? ____________
+      Javob: ____________
+  */
+  return String(value || "")
+    .replace(
+      /\s*(?:_{3,}|＿{3,}|-{5,}|–{5,}|—{3,})\s*$/u,
+      ""
+    )
     .trim();
+}
+
+function normalizeQuestionMarkSpacing(
+  value: string
+) {
+  /*
+    BMBA ko‘rinishi:
+      "aniqlang ?"
+    ya’ni ? oldidan aynan bitta bo‘sh joy.
+  */
+  return String(value || "")
+    .replace(/\s*\?/g, " ?");
+}
+
+function normalizeText(value: string) {
+  return stripTrailingAnswerBlank(
+    normalizeQuestionMarkSpacing(
+      cleanPdfInlineNoise(
+        String(value || "")
+      )
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+    )
+  ).trim();
 }
 
 /*
@@ -176,10 +235,16 @@ function normalizeQuestionText(parts: string[]) {
   const rawLines = parts
     .flatMap((part) => String(part || "").split(/\r?\n/))
     .map((line) =>
-      line
-        .replace(/\u00a0/g, " ")
-        .replace(/[ \t]+/g, " ")
-        .trim()
+      normalizeQuestionMarkSpacing(
+        cleanPdfInlineNoise(
+          line
+        )
+          .replace(/\u00a0/g, " ")
+          .replace(/[ \t]+/g, " ")
+      ).trim()
+    )
+    .map(
+      stripTrailingAnswerBlank
     )
     .filter(Boolean);
 
@@ -205,12 +270,18 @@ function normalizeQuestionText(parts: string[]) {
   }
 
   function flushCurrent() {
-    const cleaned = current
-      .replace(/\s+([,.;:!?])/g, "$1")
-      .replace(/\(\s+/g, "(")
-      .replace(/\s+\)/g, ")")
-      .replace(/\s{2,}/g, " ")
-      .trim();
+    const cleaned =
+      stripTrailingAnswerBlank(
+        normalizeQuestionMarkSpacing(
+          cleanPdfInlineNoise(
+            current
+          )
+            .replace(/\s+([,.;:!])/g, "$1")
+            .replace(/\(\s+/g, "(")
+            .replace(/\s+\)/g, ")")
+            .replace(/\s{2,}/g, " ")
+        )
+      ).trim();
 
     if (cleaned) {
       paragraphs.push(cleaned);
@@ -265,26 +336,33 @@ function normalizeQuestionText(parts: string[]) {
 
   flushCurrent();
 
-  return paragraphs
-    .join("\n")
-    .replace(/\s+([,.;:!?])/g, "$1")
-    .trim();
+  return normalizeQuestionMarkSpacing(
+    paragraphs
+      .join("\n")
+      .replace(/\s+([,.;:!])/g, "$1")
+  ).trim();
 }
 
 function normalizeOneLine(value: string) {
-  return value
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return stripTrailingAnswerBlank(
+    normalizeQuestionMarkSpacing(
+      cleanPdfInlineNoise(
+        String(value || "")
+      )
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
+    )
+  ).trim();
 }
 
 function cleanPlus(value: string) {
-  return value
-    .replace(/\(\s*\+\s*\)/g, "")
-    .replace(/\s*\+\s*$/g, "")
-    .replace(/^\s*\+\s*/g, "")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
+  return normalizeText(
+    String(value || "")
+      .replace(/\(\s*\+\s*\)/g, "")
+      .replace(/\s*\+\s*$/g, "")
+      .replace(/^\s*\+\s*/g, "")
+      .replace(/[ \t]{2,}/g, " ")
+  );
 }
 
 function hasPlus(value: string) {
@@ -1003,8 +1081,10 @@ function isPdfDecorationLine(value: string) {
 
   /* Har sahifada takrorlanadigan kolontitul / sahifa raqami */
   if (
-    /^qurbonov\s+s\.j\.?$/i.test(text) ||
+    /^qurbonov\s+s\.?\s*j\.?$/i.test(text) ||
     /^qurbonob\s+siyovush$/i.test(text) ||
+    /^milliy\s+sertifikat\s+\d+\s*[-–—]?\s*yakshanba$/i.test(text) ||
+    /^milliy\s+sertifikat\s+\d+\s*[-–—]?\s*yakshanba\s+qurbonov\s+s\.?\s*j\.?$/i.test(text) ||
     /^\d{1,3}$/.test(text)
   ) {
     return true;
@@ -1454,6 +1534,11 @@ function parseQuestion(
             answerMatch[1] || ""
           ).replace(/^\+\s*/, "");
 
+        /*
+          "Javob: ______" bo‘lsa javob topildi deb hisoblamaymiz.
+          acceptedAnswers bo‘sh qoladi va admin oynasida
+          "Javob topilmadi. Qo‘lda kiriting." ogohlantirishi turadi.
+        */
         if (answerText) {
           for (
             const part of
