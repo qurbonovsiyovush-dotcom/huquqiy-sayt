@@ -91,56 +91,126 @@ function buildPdfLikeQuestionHtml(
   }
 
   /*
-    BMBA huquq PDFlarida asosiy savol jumlasi qalin,
-    1., 2., 3., 4. hukmlar esa alohida satrlarda turadi.
+    PDF import ham qo‘lda kiritilgan Milliy sertifikat savollari
+    bilan BIR XIL o‘qiladigan ko‘rinishda saqlanadi:
 
-    PDF.js font metadata ayrim PDFlarda "Bold"ni aniq bermaydi.
-    Shu sabab editorga yuklash paytida savol stemini ishonchli
-    ravishda qalin qilib qayta quramiz.
+    1) asosiy savol — qalin;
+    2) qavs ichidagi manba — sal kichik, oddiy, italic EMAS;
+    3) 1./2./3./4. va I./II./III./IV. bandlar — alohida qator;
+    4) bandlar — qalin va aniq;
+    5) mavjud rasm/Venn/jadval obyektlari keyin alohida saqlanadi.
   */
   const rawLines = text
     .split(/\n+/)
     .map((line) =>
-      line.trim()
+      line
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .trim()
     )
     .filter(Boolean);
 
-  const firstNumbered =
+  /*
+    Savol ichidagi mazmuniy bandlar:
+      1. ...
+      2) ...
+      I. ...
+      II. ...
+      III) ...
+  */
+  const structuredLinePattern =
+    /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8}))[.)]\s+\S/i;
+
+  const firstStructured =
     rawLines.findIndex(
       (line) =>
-        /^\d{1,2}[.)]\s+/.test(
+        structuredLinePattern.test(
           line
         )
     );
 
   const stemLines =
-    firstNumbered === -1
-      ? rawLines.slice(0, 1)
+    firstStructured === -1
+      ? rawLines
       : rawLines.slice(
           0,
-          firstNumbered
+          firstStructured
         );
 
   const bodyLines =
-    firstNumbered === -1
-      ? rawLines.slice(1)
+    firstStructured === -1
+      ? []
       : rawLines.slice(
-          firstNumbered
+          firstStructured
         );
 
+  const fullStem =
+    stemLines.join(" ").trim();
+
+  /*
+    BMBA ko‘rinishidagi manba:
+      (Mehnat kodeksi, 18.09.2026-yil holatiga ko‘ra).
+      (“Ommaviy axborot vositalari to‘g‘risida”gi qonun, ...).
+      (O‘zbekiston Respublikasi Konstitutsiyasi, 92-modda).
+
+    Oddiy qavslarni xato manba deb olmaslik uchun qavs ichida
+    huquqiy manbaga xos kalit so‘z bo‘lishini talab qilamiz.
+  */
+  const sourceNotePattern =
+    /\s*(\((?=[^()]*\b(?:konstitutsiya|kodeks|qonun|qaror|farmon|nizom|modda|moddasi|holatiga\s+ko['’ʻʼ`]?ra)\b)[^()]*\)[.!?]?)\s*$/iu;
+
+  const sourceMatch =
+    fullStem.match(
+      sourceNotePattern
+    );
+
+  const sourceNote =
+    sourceMatch?.[1]?.trim() ||
+    "";
+
+  const mainStem =
+    sourceNote
+      ? fullStem
+          .slice(
+            0,
+            Math.max(
+              0,
+              (sourceMatch?.index ??
+                fullStem.length)
+            )
+          )
+          .trim()
+      : fullStem;
+
+  const mainHtml =
+    mainStem
+      ? `<span data-pdf-main="true" style="font-size:1em;font-weight:800;line-height:1.40;">${escapeHtml(
+          mainStem
+        )}</span>`
+      : "";
+
+  const sourceHtml =
+    sourceNote
+      ? `${mainStem ? " " : ""}<span data-pdf-source="true" style="font-size:0.90em;font-weight:400;font-style:normal;line-height:1.40;">${escapeHtml(
+          sourceNote
+        )}</span>`
+      : "";
+
   const stemHtml =
-    stemLines.length > 0
-      ? `<div data-pdf-stem="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;font-weight:800;line-height:1.35;margin:0 0 22px 0;color:#000;">${stemLines
-          .map(escapeHtml)
-          .join("<br>")}</div>`
+    mainHtml || sourceHtml
+      ? `<div data-pdf-stem="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;line-height:1.40;margin:0 0 ${
+          bodyLines.length > 0
+            ? "18px"
+            : "0"
+        } 0;color:#000;">${mainHtml}${sourceHtml}</div>`
       : "";
 
   const bodyHtml =
     bodyLines.length > 0
-      ? `<div data-pdf-body="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;font-weight:400;line-height:1.55;color:#000;">${bodyLines
+      ? `<div data-pdf-body="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;font-weight:700;line-height:1.55;color:#000;">${bodyLines
           .map(
             (line) =>
-              `<div style="margin:0 0 2px 0;">${escapeHtml(
+              `<div data-pdf-item="true" style="margin:0 0 7px 0;">${escapeHtml(
                 line
               )}</div>`
           )
