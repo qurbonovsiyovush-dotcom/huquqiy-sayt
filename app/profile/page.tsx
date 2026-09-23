@@ -418,8 +418,21 @@ export default function ProfilePage() {
   const [error, setError] =
     useState("");
 
+  const [timelineNow, setTimelineNow] =
+    useState(() => Date.now());
+
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTimelineNow(Date.now());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
   }, []);
 
   async function loadData() {
@@ -637,6 +650,152 @@ export default function ProfilePage() {
 
   const paymentPeriod =
     financeSummary.period;
+
+  const periodTimeline =
+    useMemo(() => {
+      const startIso =
+        extractIsoDate(
+          paymentPeriod?.startDate
+        );
+
+      const dueIso =
+        extractIsoDate(
+          paymentPeriod?.dueDate
+        );
+
+      if (!startIso || !dueIso) {
+        return {
+          progress: 0,
+          state: "none" as const,
+          label: "Muddat belgilanmagan",
+          todayLabel: "—",
+          daysText: "",
+        };
+      }
+
+      const toLocalBoundary = (
+        iso: string,
+        endOfDay = false
+      ) => {
+        const [year, month, day] =
+          iso.split("-").map(Number);
+
+        return new Date(
+          year,
+          month - 1,
+          day,
+          endOfDay ? 23 : 0,
+          endOfDay ? 59 : 0,
+          endOfDay ? 59 : 0,
+          endOfDay ? 999 : 0
+        ).getTime();
+      };
+
+      const start =
+        toLocalBoundary(startIso);
+
+      const due =
+        toLocalBoundary(dueIso, true);
+
+      const now = timelineNow;
+      const duration =
+        Math.max(1, due - start);
+
+      const raw =
+        ((now - start) / duration) * 100;
+
+      const progress =
+        Math.max(
+          0,
+          Math.min(100, raw)
+        );
+
+      const today =
+        new Date(now);
+
+      const todayLabel =
+        new Intl.DateTimeFormat(
+          "uz-UZ",
+          {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }
+        ).format(today);
+
+      if (now < start) {
+        const days =
+          Math.max(
+            1,
+            Math.ceil(
+              (start - now) /
+                86_400_000
+            )
+          );
+
+        return {
+          progress,
+          state: "waiting" as const,
+          label: "Muddat boshlanmagan",
+          todayLabel,
+          daysText: `${days} kun qoldi`,
+        };
+      }
+
+      if (now > due) {
+        const days =
+          Math.max(
+            1,
+            Math.floor(
+              (now - due) /
+                86_400_000
+            )
+          );
+
+        return {
+          progress: 100,
+          state: "overdue" as const,
+          label: "Muddat tugadi",
+          todayLabel,
+          daysText: `${days} kun o‘tgan`,
+        };
+      }
+
+      const remainingMs =
+        Math.max(0, due - now);
+
+      const daysLeft =
+        Math.ceil(
+          remainingMs /
+            86_400_000
+        );
+
+      const isLastDay =
+        daysLeft <= 1;
+
+      const isNear =
+        daysLeft <= 5;
+
+      return {
+        progress,
+        state: isLastDay
+          ? ("last" as const)
+          : isNear
+            ? ("near" as const)
+            : ("active" as const),
+        label: isLastDay
+          ? "Bugun oxirgi kun"
+          : "Muddat davom etmoqda",
+        todayLabel,
+        daysText: isLastDay
+          ? "Bugun yakunlanadi"
+          : `${daysLeft} kun qoldi`,
+      };
+    }, [
+      paymentPeriod?.startDate,
+      paymentPeriod?.dueDate,
+      timelineNow,
+    ]);
 
   const paidPercent =
     totalAmount > 0
@@ -1007,49 +1166,128 @@ export default function ProfilePage() {
           </div>
 
           <div className="paymentProgressBox">
-            <div className="paymentProgressHeader">
-              <div className="currentPeriodRoute">
+            <div className="timeJourneyHeader">
+              <div>
+                <span className="timeJourneyEyebrow">
+                  TO‘LOV MUDDATI HARAKATI
+                </span>
                 <strong>
-                  {paymentPeriod?.startDate
-                    ? formatDateOnly(
-                        paymentPeriod.startDate
-                      )
-                    : "—"}
+                  {periodTimeline.label}
                 </strong>
+              </div>
 
-                <div className="currentPeriodLine">
-                  <span />
+              <div
+                className={`timeStatusChip ${
+                  periodTimeline.state
+                }`}
+              >
+                <span className="timeStatusDot" />
+                <span>
+                  {periodTimeline.daysText ||
+                    paymentStateLabel}
+                </span>
+              </div>
+            </div>
+
+            {paymentPeriod?.startDate &&
+            paymentPeriod?.dueDate ? (
+              <div className="modernDeadline">
+                <div className="deadlineDate startDate">
+                  <span>BOSHLANISH</span>
+                  <strong>
+                    {formatDateOnly(
+                      paymentPeriod.startDate
+                    )}
+                  </strong>
                 </div>
 
-                <strong>
-                  {paymentPeriod?.dueDate
-                    ? formatDateOnly(
-                        paymentPeriod.dueDate
-                      )
-                    : "—"}
-                </strong>
+                <div className="deadlineRailWrap">
+                  <div className="deadlineRail">
+                    <div
+                      className={`deadlineElapsed ${
+                        periodTimeline.state
+                      }`}
+                      style={{
+                        width: `${periodTimeline.progress}%`,
+                      }}
+                    />
+
+                    <div className="railGlow" />
+
+                    <div
+                      className={`movingMarker ${
+                        periodTimeline.state
+                      }`}
+                      style={{
+                        left: `${periodTimeline.progress}%`,
+                      }}
+                    >
+                      <div className="markerPulse" />
+                      <div className="markerCore">
+                        <span>●</span>
+                      </div>
+
+                      <div className="todayBubble">
+                        <small>BUGUN</small>
+                        <strong>
+                          {periodTimeline.todayLabel}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="deadlineMeta">
+                    <span>
+                      {Math.round(
+                        periodTimeline.progress
+                      )}% muddat o‘tdi
+                    </span>
+                    <span>
+                      {periodTimeline.state ===
+                      "overdue"
+                        ? "Yakunlangan"
+                        : "Avtomatik yangilanadi"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="deadlineDate endDate">
+                  <span>MUDDAT</span>
+                  <strong>
+                    {formatDateOnly(
+                      paymentPeriod.dueDate
+                    )}
+                  </strong>
+                </div>
+              </div>
+            ) : (
+              <div className="deadlineEmpty">
+                <span className="deadlineEmptyIcon">◷</span>
+                <div>
+                  <strong>Muddat belgilanmagan</strong>
+                  <span>
+                    Administrator to‘lov muddatini
+                    belgilagach, harakatlanuvchi
+                    chiziq shu yerda paydo bo‘ladi.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="paymentCompletion">
+              <div className="progressLabels">
+                <span>To‘lov bajarilishi</span>
+                <strong>{paidPercent}%</strong>
               </div>
 
-              <div className="paymentState">
-                <span>Holat</span>
-                <strong>
-                  {paymentStateLabel}
-                </strong>
+              <div className="progressTrack">
+                <div
+                  className="progressFill"
+                  style={{
+                    width: `${paidPercent}%`,
+                  }}
+                />
               </div>
-            </div>
-
-            <div className="progressLabels">
-              <span>To‘lov bajarilishi</span>
-              <strong>{paidPercent}%</strong>
-            </div>
-
-            <div className="progressTrack">
-              <div
-                className="progressFill"
-                style={{
-                  width: `${paidPercent}%`,
-                }}
-              />
             </div>
           </div>
 
@@ -1899,101 +2137,409 @@ export default function ProfilePage() {
         }
 
         .paymentProgressBox {
-          margin-top: 16px;
-          padding: 13px 16px 15px;
-          border: 1px solid #90999d;
-          border-radius: 13px;
+          width: min(94%, 1180px);
+          margin: 24px auto 0;
+          padding: 22px 24px 20px;
+          border: 1px solid rgba(92, 113, 126, .72);
+          border-radius: 22px;
           background:
-            linear-gradient(180deg, #fafafa, #d7d7d7);
+            radial-gradient(
+              circle at 50% -70%,
+              rgba(91, 205, 246, .24),
+              transparent 54%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(255,255,255,.98),
+              rgba(226,234,239,.98)
+            );
           box-shadow:
-            inset 0 2px 0 #fff,
-            0 4px 0 rgba(0,0,0,.20);
+            inset 0 2px 0 rgba(255,255,255,.98),
+            inset 0 -1px 0 rgba(54,79,92,.12),
+            0 6px 0 rgba(63,77,84,.34),
+            0 14px 28px rgba(0,0,0,.14);
         }
 
-        .paymentProgressHeader {
+        .timeJourneyHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 22px;
+          padding-bottom: 15px;
+          border-bottom: 1px solid rgba(72,96,108,.18);
+        }
+
+        .timeJourneyHeader > div:first-child {
+          min-width: 0;
+        }
+
+        .timeJourneyEyebrow {
+          display: block;
+          margin-bottom: 5px;
+          color: #2d7fa7;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 1.3px;
+        }
+
+        .timeJourneyHeader strong {
+          color: #173b50;
+          font-size: 20px;
+          line-height: 1.1;
+        }
+
+        .timeStatusChip {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 38px;
+          padding: 7px 12px;
+          border: 1px solid #88b9ce;
+          border-radius: 999px;
+          background: #e9f8fe;
+          color: #175b7d;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 11px;
+          font-weight: 800;
+          box-shadow: inset 0 1px 0 #fff;
+        }
+
+        .timeStatusChip.waiting {
+          border-color: #a9b2b8;
+          background: #f0f2f3;
+          color: #5f6a70;
+        }
+
+        .timeStatusChip.near,
+        .timeStatusChip.last {
+          border-color: #d5a44b;
+          background: #fff4d4;
+          color: #765112;
+        }
+
+        .timeStatusChip.overdue {
+          border-color: #d68b8b;
+          background: #fff0f0;
+          color: #9e2e2e;
+        }
+
+        .timeStatusDot {
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          background: currentColor;
+          box-shadow: 0 0 0 4px rgba(42,143,189,.10);
+        }
+
+        .modernDeadline {
+          width: 100%;
           display: grid;
           grid-template-columns:
-            minmax(0, 1fr)
-            minmax(180px, .34fr);
-          gap: 16px;
+            minmax(130px, .22fr)
+            minmax(260px, 1fr)
+            minmax(130px, .22fr);
+          gap: 20px;
           align-items: center;
-          margin-bottom: 12px;
-          padding-bottom: 11px;
-          border-bottom: 1px solid #c3c3c3;
+          padding: 12px 4px 8px;
         }
 
-        .currentPeriodRoute {
-          display: grid;
-          grid-template-columns:
-            auto minmax(80px, 1fr) auto;
-          gap: 12px;
-          align-items: center;
+        .deadlineDate {
+          min-width: 0;
+          text-align: center;
         }
 
-        .currentPeriodRoute strong {
-          color: #0d567c;
-          font-size: 13px;
+        .deadlineDate span,
+        .deadlineDate strong {
+          display: block;
+        }
+
+        .deadlineDate span {
+          margin-bottom: 7px;
+          color: #78909c;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 1px;
+        }
+
+        .deadlineDate strong {
+          color: #0d577d;
+          font-size: 17px;
           white-space: nowrap;
         }
 
-        .currentPeriodLine {
+        .deadlineRailWrap {
+          min-width: 0;
+          padding: 38px 0 0;
+        }
+
+        .deadlineRail {
           position: relative;
-          height: 8px;
+          height: 14px;
+          border: 1px solid #8ba9b8;
           border-radius: 999px;
           background:
             linear-gradient(
               180deg,
-              #89d8f3,
-              #239cc8
+              #dce6eb 0%,
+              #bdcdd5 100%
             );
           box-shadow:
-            inset 0 1px 1px rgba(0,0,0,.18),
+            inset 0 2px 4px rgba(20,48,61,.22),
             0 1px 0 #fff;
         }
 
-        .currentPeriodLine::before,
-        .currentPeriodLine::after {
+        .deadlineRail::before,
+        .deadlineRail::after {
           content: "";
           position: absolute;
           top: 50%;
-          width: 14px;
-          height: 14px;
+          z-index: 5;
+          width: 20px;
+          height: 20px;
           transform: translateY(-50%);
-          border: 2px solid #176f96;
+          border: 4px solid #f9fdff;
           border-radius: 50%;
-          background: #eaf9ff;
+          background: #2b97c5;
+          box-shadow:
+            0 0 0 2px #2b7799,
+            0 3px 8px rgba(0,0,0,.20);
+        }
+
+        .deadlineRail::before {
+          left: -5px;
+        }
+
+        .deadlineRail::after {
+          right: -5px;
+          background: #f1b74a;
+          box-shadow:
+            0 0 0 2px #a87b24,
+            0 3px 8px rgba(0,0,0,.20);
+        }
+
+        .deadlineElapsed {
+          position: absolute;
+          inset: 0 auto 0 0;
+          z-index: 2;
+          min-width: 0;
+          border-radius: inherit;
+          background:
+            linear-gradient(
+              90deg,
+              #1d8fc0 0%,
+              #31b7e4 54%,
+              #70d7f4 100%
+            );
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.45),
+            0 0 14px rgba(49,183,228,.35);
+          transition: width 1.2s cubic-bezier(.2,.8,.2,1);
+        }
+
+        .deadlineElapsed.near,
+        .deadlineElapsed.last {
+          background:
+            linear-gradient(90deg, #289ac4, #e4a83a);
+        }
+
+        .deadlineElapsed.overdue {
+          background:
+            linear-gradient(90deg, #c94747, #ee7a65);
+        }
+
+        .railGlow {
+          position: absolute;
+          top: 2px;
+          left: 2%;
+          right: 2%;
+          z-index: 3;
+          height: 3px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.52);
+          pointer-events: none;
+        }
+
+        .movingMarker {
+          position: absolute;
+          top: 50%;
+          z-index: 8;
+          width: 1px;
+          height: 1px;
+          transform: translate(-50%, -50%);
+          transition: left 1.2s cubic-bezier(.2,.8,.2,1);
+        }
+
+        .markerCore {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 28px;
+          height: 28px;
+          display: grid;
+          place-items: center;
+          transform: translate(-50%, -50%);
+          border: 4px solid #fff;
+          border-radius: 50%;
+          background:
+            radial-gradient(circle at 35% 30%, #8ee8ff, #1e98c8 60%, #0b5f85);
+          color: transparent;
+          box-shadow:
+            0 0 0 2px #176f96,
+            0 5px 12px rgba(0,0,0,.28);
+        }
+
+        .movingMarker.near .markerCore,
+        .movingMarker.last .markerCore {
+          background:
+            radial-gradient(circle at 35% 30%, #fff0a7, #e9ad39 60%, #9d6b10);
+          box-shadow:
+            0 0 0 2px #a2731f,
+            0 5px 12px rgba(0,0,0,.28);
+        }
+
+        .movingMarker.overdue .markerCore {
+          background:
+            radial-gradient(circle at 35% 30%, #ffc6c6, #dd5454 60%, #8e2020);
+          box-shadow:
+            0 0 0 2px #a52d2d,
+            0 5px 12px rgba(0,0,0,.28);
+        }
+
+        .markerPulse {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 42px;
+          height: 42px;
+          transform: translate(-50%, -50%);
+          border: 2px solid rgba(28,153,201,.32);
+          border-radius: 50%;
+          animation: markerPulse 2s ease-out infinite;
+        }
+
+        .movingMarker.near .markerPulse,
+        .movingMarker.last .markerPulse {
+          border-color: rgba(220,157,45,.38);
+        }
+
+        .movingMarker.overdue .markerPulse {
+          border-color: rgba(214,67,67,.36);
+        }
+
+        .todayBubble {
+          position: absolute;
+          left: 50%;
+          bottom: 24px;
+          min-width: 112px;
+          padding: 7px 10px;
+          transform: translateX(-50%);
+          border: 1px solid #87bad0;
+          border-radius: 11px;
+          background:
+            linear-gradient(180deg, #ffffff, #e5f5fb);
+          color: #174f6a;
+          text-align: center;
           box-shadow:
             inset 0 1px 0 #fff,
-            0 2px 0 rgba(0,0,0,.15);
+            0 4px 10px rgba(0,0,0,.12);
+          white-space: nowrap;
         }
 
-        .currentPeriodLine::before {
-          left: -3px;
+        .todayBubble::after {
+          content: "";
+          position: absolute;
+          left: 50%;
+          bottom: -6px;
+          width: 10px;
+          height: 10px;
+          transform: translateX(-50%) rotate(45deg);
+          border-right: 1px solid #87bad0;
+          border-bottom: 1px solid #87bad0;
+          background: #e5f5fb;
         }
 
-        .currentPeriodLine::after {
-          right: -3px;
-        }
-
-        .paymentState {
-          text-align: right;
-        }
-
-        .paymentState span,
-        .paymentState strong {
+        .todayBubble small,
+        .todayBubble strong {
           display: block;
+          position: relative;
+          z-index: 2;
         }
 
-        .paymentState span {
-          margin-bottom: 3px;
-          color: #6b7174;
-          font-size: 10px;
+        .todayBubble small {
+          margin-bottom: 2px;
+          color: #4b93b3;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: .9px;
+        }
+
+        .todayBubble strong {
+          font-size: 12px;
+        }
+
+        .deadlineMeta {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 11px;
+          color: #6f818a;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 9px;
           font-weight: 700;
         }
 
-        .paymentState strong {
-          color: #253e4a;
-          font-size: 13px;
+        .deadlineEmpty {
+          min-height: 120px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          padding: 20px;
+          border: 1px dashed #9bb0ba;
+          border-radius: 16px;
+          background: rgba(255,255,255,.48);
+          color: #58717e;
+          text-align: left;
+        }
+
+        .deadlineEmptyIcon {
+          width: 45px;
+          height: 45px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          background: #e5f5fb;
+          color: #2388b4;
+          font-size: 23px;
+        }
+
+        .deadlineEmpty strong,
+        .deadlineEmpty span {
+          display: block;
+        }
+
+        .deadlineEmpty strong {
+          margin-bottom: 4px;
+          color: #294c5e;
+        }
+
+        .deadlineEmpty div span {
+          max-width: 430px;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 11px;
+          line-height: 1.4;
+        }
+
+        .paymentCompletion {
+          margin-top: 18px;
+          padding-top: 15px;
+          border-top: 1px solid rgba(72,96,108,.16);
         }
 
         .progressLabels {
@@ -2002,11 +2548,8 @@ export default function ProfilePage() {
           justify-content: space-between;
           gap: 12px;
           margin-bottom: 8px;
-          font-weight: 700;
-        }
-
-        .progressLabels span {
           color: #344c59;
+          font-weight: 700;
         }
 
         .progressLabels strong {
@@ -2031,7 +2574,33 @@ export default function ProfilePage() {
             linear-gradient(180deg, #45c0ee, #168fbd);
           box-shadow:
             inset 0 1px 0 rgba(255,255,255,.55);
-          transition: width .25s ease;
+          transition: width .7s ease;
+        }
+
+        @keyframes markerPulse {
+          0% {
+            opacity: .72;
+            transform: translate(-50%, -50%) scale(.76);
+          }
+          70% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.28);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.28);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .deadlineElapsed,
+          .movingMarker {
+            transition: none;
+          }
+
+          .markerPulse {
+            animation: none;
+          }
         }
 
         .historyBlock {
@@ -2526,6 +3095,40 @@ export default function ProfilePage() {
         }
 
         @media (max-width: 820px) {
+          .paymentProgressBox {
+            width: 100%;
+            padding: 18px 14px;
+          }
+
+          .timeJourneyHeader {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .modernDeadline {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+
+          .deadlineDate {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 4px;
+          }
+
+          .deadlineDate span {
+            margin: 0;
+          }
+
+          .deadlineRailWrap {
+            padding: 42px 10px 6px;
+          }
+
+          .endDate {
+            margin-top: 3px;
+          }
           .content {
             width: calc(100% - 24px);
           }
@@ -2619,6 +3222,32 @@ export default function ProfilePage() {
         }
 
         @media (max-width: 560px) {
+          .timeJourneyHeader strong {
+            font-size: 18px;
+          }
+
+          .timeStatusChip {
+            max-width: 100%;
+          }
+
+          .deadlineDate strong {
+            font-size: 15px;
+          }
+
+          .deadlineRailWrap {
+            padding-top: 46px;
+          }
+
+          .todayBubble {
+            min-width: 100px;
+            padding: 6px 8px;
+          }
+
+          .deadlineMeta {
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+          }
           .siteHeader {
             width: calc(100% - 16px);
             margin-top: 8px;
