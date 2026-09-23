@@ -679,45 +679,59 @@ export default function ProfilePage() {
         };
       }
 
-      const toLocalBoundary = (
-        iso: string,
-        endOfDay = false
+      const toDayNumber = (
+        iso: string
       ) => {
         const [year, month, day] =
           iso.split("-").map(Number);
 
-        return new Date(
-          year,
-          month - 1,
-          day,
-          endOfDay ? 23 : 0,
-          endOfDay ? 59 : 0,
-          endOfDay ? 59 : 0,
-          endOfDay ? 999 : 0
-        ).getTime();
+        return Math.floor(
+          Date.UTC(
+            year,
+            month - 1,
+            day
+          ) / 86_400_000
+        );
       };
 
-      const start =
-        toLocalBoundary(startIso);
-
-      const due =
-        toLocalBoundary(dueIso, true);
-
       const now = timelineNow;
-      const duration =
-        Math.max(1, due - start);
+      const today = new Date(now);
 
-      const raw =
-        ((now - start) / duration) * 100;
+      // Bugungi sanani vaqtni hisobga olmasdan olamiz.
+      // Shu sabab 23.09 → 18.10 aynan 25 kun bo‘ladi.
+      const todayDay =
+        Math.floor(
+          Date.UTC(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate()
+          ) / 86_400_000
+        );
+
+      const startDay =
+        toDayNumber(startIso);
+
+      const dueDay =
+        toDayNumber(dueIso);
+
+      const totalDays =
+        Math.max(
+          1,
+          dueDay - startDay
+        );
+
+      const elapsedDays =
+        todayDay - startDay;
 
       const progress =
         Math.max(
           0,
-          Math.min(100, raw)
+          Math.min(
+            100,
+            (elapsedDays / totalDays) *
+              100
+          )
         );
-
-      const today =
-        new Date(now);
 
       const todayLabel =
         new Intl.DateTimeFormat(
@@ -729,14 +743,11 @@ export default function ProfilePage() {
           }
         ).format(today);
 
-      if (now < start) {
+      if (todayDay < startDay) {
         const days =
           Math.max(
             1,
-            Math.ceil(
-              (start - now) /
-                86_400_000
-            )
+            startDay - todayDay
           );
 
         return {
@@ -748,14 +759,11 @@ export default function ProfilePage() {
         };
       }
 
-      if (now > due) {
+      if (todayDay > dueDay) {
         const days =
           Math.max(
             1,
-            Math.floor(
-              (now - due) /
-                86_400_000
-            )
+            todayDay - dueDay
           );
 
         return {
@@ -767,17 +775,14 @@ export default function ProfilePage() {
         };
       }
 
-      const remainingMs =
-        Math.max(0, due - now);
-
       const daysLeft =
-        Math.ceil(
-          remainingMs /
-            86_400_000
+        Math.max(
+          0,
+          dueDay - todayDay
         );
 
       const isLastDay =
-        daysLeft <= 1;
+        daysLeft === 0;
 
       const isNear =
         daysLeft <= 5;
