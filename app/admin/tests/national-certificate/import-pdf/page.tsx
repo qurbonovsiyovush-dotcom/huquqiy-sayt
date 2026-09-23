@@ -91,33 +91,32 @@ function buildPdfLikeQuestionHtml(
   }
 
   /*
-    PDF import ham qo‘lda kiritilgan Milliy sertifikat savollari
-    bilan BIR XIL o‘qiladigan ko‘rinishda saqlanadi:
+    PDF import savollari qo‘lda kiritilgan Milliy sertifikat
+    savollari bilan BIR XIL public tipografiyaga bo‘ysunadi.
 
-    1) asosiy savol — qalin;
-    2) qavs ichidagi manba — sal kichik, oddiy, italic EMAS;
-    3) 1./2./3./4. va I./II./III./IV. bandlar — alohida qator;
-    4) bandlar — qalin va aniq;
-    5) mavjud rasm/Venn/jadval obyektlari keyin alohida saqlanadi.
+    MUHIM:
+    - bu yerda 18px/Times kabi qattiq font-size bermaymiz;
+    - public sahifadagi .questionText = 26px standart ishlaydi;
+    - asosiy savol qalin;
+    - qavs ichidagi huquqiy manba sal kichik, qalin emas, qiyshiq;
+    - 1./2./3./4. va I./II./III./IV. alohida qatorda;
+    - bandlar public CSSdagi .nc-numbered-line qoidasiga tushadi.
   */
+
+  const cleanLine = (
+    value: string
+  ) =>
+    String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\s*\?/g, " ?")
+      .trim();
+
   const rawLines = text
     .split(/\n+/)
-    .map((line) =>
-      line
-        .replace(/\u00a0/g, " ")
-        .replace(/[ \t]+/g, " ")
-        .trim()
-    )
+    .map(cleanLine)
     .filter(Boolean);
 
-  /*
-    Savol ichidagi mazmuniy bandlar:
-      1. ...
-      2) ...
-      I. ...
-      II. ...
-      III) ...
-  */
   const structuredLinePattern =
     /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8}))[.)]\s+\S/i;
 
@@ -148,13 +147,13 @@ function buildPdfLikeQuestionHtml(
     stemLines.join(" ").trim();
 
   /*
-    BMBA ko‘rinishidagi manba:
+    BMBA namunasidagi manba:
       (Mehnat kodeksi, 18.09.2026-yil holatiga ko‘ra).
       (“Ommaviy axborot vositalari to‘g‘risida”gi qonun, ...).
       (O‘zbekiston Respublikasi Konstitutsiyasi, 92-modda).
 
-    Oddiy qavslarni xato manba deb olmaslik uchun qavs ichida
-    huquqiy manbaga xos kalit so‘z bo‘lishini talab qilamiz.
+    Oddiy qavslarni manba deb xato tanimaslik uchun
+    huquqiy kalit so‘zlardan biri bo‘lishi shart.
   */
   const sourceNotePattern =
     /\s*(\((?=[^()]*\b(?:konstitutsiya|kodeks|qonun|qaror|farmon|nizom|modda|moddasi|holatiga\s+ko['’ʻʼ`]?ra)\b)[^()]*\)[.!?]?)\s*$/iu;
@@ -175,42 +174,50 @@ function buildPdfLikeQuestionHtml(
             0,
             Math.max(
               0,
-              (sourceMatch?.index ??
-                fullStem.length)
+              sourceMatch?.index ??
+                fullStem.length
             )
           )
           .trim()
       : fullStem;
 
+  /*
+    Public sahifada:
+      .questionText = 26px / 700
+      em/i = 0.92em / 400 / italic
+      .nc-numbered-line = 0.92em / 700
+
+    Shu sabab semantik HTML yetarli.
+  */
   const mainHtml =
     mainStem
-      ? `<span data-pdf-main="true" style="font-size:1em;font-weight:800;line-height:1.40;">${escapeHtml(
+      ? `<strong data-pdf-main="true">${escapeHtml(
           mainStem
-        )}</span>`
+        )}</strong>`
       : "";
 
   const sourceHtml =
     sourceNote
-      ? `${mainStem ? " " : ""}<span data-pdf-source="true" style="font-size:0.90em;font-weight:400;font-style:normal;line-height:1.40;">${escapeHtml(
+      ? `${mainStem ? " " : ""}<em data-pdf-source="true">${escapeHtml(
           sourceNote
-        )}</span>`
+        )}</em>`
       : "";
 
   const stemHtml =
     mainHtml || sourceHtml
-      ? `<div data-pdf-stem="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;line-height:1.40;margin:0 0 ${
+      ? `<p data-pdf-stem="true" style="margin:0 0 ${
           bodyLines.length > 0
-            ? "18px"
+            ? "12px"
             : "0"
-        } 0;color:#000;">${mainHtml}${sourceHtml}</div>`
+        } 0;">${mainHtml}${sourceHtml}</p>`
       : "";
 
   const bodyHtml =
     bodyLines.length > 0
-      ? `<div data-pdf-body="true" style="font-family:'Times New Roman',Georgia,serif;font-size:18px;font-weight:700;line-height:1.55;color:#000;">${bodyLines
+      ? `<div data-pdf-body="true">${bodyLines
           .map(
             (line) =>
-              `<div data-pdf-item="true" style="margin:0 0 7px 0;">${escapeHtml(
+              `<div class="nc-numbered-line" data-pdf-item="true">${escapeHtml(
                 line
               )}</div>`
           )
