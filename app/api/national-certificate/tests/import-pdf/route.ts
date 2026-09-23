@@ -224,6 +224,8 @@ function normalizeQuestionText(parts: string[]) {
       Yangi ichki band boshlanishi:
         1) ...
         2) ...
+        I. ...
+        II. ...
         a) ...
         b) ...
 
@@ -232,9 +234,23 @@ function normalizeQuestionText(parts: string[]) {
       hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
     */
     const startsInnerListItem =
-      /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
+      /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8})|(?:[a-zA-Z]))[\)\.]\s+\S/i.test(
+        line
+      );
 
-    if (startsInnerListItem) {
+    /*
+      BMBAdagi kazus/vaziyat bloklari ham oldingi gapga yopishib
+      ketmasligi kerak.
+    */
+    const startsNamedBlock =
+      /^(?:kazus|vaziyat|holat)\s*:/i.test(
+        line
+      );
+
+    if (
+      startsInnerListItem ||
+      startsNamedBlock
+    ) {
       flushCurrent();
       current = line;
       continue;
