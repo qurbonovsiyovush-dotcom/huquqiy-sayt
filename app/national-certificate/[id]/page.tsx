@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -208,8 +209,15 @@ export default function NationalCertificateTestPage() {
     kelishi mumkin. Public sahifada uni bir xil, tabiiy document-flow
     ko‘rinishiga keltiramiz va Venn bilan keyingi matn orasidagi barcha
     bo‘sh spacer elementlarni olib tashlaymiz.
+
+    MUHIM:
+    Bu blok useLayoutEffect bilan ishlaydi. Sababi birinchi savol
+    ekranga chizilishidan OLDIN "1.     matn" kabi ortiqcha bo‘shliqlar
+    normallashtirilishi kerak. Aks holda test birinchi ochilganda eski
+    bo‘shliq ko‘rinib, boshqa savolga o‘tib qaytilgandan keyingina
+    tuzalib qolardi.
   */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = questionHtmlRef.current;
 
     if (
@@ -553,6 +561,19 @@ export default function NationalCertificateTestPage() {
       });
     };
 
+    /*
+      BIRINCHI PAINTDAN OLDIN darhol normalizatsiya qilamiz.
+      Shu qism 1-savol birinchi ochilgandagi ortiqcha bo‘shliqni yo‘qotadi.
+    */
+    normalizeNumberedLines();
+    normalizeVenn();
+
+    /*
+      Editor/Venn/SVG ichki o‘lchamlari keyingi frame'da o‘zgarishi
+      mumkinligi uchun ikki frame'dan keyin yana bir marta tekshiramiz.
+      Bu faqat xavfsizlik uchun; asosiy ko‘rinish allaqachon yuqorida
+      birinchi paintdan oldin tuzatilgan bo‘ladi.
+    */
     frame1 =
       window.requestAnimationFrame(
         () => {
@@ -589,6 +610,7 @@ export default function NationalCertificateTestPage() {
       );
     };
   }, [
+    attempt?.id,
     currentQuestion?.id,
     currentQuestion?.questionHtml,
   ]);
