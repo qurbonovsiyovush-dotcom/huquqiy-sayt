@@ -42,12 +42,937 @@ function getUserKey(request: NextRequest) {
   );
 }
 
-function normalizeAnswer(value: string) {
+/*
+  ============================================================
+  BEPUL SMART OPEN-ANSWER CHECKER
+  ============================================================
+
+  Bu checker hech qanday tashqi AI/API ishlatmaydi.
+
+  Nimalarni tushunadi:
+  - katta/kichik harf farqi;
+  - nuqta, vergul, tire va ortiqcha bo‘sh joylar;
+  - turli apostroflar;
+  - "5", "5 yil", "besh", "besh yil" kabi son variantlari;
+  - so‘zlar tartibi o‘zgargan javoblar;
+  - ayrim o‘zbekcha qo‘shimchalar va yengil imlo xatolari;
+  - vergul/nuqtali vergul bilan yozilgan ro‘yxatlarda bandlar tartibi;
+  - etalon javobdagi raqam noto‘g‘ri almashtirilsa, javobni xato qiladi.
+
+  Muhim:
+  Bu AI emas. Juda erkin, chuqur parafrazlarni 100% tushunmaydi.
+  Shuning uchun huquqiy aniqlikni saqlash uchun ehtiyotkor ishlaydi.
+*/
+
+type AcceptedOpenAnswer = {
+  answerText: string;
+  normalizedAnswer: string;
+};
+
+const UZBEK_NUMBER_UNITS: Record<string, number> = {
+  nol: 0,
+  bir: 1,
+  ikki: 2,
+  uch: 3,
+  tort: 4,
+  besh: 5,
+  olti: 6,
+  yetti: 7,
+  sakkiz: 8,
+  toqqiz: 9,
+};
+
+const UZBEK_NUMBER_TENS: Record<string, number> = {
+  on: 10,
+  yigirma: 20,
+  ottiz: 30,
+  qirq: 40,
+  ellik: 50,
+  oltmish: 60,
+  yetmish: 70,
+  sakson: 80,
+  toqson: 90,
+};
+
+const LIGHT_STOP_WORDS = new Set([
+  "va",
+  "ham",
+  "yoki",
+  "esa",
+  "bilan",
+  "uchun",
+  "boyicha",
+  "bo'yicha",
+  "sifatida",
+  "deb",
+  "bu",
+  "shu",
+  "osha",
+  "o'sha",
+]);
+
+const PHRASE_ALIASES: Array<[RegExp, string]> = [
+  [/\bumrining\s+oxirigacha\b/giu, "umrbod"],
+  [/\bumrining\s+oxiriga\s+qadar\b/giu, "umrbod"],
+  [/\bhayotining\s+oxirigacha\b/giu, "umrbod"],
+  [/\bhayotining\s+oxiriga\s+qadar\b/giu, "umrbod"],
+  [/\bavloddan\s+avlodga\b/giu, "meros"],
+  [/\bnasldan\s+naslga\b/giu, "meros"],
+  [/\bmeros\s+bo['’ʻʼ`]?yicha\b/giu, "meros"],
+  [/\bmeros\s+orqali\b/giu, "meros"],
+  [/\bovoz\s+berish\s+yo['’ʻʼ`]?li\s+bilan\b/giu, "saylov"],
+  [/\bsaylov\s+orqali\b/giu, "saylov"],
+];
+
+function normalizeApostrophes(value: string) {
   return value
-    .trim()
-    .toLowerCase()
-    .replace(/[ʻʼ’`]/g, "'")
-    .replace(/\s+/g, " ");
+    .replace(/[ʻʼ’`‘]/g, "'")
+    .replace(/[“”„"]/g, " ");
+}
+
+function basicNormalize(value: string) {
+  let result = normalizeApostrophes(
+    String(value || "")
+      .trim()
+      .toLowerCase()
+  );
+
+  for (const [pattern, replacement] of PHRASE_ALIASES) {
+    result = result.replace(
+      pattern,
+      replacement
+    );
+  }
+
+  return result
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[-–—_/\\|]+/g, " ")
+    .replace(/[^\p{L}\p{N}'%]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function canonicalNumberWord(
+  token: string
+) {
+  return token
+    .replace(/'/g, "")
+    .replace(/^toʻrt$/u, "tort")
+    .replace(/^to‘rt$/u, "tort")
+    .replace(/^toʻqqiz$/u, "toqqiz")
+    .replace(/^to‘qqiz$/u, "toqqiz")
+    .replace(/^oʻn$/u, "on")
+    .replace(/^o‘n$/u, "on")
+    .replace(/^oʻttiz$/u, "ottiz")
+    .replace(/^o‘ttiz$/u, "ottiz")
+    .replace(/^toʻqson$/u, "toqson")
+    .replace(/^to‘qson$/u, "toqson");
+}
+
+function parseUzbekNumberSequence(
+  tokens: string[],
+  startIndex: number
+): {
+  value: number;
+  consumed: number;
+} | null {
+  let total = 0;
+  let current = 0;
+  let consumed = 0;
+  let found = false;
+
+  for (
+    let index = startIndex;
+    index < tokens.length;
+    index += 1
+  ) {
+    const rawToken =
+      canonicalNumberWord(
+        tokens[index]
+      );
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        UZBEK_NUMBER_UNITS,
+        rawToken
+      )
+    ) {
+      current +=
+        UZBEK_NUMBER_UNITS[
+          rawToken
+        ];
+      consumed += 1;
+      found = true;
+      continue;
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        UZBEK_NUMBER_TENS,
+        rawToken
+      )
+    ) {
+      current +=
+        UZBEK_NUMBER_TENS[
+          rawToken
+        ];
+      consumed += 1;
+      found = true;
+      continue;
+    }
+
+    if (rawToken === "yuz") {
+      current =
+        Math.max(
+          1,
+          current
+        ) * 100;
+      consumed += 1;
+      found = true;
+      continue;
+    }
+
+    if (rawToken === "ming") {
+      total +=
+        Math.max(
+          1,
+          current
+        ) * 1000;
+      current = 0;
+      consumed += 1;
+      found = true;
+      continue;
+    }
+
+    break;
+  }
+
+  if (!found) {
+    return null;
+  }
+
+  return {
+    value: total + current,
+    consumed,
+  };
+}
+
+function normalizeNumberWords(
+  value: string
+) {
+  const tokens =
+    basicNormalize(value)
+      .split(" ")
+      .filter(Boolean);
+
+  const output: string[] = [];
+
+  let index = 0;
+
+  while (index < tokens.length) {
+    const parsed =
+      parseUzbekNumberSequence(
+        tokens,
+        index
+      );
+
+    if (
+      parsed &&
+      parsed.consumed > 0
+    ) {
+      output.push(
+        String(parsed.value)
+      );
+      index +=
+        parsed.consumed;
+      continue;
+    }
+
+    output.push(tokens[index]);
+    index += 1;
+  }
+
+  return output.join(" ");
+}
+
+function normalizeAnswer(value: string) {
+  return normalizeNumberWords(
+    value
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripApostrophe(
+  value: string
+) {
+  return value.replace(
+    /'/g,
+    ""
+  );
+}
+
+function stemToken(
+  rawToken: string
+) {
+  let token =
+    stripApostrophe(
+      rawToken
+        .toLowerCase()
+        .trim()
+    );
+
+  if (!token) {
+    return "";
+  }
+
+  if (/^\d+(?:[.,]\d+)?$/.test(token)) {
+    return token.replace(
+      ",",
+      "."
+    );
+  }
+
+  /*
+    O‘zbek tilidagi eng ko‘p uchraydigan qo‘shimchalardan
+    faqat xavfsizroq qismini yengil kesamiz.
+  */
+  const suffixes = [
+    "larining",
+    "larning",
+    "lardan",
+    "larga",
+    "larini",
+    "lari",
+    "lar",
+    "ning",
+    "dan",
+    "ga",
+    "ka",
+    "qa",
+    "da",
+    "ni",
+    "si",
+  ];
+
+  for (const suffix of suffixes) {
+    if (
+      token.length >=
+        suffix.length + 4 &&
+      token.endsWith(suffix)
+    ) {
+      token = token.slice(
+        0,
+        -suffix.length
+      );
+      break;
+    }
+  }
+
+  const verbSuffixes = [
+    "lanadi",
+    "lanish",
+    "lanishi",
+    "iladi",
+    "ilishi",
+    "ishadi",
+    "adi",
+    "aydi",
+    "ydi",
+    "gan",
+    "kan",
+    "qan",
+    "ish",
+  ];
+
+  for (
+    const suffix of verbSuffixes
+  ) {
+    if (
+      token.length >=
+        suffix.length + 4 &&
+      token.endsWith(suffix)
+    ) {
+      token = token.slice(
+        0,
+        -suffix.length
+      );
+      break;
+    }
+  }
+
+  return token;
+}
+
+function tokenList(
+  value: string
+) {
+  const normalized =
+    normalizeAnswer(value);
+
+  const rawTokens =
+    normalized
+      .split(" ")
+      .filter(Boolean);
+
+  const tokens: string[] = [];
+
+  for (const rawToken of rawTokens) {
+    const clean =
+      stripApostrophe(
+        rawToken
+      );
+
+    if (
+      clean.endsWith("maydi") &&
+      clean.length > 6
+    ) {
+      tokens.push(
+        stemToken(
+          clean.slice(
+            0,
+            -"maydi".length
+          )
+        )
+      );
+      tokens.push("emas");
+      continue;
+    }
+
+    const stem =
+      stemToken(rawToken);
+
+    if (
+      stem &&
+      !LIGHT_STOP_WORDS.has(
+        stem
+      )
+    ) {
+      tokens.push(stem);
+    }
+  }
+
+  return tokens.filter(
+    Boolean
+  );
+}
+
+function unique<T>(
+  values: T[]
+) {
+  return Array.from(
+    new Set(values)
+  );
+}
+
+function levenshteinDistance(
+  left: string,
+  right: string
+) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left.length) {
+    return right.length;
+  }
+
+  if (!right.length) {
+    return left.length;
+  }
+
+  const previous =
+    Array.from(
+      {
+        length:
+          right.length + 1,
+      },
+      (_, index) => index
+    );
+
+  for (
+    let i = 1;
+    i <= left.length;
+    i += 1
+  ) {
+    const current =
+      new Array(
+        right.length + 1
+      ).fill(0);
+
+    current[0] = i;
+
+    for (
+      let j = 1;
+      j <= right.length;
+      j += 1
+    ) {
+      const cost =
+        left[i - 1] ===
+        right[j - 1]
+          ? 0
+          : 1;
+
+      current[j] =
+        Math.min(
+          current[j - 1] + 1,
+          previous[j] + 1,
+          previous[j - 1] +
+            cost
+        );
+    }
+
+    for (
+      let j = 0;
+      j < current.length;
+      j += 1
+    ) {
+      previous[j] =
+        current[j];
+    }
+  }
+
+  return previous[
+    right.length
+  ];
+}
+
+function tokensEquivalent(
+  leftRaw: string,
+  rightRaw: string
+) {
+  const left =
+    stemToken(leftRaw);
+  const right =
+    stemToken(rightRaw);
+
+  if (!left || !right) {
+    return false;
+  }
+
+  if (left === right) {
+    return true;
+  }
+
+  const leftIsNumber =
+    /^\d+(?:\.\d+)?$/.test(
+      left
+    );
+
+  const rightIsNumber =
+    /^\d+(?:\.\d+)?$/.test(
+      right
+    );
+
+  if (
+    leftIsNumber ||
+    rightIsNumber
+  ) {
+    return (
+      leftIsNumber &&
+      rightIsNumber &&
+      left === right
+    );
+  }
+
+  if (
+    left.length >= 5 &&
+    right.length >= 5 &&
+    (
+      left.startsWith(right) ||
+      right.startsWith(left)
+    )
+  ) {
+    const difference =
+      Math.abs(
+        left.length -
+          right.length
+      );
+
+    if (difference <= 4) {
+      return true;
+    }
+  }
+
+  if (
+    left.length >= 5 &&
+    right.length >= 5 &&
+    levenshteinDistance(
+      left,
+      right
+    ) <= 1
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function extractNumbers(
+  value: string
+) {
+  return unique(
+    normalizeAnswer(value)
+      .match(
+        /\b\d+(?:\.\d+)?\b/g
+      ) || []
+  );
+}
+
+function isNumericQuestion(
+  questionText: string
+) {
+  const normalized =
+    normalizeAnswer(
+      questionText
+    );
+
+  return (
+    /\bnecha\b/.test(
+      normalized
+    ) ||
+    /\bnechta\b/.test(
+      normalized
+    ) ||
+    /\bqancha\b/.test(
+      normalized
+    )
+  );
+}
+
+function splitConcepts(
+  value: string
+) {
+  const cleaned =
+    normalizeApostrophes(
+      String(value || "")
+    )
+      .replace(/<[^>]*>/g, " ")
+      .replace(
+        /(?:^|\s)[•●▪◦]\s*/g,
+        "; "
+      )
+      .replace(
+        /\r?\n+/g,
+        "; "
+      )
+      .replace(
+        /(?:^|\s)\d{1,2}[.)-]\s*/g,
+        "; "
+      )
+      .trim();
+
+  let parts =
+    cleaned
+      .split(/[;]+/)
+      .map(
+        (item) =>
+          item.trim()
+      )
+      .filter(Boolean);
+
+  /*
+    Agar etalon bitta uzun qatorda, vergullar bilan
+    sanab yozilgan bo‘lsa, uni alohida mazmuniy bandlarga ajratamiz.
+  */
+  if (
+    parts.length === 1
+  ) {
+    const commaParts =
+      cleaned
+        .split(/[,]+/)
+        .map(
+          (item) =>
+            item.trim()
+        )
+        .filter(Boolean);
+
+    if (
+      commaParts.length >= 3
+    ) {
+      parts =
+        commaParts;
+    }
+  }
+
+  return parts;
+}
+
+function matchTokenCoverage(
+  expectedTokens: string[],
+  userTokens: string[]
+) {
+  const expected =
+    unique(
+      expectedTokens
+    );
+
+  if (
+    expected.length === 0
+  ) {
+    return 0;
+  }
+
+  let matched = 0;
+
+  for (
+    const expectedToken of
+    expected
+  ) {
+    const exists =
+      userTokens.some(
+        (userToken) =>
+          tokensEquivalent(
+            expectedToken,
+            userToken
+          )
+      );
+
+    if (exists) {
+      matched += 1;
+    }
+  }
+
+  return (
+    matched /
+    expected.length
+  );
+}
+
+function conceptMatches(
+  concept: string,
+  userAnswer: string
+) {
+  const expectedTokens =
+    tokenList(concept);
+  const userTokens =
+    tokenList(userAnswer);
+
+  if (
+    expectedTokens.length === 0 ||
+    userTokens.length === 0
+  ) {
+    return false;
+  }
+
+  const expectedNumbers =
+    extractNumbers(
+      concept
+    );
+
+  const userNumbers =
+    extractNumbers(
+      userAnswer
+    );
+
+  /*
+    Etalonda raqam bo‘lsa, foydalanuvchi aynan shu raqamni
+    yozishi kerak. Masalan 5 yil o‘rniga 4 yil qabul qilinmaydi.
+  */
+  if (
+    expectedNumbers.length > 0 &&
+    !expectedNumbers.every(
+      (number) =>
+        userNumbers.includes(
+          number
+        )
+    )
+  ) {
+    return false;
+  }
+
+  const coverage =
+    matchTokenCoverage(
+      expectedTokens,
+      userTokens
+    );
+
+  if (
+    expectedTokens.length === 1
+  ) {
+    return coverage === 1;
+  }
+
+  if (
+    expectedTokens.length === 2
+  ) {
+    return coverage >= 0.5;
+  }
+
+  if (
+    expectedTokens.length <= 4
+  ) {
+    return coverage >= 0.67;
+  }
+
+  return coverage >= 0.6;
+}
+
+function smartOpenAnswerMatches(
+  questionText: string,
+  userAnswer: string,
+  acceptedAnswers:
+    AcceptedOpenAnswer[]
+) {
+  const normalizedUser =
+    normalizeAnswer(
+      userAnswer
+    );
+
+  if (!normalizedUser) {
+    return false;
+  }
+
+  /*
+    1) Eng ishonchli usul — to‘liq normallashtirilgan moslik.
+  */
+  for (
+    const accepted of
+    acceptedAnswers
+  ) {
+    const normalizedAccepted =
+      normalizeAnswer(
+        accepted.answerText ||
+          accepted.normalizedAnswer
+      );
+
+    if (
+      normalizedAccepted &&
+      normalizedAccepted ===
+        normalizedUser
+    ) {
+      return true;
+    }
+  }
+
+  /*
+    2) "Necha?", "Nechta?", "Qancha?" tipidagi savollar.
+       Masalan etalon: "5 yil muddatga saylanadi"
+       Qabul qilinadi:
+       - 5
+       - 5 yil
+       - besh
+       - besh yil
+  */
+  if (
+    isNumericQuestion(
+      questionText
+    )
+  ) {
+    for (
+      const accepted of
+      acceptedAnswers
+    ) {
+      const acceptedNumbers =
+        extractNumbers(
+          accepted.answerText ||
+            accepted.normalizedAnswer
+        );
+
+      const userNumbers =
+        extractNumbers(
+          userAnswer
+        );
+
+      if (
+        acceptedNumbers.length === 1 &&
+        userNumbers.length === 1 &&
+        acceptedNumbers[0] ===
+          userNumbers[0]
+      ) {
+        return true;
+      }
+    }
+  }
+
+  /*
+    3) Mazmuniy bandlar bo‘yicha bepul tekshiruv.
+       Bandlar qaysi tartibda yozilgani muhim emas.
+  */
+  for (
+    const accepted of
+    acceptedAnswers
+  ) {
+    const acceptedText =
+      accepted.answerText ||
+      accepted.normalizedAnswer;
+
+    if (!acceptedText) {
+      continue;
+    }
+
+    const acceptedNumbers =
+      extractNumbers(
+        acceptedText
+      );
+
+    const userNumbers =
+      extractNumbers(
+        userAnswer
+      );
+
+    /*
+      Etalondagi raqamlar o‘zgartirib yuborilgan bo‘lsa,
+      umumiy gap o‘xshash bo‘lsa ham to‘g‘ri demaymiz.
+    */
+    if (
+      acceptedNumbers.length > 0 &&
+      !acceptedNumbers.every(
+        (number) =>
+          userNumbers.includes(
+            number
+          )
+      )
+    ) {
+      continue;
+    }
+
+    const concepts =
+      splitConcepts(
+        acceptedText
+      );
+
+    if (
+      concepts.length >= 2
+    ) {
+      const matchedConcepts =
+        concepts.filter(
+          (concept) =>
+            conceptMatches(
+              concept,
+              userAnswer
+            )
+        ).length;
+
+      /*
+        Ro‘yxat tipidagi javobda barcha asosiy bandlar bo‘lishi kerak.
+        Tartib muhim emas.
+      */
+      if (
+        matchedConcepts ===
+        concepts.length
+      ) {
+        return true;
+      }
+
+      continue;
+    }
+
+    /*
+      Bitta gapli javoblarda so‘zlar tartibi muhim emas.
+      60–67% mazmuniy token mosligi talab qilinadi.
+    */
+    if (
+      conceptMatches(
+        acceptedText,
+        userAnswer
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export async function POST(
@@ -282,6 +1207,8 @@ export async function POST(
         id,
         question_number,
         question_type,
+        question_text,
+        question_html,
         points
       FROM national_certificate_questions
       WHERE test_id = ${testId}
@@ -345,6 +1272,7 @@ export async function POST(
     const acceptedAnswers = await sql`
       SELECT
         a.question_id,
+        a.answer_text,
         a.normalized_answer
       FROM national_certificate_open_answers a
       INNER JOIN national_certificate_questions q
@@ -383,7 +1311,10 @@ export async function POST(
     }
 
     const openAnswersByQuestion =
-      new Map<string, Set<string>>();
+      new Map<
+        string,
+        AcceptedOpenAnswer[]
+      >();
 
     for (
       const accepted of
@@ -397,13 +1328,20 @@ export async function POST(
       const current =
         openAnswersByQuestion.get(
           questionId
-        ) || new Set<string>();
+        ) || [];
 
-      current.add(
-        String(
-          accepted.normalized_answer
-        )
-      );
+      current.push({
+        answerText:
+          String(
+            accepted.answer_text ||
+              ""
+          ),
+        normalizedAnswer:
+          String(
+            accepted.normalized_answer ||
+              ""
+          ),
+      });
 
       openAnswersByQuestion.set(
         questionId,
@@ -598,14 +1536,23 @@ export async function POST(
           openAnswerText
         );
 
-      const acceptedSet =
+      const acceptedList =
         openAnswersByQuestion.get(
           questionId
-        ) || new Set<string>();
+        ) || [];
+
+      const questionText =
+        String(
+          question.question_text ||
+            question.question_html ||
+            ""
+        );
 
       const isCorrect =
-        acceptedSet.has(
-          normalized
+        smartOpenAnswerMatches(
+          questionText,
+          openAnswerText,
+          acceptedList
         );
 
       const awardedPoints =
