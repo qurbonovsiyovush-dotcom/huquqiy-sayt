@@ -576,6 +576,12 @@ export default function ProfilePage() {
           (item) =>
             !item.isVoided
         )
+        // Muddat yozuvi bazada saqlanadi, lekin profil tarixida ko‘rsatilmaydi.
+        // Muddatning o‘zi yuqoridagi zamonaviy avtomatik timeline’da ko‘rinadi.
+        .filter(
+          (item) =>
+            !isPeriodEntry(item)
+        )
         .filter((item) => {
           const canonicalType =
             isPeriodEntry(item)
