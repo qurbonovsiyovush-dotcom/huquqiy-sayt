@@ -3590,8 +3590,74 @@ function PageStyles() {
 
         font-size: inherit !important;
         line-height: inherit !important;
-        font-weight: inherit !important;
         color: inherit !important;
+      }
+
+      /* =========================================================
+         PDF IMPORT — BMBA/PDFGA YAQIN MATN IERARXIYASI
+         =========================================================
+         Topshiriq          -> qalin
+         Huquqiy manba      -> kursiv, qalin emas
+         Kazus/vaziyat      -> oddiy matn
+         Yakuniy savol      -> qalin
+
+         data-pdf-* atributlari import sahifasida saqlangan
+         questionHtml bilan birga bazaga yoziladi. Shu sabab preview
+         va foydalanuvchi sahifasida bir xil ko‘rinish saqlanadi.
+      */
+      .questionText.htmlContent [data-pdf-question-layout="true"] {
+        font-weight: 400 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-heading="true"],
+      .questionText.htmlContent [data-pdf-main="true"],
+      .questionText.htmlContent [data-pdf-open-prefix="true"] {
+        font-weight: 700 !important;
+        line-height: 1.5 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-source-row="true"] {
+        margin-top: 6px !important;
+        margin-bottom: 12px !important;
+        font-weight: 400 !important;
+        line-height: 1.42 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-source="true"] {
+        font-size: 0.92em !important;
+        line-height: 1.42 !important;
+        font-weight: 400 !important;
+        font-style: italic !important;
+        color: #202a38 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-case="true"],
+      .questionText.htmlContent [data-pdf-body="true"] {
+        margin-top: 12px !important;
+        font-weight: 400 !important;
+        line-height: 1.55 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-final-question="true"] {
+        margin-top: 14px !important;
+        font-weight: 700 !important;
+        line-height: 1.5 !important;
+      }
+
+      /* Kazus ichidagi oddiy paragraph/divlar ota blokning normal
+         qalinligini oladi; haqiqiy strong/b esa qalin qoladi. */
+      .questionText.htmlContent [data-pdf-case="true"] p,
+      .questionText.htmlContent [data-pdf-case="true"] div:not(.nc-numbered-line),
+      .questionText.htmlContent [data-pdf-body="true"] p,
+      .questionText.htmlContent [data-pdf-body="true"] div:not(.nc-numbered-line) {
+        font-weight: 400 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-case="true"] strong,
+      .questionText.htmlContent [data-pdf-case="true"] b,
+      .questionText.htmlContent [data-pdf-final-question="true"] strong,
+      .questionText.htmlContent [data-pdf-final-question="true"] b {
+        font-weight: 700 !important;
       }
 
       /*
