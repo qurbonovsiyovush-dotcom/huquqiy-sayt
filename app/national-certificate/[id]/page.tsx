@@ -410,6 +410,7 @@ export default function NationalCertificateTestPage() {
 
         element.classList.remove(
           "nc-numbered-line",
+          "nc-number-full-line",
           "nc-roman-line",
           "nc-letter-line",
           "nc-roman-full-line",
@@ -444,11 +445,8 @@ export default function NationalCertificateTestPage() {
 
         if (numberMatch) {
           element.classList.add(
-            "nc-numbered-line"
-          );
-          addMarkerSpan(
-            element,
-            "number"
+            "nc-numbered-line",
+            "nc-number-full-line"
           );
           return;
         }
@@ -460,32 +458,9 @@ export default function NationalCertificateTestPage() {
 
         if (romanMatch) {
           element.classList.add(
-            "nc-roman-line"
+            "nc-roman-line",
+            "nc-roman-full-line"
           );
-
-          /*
-            PDFdagi matching savollarida I./II./III. dan keyingi
-            qisqa kategoriya nomlari to‘liq qalin. True/False kabi
-            to‘liq gaplar esa oddiy, faqat Rim marker qalin.
-          */
-          const romanBody =
-            romanMatch[2].trim();
-
-          if (
-            !/[.;:!?]$/.test(
-              romanBody
-            )
-          ) {
-            element.classList.add(
-              "nc-roman-full-line"
-            );
-          } else {
-            addMarkerSpan(
-              element,
-              "roman"
-            );
-          }
-
           return;
         }
 
@@ -539,6 +514,60 @@ export default function NationalCertificateTestPage() {
               "[data-pdf-case-line]"
             )
           ) as HTMLElement[];
+
+        /*
+          19-savolga o‘xshash PDF holati:
+          "I." markerining matni text-run tartibi sabab final savol
+          boshiga o‘tib qolishi mumkin. Masalan:
+          "kollektiv xavfsizlik ...; Qaysi ...?"
+
+          Orphan I./II./1. marker topilsa, nuqtali vergulgacha bo‘lgan
+          qismini yana o‘sha markerga qaytaramiz.
+        */
+        const orphanStructuredLine =
+          caseLines.find((element) =>
+            /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8}))[.)]$/u.test(
+              elementText(element)
+            )
+          ) || null;
+
+        if (orphanStructuredLine) {
+          const misplaced = finalText.match(
+            /^(.+?[;:])\s*((?:qaysi|qanday|qancha|necha|nechta|kim|nima|qachon|qayerda|ushbu|mazkur)\b[\s\S]*\?)$/iu
+          );
+
+          if (misplaced) {
+            const marker =
+              elementText(
+                orphanStructuredLine
+              );
+
+            orphanStructuredLine.textContent =
+              cleanText(
+                `${marker} ${misplaced[1]}`
+              );
+
+            if (
+              /^[IVXLCDM]{1,8}[.)]$/u.test(
+                marker
+              )
+            ) {
+              orphanStructuredLine.classList.add(
+                "nc-roman-line",
+                "nc-roman-full-line"
+              );
+            } else {
+              orphanStructuredLine.classList.add(
+                "nc-numbered-line",
+                "nc-number-full-line"
+              );
+            }
+
+            finalText = cleanText(
+              misplaced[2]
+            );
+          }
+        }
 
         let previous =
           caseLines.length > 0
@@ -4109,11 +4138,23 @@ function PageStyles() {
       }
 
       .questionText.htmlContent [data-pdf-case-line="true"],
-      .questionText.htmlContent [data-pdf-item="true"],
-      .questionText.htmlContent .nc-numbered-line,
-      .questionText.htmlContent .nc-letter-line,
-      .questionText.htmlContent .nc-roman-line {
+      .questionText.htmlContent .nc-letter-line {
         font-weight: 400 !important;
+      }
+
+      /*
+        PDFdagi yopiq savollarda 1./2./3. va I./II./III.
+        dan keyingi kategoriya/atama satrlari ham qalin.
+      */
+      .questionText.htmlContent [data-pdf-number-line="true"],
+      .questionText.htmlContent [data-pdf-number-line="true"] *,
+      .questionText.htmlContent [data-pdf-roman-line="true"],
+      .questionText.htmlContent [data-pdf-roman-line="true"] *,
+      .questionText.htmlContent .nc-number-full-line,
+      .questionText.htmlContent .nc-number-full-line *,
+      .questionText.htmlContent .nc-roman-full-line,
+      .questionText.htmlContent .nc-roman-full-line * {
+        font-weight: 700 !important;
       }
 
       .questionText.htmlContent .nc-list-marker,
@@ -4162,7 +4203,7 @@ function PageStyles() {
 
         font-size: 0.92em !important;
         line-height: 1.42 !important;
-        font-weight: 400 !important;
+        font-weight: 700 !important;
       }
 
       /*
@@ -4185,7 +4226,7 @@ function PageStyles() {
 
         font-size: 0.92em !important;
         line-height: 1.42 !important;
-        font-weight: 400 !important;
+        font-weight: 700 !important;
 
         counter-increment: question-list;
       }
