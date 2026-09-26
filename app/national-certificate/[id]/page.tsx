@@ -243,6 +243,19 @@ export default function NationalCertificateTestPage() {
       - keyingi qatorda matn raqam ostiga emas, matn ostiga tushadi.
     */
     const normalizeNumberedLines = () => {
+      /*
+        Agar admin qoralama muharririda savol qo‘lda o‘zgartirilgan
+        bo‘lsa, foydalanuvchining HTML formatiga tegmaymiz.
+        Bu belgi admin editor tomonidan saqlanadi.
+      */
+      if (
+        root.querySelector(
+          '[data-user-edited="true"]'
+        )
+      ) {
+        return;
+      }
+
       const leafBlocks =
         root.querySelectorAll<HTMLElement>(
           "p, div"
@@ -525,7 +538,13 @@ export default function NationalCertificateTestPage() {
           qismini yana o‘sha markerga qaytaramiz.
         */
         const orphanStructuredLine =
-          caseLines.find((element) =>
+          (
+            Array.from(
+              root.querySelectorAll<HTMLElement>(
+                '[data-pdf-roman-line], [data-pdf-number-line], [data-pdf-case-line]'
+              )
+            ) as HTMLElement[]
+          ).find((element) =>
             /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8}))[.)]$/u.test(
               elementText(element)
             )
