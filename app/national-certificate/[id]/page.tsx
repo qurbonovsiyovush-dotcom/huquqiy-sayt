@@ -243,16 +243,152 @@ export default function NationalCertificateTestPage() {
       - keyingi qatorda matn raqam ostiga emas, matn ostiga tushadi.
     */
     const normalizeNumberedLines = () => {
-      const blocks =
+      const leafBlocks =
         root.querySelectorAll<HTMLElement>(
           "p, div"
         );
 
-      blocks.forEach((element) => {
-        /*
-          Katta wrapper div'larni o‘zgartirmaymiz.
-          Faqat bevosita matnli satr/bloklar.
-        */
+      const cleanText = (value: string) =>
+        String(value || "")
+          .replace(/\u00a0/g, " ")
+          .replace(/[\t\f\v ]{2,}/g, " ")
+          .replace(/\s+\?/g, "?")
+          .trim();
+
+      const elementText = (element: HTMLElement) =>
+        cleanText(element.textContent || "");
+
+      const isLegalSourceText = (text: string) => {
+        const normalized = text.toLowerCase();
+
+        return (
+          /^\s*\(/.test(text) &&
+          (
+            normalized.includes("konstituts") ||
+            normalized.includes("kodeks") ||
+            normalized.includes("qonun") ||
+            normalized.includes("modda") ||
+            normalized.includes("farmon") ||
+            normalized.includes("qaror") ||
+            normalized.includes("nizom") ||
+            normalized.includes("holatiga ko")
+          )
+        );
+      };
+
+      const normalizeTextNodes = (element: HTMLElement) => {
+        const walker =
+          document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT
+          );
+
+        let node = walker.nextNode();
+
+        while (node) {
+          const textNode = node as Text;
+          const original = textNode.nodeValue || "";
+          const normalized = original
+            .replace(/\u00a0/g, " ")
+            .replace(/[\t\f\v ]{2,}/g, " ")
+            .replace(/\s+\?/g, "?");
+
+          if (normalized !== original) {
+            textNode.nodeValue = normalized;
+          }
+
+          node = walker.nextNode();
+        }
+      };
+
+      const addMarkerSpan = (
+        element: HTMLElement,
+        kind: "number" | "roman" | "letter"
+      ) => {
+        if (
+          element.querySelector(
+            ":scope .nc-list-marker"
+          )
+        ) {
+          return;
+        }
+
+        const pattern =
+          kind === "number"
+            ? /^(\s*)(\d{1,3}[.)])(\s+)/u
+            : kind === "roman"
+            ? /^(\s*)([IVXLCDM]{1,8}[.)])(\s+)/u
+            : /^(\s*)([a-z][.)])(\s+)/u;
+
+        const walker =
+          document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT
+          );
+
+        let node = walker.nextNode();
+
+        while (node) {
+          const textNode = node as Text;
+
+          if (
+            textNode.parentElement?.closest(
+              ".nc-list-marker"
+            )
+          ) {
+            node = walker.nextNode();
+            continue;
+          }
+
+          const value = textNode.nodeValue || "";
+          const match = value.match(pattern);
+
+          if (!match) {
+            node = walker.nextNode();
+            continue;
+          }
+
+          const parent = textNode.parentNode;
+          if (!parent) return;
+
+          const fragment =
+            document.createDocumentFragment();
+
+          if (match[1]) {
+            fragment.appendChild(
+              document.createTextNode(match[1])
+            );
+          }
+
+          const marker =
+            document.createElement("strong");
+
+          marker.className = "nc-list-marker";
+          marker.textContent = match[2];
+          fragment.appendChild(marker);
+          fragment.appendChild(
+            document.createTextNode(match[3])
+          );
+
+          const consumed =
+            match[0].length;
+
+          fragment.appendChild(
+            document.createTextNode(
+              value.slice(consumed)
+            )
+          );
+
+          parent.replaceChild(
+            fragment,
+            textNode
+          );
+
+          return;
+        }
+      };
+
+      leafBlocks.forEach((element) => {
         if (
           element.tagName === "DIV" &&
           element.querySelector(
@@ -270,63 +406,376 @@ export default function NationalCertificateTestPage() {
           return;
         }
 
-        const walker =
-          document.createTreeWalker(
-            element,
-            NodeFilter.SHOW_TEXT
-          );
+        normalizeTextNodes(element);
 
-        let node =
-          walker.nextNode();
-
-        while (node) {
-          const textNode =
-            node as Text;
-
-          const original =
-            textNode.nodeValue || "";
-
-          /*
-            DOM’da &nbsp; = \u00A0.
-            Gorizontal bo‘shliqlarni bir dona space qilamiz.
-            Yangi qatorlarni buzmaymiz.
-          */
-          const normalized =
-            original
-              .replace(/\u00a0/g, " ")
-              .replace(/[\t\f\v ]{2,}/g, " ");
-
-          if (
-            normalized !== original
-          ) {
-            textNode.nodeValue =
-              normalized;
-          }
-
-          node =
-            walker.nextNode();
-        }
+        element.classList.remove(
+          "nc-numbered-line",
+          "nc-roman-line",
+          "nc-letter-line",
+          "nc-roman-full-line",
+          "nc-source-line",
+          "nc-final-question-line"
+        );
 
         const visibleText =
-          (element.textContent || "")
-            .replace(/\u00a0/g, " ")
-            .trim();
+          elementText(element);
+
+        if (!visibleText) return;
 
         if (
-          /^\d{1,2}[.)]\s+/.test(
-            visibleText
-          )
+          element.hasAttribute(
+            "data-pdf-source-row"
+          ) ||
+          element.hasAttribute(
+            "data-pdf-source"
+          ) ||
+          isLegalSourceText(visibleText)
         ) {
+          element.classList.add(
+            "nc-source-line"
+          );
+          return;
+        }
+
+        const numberMatch =
+          visibleText.match(
+            /^(\d{1,3}[.)])\s+(.+)$/u
+          );
+
+        if (numberMatch) {
           element.classList.add(
             "nc-numbered-line"
           );
-        } else {
-          element.classList.remove(
-            "nc-numbered-line"
+          addMarkerSpan(
+            element,
+            "number"
+          );
+          return;
+        }
+
+        const romanMatch =
+          visibleText.match(
+            /^([IVXLCDM]{1,8}[.)])\s+(.+)$/u
+          );
+
+        if (romanMatch) {
+          element.classList.add(
+            "nc-roman-line"
+          );
+
+          /*
+            PDFdagi matching savollarida I./II./III. dan keyingi
+            qisqa kategoriya nomlari to‘liq qalin. True/False kabi
+            to‘liq gaplar esa oddiy, faqat Rim marker qalin.
+          */
+          const romanBody =
+            romanMatch[2].trim();
+
+          if (
+            !/[.;:!?]$/.test(
+              romanBody
+            )
+          ) {
+            element.classList.add(
+              "nc-roman-full-line"
+            );
+          } else {
+            addMarkerSpan(
+              element,
+              "roman"
+            );
+          }
+
+          return;
+        }
+
+        const letterMatch =
+          visibleText.match(
+            /^([a-z][.)])\s+(.+)$/u
+          );
+
+        if (letterMatch) {
+          element.classList.add(
+            "nc-letter-line"
+          );
+          return;
+        }
+
+        if (
+          element.hasAttribute(
+            "data-pdf-final-question"
+          )
+        ) {
+          element.classList.add(
+            "nc-final-question-line"
           );
         }
       });
+
+      /*
+        OCHIQ/KAZUS SAVOLLAR FIXI
+
+        Oldingi importlarda yakuniy savol ba'zan:
+          "Qarzdor ushbu majburiyatni"
+          "necha kunlik muddat ...?"
+        deb ikkiga bo‘linib qolgan.
+
+        Bu yerda oxirgi savolni yana bitta to‘liq gapga yig‘amiz.
+      */
+      const finalQuestion =
+        root.querySelector<HTMLElement>(
+          "[data-pdf-final-question]"
+        );
+
+      if (finalQuestion) {
+        normalizeTextNodes(finalQuestion);
+
+        let finalText =
+          elementText(finalQuestion);
+
+        const caseLines: HTMLElement[] =
+          Array.from(
+            root.querySelectorAll<HTMLElement>(
+              "[data-pdf-case-line]"
+            )
+          ) as HTMLElement[];
+
+        let previous =
+          caseLines.length > 0
+            ? caseLines[
+                caseLines.length - 1
+              ]
+            : null;
+
+        const beginsAsContinuation =
+          /^(?:necha|nechta|qancha|qanday|qaysi|qachon|qayer|kim|nima|eng\s+kechi|muddat|tartib|bajarishi|tuzilishi|so['’ʻʼ`]?roq)/iu;
+
+        let safety = 0;
+
+        while (
+          previous &&
+          safety < 3 &&
+          (
+            beginsAsContinuation.test(
+              finalText
+            ) ||
+            !/[.!?;:]$/.test(
+              elementText(previous)
+            )
+          )
+        ) {
+          safety += 1;
+
+          const previousText =
+            elementText(previous);
+
+          if (!previousText) break;
+
+          let boundary = -1;
+          const boundaryRegex =
+            /[.!?](?:\s+|$)/g;
+          let boundaryMatch:
+            RegExpExecArray | null;
+
+          while (
+            (boundaryMatch =
+              boundaryRegex.exec(
+                previousText
+              )) !== null
+          ) {
+            if (
+              boundaryMatch.index <
+              previousText.length - 1
+            ) {
+              boundary =
+                boundaryMatch.index;
+            }
+          }
+
+          if (boundary >= 0) {
+            const prefix = cleanText(
+              previousText.slice(
+                0,
+                boundary + 1
+              )
+            );
+
+            const fragment = cleanText(
+              previousText.slice(
+                boundary + 1
+              )
+            );
+
+            if (fragment) {
+              finalText = cleanText(
+                `${fragment} ${finalText}`
+              );
+            }
+
+            if (prefix) {
+              previous.textContent =
+                prefix;
+            } else {
+              previous.remove();
+            }
+
+            break;
+          }
+
+          if (
+            /[.!?;:]$/.test(
+              previousText
+            )
+          ) {
+            break;
+          }
+
+          finalText = cleanText(
+            `${previousText} ${finalText}`
+          );
+
+          const allCaseLines: HTMLElement[] =
+            Array.from(
+              root.querySelectorAll<HTMLElement>(
+                "[data-pdf-case-line]"
+              )
+            ) as HTMLElement[];
+
+          const previousIndex =
+            allCaseLines.indexOf(
+              previous
+            );
+
+          previous.remove();
+
+          previous =
+            previousIndex > 0
+              ? allCaseLines[
+                  previousIndex - 1
+                ]
+              : null;
+        }
+
+        finalQuestion.textContent =
+          cleanText(finalText);
+
+        finalQuestion.classList.add(
+          "nc-final-question-line"
+        );
+
+        const questionNumber =
+          Number(
+            currentQuestion?.questionNumber ||
+              0
+          );
+
+        /*
+          PDFdagi ochiq savol qalinligi:
+          36, 37, 39, 43, 44, 45 — yakuniy savol to‘liq qalin.
+          38, 40 — yakuniy savol oddiy.
+          41, 42 — faqat kalit ibora qalin.
+
+          Boshqa testlarda esa final savolni qalin chiqaramiz.
+        */
+        const knownOpenQuestion =
+          questionNumber >= 36 &&
+          questionNumber <= 45;
+
+        const fullBoldOpen =
+          [36, 37, 39, 43, 44, 45].includes(
+            questionNumber
+          );
+
+        finalQuestion.classList.toggle(
+          "nc-final-question-bold",
+          !knownOpenQuestion ||
+            fullBoldOpen
+        );
+
+        finalQuestion.classList.toggle(
+          "nc-final-question-regular",
+          knownOpenQuestion &&
+            !fullBoldOpen
+        );
+
+        const boldPhrase = (
+          pattern: RegExp
+        ) => {
+          const text =
+            finalQuestion.textContent ||
+            "";
+          const match =
+            text.match(pattern);
+
+          if (!match || match.index == null) {
+            return;
+          }
+
+          const before =
+            text.slice(0, match.index);
+          const after =
+            text.slice(
+              match.index +
+                match[0].length
+            );
+
+          finalQuestion.textContent =
+            "";
+
+          finalQuestion.append(
+            document.createTextNode(
+              before
+            )
+          );
+
+          const strong =
+            document.createElement(
+              "strong"
+            );
+
+          strong.className =
+            "nc-final-keyphrase";
+          strong.textContent =
+            match[0];
+
+          finalQuestion.append(
+            strong
+          );
+          finalQuestion.append(
+            document.createTextNode(
+              after
+            )
+          );
+        };
+
+        if (questionNumber === 41) {
+          boldPhrase(
+            /necha\s+daqiqa/iu
+          );
+        }
+
+        if (questionNumber === 42) {
+          boldPhrase(
+            /eng\s+kechi\s+bilan\s+qachongacha/iu
+          );
+        }
+      }
+
+      /*
+        Asosiy savol/topshiriq qalin qoladi.
+      */
+      const main =
+        root.querySelector<HTMLElement>(
+          "[data-pdf-heading], [data-pdf-main]"
+        );
+
+      if (main) {
+        main.classList.add(
+          "nc-main-question-line"
+        );
+      }
     };
+
 
     const normalizeVenn = () => {
       const venns =
@@ -3519,7 +3968,7 @@ function PageStyles() {
 
         font-size: 26px;
         line-height: 1.46;
-        font-weight: 700;
+        font-weight: 400;
 
         overflow-wrap: break-word;
         word-break: normal;
@@ -3579,9 +4028,7 @@ function PageStyles() {
       .questionText.htmlContent div:not(.nc-object),
       .questionText.htmlContent span,
       .questionText.htmlContent li,
-      .questionText.htmlContent font,
-      .questionText.htmlContent strong,
-      .questionText.htmlContent b {
+      .questionText.htmlContent font {
         font-family:
           "Bell MT",
           Georgia,
@@ -3593,70 +4040,13 @@ function PageStyles() {
         color: inherit !important;
       }
 
-      /* =========================================================
-         PDF IMPORT — BMBA/PDFGA YAQIN MATN IERARXIYASI
-         =========================================================
-         Topshiriq          -> qalin
-         Huquqiy manba      -> kursiv, qalin emas
-         Kazus/vaziyat      -> oddiy matn
-         Yakuniy savol      -> qalin
-
-         data-pdf-* atributlari import sahifasida saqlangan
-         questionHtml bilan birga bazaga yoziladi. Shu sabab preview
-         va foydalanuvchi sahifasida bir xil ko‘rinish saqlanadi.
-      */
-      .questionText.htmlContent [data-pdf-question-layout="true"] {
-        font-weight: 400 !important;
-      }
-
-      .questionText.htmlContent [data-pdf-heading="true"],
-      .questionText.htmlContent [data-pdf-main="true"],
-      .questionText.htmlContent [data-pdf-open-prefix="true"] {
-        font-weight: 700 !important;
-        line-height: 1.5 !important;
-      }
-
-      .questionText.htmlContent [data-pdf-source-row="true"] {
-        margin-top: 6px !important;
-        margin-bottom: 12px !important;
-        font-weight: 400 !important;
-        line-height: 1.42 !important;
-      }
-
-      .questionText.htmlContent [data-pdf-source="true"] {
-        font-size: 0.92em !important;
-        line-height: 1.42 !important;
-        font-weight: 400 !important;
-        font-style: italic !important;
-        color: #202a38 !important;
-      }
-
-      .questionText.htmlContent [data-pdf-case="true"],
-      .questionText.htmlContent [data-pdf-body="true"] {
-        margin-top: 12px !important;
-        font-weight: 400 !important;
-        line-height: 1.55 !important;
-      }
-
-      .questionText.htmlContent [data-pdf-final-question="true"] {
-        margin-top: 14px !important;
-        font-weight: 700 !important;
-        line-height: 1.5 !important;
-      }
-
-      /* Kazus ichidagi oddiy paragraph/divlar ota blokning normal
-         qalinligini oladi; haqiqiy strong/b esa qalin qoladi. */
-      .questionText.htmlContent [data-pdf-case="true"] p,
-      .questionText.htmlContent [data-pdf-case="true"] div:not(.nc-numbered-line),
-      .questionText.htmlContent [data-pdf-body="true"] p,
-      .questionText.htmlContent [data-pdf-body="true"] div:not(.nc-numbered-line) {
-        font-weight: 400 !important;
-      }
-
-      .questionText.htmlContent [data-pdf-case="true"] strong,
-      .questionText.htmlContent [data-pdf-case="true"] b,
-      .questionText.htmlContent [data-pdf-final-question="true"] strong,
-      .questionText.htmlContent [data-pdf-final-question="true"] b {
+      .questionText.htmlContent strong,
+      .questionText.htmlContent b {
+        font-family:
+          "Bell MT",
+          Georgia,
+          "Times New Roman",
+          serif !important;
         font-weight: 700 !important;
       }
 
@@ -3677,7 +4067,6 @@ function PageStyles() {
         margin-bottom: 12px;
         font-size: 1em !important;
         line-height: 1.42 !important;
-        font-weight: 700 !important;
       }
 
       .questionText.htmlContent p {
@@ -3704,6 +4093,57 @@ function PageStyles() {
         color: #202a38 !important;
       }
 
+      /* ===== PDF IMPORT: MATN QALINLIGI VA KAZUS TUZILISHI ===== */
+      .questionText.htmlContent [data-pdf-heading="true"],
+      .questionText.htmlContent [data-pdf-main="true"],
+      .questionText.htmlContent [data-pdf-open-prefix="true"],
+      .questionText.htmlContent .nc-main-question-line {
+        font-weight: 700 !important;
+      }
+
+      .questionText.htmlContent [data-pdf-source-row="true"],
+      .questionText.htmlContent [data-pdf-source="true"],
+      .questionText.htmlContent .nc-source-line {
+        font-weight: 400 !important;
+        font-style: italic !important;
+      }
+
+      .questionText.htmlContent [data-pdf-case-line="true"],
+      .questionText.htmlContent [data-pdf-item="true"],
+      .questionText.htmlContent .nc-numbered-line,
+      .questionText.htmlContent .nc-letter-line,
+      .questionText.htmlContent .nc-roman-line {
+        font-weight: 400 !important;
+      }
+
+      .questionText.htmlContent .nc-list-marker,
+      .questionText.htmlContent [data-pdf-marker="true"] {
+        font-weight: 700 !important;
+      }
+
+      .questionText.htmlContent .nc-roman-full-line,
+      .questionText.htmlContent .nc-roman-full-line * {
+        font-weight: 700 !important;
+      }
+
+      .questionText.htmlContent .nc-final-question-line {
+        margin-top: 14px !important;
+        line-height: 1.5 !important;
+      }
+
+      .questionText.htmlContent .nc-final-question-bold,
+      .questionText.htmlContent .nc-final-question-bold * {
+        font-weight: 700 !important;
+      }
+
+      .questionText.htmlContent .nc-final-question-regular {
+        font-weight: 400 !important;
+      }
+
+      .questionText.htmlContent .nc-final-keyphrase {
+        font-weight: 700 !important;
+      }
+
       /*
         WORD/EDITOR'DAN KELGAN ODDIY RAQAMLI SATRLAR
 
@@ -3722,7 +4162,7 @@ function PageStyles() {
 
         font-size: 0.92em !important;
         line-height: 1.42 !important;
-        font-weight: 700 !important;
+        font-weight: 400 !important;
       }
 
       /*
@@ -3745,7 +4185,7 @@ function PageStyles() {
 
         font-size: 0.92em !important;
         line-height: 1.42 !important;
-        font-weight: 700 !important;
+        font-weight: 400 !important;
 
         counter-increment: question-list;
       }
@@ -3782,7 +4222,7 @@ function PageStyles() {
 
         font-size: 0.92em !important;
         line-height: 1.42 !important;
-        font-weight: 700 !important;
+        font-weight: 400 !important;
       }
 
       .questionText.htmlContent ul > li::marker {
