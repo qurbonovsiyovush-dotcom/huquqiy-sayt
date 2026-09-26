@@ -78,7 +78,8 @@ function htmlToPlainText(html: string) {
 
 function buildPdfLikeQuestionHtml(
   questionText: string,
-  existingHtml?: string
+  existingHtml?: string,
+  questionNumber?: number
 ) {
   const original = String(questionText || "")
     .replace(/\u00a0/g, " ")
@@ -89,28 +90,11 @@ function buildPdfLikeQuestionHtml(
     return String(existingHtml || "");
   }
 
-  /*
-    PDF importdan kelgan savol saytga PDFdagi mantiqiy tuzilishga
-    yaqin ko‘rinishda chiqariladi:
-
-      1) asosiy topshiriq / savol;
-      2) qavs ichidagi huquqiy manba;
-      3) kazus yoki asosiy mazmun;
-      4) yakuniy savol;
-      5) A/B/C/D variantlar esa alohida option bloklarida turadi.
-
-    MUHIM:
-    - qavs ichidagi manba savolning oxirida bo‘lishi shart emas;
-    - kazus ichidagi A. / B. kabi shaxs belgilari matn bo‘lib qoladi;
-    - I. / II. / III., 1. / 2. / 3., a) / b) bandlar alohida qatorda;
-    - manba qalin emas, kursiv va sal kichikroq ko‘rinadi.
-  */
-
   const cleanInline = (value: string) =>
     String(value || "")
       .replace(/[ \t]+/g, " ")
       .replace(/\s+([,.;:!])/g, "$1")
-      .replace(/\s*\?/g, " ?")
+      .replace(/\s+\?/g, "?")
       .trim();
 
   const cleanMultiline = (value: string) =>
@@ -126,11 +110,6 @@ function buildPdfLikeQuestionHtml(
   const legalSourceKeywordPattern =
     /\b(?:konstitutsiya|kodeks|qonun|qonuni|qonunning|qaror|farmon|nizom|modda|moddasi|moddalari|holatiga\s+ko['’ʻʼ`]?ra)\b/iu;
 
-  /*
-    Manba ichida qo‘shimcha qavs ham bo‘lishi mumkin:
-      (... Inson huquqlari bo‘yicha vakili (ombudsman) to‘g‘risida ...)
-    Shu sabab oddiy regex emas, balanslangan qavs qidiruvi ishlatiladi.
-  */
   function findLegalSource(value: string) {
     let depth = 0;
     let start = -1;
@@ -139,10 +118,7 @@ function buildPdfLikeQuestionHtml(
       const char = value[index];
 
       if (char === "(") {
-        if (depth === 0) {
-          start = index;
-        }
-
+        if (depth === 0) start = index;
         depth += 1;
         continue;
       }
@@ -179,14 +155,10 @@ function buildPdfLikeQuestionHtml(
     ? cleanInline(source.text.replace(/\s*\n\s*/g, " "))
     : "";
 
-  let afterSource = source
+  const afterSource = source
     ? cleanMultiline(original.slice(source.end))
     : "";
 
-  /*
-    Ochiq savollarda PDFdagi "Ochiq savol:" yozuvi saqlanadi,
-    lekin manba bilan birga qalinlashib ketmaydi.
-  */
   let openPrefix = "";
 
   if (/^ochiq\s+savol\s*:/iu.test(beforeSource)) {
@@ -196,17 +168,15 @@ function buildPdfLikeQuestionHtml(
     );
   }
 
-  /*
-    Kazusning oxiridagi yakuniy savolni ajratamiz.
-    Masalan:
-      - Mazkur vaziyatda ... ?
-      - Ushbu vaziyatga oid ... aniqlang.
-      - Davlat organi qanday harakat qilishi kerak ?
-      - Qaysi ... ?
-      - Ularning ... aniqlang.
+  const structuredLinePattern =
+    /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8})|(?:[a-z]))[.)]\s+\S/u;
 
-    Oddiy savollardagi I/II/III yoki 1/2/3 bandlarga tegmaymiz.
-  */
+  const namedCasePersonPattern =
+    /^[A-ZА-ЯЁ][.]\s+\S/u;
+
+  const finalContinuationPattern =
+    /^(?:necha|nechta|qancha|qanday|qaysi|qachon|qayer|kim|nima|eng\s+kechi|muddat|tartib|holat|vaziyat|javob|qo['’ʻʼ`]?yishi|bajarishi|tuzilishi|so['’ʻʼ`]?roq)/iu;
+
   function splitCaseAndFinalQuestion(value: string) {
     const body = cleanMultiline(value);
 
@@ -216,24 +186,6 @@ function buildPdfLikeQuestionHtml(
         finalQuestion: "",
       };
     }
-
-    /*
-      MUHIM FIX:
-      Yakuniy savolni "Necha", "Qaysi" kabi so'zdan boshlab emas,
-      OXIRGI TO'LIQ GAP sifatida ajratamiz.
-
-      Shu sabab:
-        "Qarzdor ushbu majburiyatni necha kunlik ... ?"
-      to'liq olinadi, faqat "necha kunlik ... ?" emas.
-
-      Xuddi shuningdek:
-        "Majburiyatni bajargan qarzdor ... qancha ... ?"
-      ham to'liq alohida chiqadi.
-
-      Ro'yxatli savollarda I./II./III. qatorlar saqlanadi. Agar yakuniy
-      savol III. bandning oxiriga yopishib kelgan bo'lsa, faqat oxirgi
-      gap ajratiladi.
-    */
 
     const lines = body
       .split(/\n+/)
@@ -247,124 +199,140 @@ function buildPdfLikeQuestionHtml(
       };
     }
 
-    function previousSentenceStart(line: string, endIndex: number) {
-      const beforeEnd = line.slice(0, Math.max(0, endIndex));
-      const boundary = /[.!?]\s+/g;
-      let lastStart = 0;
+    const sentenceBoundaryIndex = (value: string) => {
+      let last = -1;
+      const re = /[.!?](?:\s+|$)/g;
       let match: RegExpExecArray | null;
 
-      while ((match = boundary.exec(beforeEnd)) !== null) {
-        lastStart = match.index + match[0].length;
+      while ((match = re.exec(value)) !== null) {
+        if (match.index < value.length - 1) {
+          last = match.index;
+        }
       }
 
-      return lastStart;
-    }
+      return last;
+    };
 
-    function makeResult(
-      lineIndex: number,
-      sentenceStart: number,
-      finalEnd?: number
-    ) {
-      const originalLine = lines[lineIndex];
-      const end =
-        typeof finalEnd === "number"
-          ? finalEnd
-          : originalLine.length;
+    function takeFinalFromQuestionMark(lineIndex: number) {
+      const target = lines[lineIndex];
+      const questionMark = target.lastIndexOf("?");
 
-      const finalQuestion = cleanInline(
-        originalLine.slice(sentenceStart, end)
+      if (
+        questionMark === -1 ||
+        target.slice(questionMark + 1).trim()
+      ) {
+        return null;
+      }
+
+      let finalParts: string[] = [];
+      let caseLines = [...lines];
+
+      const targetBeforeQuestion = cleanInline(
+        target.slice(0, questionMark + 1)
       );
 
-      const beforeFinal = cleanInline(
-        originalLine.slice(0, sentenceStart)
+      const lastBoundary = sentenceBoundaryIndex(
+        targetBeforeQuestion.slice(0, -1)
       );
 
-      const caseLines = [...lines];
+      if (lastBoundary >= 0) {
+        const prefix = cleanInline(
+          targetBeforeQuestion.slice(0, lastBoundary + 1)
+        );
+        const finalPart = cleanInline(
+          targetBeforeQuestion.slice(lastBoundary + 1)
+        );
 
-      if (beforeFinal) {
-        caseLines[lineIndex] = beforeFinal;
+        if (prefix) {
+          caseLines[lineIndex] = prefix;
+        } else {
+          caseLines.splice(lineIndex, 1);
+        }
+
+        finalParts = [finalPart];
       } else {
+        finalParts = [targetBeforeQuestion];
         caseLines.splice(lineIndex, 1);
+
+        let cursor = lineIndex - 1;
+
+        while (cursor >= 0) {
+          const previous = lines[cursor];
+
+          if (
+            structuredLinePattern.test(previous) ||
+            namedCasePersonPattern.test(previous)
+          ) {
+            break;
+          }
+
+          const currentFinal = finalParts.join(" ");
+          const previousEndsSentence = /[.!?;:]$/.test(previous);
+          const currentLooksContinuation =
+            finalContinuationPattern.test(currentFinal) ||
+            /^[a-zа-яёʻʼ’`]/u.test(currentFinal);
+
+          if (previousEndsSentence && currentLooksContinuation) {
+            break;
+          }
+
+          if (previousEndsSentence) {
+            break;
+          }
+
+          const boundary = sentenceBoundaryIndex(previous);
+
+          if (boundary >= 0) {
+            const prefix = cleanInline(
+              previous.slice(0, boundary + 1)
+            );
+            const fragment = cleanInline(
+              previous.slice(boundary + 1)
+            );
+
+            if (fragment) {
+              finalParts.unshift(fragment);
+            }
+
+            if (prefix) {
+              caseLines[cursor] = prefix;
+            } else {
+              caseLines.splice(cursor, 1);
+            }
+
+            break;
+          }
+
+          finalParts.unshift(previous);
+          caseLines.splice(cursor, 1);
+          cursor -= 1;
+        }
       }
 
       return {
         caseText: cleanMultiline(caseLines.join("\n")),
-        finalQuestion,
+        finalQuestion: cleanInline(finalParts.join(" ")),
       };
     }
 
-    /* 1) Eng ishonchli signal — oxirgi ? bilan tugagan gap. */
     for (let index = lines.length - 1; index >= 0; index--) {
-      const line = lines[index];
-      const questionMark = line.lastIndexOf("?");
-
-      if (questionMark === -1) {
-        continue;
-      }
-
-      /* ? dan keyin faqat bo'sh joy bo'lsa, bu yakuniy savol. */
-      if (line.slice(questionMark + 1).trim()) {
-        continue;
-      }
-
-      const sentenceStart = previousSentenceStart(
-        line,
-        questionMark
-      );
-
-      return makeResult(
-        index,
-        sentenceStart,
-        questionMark + 1
-      );
+      const result = takeFinalFromQuestionMark(index);
+      if (result) return result;
     }
 
-    /*
-      2) Ayrim BMBA savollari ? emas, "aniqlang." bilan tugaydi.
-         Masalan:
-           "Ularning tabiatdan foydalanish turi TO'G'RI ko'rsatilgan
-            javobni aniqlang."
-    */
     const instructionPattern =
       /\b(?:aniqlang|belgilang|ko['’ʻʼ`]?rsating|toping|baholang|nomlang)\s*[.!]?$/iu;
 
     for (let index = lines.length - 1; index >= 0; index--) {
       const line = lines[index];
 
-      if (!instructionPattern.test(line)) {
-        continue;
-      }
+      if (!instructionPattern.test(line)) continue;
+      if (structuredLinePattern.test(line)) continue;
 
-      const terminalPunctuation = /[.!]$/.test(line)
-        ? line.length - 1
-        : line.length;
-
-      const sentenceStart = previousSentenceStart(
-        line,
-        terminalPunctuation
-      );
-
-      const candidate = cleanInline(
-        line.slice(sentenceStart)
-      );
-
-      /*
-        Oddiy a), b), 1., 2. bandini tasodifan yakuniy savol deb
-        ajratmaslik uchun savol/topshiriq signali bo'lishi kerak.
-      */
-      const looksLikeFinalInstruction =
-        /\b(?:aniqlang|belgilang|ko['’ʻʼ`]?rsating|toping|baholang|nomlang)\b/iu.test(
-          candidate
-        ) &&
-        /\b(?:ushbu|mazkur|qaysi|qanday|ularning|javob|holat|vaziyat|turi|to['’ʻʼ`]?g['’ʻʼ`]?ri)\b/iu.test(
-          candidate
-        );
-
-      if (!looksLikeFinalInstruction) {
-        continue;
-      }
-
-      return makeResult(index, sentenceStart);
+      return {
+        caseText: cleanMultiline(lines.slice(0, index).join("\n")),
+        finalQuestion: cleanInline(line),
+      };
     }
 
     return {
@@ -376,38 +344,63 @@ function buildPdfLikeQuestionHtml(
   const { caseText, finalQuestion } =
     splitCaseAndFinalQuestion(afterSource);
 
-  const structuredLinePattern =
-    /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8})|(?:[a-z]))[.)]\s+\S/iu;
+  function splitMarker(line: string) {
+    const match = line.match(
+      /^((?:\d{1,3}|[IVXLCDM]{1,8}|[a-z])[.)])\s+(.*)$/u
+    );
 
-  const namedCasePersonPattern =
-    /^[A-ZА-ЯЁ][.]\s+\S/u;
+    return match
+      ? {
+          marker: match[1],
+          text: match[2],
+        }
+      : null;
+  }
 
   function renderBody(value: string) {
-    if (!value) {
-      return "";
-    }
+    if (!value) return "";
 
     const lines = value
       .split(/\n+/)
       .map(cleanInline)
       .filter(Boolean);
 
-    if (lines.length === 0) {
-      return "";
-    }
+    if (lines.length === 0) return "";
 
     return `<div data-pdf-body="true" style="margin-top:10px;line-height:1.55;">${lines
       .map((line) => {
-        const structured = structuredLinePattern.test(line);
+        const markerData = splitMarker(line);
         const namedPerson = namedCasePersonPattern.test(line);
 
-        if (structured && !namedPerson) {
-          return `<div class="nc-numbered-line" data-pdf-item="true" style="margin:6px 0;font-weight:700;">${escapeHtml(
-            line
+        if (markerData && !namedPerson) {
+          const { marker, text } = markerData;
+
+          if (/^[IVXLCDM]+[.)]$/u.test(marker)) {
+            const fullBold = !/[.;:!?]$/.test(text);
+
+            return `<div data-pdf-item="true" data-pdf-roman-line="true" style="margin:6px 0;font-weight:${
+              fullBold ? 700 : 400
+            };">${
+              fullBold
+                ? `<strong>${escapeHtml(`${marker} ${text}`)}</strong>`
+                : `<strong data-pdf-marker="true">${escapeHtml(
+                    marker
+                  )}</strong> ${escapeHtml(text)}`
+            }</div>`;
+          }
+
+          if (/^\d{1,3}[.)]$/u.test(marker)) {
+            return `<div data-pdf-item="true" data-pdf-number-line="true" style="margin:6px 0;font-weight:400;"><strong data-pdf-marker="true">${escapeHtml(
+              marker
+            )}</strong> ${escapeHtml(text)}</div>`;
+          }
+
+          return `<div data-pdf-item="true" data-pdf-letter-line="true" style="margin:6px 0;font-weight:400;">${escapeHtml(
+            `${marker} ${text}`
           )}</div>`;
         }
 
-        return `<div data-pdf-case-line="true" style="margin:4px 0;font-weight:600;">${escapeHtml(
+        return `<div data-pdf-case-line="true" style="margin:4px 0;font-weight:400;">${escapeHtml(
           line
         )}</div>`;
       })
@@ -434,27 +427,32 @@ function buildPdfLikeQuestionHtml(
 
   const headingRow =
     prefixHtml || headingHtml
-      ? `<div data-pdf-heading="true" style="margin:0;line-height:1.5;">${prefixHtml}${
+      ? `<div data-pdf-heading="true" style="margin:0;line-height:1.5;font-weight:700;">${prefixHtml}${
           prefixHtml && headingHtml ? " " : ""
         }${headingHtml}</div>`
       : "";
 
   const sourceHtml = sourceText
-    ? `<div data-pdf-source-row="true" style="margin-top:5px;margin-bottom:9px;line-height:1.4;"><em data-pdf-source="true" style="font-size:.90em;font-weight:400;">${escapeHtml(
+    ? `<div data-pdf-source-row="true" style="margin-top:5px;margin-bottom:9px;line-height:1.4;font-weight:400;"><em data-pdf-source="true" style="font-size:.90em;font-weight:400;font-style:italic;">${escapeHtml(
         sourceText
       )}</em></div>`
     : "";
 
+  const finalShouldBeBold =
+    !openPrefix ||
+    questionNumber === undefined ||
+    [36, 37, 39, 43, 44, 45].includes(questionNumber);
+
   const finalHtml = finalQuestion
-    ? `<div data-pdf-final-question="true" style="margin-top:11px;line-height:1.5;font-weight:700;">${escapeHtml(
-        finalQuestion
-      )}</div>`
+    ? `<div data-pdf-final-question="true" style="margin-top:11px;line-height:1.5;font-weight:${
+        finalShouldBeBold ? 700 : 400
+      };">${
+        finalShouldBeBold
+          ? `<strong>${escapeHtml(finalQuestion)}</strong>`
+          : escapeHtml(finalQuestion)
+      }</div>`
     : "";
 
-  /*
-    Agar manba topilmagan bo‘lsa, eski savollar buzilmasin:
-    butun matnni asosiy savol sifatida chiqaramiz.
-  */
   if (!source) {
     const fallbackLines = cleanMultiline(original)
       .split(/\n+/)
@@ -476,21 +474,12 @@ function buildPdfLikeQuestionHtml(
         : fallbackLines.slice(firstStructured);
 
     const mainHtml = mainLines.length
-      ? `<div data-pdf-heading="true" style="margin:0;line-height:1.5;"><strong data-pdf-main="true">${escapeHtml(
+      ? `<div data-pdf-heading="true" style="margin:0;line-height:1.5;font-weight:700;"><strong data-pdf-main="true">${escapeHtml(
           mainLines.join(" ")
         )}</strong></div>`
       : "";
 
-    const itemHtml = itemLines.length
-      ? `<div data-pdf-body="true" style="margin-top:10px;line-height:1.55;">${itemLines
-          .map(
-            (line) =>
-              `<div class="nc-numbered-line" data-pdf-item="true" style="margin:6px 0;font-weight:700;">${escapeHtml(
-                line
-              )}</div>`
-          )
-          .join("")}</div>`
-      : "";
+    const itemHtml = renderBody(itemLines.join("\n"));
 
     return `<div data-pdf-question-layout="true">${mainHtml}${itemHtml}</div>`;
   }
@@ -499,6 +488,7 @@ function buildPdfLikeQuestionHtml(
     caseText
   )}${finalHtml}</div>`;
 }
+
 
 function initialUnifiedHtml(question: ImportedQuestion) {
   /*
@@ -544,7 +534,8 @@ function initialUnifiedHtml(question: ImportedQuestion) {
 
   return `${buildPdfLikeQuestionHtml(
     question.questionText || "",
-    existing
+    existing,
+    question.number
   )}${visualOnly}`;
 }
 
@@ -721,7 +712,8 @@ export default function NationalCertificatePdfImportPage() {
                     : "",
                   typeof question.questionHtml === "string"
                     ? question.questionHtml
-                    : ""
+                    : "",
+                  Number(question.number)
                 ),
             }))
             .sort((a, b) => a.number - b.number)
