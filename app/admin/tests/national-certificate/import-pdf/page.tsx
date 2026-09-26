@@ -80,151 +80,307 @@ function buildPdfLikeQuestionHtml(
   questionText: string,
   existingHtml?: string
 ) {
-  const text = String(
-    questionText || ""
-  ).trim();
+  const original = String(questionText || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .trim();
 
-  if (!text) {
-    return String(
-      existingHtml || ""
+  if (!original) {
+    return String(existingHtml || "");
+  }
+
+  /*
+    PDF importdan kelgan savol saytga PDFdagi mantiqiy tuzilishga
+    yaqin ko‘rinishda chiqariladi:
+
+      1) asosiy topshiriq / savol;
+      2) qavs ichidagi huquqiy manba;
+      3) kazus yoki asosiy mazmun;
+      4) yakuniy savol;
+      5) A/B/C/D variantlar esa alohida option bloklarida turadi.
+
+    MUHIM:
+    - qavs ichidagi manba savolning oxirida bo‘lishi shart emas;
+    - kazus ichidagi A. / B. kabi shaxs belgilari matn bo‘lib qoladi;
+    - I. / II. / III., 1. / 2. / 3., a) / b) bandlar alohida qatorda;
+    - manba qalin emas, kursiv va sal kichikroq ko‘rinadi.
+  */
+
+  const cleanInline = (value: string) =>
+    String(value || "")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\s+([,.;:!])/g, "$1")
+      .replace(/\s*\?/g, " ?")
+      .trim();
+
+  const cleanMultiline = (value: string) =>
+    String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\r\n?/g, "\n")
+      .split(/\n+/)
+      .map(cleanInline)
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+
+  const legalSourceKeywordPattern =
+    /\b(?:konstitutsiya|kodeks|qonun|qonuni|qonunning|qaror|farmon|nizom|modda|moddasi|moddalari|holatiga\s+ko['’ʻʼ`]?ra)\b/iu;
+
+  /*
+    Manba ichida qo‘shimcha qavs ham bo‘lishi mumkin:
+      (... Inson huquqlari bo‘yicha vakili (ombudsman) to‘g‘risida ...)
+    Shu sabab oddiy regex emas, balanslangan qavs qidiruvi ishlatiladi.
+  */
+  function findLegalSource(value: string) {
+    let depth = 0;
+    let start = -1;
+
+    for (let index = 0; index < value.length; index++) {
+      const char = value[index];
+
+      if (char === "(") {
+        if (depth === 0) {
+          start = index;
+        }
+
+        depth += 1;
+        continue;
+      }
+
+      if (char === ")" && depth > 0) {
+        depth -= 1;
+
+        if (depth === 0 && start !== -1) {
+          const candidate = value.slice(start, index + 1);
+
+          if (legalSourceKeywordPattern.test(candidate)) {
+            return {
+              start,
+              end: index + 1,
+              text: candidate,
+            };
+          }
+
+          start = -1;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  const source = findLegalSource(original);
+
+  let beforeSource = source
+    ? cleanMultiline(original.slice(0, source.start))
+    : cleanMultiline(original);
+
+  const sourceText = source
+    ? cleanInline(source.text.replace(/\s*\n\s*/g, " "))
+    : "";
+
+  let afterSource = source
+    ? cleanMultiline(original.slice(source.end))
+    : "";
+
+  /*
+    Ochiq savollarda PDFdagi "Ochiq savol:" yozuvi saqlanadi,
+    lekin manba bilan birga qalinlashib ketmaydi.
+  */
+  let openPrefix = "";
+
+  if (/^ochiq\s+savol\s*:/iu.test(beforeSource)) {
+    openPrefix = "Ochiq savol:";
+    beforeSource = cleanMultiline(
+      beforeSource.replace(/^ochiq\s+savol\s*:/iu, "")
     );
   }
 
   /*
-    PDF import savollari qo‘lda kiritilgan Milliy sertifikat
-    savollari bilan BIR XIL public tipografiyaga bo‘ysunadi.
+    Kazusning oxiridagi yakuniy savolni ajratamiz.
+    Masalan:
+      - Mazkur vaziyatda ... ?
+      - Ushbu vaziyatga oid ... aniqlang.
+      - Davlat organi qanday harakat qilishi kerak ?
+      - Qaysi ... ?
+      - Ularning ... aniqlang.
 
-    MUHIM:
-    - bu yerda 18px/Times kabi qattiq font-size bermaymiz;
-    - public sahifadagi .questionText = 26px standart ishlaydi;
-    - asosiy savol qalin;
-    - qavs ichidagi huquqiy manba sal kichik, qalin emas, qiyshiq;
-    - 1./2./3./4. va I./II./III./IV. alohida qatorda;
-    - bandlar public CSSdagi .nc-numbered-line qoidasiga tushadi.
+    Oddiy savollardagi I/II/III yoki 1/2/3 bandlarga tegmaymiz.
   */
+  function splitCaseAndFinalQuestion(value: string) {
+    const body = cleanMultiline(value);
 
-  const cleanLine = (
-    value: string
-  ) =>
-    String(value || "")
-      .replace(/\u00a0/g, " ")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\s*\?/g, " ?")
-      .trim();
+    if (!body) {
+      return {
+        caseText: "",
+        finalQuestion: "",
+      };
+    }
 
-  const rawLines = text
-    .split(/\n+/)
-    .map(cleanLine)
-    .filter(Boolean);
+    const patterns: RegExp[] = [
+      /(?:^|\n|\s)(Mazkur\s+(?:vaziyat|holat)[\s\S]*?[?])\s*$/iu,
+      /(?:^|\n|\s)(Mazkur\s+(?:vaziyat|holat)[\s\S]*?aniqlang\.?)[\s]*$/iu,
+      /(?:^|\n|\s)(Ushbu\s+(?:vaziyat|holat)[\s\S]*?[?])\s*$/iu,
+      /(?:^|\n|\s)(Ushbu\s+(?:vaziyat|holat)[\s\S]*?aniqlang\.?)[\s]*$/iu,
+      /(?:^|\n|\s)(Davlat\s+organi\s+[\s\S]*?[?])\s*$/iu,
+      /(?:^|\n|\s)(Ularning\s+[\s\S]*?aniqlang\.?)[\s]*$/iu,
+      /(?:^|\n|\s)((?:Qaysi|Qanday|Kim|Nima|Necha|Qachon|Qayerda)\s+[\s\S]*?[?])\s*$/iu,
+    ];
+
+    for (const pattern of patterns) {
+      const match = body.match(pattern);
+
+      if (!match?.[1]) {
+        continue;
+      }
+
+      const finalQuestion = cleanInline(
+        match[1].replace(/\s*\n\s*/g, " ")
+      );
+
+      const matchIndex = match.index ?? -1;
+
+      if (matchIndex < 0) {
+        continue;
+      }
+
+      return {
+        caseText: cleanMultiline(body.slice(0, matchIndex)),
+        finalQuestion,
+      };
+    }
+
+    return {
+      caseText: body,
+      finalQuestion: "",
+    };
+  }
+
+  const { caseText, finalQuestion } =
+    splitCaseAndFinalQuestion(afterSource);
 
   const structuredLinePattern =
-    /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8}))[.)]\s+\S/i;
+    /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8})|(?:[a-z]))[.)]\s+\S/iu;
 
-  const firstStructured =
-    rawLines.findIndex(
-      (line) =>
-        structuredLinePattern.test(
+  const namedCasePersonPattern =
+    /^[A-ZА-ЯЁ][.]\s+\S/u;
+
+  function renderBody(value: string) {
+    if (!value) {
+      return "";
+    }
+
+    const lines = value
+      .split(/\n+/)
+      .map(cleanInline)
+      .filter(Boolean);
+
+    if (lines.length === 0) {
+      return "";
+    }
+
+    return `<div data-pdf-body="true" style="margin-top:10px;line-height:1.55;">${lines
+      .map((line) => {
+        const structured = structuredLinePattern.test(line);
+        const namedPerson = namedCasePersonPattern.test(line);
+
+        if (structured && !namedPerson) {
+          return `<div class="nc-numbered-line" data-pdf-item="true" style="margin:6px 0;font-weight:700;">${escapeHtml(
+            line
+          )}</div>`;
+        }
+
+        return `<div data-pdf-case-line="true" style="margin:4px 0;font-weight:600;">${escapeHtml(
           line
-        )
-    );
+        )}</div>`;
+      })
+      .join("")}</div>`;
+  }
 
-  const stemLines =
-    firstStructured === -1
-      ? rawLines
-      : rawLines.slice(
-          0,
-          firstStructured
-        );
+  const prefixHtml = openPrefix
+    ? `<strong data-pdf-open-prefix="true">${escapeHtml(
+        openPrefix
+      )}</strong>`
+    : "";
 
-  const bodyLines =
-    firstStructured === -1
-      ? []
-      : rawLines.slice(
-          firstStructured
-        );
+  const headingText = beforeSource
+    .split(/\n+/)
+    .map(cleanInline)
+    .filter(Boolean)
+    .join(" ");
 
-  const fullStem =
-    stemLines.join(" ").trim();
+  const headingHtml = headingText
+    ? `<strong data-pdf-main="true">${escapeHtml(
+        headingText
+      )}</strong>`
+    : "";
+
+  const headingRow =
+    prefixHtml || headingHtml
+      ? `<div data-pdf-heading="true" style="margin:0;line-height:1.5;">${prefixHtml}${
+          prefixHtml && headingHtml ? " " : ""
+        }${headingHtml}</div>`
+      : "";
+
+  const sourceHtml = sourceText
+    ? `<div data-pdf-source-row="true" style="margin-top:5px;margin-bottom:9px;line-height:1.4;"><em data-pdf-source="true" style="font-size:.90em;font-weight:400;">${escapeHtml(
+        sourceText
+      )}</em></div>`
+    : "";
+
+  const finalHtml = finalQuestion
+    ? `<div data-pdf-final-question="true" style="margin-top:11px;line-height:1.5;font-weight:700;">${escapeHtml(
+        finalQuestion
+      )}</div>`
+    : "";
 
   /*
-    BMBA namunasidagi manba:
-      (Mehnat kodeksi, 18.09.2026-yil holatiga ko‘ra).
-      (“Ommaviy axborot vositalari to‘g‘risida”gi qonun, ...).
-      (O‘zbekiston Respublikasi Konstitutsiyasi, 92-modda).
-
-    Oddiy qavslarni manba deb xato tanimaslik uchun
-    huquqiy kalit so‘zlardan biri bo‘lishi shart.
+    Agar manba topilmagan bo‘lsa, eski savollar buzilmasin:
+    butun matnni asosiy savol sifatida chiqaramiz.
   */
-  const sourceNotePattern =
-    /\s*(\((?=[^()]*\b(?:konstitutsiya|kodeks|qonun|qaror|farmon|nizom|modda|moddasi|holatiga\s+ko['’ʻʼ`]?ra)\b)[^()]*\)[.!?]?)\s*$/iu;
+  if (!source) {
+    const fallbackLines = cleanMultiline(original)
+      .split(/\n+/)
+      .map(cleanInline)
+      .filter(Boolean);
 
-  const sourceMatch =
-    fullStem.match(
-      sourceNotePattern
+    const firstStructured = fallbackLines.findIndex((line) =>
+      structuredLinePattern.test(line)
     );
 
-  const sourceNote =
-    sourceMatch?.[1]?.trim() ||
-    "";
+    const mainLines =
+      firstStructured === -1
+        ? fallbackLines
+        : fallbackLines.slice(0, firstStructured);
 
-  const mainStem =
-    sourceNote
-      ? fullStem
-          .slice(
-            0,
-            Math.max(
-              0,
-              sourceMatch?.index ??
-                fullStem.length
-            )
-          )
-          .trim()
-      : fullStem;
+    const itemLines =
+      firstStructured === -1
+        ? []
+        : fallbackLines.slice(firstStructured);
 
-  /*
-    Public sahifada:
-      .questionText = 26px / 700
-      em/i = 0.92em / 400 / italic
-      .nc-numbered-line = 0.92em / 700
-
-    Shu sabab semantik HTML yetarli.
-  */
-  const mainHtml =
-    mainStem
-      ? `<strong data-pdf-main="true">${escapeHtml(
-          mainStem
-        )}</strong>`
+    const mainHtml = mainLines.length
+      ? `<div data-pdf-heading="true" style="margin:0;line-height:1.5;"><strong data-pdf-main="true">${escapeHtml(
+          mainLines.join(" ")
+        )}</strong></div>`
       : "";
 
-  const sourceHtml =
-    sourceNote
-      ? `${mainStem ? " " : ""}<em data-pdf-source="true">${escapeHtml(
-          sourceNote
-        )}</em>`
-      : "";
-
-  const stemHtml =
-    mainHtml || sourceHtml
-      ? `<p data-pdf-stem="true" style="margin:0 0 ${
-          bodyLines.length > 0
-            ? "12px"
-            : "0"
-        } 0;">${mainHtml}${sourceHtml}</p>`
-      : "";
-
-  const bodyHtml =
-    bodyLines.length > 0
-      ? `<div data-pdf-body="true">${bodyLines
+    const itemHtml = itemLines.length
+      ? `<div data-pdf-body="true" style="margin-top:10px;line-height:1.55;">${itemLines
           .map(
             (line) =>
-              `<div class="nc-numbered-line" data-pdf-item="true">${escapeHtml(
+              `<div class="nc-numbered-line" data-pdf-item="true" style="margin:6px 0;font-weight:700;">${escapeHtml(
                 line
               )}</div>`
           )
           .join("")}</div>`
       : "";
 
-  return `${stemHtml}${bodyHtml}`;
+    return `<div data-pdf-question-layout="true">${mainHtml}${itemHtml}</div>`;
+  }
+
+  return `<div data-pdf-question-layout="true">${headingRow}${sourceHtml}${renderBody(
+    caseText
+  )}${finalHtml}</div>`;
 }
 
 function initialUnifiedHtml(question: ImportedQuestion) {
