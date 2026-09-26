@@ -177,6 +177,39 @@ function buildPdfLikeQuestionHtml(
   const finalContinuationPattern =
     /^(?:necha|nechta|qancha|qanday|qaysi|qachon|qayer|kim|nima|eng\s+kechi|muddat|tartib|holat|vaziyat|javob|qo['’ʻʼ`]?yishi|bajarishi|tuzilishi|so['’ʻʼ`]?roq)/iu;
 
+  const detachedMarkerPattern =
+    /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8})|(?:[a-z]))[.)]$/u;
+
+  function mergeDetachedMarkers(lines: string[]) {
+    const merged: string[] = [];
+
+    for (let index = 0; index < lines.length; index++) {
+      const line = cleanInline(lines[index]);
+
+      if (
+        detachedMarkerPattern.test(line) &&
+        index + 1 < lines.length
+      ) {
+        const next = cleanInline(lines[index + 1]);
+
+        if (
+          next &&
+          !detachedMarkerPattern.test(next) &&
+          !structuredLinePattern.test(next) &&
+          !namedCasePersonPattern.test(next)
+        ) {
+          merged.push(`${line} ${next}`);
+          index += 1;
+          continue;
+        }
+      }
+
+      merged.push(line);
+    }
+
+    return merged.filter(Boolean);
+  }
+
   function splitCaseAndFinalQuestion(value: string) {
     const body = cleanMultiline(value);
 
@@ -187,10 +220,12 @@ function buildPdfLikeQuestionHtml(
       };
     }
 
-    const lines = body
-      .split(/\n+/)
-      .map(cleanInline)
-      .filter(Boolean);
+    const lines = mergeDetachedMarkers(
+      body
+        .split(/\n+/)
+        .map(cleanInline)
+        .filter(Boolean)
+    );
 
     if (lines.length === 0) {
       return {
@@ -212,6 +247,49 @@ function buildPdfLikeQuestionHtml(
 
       return last;
     };
+
+    function finalizeCaseAndQuestion(
+      caseLinesInput: string[],
+      finalPartsInput: string[]
+    ) {
+      const caseLines = [...caseLinesInput];
+      let finalQuestion = cleanInline(
+        finalPartsInput.join(" ")
+      );
+
+      /*
+        Ayrim PDFlarda Rim marker va uning matni alohida text-run bo‘ladi.
+        Masalan 19-savolda parser:
+          I.
+          ...
+          kollektiv xavfsizlik ...; Qaysi ...?
+        ko‘rinishida olishi mumkin.
+
+        Bunday holatda final savol boshiga kirib qolgan I-band matnini
+        yana I. markeriga qaytaramiz.
+      */
+      const orphanIndex = caseLines.findIndex((line) =>
+        detachedMarkerPattern.test(cleanInline(line))
+      );
+
+      if (orphanIndex >= 0 && finalQuestion) {
+        const misplaced = finalQuestion.match(
+          /^(.+?[;:])\s*((?:qaysi|qanday|qancha|necha|nechta|kim|nima|qachon|qayerda|ushbu|mazkur)\b[\s\S]*\?)$/iu
+        );
+
+        if (misplaced) {
+          caseLines[orphanIndex] = cleanInline(
+            `${caseLines[orphanIndex]} ${misplaced[1]}`
+          );
+          finalQuestion = cleanInline(misplaced[2]);
+        }
+      }
+
+      return {
+        caseText: cleanMultiline(caseLines.join("\n")),
+        finalQuestion,
+      };
+    }
 
     function takeFinalFromQuestionMark(lineIndex: number) {
       const target = lines[lineIndex];
@@ -309,10 +387,10 @@ function buildPdfLikeQuestionHtml(
         }
       }
 
-      return {
-        caseText: cleanMultiline(caseLines.join("\n")),
-        finalQuestion: cleanInline(finalParts.join(" ")),
-      };
+      return finalizeCaseAndQuestion(
+        caseLines,
+        finalParts
+      );
     }
 
     for (let index = lines.length - 1; index >= 0; index--) {
@@ -360,10 +438,12 @@ function buildPdfLikeQuestionHtml(
   function renderBody(value: string) {
     if (!value) return "";
 
-    const lines = value
-      .split(/\n+/)
-      .map(cleanInline)
-      .filter(Boolean);
+    const lines = mergeDetachedMarkers(
+      value
+        .split(/\n+/)
+        .map(cleanInline)
+        .filter(Boolean)
+    );
 
     if (lines.length === 0) return "";
 
@@ -376,23 +456,15 @@ function buildPdfLikeQuestionHtml(
           const { marker, text } = markerData;
 
           if (/^[IVXLCDM]+[.)]$/u.test(marker)) {
-            const fullBold = !/[.;:!?]$/.test(text);
-
-            return `<div data-pdf-item="true" data-pdf-roman-line="true" style="margin:6px 0;font-weight:${
-              fullBold ? 700 : 400
-            };">${
-              fullBold
-                ? `<strong>${escapeHtml(`${marker} ${text}`)}</strong>`
-                : `<strong data-pdf-marker="true">${escapeHtml(
-                    marker
-                  )}</strong> ${escapeHtml(text)}`
-            }</div>`;
+            return `<div data-pdf-item="true" data-pdf-roman-line="true" style="margin:6px 0;font-weight:700;"><strong>${escapeHtml(
+              `${marker} ${text}`
+            )}</strong></div>`;
           }
 
           if (/^\d{1,3}[.)]$/u.test(marker)) {
-            return `<div data-pdf-item="true" data-pdf-number-line="true" style="margin:6px 0;font-weight:400;"><strong data-pdf-marker="true">${escapeHtml(
-              marker
-            )}</strong> ${escapeHtml(text)}</div>`;
+            return `<div data-pdf-item="true" data-pdf-number-line="true" style="margin:6px 0;font-weight:700;"><strong>${escapeHtml(
+              `${marker} ${text}`
+            )}</strong></div>`;
           }
 
           return `<div data-pdf-item="true" data-pdf-letter-line="true" style="margin:6px 0;font-weight:400;">${escapeHtml(
