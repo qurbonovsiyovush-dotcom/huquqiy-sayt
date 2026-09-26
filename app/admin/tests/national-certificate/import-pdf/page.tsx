@@ -217,37 +217,154 @@ function buildPdfLikeQuestionHtml(
       };
     }
 
-    const patterns: RegExp[] = [
-      /(?:^|\n|\s)(Mazkur\s+(?:vaziyat|holat)[\s\S]*?[?])\s*$/iu,
-      /(?:^|\n|\s)(Mazkur\s+(?:vaziyat|holat)[\s\S]*?aniqlang\.?)[\s]*$/iu,
-      /(?:^|\n|\s)(Ushbu\s+(?:vaziyat|holat)[\s\S]*?[?])\s*$/iu,
-      /(?:^|\n|\s)(Ushbu\s+(?:vaziyat|holat)[\s\S]*?aniqlang\.?)[\s]*$/iu,
-      /(?:^|\n|\s)(Davlat\s+organi\s+[\s\S]*?[?])\s*$/iu,
-      /(?:^|\n|\s)(Ularning\s+[\s\S]*?aniqlang\.?)[\s]*$/iu,
-      /(?:^|\n|\s)((?:Qaysi|Qanday|Kim|Nima|Necha|Qachon|Qayerda)\s+[\s\S]*?[?])\s*$/iu,
-    ];
+    /*
+      MUHIM FIX:
+      Yakuniy savolni "Necha", "Qaysi" kabi so'zdan boshlab emas,
+      OXIRGI TO'LIQ GAP sifatida ajratamiz.
 
-    for (const pattern of patterns) {
-      const match = body.match(pattern);
+      Shu sabab:
+        "Qarzdor ushbu majburiyatni necha kunlik ... ?"
+      to'liq olinadi, faqat "necha kunlik ... ?" emas.
 
-      if (!match?.[1]) {
-        continue;
+      Xuddi shuningdek:
+        "Majburiyatni bajargan qarzdor ... qancha ... ?"
+      ham to'liq alohida chiqadi.
+
+      Ro'yxatli savollarda I./II./III. qatorlar saqlanadi. Agar yakuniy
+      savol III. bandning oxiriga yopishib kelgan bo'lsa, faqat oxirgi
+      gap ajratiladi.
+    */
+
+    const lines = body
+      .split(/\n+/)
+      .map(cleanInline)
+      .filter(Boolean);
+
+    if (lines.length === 0) {
+      return {
+        caseText: "",
+        finalQuestion: "",
+      };
+    }
+
+    function previousSentenceStart(line: string, endIndex: number) {
+      const beforeEnd = line.slice(0, Math.max(0, endIndex));
+      const boundary = /[.!?]\s+/g;
+      let lastStart = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = boundary.exec(beforeEnd)) !== null) {
+        lastStart = match.index + match[0].length;
       }
 
+      return lastStart;
+    }
+
+    function makeResult(
+      lineIndex: number,
+      sentenceStart: number,
+      finalEnd?: number
+    ) {
+      const originalLine = lines[lineIndex];
+      const end =
+        typeof finalEnd === "number"
+          ? finalEnd
+          : originalLine.length;
+
       const finalQuestion = cleanInline(
-        match[1].replace(/\s*\n\s*/g, " ")
+        originalLine.slice(sentenceStart, end)
       );
 
-      const matchIndex = match.index ?? -1;
+      const beforeFinal = cleanInline(
+        originalLine.slice(0, sentenceStart)
+      );
 
-      if (matchIndex < 0) {
-        continue;
+      const caseLines = [...lines];
+
+      if (beforeFinal) {
+        caseLines[lineIndex] = beforeFinal;
+      } else {
+        caseLines.splice(lineIndex, 1);
       }
 
       return {
-        caseText: cleanMultiline(body.slice(0, matchIndex)),
+        caseText: cleanMultiline(caseLines.join("\n")),
         finalQuestion,
       };
+    }
+
+    /* 1) Eng ishonchli signal — oxirgi ? bilan tugagan gap. */
+    for (let index = lines.length - 1; index >= 0; index--) {
+      const line = lines[index];
+      const questionMark = line.lastIndexOf("?");
+
+      if (questionMark === -1) {
+        continue;
+      }
+
+      /* ? dan keyin faqat bo'sh joy bo'lsa, bu yakuniy savol. */
+      if (line.slice(questionMark + 1).trim()) {
+        continue;
+      }
+
+      const sentenceStart = previousSentenceStart(
+        line,
+        questionMark
+      );
+
+      return makeResult(
+        index,
+        sentenceStart,
+        questionMark + 1
+      );
+    }
+
+    /*
+      2) Ayrim BMBA savollari ? emas, "aniqlang." bilan tugaydi.
+         Masalan:
+           "Ularning tabiatdan foydalanish turi TO'G'RI ko'rsatilgan
+            javobni aniqlang."
+    */
+    const instructionPattern =
+      /\b(?:aniqlang|belgilang|ko['’ʻʼ`]?rsating|toping|baholang|nomlang)\s*[.!]?$/iu;
+
+    for (let index = lines.length - 1; index >= 0; index--) {
+      const line = lines[index];
+
+      if (!instructionPattern.test(line)) {
+        continue;
+      }
+
+      const terminalPunctuation = /[.!]$/.test(line)
+        ? line.length - 1
+        : line.length;
+
+      const sentenceStart = previousSentenceStart(
+        line,
+        terminalPunctuation
+      );
+
+      const candidate = cleanInline(
+        line.slice(sentenceStart)
+      );
+
+      /*
+        Oddiy a), b), 1., 2. bandini tasodifan yakuniy savol deb
+        ajratmaslik uchun savol/topshiriq signali bo'lishi kerak.
+      */
+      const looksLikeFinalInstruction =
+        /\b(?:aniqlang|belgilang|ko['’ʻʼ`]?rsating|toping|baholang|nomlang)\b/iu.test(
+          candidate
+        ) &&
+        /\b(?:ushbu|mazkur|qaysi|qanday|ularning|javob|holat|vaziyat|turi|to['’ʻʼ`]?g['’ʻʼ`]?ri)\b/iu.test(
+          candidate
+        );
+
+      if (!looksLikeFinalInstruction) {
+        continue;
+      }
+
+      return makeResult(index, sentenceStart);
     }
 
     return {
