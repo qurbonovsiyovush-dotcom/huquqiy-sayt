@@ -189,12 +189,11 @@ function normalizeQuestionMarkSpacing(
   value: string
 ) {
   /*
-    BMBA ko‘rinishi:
-      "aniqlang ?"
-    ya’ni ? oldidan aynan bitta bo‘sh joy.
+    Savol belgisi oldida ortiqcha bo‘shliq qoldirmaymiz:
+      "aniqlang ?" -> "aniqlang?"
   */
   return String(value || "")
-    .replace(/\s*\?/g, " ?");
+    .replace(/\s+\?/g, "?");
 }
 
 function normalizeText(value: string) {
