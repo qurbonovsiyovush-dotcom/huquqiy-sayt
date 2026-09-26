@@ -640,124 +640,226 @@ function isNumericQuestion(
   );
 }
 
-function splitConcepts(
+/*
+  ============================================================
+  QAT'IY, LEKIN FOYDALANUVCHIGA QULAY OCHIQ JAVOB CHECKER
+  ============================================================
+
+  Qabul qilinadi:
+  - katta/kichik harf farqi;
+  - nuqta, vergul, ikki nuqta, tire va ortiqcha bo'sh joylar;
+  - turli apostrof belgilar;
+  - "7" va "yetti" kabi son yozilishlari;
+  - son + birlikda birlikning grammatik ko'rinishlari:
+      7 kun / 7 kunlik / 7 kunda
+      3 oy / 3 oylik
+      5 yil / 5 yillik
+
+  Qabul qilinmaydi:
+  - noto'g'ri son;
+  - noto'g'ri birlik (7 yil o'rniga 7 kun);
+  - faqat son, agar savol/etalonda birlik talab qilinsa;
+  - huquqiy terminning faqat bir qismi yoki taxminiy o'xshashligi.
+
+  Muhim:
+  Huquqiy atamalarda "fuzzy" 50-67% moslik ishlatilmaydi.
+  Admin kiritgan acceptedAnswers — asosiy etalon hisoblanadi.
+*/
+
+type UnitKind =
+  | "kun"
+  | "oy"
+  | "yil"
+  | "soat"
+  | "daqiqa"
+  | "soniya"
+  | "nafar"
+  | "foiz"
+  | "som"
+  | "marta"
+  | "baravar"
+  | "sutka"
+  | "yosh";
+
+const UNIT_PATTERNS: Array<{
+  kind: UnitKind;
+  pattern: RegExp;
+}> = [
+  {
+    kind: "kun",
+    pattern:
+      /\bkun(?:i|ida|dan|ga|lik|likda|likdan|likka)?\b/iu,
+  },
+  {
+    kind: "oy",
+    pattern:
+      /\boy(?:i|ida|dan|ga|lik|likda|likdan|likka)?\b/iu,
+  },
+  {
+    kind: "yil",
+    pattern:
+      /\byil(?:i|ida|dan|ga|lik|likda|likdan|likka)?\b/iu,
+  },
+  {
+    kind: "soat",
+    pattern:
+      /\bsoat(?:i|da|dan|ga|lik)?\b/iu,
+  },
+  {
+    kind: "daqiqa",
+    pattern:
+      /\bdaqiqa(?:si|da|dan|ga|lik)?\b/iu,
+  },
+  {
+    kind: "soniya",
+    pattern:
+      /\bsoniya(?:si|da|dan|ga|lik)?\b/iu,
+  },
+  {
+    kind: "nafar",
+    pattern:
+      /\b(?:nafar|kishi|shaxs)\b/iu,
+  },
+  {
+    kind: "foiz",
+    pattern:
+      /(?:\bfoiz\b|%)/iu,
+  },
+  {
+    kind: "som",
+    pattern:
+      /\bso['’ʻʼ`]?m\b/iu,
+  },
+  {
+    kind: "marta",
+    pattern:
+      /\bmarta\b/iu,
+  },
+  {
+    kind: "baravar",
+    pattern:
+      /\bbaravar\b/iu,
+  },
+  {
+    kind: "sutka",
+    pattern:
+      /\bsutka\b/iu,
+  },
+  {
+    kind: "yosh",
+    pattern:
+      /\byosh(?:i|ida|dan|ga|lik)?\b/iu,
+  },
+];
+
+function extractUnitKinds(
   value: string
 ) {
-  const cleaned =
+  const source =
     normalizeApostrophes(
       String(value || "")
-    )
-      .replace(/<[^>]*>/g, " ")
-      .replace(
-        /(?:^|\s)[•●▪◦]\s*/g,
-        "; "
-      )
-      .replace(
-        /\r?\n+/g,
-        "; "
-      )
-      .replace(
-        /(?:^|\s)\d{1,2}[.)-]\s*/g,
-        "; "
-      )
-      .trim();
-
-  let parts =
-    cleaned
-      .split(/[;]+/)
-      .map(
-        (item) =>
-          item.trim()
-      )
-      .filter(Boolean);
-
-  /*
-    Agar etalon bitta uzun qatorda, vergullar bilan
-    sanab yozilgan bo‘lsa, uni alohida mazmuniy bandlarga ajratamiz.
-  */
-  if (
-    parts.length === 1
-  ) {
-    const commaParts =
-      cleaned
-        .split(/[,]+/)
-        .map(
-          (item) =>
-            item.trim()
-        )
-        .filter(Boolean);
-
-    if (
-      commaParts.length >= 3
-    ) {
-      parts =
-        commaParts;
-    }
-  }
-
-  return parts;
-}
-
-function matchTokenCoverage(
-  expectedTokens: string[],
-  userTokens: string[]
-) {
-  const expected =
-    unique(
-      expectedTokens
+        .toLowerCase()
     );
 
-  if (
-    expected.length === 0
-  ) {
-    return 0;
-  }
+  const units =
+    new Set<UnitKind>();
 
-  let matched = 0;
-
-  for (
-    const expectedToken of
-    expected
-  ) {
-    const exists =
-      userTokens.some(
-        (userToken) =>
-          tokensEquivalent(
-            expectedToken,
-            userToken
-          )
-      );
-
-    if (exists) {
-      matched += 1;
+  for (const item of UNIT_PATTERNS) {
+    if (
+      item.pattern.test(source)
+    ) {
+      units.add(item.kind);
     }
   }
 
-  return (
-    matched /
-    expected.length
-  );
+  return units;
 }
 
-function conceptMatches(
-  concept: string,
-  userAnswer: string
+function sameSet<T>(
+  left: Set<T>,
+  right: Set<T>
 ) {
-  const expectedTokens =
-    tokenList(concept);
-  const userTokens =
-    tokenList(userAnswer);
-
   if (
-    expectedTokens.length === 0 ||
-    userTokens.length === 0
+    left.size !== right.size
   ) {
     return false;
   }
 
-  const expectedNumbers =
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function sameNumberList(
+  left: string[],
+  right: string[]
+) {
+  const a = unique(left).sort();
+  const b = unique(right).sort();
+
+  return (
+    a.length === b.length &&
+    a.every(
+      (value, index) =>
+        value === b[index]
+    )
+  );
+}
+
+function extractQuestionRequiredUnits(
+  questionText: string
+) {
+  const source =
+    normalizeApostrophes(
+      String(questionText || "")
+        .toLowerCase()
+    );
+
+  /*
+    Qonun manbasidagi sana (masalan 25.09.2026-yil) birlik sifatida
+    xalaqit bermasligi uchun faqat oxirgi necha/nechta/qancha so'zidan
+    keyingi qismini tekshiramiz.
+  */
+  const trigger =
+    /\b(?:necha|nechta|qancha)\b/giu;
+
+  let match: RegExpExecArray | null;
+  let lastIndex = -1;
+
+  while ((match = trigger.exec(source)) !== null) {
+    lastIndex = match.index;
+  }
+
+  if (lastIndex < 0) {
+    return new Set<UnitKind>();
+  }
+
+  const tail =
+    source.slice(
+      lastIndex,
+      Math.min(
+        source.length,
+        lastIndex + 120
+      )
+    );
+
+  return extractUnitKinds(
+    tail
+  );
+}
+
+function numericAnswerMatches(
+  questionText: string,
+  acceptedText: string,
+  userAnswer: string
+) {
+  const acceptedNumbers =
     extractNumbers(
-      concept
+      acceptedText
     );
 
   const userNumbers =
@@ -765,47 +867,62 @@ function conceptMatches(
       userAnswer
     );
 
-  /*
-    Etalonda raqam bo‘lsa, foydalanuvchi aynan shu raqamni
-    yozishi kerak. Masalan 5 yil o‘rniga 4 yil qabul qilinmaydi.
-  */
   if (
-    expectedNumbers.length > 0 &&
-    !expectedNumbers.every(
-      (number) =>
-        userNumbers.includes(
-          number
-        )
+    acceptedNumbers.length === 0 ||
+    userNumbers.length === 0 ||
+    !sameNumberList(
+      acceptedNumbers,
+      userNumbers
     )
   ) {
     return false;
   }
 
-  const coverage =
-    matchTokenCoverage(
-      expectedTokens,
-      userTokens
+  /*
+    Birlikni avval etalon javobdan olamiz.
+    Agar etalonda birlik yozilmagan bo'lsa, savol matnidan aniqlaymiz.
+
+    Masalan savol "necha kun" desa, acceptedAnswer tasodifan "7"
+    bo'lib qolgan taqdirda ham foydalanuvchidan "7 kun" talab qilinadi.
+  */
+  const acceptedUnits =
+    extractUnitKinds(
+      acceptedText
+    );
+
+  const questionUnits =
+    extractQuestionRequiredUnits(
+      questionText
+    );
+
+  const requiredUnits =
+    acceptedUnits.size > 0
+      ? acceptedUnits
+      : questionUnits;
+
+  const userUnits =
+    extractUnitKinds(
+      userAnswer
     );
 
   if (
-    expectedTokens.length === 1
+    requiredUnits.size > 0
   ) {
-    return coverage === 1;
+    /*
+      Kerakli birliklarning barchasi foydalanuvchi javobida bo'lishi shart.
+      Qo'shimcha boshqa birlik yozilsa ham xato: "7 kun yil" qabul qilinmaydi.
+    */
+    return sameSet(
+      requiredUnits,
+      userUnits
+    );
   }
 
-  if (
-    expectedTokens.length === 2
-  ) {
-    return coverage >= 0.5;
-  }
-
-  if (
-    expectedTokens.length <= 4
-  ) {
-    return coverage >= 0.67;
-  }
-
-  return coverage >= 0.6;
+  /*
+    Savol va etalonda birlik umuman yo'q bo'lsa,
+    aynan sonlarning tengligi yetarli.
+  */
+  return true;
 }
 
 function smartOpenAnswerMatches(
@@ -823,19 +940,62 @@ function smartOpenAnswerMatches(
     return false;
   }
 
-  /*
-    1) Eng ishonchli usul — to‘liq normallashtirilgan moslik.
-  */
   for (
     const accepted of
     acceptedAnswers
   ) {
-    const normalizedAccepted =
-      normalizeAnswer(
+    const acceptedText =
+      String(
         accepted.answerText ||
-          accepted.normalizedAnswer
+          accepted.normalizedAnswer ||
+          ""
+      ).trim();
+
+    if (!acceptedText) {
+      continue;
+    }
+
+    const numericQuestion =
+      isNumericQuestion(
+        questionText
       );
 
+    /*
+      1) Sonli savollarda avval son + birlikni tekshiramiz.
+
+      Bu juda muhim: etalon tasodifan faqat "7" bo'lib qolgan bo'lsa ham,
+      savol "necha kun" deb turgan bo'lsa foydalanuvchi "7 kun" yozishi kerak.
+    */
+    if (numericQuestion) {
+      if (
+        numericAnswerMatches(
+          questionText,
+          acceptedText,
+          userAnswer
+        )
+      ) {
+        return true;
+      }
+
+      continue;
+    }
+
+    const normalizedAccepted =
+      normalizeAnswer(
+        acceptedText
+      );
+
+    /*
+      2) Huquqiy atama va oddiy matnli javoblarda
+         normallashtirilgan TO'LIQ moslik.
+
+      Shu sabab quyidagilar bir xil:
+        "Egri qasd."
+        "egri qasd"
+        "EGRI QASD!!!"
+
+      Nuqta, vergul, harf registri va ortiqcha bo'sh joy bahoga ta'sir qilmaydi.
+    */
     if (
       normalizedAccepted &&
       normalizedAccepted ===
@@ -846,132 +1006,10 @@ function smartOpenAnswerMatches(
   }
 
   /*
-    2) "Necha?", "Nechta?", "Qancha?" tipidagi savollar.
-       Masalan etalon: "5 yil muddatga saylanadi"
-       Qabul qilinadi:
-       - 5
-       - 5 yil
-       - besh
-       - besh yil
+    Huquqiy atamalarda taxminiy/fuzzy moslik yo'q.
+    Agar boshqa to'g'ri yozilish variantini ham qabul qilish kerak bo'lsa,
+    admin qoralama muharririda uni acceptedAnswers ga alohida qo'shadi.
   */
-  if (
-    isNumericQuestion(
-      questionText
-    )
-  ) {
-    for (
-      const accepted of
-      acceptedAnswers
-    ) {
-      const acceptedNumbers =
-        extractNumbers(
-          accepted.answerText ||
-            accepted.normalizedAnswer
-        );
-
-      const userNumbers =
-        extractNumbers(
-          userAnswer
-        );
-
-      if (
-        acceptedNumbers.length === 1 &&
-        userNumbers.length === 1 &&
-        acceptedNumbers[0] ===
-          userNumbers[0]
-      ) {
-        return true;
-      }
-    }
-  }
-
-  /*
-    3) Mazmuniy bandlar bo‘yicha bepul tekshiruv.
-       Bandlar qaysi tartibda yozilgani muhim emas.
-  */
-  for (
-    const accepted of
-    acceptedAnswers
-  ) {
-    const acceptedText =
-      accepted.answerText ||
-      accepted.normalizedAnswer;
-
-    if (!acceptedText) {
-      continue;
-    }
-
-    const acceptedNumbers =
-      extractNumbers(
-        acceptedText
-      );
-
-    const userNumbers =
-      extractNumbers(
-        userAnswer
-      );
-
-    /*
-      Etalondagi raqamlar o‘zgartirib yuborilgan bo‘lsa,
-      umumiy gap o‘xshash bo‘lsa ham to‘g‘ri demaymiz.
-    */
-    if (
-      acceptedNumbers.length > 0 &&
-      !acceptedNumbers.every(
-        (number) =>
-          userNumbers.includes(
-            number
-          )
-      )
-    ) {
-      continue;
-    }
-
-    const concepts =
-      splitConcepts(
-        acceptedText
-      );
-
-    if (
-      concepts.length >= 2
-    ) {
-      const matchedConcepts =
-        concepts.filter(
-          (concept) =>
-            conceptMatches(
-              concept,
-              userAnswer
-            )
-        ).length;
-
-      /*
-        Ro‘yxat tipidagi javobda barcha asosiy bandlar bo‘lishi kerak.
-        Tartib muhim emas.
-      */
-      if (
-        matchedConcepts ===
-        concepts.length
-      ) {
-        return true;
-      }
-
-      continue;
-    }
-
-    /*
-      Bitta gapli javoblarda so‘zlar tartibi muhim emas.
-      60–67% mazmuniy token mosligi talab qilinadi.
-    */
-    if (
-      conceptMatches(
-        acceptedText,
-        userAnswer
-      )
-    ) {
-      return true;
-    }
-  }
-
   return false;
 }
 
