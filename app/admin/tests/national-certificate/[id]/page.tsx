@@ -196,6 +196,72 @@ function initialHtml(
   )}</div>`;
 }
 
+/*
+  Admin qoralama muharririda foydalanuvchi savol HTMLini
+  qo‘lda o‘zgartirganini belgilaymiz.
+
+  Public sahifa shu belgini ko‘rsa, avtomatik PDF formatlovchi
+  eski holatni qayta majburlamaydi.
+*/
+function markUserEditedHtml(
+  html: string
+) {
+  const raw =
+    String(html || "").trim();
+
+  if (!raw) {
+    return raw;
+  }
+
+  if (
+    typeof document ===
+    "undefined"
+  ) {
+    return `<div data-user-edited="true">${raw}</div>`;
+  }
+
+  const box =
+    document.createElement(
+      "div"
+    );
+
+  box.innerHTML =
+    raw;
+
+  const layout =
+    box.querySelector<HTMLElement>(
+      '[data-pdf-question-layout="true"]'
+    );
+
+  if (layout) {
+    layout.setAttribute(
+      "data-user-edited",
+      "true"
+    );
+
+    return box.innerHTML;
+  }
+
+  const first =
+    box.firstElementChild as
+      | HTMLElement
+      | null;
+
+  if (
+    first &&
+    box.childElementCount === 1
+  ) {
+    first.setAttribute(
+      "data-user-edited",
+      "true"
+    );
+
+    return box.innerHTML;
+  }
+
+  return `<div data-user-edited="true">${raw}</div>`;
+}
+
 async function readJson(
   response: Response
 ) {
@@ -241,6 +307,13 @@ export default function NationalCertificateTestEditorPage() {
 
   const [message, setMessage] =
     useState("");
+
+  /*
+    Qoralamada qo‘lda kiritilgan o‘zgarishlar uchun dirty flag.
+    Savol saqlangach false bo‘ladi.
+  */
+  const [dirty, setDirty] =
+    useState(false);
 
   const [
     currentNumber,
@@ -483,6 +556,7 @@ export default function NationalCertificateTestEditorPage() {
 
     setError("");
     setMessage("");
+    setDirty(false);
   }, [
     test,
     questionMap,
@@ -611,12 +685,14 @@ export default function NationalCertificateTestEditorPage() {
           })
         )
     );
+
+    setDirty(true);
   }
 
   async function saveQuestion(
     goNext = false
-  ) {
-    if (!test) return;
+  ): Promise<boolean> {
+    if (!test) return false;
 
     if (
       test.status !==
@@ -625,7 +701,7 @@ export default function NationalCertificateTestEditorPage() {
       setError(
         "E’lon qilingan testni tahrirlab bo‘lmaydi."
       );
-      return;
+      return false;
     }
 
     const cleanHtml =
@@ -641,7 +717,7 @@ export default function NationalCertificateTestEditorPage() {
       setError(
         "Savol matnini kiriting."
       );
-      return;
+      return false;
     }
 
     const numericPoints =
@@ -656,7 +732,7 @@ export default function NationalCertificateTestEditorPage() {
       setError(
         "Savol bali noto‘g‘ri."
       );
-      return;
+      return false;
     }
 
     if (
@@ -672,7 +748,7 @@ export default function NationalCertificateTestEditorPage() {
         setError(
           "A/B/C/D variantlarining barchasini kiriting."
         );
-        return;
+        return false;
       }
 
       if (
@@ -684,7 +760,7 @@ export default function NationalCertificateTestEditorPage() {
         setError(
           "Aynan bitta to‘g‘ri javobni belgilang."
         );
-        return;
+        return false;
       }
     } else {
       const valid =
@@ -699,7 +775,7 @@ export default function NationalCertificateTestEditorPage() {
         setError(
           "Kamida bitta qabul qilinadigan javob kiriting."
         );
-        return;
+        return false;
       }
     }
 
@@ -708,6 +784,15 @@ export default function NationalCertificateTestEditorPage() {
     setMessage("");
 
     try {
+      const finalHtml =
+        cleanHtml ||
+        `<div>${escapeHtml(
+          cleanText
+        ).replace(
+          /\n/g,
+          "<br>"
+        )}</div>`;
+
       const body =
         currentType ===
         "closed"
@@ -717,13 +802,7 @@ export default function NationalCertificateTestEditorPage() {
               questionText:
                 cleanText,
               questionHtml:
-                cleanHtml ||
-                `<div>${escapeHtml(
-                  cleanText
-                ).replace(
-                  /\n/g,
-                  "<br>"
-                )}</div>`,
+                finalHtml,
               points:
                 numericPoints,
               options:
@@ -746,13 +825,7 @@ export default function NationalCertificateTestEditorPage() {
               questionText:
                 cleanText,
               questionHtml:
-                cleanHtml ||
-                `<div>${escapeHtml(
-                  cleanText
-                ).replace(
-                  /\n/g,
-                  "<br>"
-                )}</div>`,
+                finalHtml,
               points:
                 numericPoints,
               acceptedAnswers:
@@ -799,11 +872,123 @@ export default function NationalCertificateTestEditorPage() {
         );
       }
 
+      /*
+        MUHIM:
+        Oldingi kod save'dan keyin loadTest() chaqirib,
+        editor state'ini serverdan qayta yuklardi. Shu paytda
+        foydalanuvchi qo‘lda qilgan format ba’zan eski ko‘rinishga
+        qaytib ketardi.
+
+        Endi server muvaffaqiyatli saqlagach, lokal test state'ini
+        aynan hozirgi HTML bilan yangilaymiz. Hech qanday avtomatik
+        qayta formatlash yo‘q.
+      */
+      setTest(
+        (previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          const savedQuestion:
+            ApiQuestion = {
+            id:
+              questionMap.get(
+                currentNumber
+              )?.id ||
+              data?.question?.id,
+            question_number:
+              currentNumber,
+            question_type:
+              currentType,
+            question_text:
+              cleanText,
+            question_html:
+              finalHtml,
+            points:
+              numericPoints,
+            options:
+              currentType ===
+              "closed"
+                ? options.map(
+                    (
+                      option
+                    ) => ({
+                      option_key:
+                        option.key,
+                      option_text:
+                        option.text.trim(),
+                      option_html:
+                        option.html,
+                      is_correct:
+                        option.isCorrect,
+                    })
+                  )
+                : [],
+            acceptedAnswers:
+              currentType ===
+              "open"
+                ? acceptedAnswers
+                    .map(
+                      (
+                        answer
+                      ) =>
+                        answer.trim()
+                    )
+                    .filter(
+                      Boolean
+                    )
+                : [],
+          };
+
+          const exists =
+            previous.questions.some(
+              (question) =>
+                Number(
+                  question.question_number
+                ) ===
+                currentNumber
+            );
+
+          return {
+            ...previous,
+            questions:
+              exists
+                ? previous.questions.map(
+                    (question) =>
+                      Number(
+                        question.question_number
+                      ) ===
+                      currentNumber
+                        ? savedQuestion
+                        : question
+                  )
+                : [
+                    ...previous.questions,
+                    savedQuestion,
+                  ].sort(
+                    (a, b) =>
+                      Number(
+                        a.question_number
+                      ) -
+                      Number(
+                        b.question_number
+                      )
+                  ),
+          };
+        }
+      );
+
+      setQuestionHtml(
+        finalHtml
+      );
+      setQuestionText(
+        cleanText
+      );
+      setDirty(false);
+
       setMessage(
         `${currentNumber}-savol saqlandi.`
       );
-
-      await loadTest();
 
       if (
         goNext &&
@@ -814,16 +999,87 @@ export default function NationalCertificateTestEditorPage() {
             number + 1
         );
       }
+
+      return true;
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Savolni saqlashda xatolik."
       );
+
+      return false;
     } finally {
       setSaving(false);
     }
   }
+
+  async function goToQuestion(
+    nextNumber: number
+  ) {
+    const safeNumber =
+      Math.max(
+        1,
+        Math.min(
+          45,
+          nextNumber
+        )
+      );
+
+    if (
+      safeNumber ===
+      currentNumber
+    ) {
+      return;
+    }
+
+    /*
+      Savolda qo‘lda o‘zgarish bo‘lsa, boshqa savolga o‘tishdan
+      OLDIN avtomatik saqlaymiz. Saqlash xato qilsa joyidan
+      siljimaydi.
+    */
+    if (
+      dirty &&
+      test?.status ===
+        "draft"
+    ) {
+      const saved =
+        await saveQuestion(
+          false
+        );
+
+      if (!saved) {
+        return;
+      }
+    }
+
+    setCurrentNumber(
+      safeNumber
+    );
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (
+      event: BeforeUnloadEvent
+    ) => {
+      if (!dirty) return;
+
+      event.preventDefault();
+      event.returnValue =
+        "";
+    };
+
+    window.addEventListener(
+      "beforeunload",
+      handleBeforeUnload
+    );
+
+    return () =>
+      window.removeEventListener(
+        "beforeunload",
+        handleBeforeUnload
+      );
+  }, [dirty]);
 
   if (loading) {
     return (
@@ -984,7 +1240,7 @@ export default function NationalCertificateTestEditorPage() {
                       .filter(Boolean)
                       .join(" ")}
                     onClick={() =>
-                      setCurrentNumber(
+                      void goToQuestion(
                         number
                       )
                     }
@@ -1033,12 +1289,13 @@ export default function NationalCertificateTestEditorPage() {
                 min="0"
                 step="0.001"
                 value={points}
-                onChange={(event) =>
-                  setPoints(
-                    event.target
-                      .value
-                  )
-                }
+                onChange={(event) => {
+                setPoints(
+                  event.target
+                    .value
+                );
+                setDirty(true);
+              }}
               />
             </label>
           </div>
@@ -1057,20 +1314,25 @@ export default function NationalCertificateTestEditorPage() {
             key={`${test.id}-${currentNumber}`}
             value={questionHtml}
             onChange={(html) => {
+              const markedHtml =
+                markUserEditedHtml(
+                  html
+                );
+
               setQuestionHtml(
-                html
+                markedHtml
               );
 
               const plain =
                 plainTextFromHtml(
-                  html
+                  markedHtml
                 );
 
-              if (plain) {
-                setQuestionText(
-                  plain
-                );
-              }
+              setQuestionText(
+                plain
+              );
+
+              setDirty(true);
             }}
           />
 
@@ -1105,7 +1367,7 @@ export default function NationalCertificateTestEditorPage() {
                       }
                       onChange={(
                         event
-                      ) =>
+                      ) => {
                         setOptions(
                           (previous) =>
                             previous.map(
@@ -1124,8 +1386,9 @@ export default function NationalCertificateTestEditorPage() {
                                     }
                                   : item
                             )
-                        )
-                      }
+                        );
+                        setDirty(true);
+                      }}
                     />
 
                     <label className="correctChoice">
@@ -1170,7 +1433,7 @@ export default function NationalCertificateTestEditorPage() {
                       value={answer}
                       onChange={(
                         event
-                      ) =>
+                      ) => {
                         setAcceptedAnswers(
                           (
                             previous
@@ -1187,13 +1450,14 @@ export default function NationalCertificateTestEditorPage() {
                                       .value
                                   : value
                             )
-                        )
-                      }
+                        );
+                        setDirty(true);
+                      }}
                     />
 
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         setAcceptedAnswers(
                           (
                             previous
@@ -1209,8 +1473,9 @@ export default function NationalCertificateTestEditorPage() {
                                     index
                                 )
                               : [""]
-                        )
-                      }
+                        );
+                        setDirty(true);
+                      }}
                     >
                       ×
                     </button>
@@ -1220,14 +1485,15 @@ export default function NationalCertificateTestEditorPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setAcceptedAnswers(
-                    (previous) => [
-                      ...previous,
-                      "",
-                    ]
-                  )
-                }
+                onClick={() => {
+                setAcceptedAnswers(
+                  (previous) => [
+                    ...previous,
+                    "",
+                  ]
+                );
+                setDirty(true);
+              }}
               >
                 + Javob qo‘shish
               </button>
@@ -1250,12 +1516,8 @@ export default function NationalCertificateTestEditorPage() {
             <button
               type="button"
               onClick={() =>
-                setCurrentNumber(
-                  (number) =>
-                    Math.max(
-                      1,
-                      number - 1
-                    )
+                void goToQuestion(
+                  currentNumber - 1
                 )
               }
               disabled={
