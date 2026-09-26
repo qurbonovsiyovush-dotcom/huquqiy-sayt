@@ -408,15 +408,18 @@ function optionLabelFromStart(
   value: string
 ): OptionLabel | null {
   /*
-    Qabul qilinadi:
+    Qabul qilinadi FAQAT haqiqiy javob markerlari:
       A) ...
       +A) ...
       + A) ...
       A)+ ...
       A) + ...
+
+    MUHIM: kazus ichidagi shaxs belgilarini (A. / B. / C. / D.)
+    variant deb qabul qilmaymiz.
   */
   const match = value.match(
-    /^\s*\+?\s*([ABCD])[\)\.\-:]\s*\+?\s*/
+    /^\s*\+?\s*([ABCD])\s*\)\s*\+?\s*/
   );
 
   return match
@@ -427,7 +430,7 @@ function optionLabelFromStart(
 function stripOptionPrefix(value: string) {
   return value
     .replace(
-      /^\s*\+?\s*[ABCD][\)\.\-:]\s*\+?\s*/,
+      /^\s*\+?\s*[ABCD]\s*\)\s*\+?\s*/,
       ""
     )
     .trim();
@@ -435,8 +438,8 @@ function stripOptionPrefix(value: string) {
 
 function optionMarkerHasLeadingOrTrailingPlus(value: string) {
   return (
-    /^\s*\+\s*[ABCD][\)\.\-:]/.test(value) ||
-    /^\s*[ABCD][\)\.\-:]\s*\+/.test(value)
+    /^\s*\+\s*[ABCD]\s*\)/.test(value) ||
+    /^\s*[ABCD]\s*\)\s*\+/.test(value)
   );
 }
 
@@ -1337,9 +1340,12 @@ function splitInlineOptions(
       +A) ... B) ...
       A)+ ... B) ...
       A) + ... B) ...
+
+    MUHIM: A. / B. / C. / D. kazusdagi shaxs belgisi bo‘lishi mumkin.
+    Shu sabab inline variant markerida ham faqat ')' qabul qilinadi.
   */
   const regex =
-    /(^|\s)(\+?\s*)([ABCD])[\)\.\-:]\s*(\+?\s*)/g;
+    /(^|\s)(\+?\s*)([ABCD])\s*\)\s*(\+?\s*)/g;
 
   const matches: {
     label: OptionLabel;
