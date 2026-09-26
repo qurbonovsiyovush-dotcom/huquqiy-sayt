@@ -234,6 +234,62 @@ function buildPdfLikeQuestionHtml(
       };
     }
 
+    /*
+      PDF text-run tartibidagi xatoni oldindan tuzatamiz.
+
+      Ayrim sahifalarda, masalan 19-savolda, PDF parser:
+        I.
+        II. ...
+        III. ...
+        kollektiv xavfsizlik ...; Qaysi ...?
+      tartibida berishi mumkin.
+
+      Bu yerda oxirgi savol boshiga noto‘g‘ri ko‘chib qolgan
+      birinchi band matnini standalone markerga qaytaramiz.
+    */
+    const detachedIndex =
+      lines.findIndex((line) =>
+        /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8}))[.)]$/u.test(
+          cleanInline(line)
+        )
+      );
+
+    if (detachedIndex >= 0) {
+      for (
+        let index = lines.length - 1;
+        index > detachedIndex;
+        index -= 1
+      ) {
+        const candidate =
+          cleanInline(lines[index]);
+
+        if (!candidate.includes("?")) {
+          continue;
+        }
+
+        const misplaced =
+          candidate.match(
+            /^(.+?[;:])\s*((?:qaysi|qanday|qancha|necha|nechta|kim|nima|qachon|qayerda|ushbu|mazkur)\b[\s\S]*\?)$/iu
+          );
+
+        if (!misplaced) {
+          continue;
+        }
+
+        lines[detachedIndex] =
+          cleanInline(
+            `${lines[detachedIndex]} ${misplaced[1]}`
+          );
+
+        lines[index] =
+          cleanInline(
+            misplaced[2]
+          );
+
+        break;
+      }
+    }
+
     const sentenceBoundaryIndex = (value: string) => {
       let last = -1;
       const re = /[.!?](?:\s+|$)/g;
@@ -564,51 +620,29 @@ function buildPdfLikeQuestionHtml(
 
 function initialUnifiedHtml(question: ImportedQuestion) {
   /*
-    Import qilingan savol matnining asosiy savol qismini
-    editorning o‘zida PDFdagidek qalin ko‘rsatamiz.
+    MUHIM:
+    questionHtml bir marta yaratilgandan yoki foydalanuvchi
+    muharrirda uni o‘zgartirgandan keyin, aynan o‘sha HTMLni
+    qaytaramiz.
 
-    Agar questionHtml ichida rasm/Venn/shakl bo‘lsa,
-    ularni yo‘qotmaslik uchun mavjud visual HTMLni ham saqlaymiz.
+    Oldingi kod har renderda questionText'dan HTMLni qayta
+    yasardi. Natijada foydalanuvchi qilgan bold/italic/qator
+    tuzatishlari avtomatik ravishda eski holatga qaytib ketardi.
   */
   const existing =
     String(
       question.questionHtml || ""
-    );
+    ).trim();
 
-  const visualOnly =
-    typeof document !== "undefined"
-      ? (() => {
-          const box =
-            document.createElement(
-              "div"
-            );
+  if (existing) {
+    return existing;
+  }
 
-          box.innerHTML =
-            existing;
-
-          const visuals =
-            Array.from(
-              box.querySelectorAll(
-                "[data-object-id]"
-              )
-            )
-              .map(
-                (node) =>
-                  (
-                    node as HTMLElement
-                  ).outerHTML
-              )
-              .join("");
-
-          return visuals;
-        })()
-      : "";
-
-  return `${buildPdfLikeQuestionHtml(
+  return buildPdfLikeQuestionHtml(
     question.questionText || "",
-    existing,
+    "",
     question.number
-  )}${visualOnly}`;
+  );
 }
 
 export default function NationalCertificatePdfImportPage() {
