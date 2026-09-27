@@ -867,6 +867,10 @@ function numericAnswerMatches(
       userAnswer
     );
 
+  /*
+    Avvalo SON aynan bir xil bo‘lishi shart.
+    "uch" normalize qilinganda "3" bo‘ladi.
+  */
   if (
     acceptedNumbers.length === 0 ||
     userNumbers.length === 0 ||
@@ -878,13 +882,6 @@ function numericAnswerMatches(
     return false;
   }
 
-  /*
-    Birlikni avval etalon javobdan olamiz.
-    Agar etalonda birlik yozilmagan bo'lsa, savol matnidan aniqlaymiz.
-
-    Masalan savol "necha kun" desa, acceptedAnswer tasodifan "7"
-    bo'lib qolgan taqdirda ham foydalanuvchidan "7 kun" talab qilinadi.
-  */
   const acceptedUnits =
     extractUnitKinds(
       acceptedText
@@ -895,34 +892,74 @@ function numericAnswerMatches(
       questionText
     );
 
-  const requiredUnits =
-    acceptedUnits.size > 0
-      ? acceptedUnits
-      : questionUnits;
-
   const userUnits =
     extractUnitKinds(
       userAnswer
     );
 
-  if (
-    requiredUnits.size > 0
-  ) {
+  /*
+    MUHIM QOIDA:
+
+    1) Admin "3" ni alohida qabul qilinadigan javob sifatida
+       kiritgan bo‘lsa, foydalanuvchi:
+         3 / 3. / uch
+       deb yozishi mumkin.
+
+    2) Lekin foydalanuvchi birlik yozsa, u SAVOLDA talab
+       qilingan yoki aynan accepted answerda yozilgan birlikka
+       mos bo‘lishi shart.
+
+       Savol: "necha oy?"
+       Accepted: "3", "3 oy"
+
+       TO‘G‘RI:
+         3
+         3.
+         uch
+         3 oy
+         uch oy
+
+       XATO:
+         3 yil
+         3 kun
+         4 oy
+  */
+
+  if (userUnits.size === 0) {
     /*
-      Kerakli birliklarning barchasi foydalanuvchi javobida bo'lishi shart.
-      Qo'shimcha boshqa birlik yozilsa ham xato: "7 kun yil" qabul qilinmaydi.
+      Birliksiz foydalanuvchi javobi faqat birliksiz accepted
+      answer mavjud bo‘lgandagina qabul qilinadi.
     */
-    return sameSet(
-      requiredUnits,
-      userUnits
-    );
+    return acceptedUnits.size === 0;
   }
 
   /*
-    Savol va etalonda birlik umuman yo'q bo'lsa,
-    aynan sonlarning tengligi yetarli.
+    Foydalanuvchi birlik yozgan bo‘lsa:
+    - accepted answerda birlik bo‘lsa — aynan o‘sha birlik;
+    - accepted answer birliksiz bo‘lsa — savoldagi birlik talab qilinadi.
   */
-  return true;
+  const requiredUnits =
+    acceptedUnits.size > 0
+      ? acceptedUnits
+      : questionUnits;
+
+  /*
+    Savolda ham, accepted answerda ham birlik yo‘q, lekin
+    foydalanuvchi o‘zicha birlik qo‘shgan bo‘lsa — qabul qilmaymiz.
+  */
+  if (requiredUnits.size === 0) {
+    return false;
+  }
+
+  /*
+    Qo‘shimcha yoki boshqa birlik ham xato:
+      "3 oy yil" -> xato
+      "3 yil"    -> xato (savol oy so‘rasa)
+  */
+  return sameSet(
+    requiredUnits,
+    userUnits
+  );
 }
 
 function smartOpenAnswerMatches(
@@ -940,6 +977,11 @@ function smartOpenAnswerMatches(
     return false;
   }
 
+  const numericQuestion =
+    isNumericQuestion(
+      questionText
+    );
+
   for (
     const accepted of
     acceptedAnswers
@@ -955,16 +997,17 @@ function smartOpenAnswerMatches(
       continue;
     }
 
-    const numericQuestion =
-      isNumericQuestion(
-        questionText
+    const normalizedAccepted =
+      normalizeAnswer(
+        acceptedText
       );
 
     /*
-      1) Sonli savollarda avval son + birlikni tekshiramiz.
+      SONLI SAVOLNI AVVAL son + birlik bo‘yicha tekshiramiz.
 
-      Bu juda muhim: etalon tasodifan faqat "7" bo'lib qolgan bo'lsa ham,
-      savol "necha kun" deb turgan bo'lsa foydalanuvchi "7 kun" yozishi kerak.
+      Bu tartib juda muhim: "3 yil" hech qachon faqat soni 3
+      bo‘lgani uchun "3" accepted answergacha tushib, to‘g‘ri
+      bo‘lib ketmaydi.
     */
     if (numericQuestion) {
       if (
@@ -980,21 +1023,19 @@ function smartOpenAnswerMatches(
       continue;
     }
 
-    const normalizedAccepted =
-      normalizeAnswer(
-        acceptedText
-      );
-
     /*
-      2) Huquqiy atama va oddiy matnli javoblarda
-         normallashtirilgan TO'LIQ moslik.
+      HUQUQIY TERMIN / MATNLI JAVOBLAR:
 
-      Shu sabab quyidagilar bir xil:
-        "Egri qasd."
+      - katta-kichik harf farqi hisobga olinmaydi;
+      - nuqta, vergul, !, ? kabi tinish belgilari hisobga olinmaydi;
+      - turli apostroflar va ortiqcha bo‘sh joylar hisobga olinmaydi;
+      - lekin mazmuniy javob aynan accepted answerga mos bo‘lishi kerak.
+
+      Misol:
+        "Egri qasd"
         "egri qasd"
-        "EGRI QASD!!!"
-
-      Nuqta, vergul, harf registri va ortiqcha bo'sh joy bahoga ta'sir qilmaydi.
+        "EGRI QASD."
+      -> barchasi to‘g‘ri.
     */
     if (
       normalizedAccepted &&
@@ -1005,11 +1046,6 @@ function smartOpenAnswerMatches(
     }
   }
 
-  /*
-    Huquqiy atamalarda taxminiy/fuzzy moslik yo'q.
-    Agar boshqa to'g'ri yozilish variantini ham qabul qilish kerak bo'lsa,
-    admin qoralama muharririda uni acceptedAnswers ga alohida qo'shadi.
-  */
   return false;
 }
 
