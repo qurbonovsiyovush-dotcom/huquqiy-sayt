@@ -31,6 +31,20 @@ function normalizeTestCategory(value: unknown): TestCategory {
     : "legislation";
 }
 
+/*
+  PDF parser oilasi:
+  - thematic / block / thirty / custom bir xil PDF parserdan foydalanadi;
+  - ularning bazadagi testType qiymati esa o'z holicha saqlanadi.
+*/
+function usesThematicParser(value: TestCategory) {
+  return (
+    value === "thematic" ||
+    value === "block" ||
+    value === "thirty" ||
+    value === "custom"
+  );
+}
+
 type ImportedOption = {
   id: string;
   label: "A" | "B" | "C" | "D";
@@ -1563,6 +1577,17 @@ export default function ImportPdfTestPage() {
   }
 
   async function analyzePdf() {
+    /*
+      Milliy sertifikatning o'z import sahifasi va o'z parseri bor.
+      Uni oddiy/mavzulashtirilgan importer bilan aralashtirmaymiz.
+    */
+    if (testType === "national-certificate") {
+      router.push(
+        "/admin/tests/national-certificate/import-pdf"
+      );
+      return;
+    }
+
     if (!title.trim()) {
       setMessage(
         "Test nomini kiriting."
@@ -1584,18 +1609,6 @@ export default function ImportPdfTestPage() {
       return;
     }
 
-    /*
-      MILLIY SERTIFIKAT — alohida importer/editor.
-      Bu umumiy sahifada Milliy sertifikatning 36–45 ochiq savol
-      qoidasi ishlatilmaydi.
-    */
-    if (testType === "national-certificate") {
-      router.push(
-        "/admin/tests/national-certificate/import-pdf"
-      );
-      return;
-    }
-
     try {
       setAnalyzing(true);
       setMessage("");
@@ -1613,18 +1626,27 @@ export default function ImportPdfTestPage() {
       );
 
       /*
-        ALOHIDA PARSERLAR:
-        thematic    -> /api/tests/import-pdf-thematic
-        legislation -> /api/tests/import-pdf-legislation
+        HAR BIR TEST OILASI ALOHIDA PARSERDA:
 
-        national-certificate yuqorida o‘zining alohida sahifasiga
-        redirect qilinadi. block/thirty/custom yopiq A/B/C/D formatda
-        bo‘lgani uchun hozircha legislation parseridan foydalanadi.
+        legislation
+          -> /api/tests/import-pdf-legislation
+
+        thematic / block / thirty / custom
+          -> /api/tests/import-pdf-thematic
+
+        national-certificate
+          -> yuqorida maxsus sahifaga yo'naltiriladi.
+
+        Muhim: block / thirty / custom faqat PDF PARSER bo'yicha
+        thematic bilan bir xil. Saqlanganda ularning testType qiymati
+        o'z nomida qoladi.
       */
       const importEndpoint =
-        testType === "thematic"
+        testType === "legislation"
+          ? "/api/tests/import-pdf-legislation"
+          : usesThematicParser(testType)
           ? "/api/tests/import-pdf-thematic"
-          : "/api/tests/import-pdf-legislation";
+          : "/api/tests/import-pdf";
 
       const response =
         await fetch(
