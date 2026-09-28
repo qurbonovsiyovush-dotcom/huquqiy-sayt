@@ -1584,6 +1584,18 @@ export default function ImportPdfTestPage() {
       return;
     }
 
+    /*
+      MILLIY SERTIFIKAT — alohida importer/editor.
+      Bu umumiy sahifada Milliy sertifikatning 36–45 ochiq savol
+      qoidasi ishlatilmaydi.
+    */
+    if (testType === "national-certificate") {
+      router.push(
+        "/admin/tests/national-certificate/import-pdf"
+      );
+      return;
+    }
+
     try {
       setAnalyzing(true);
       setMessage("");
@@ -1601,13 +1613,18 @@ export default function ImportPdfTestPage() {
       );
 
       /*
-        Mavzulashtirilgan testlar uchun alohida parser ishlatiladi.
-        Qolgan test turlari eski universal PDF importerda qoladi.
+        ALOHIDA PARSERLAR:
+        thematic    -> /api/tests/import-pdf-thematic
+        legislation -> /api/tests/import-pdf-legislation
+
+        national-certificate yuqorida o‘zining alohida sahifasiga
+        redirect qilinadi. block/thirty/custom yopiq A/B/C/D formatda
+        bo‘lgani uchun hozircha legislation parseridan foydalanadi.
       */
       const importEndpoint =
         testType === "thematic"
           ? "/api/tests/import-pdf-thematic"
-          : "/api/tests/import-pdf";
+          : "/api/tests/import-pdf-legislation";
 
       const response =
         await fetch(
