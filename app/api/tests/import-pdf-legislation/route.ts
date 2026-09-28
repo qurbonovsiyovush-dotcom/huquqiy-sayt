@@ -172,6 +172,80 @@ function normalizeText(value: string) {
     3) ...
   alohida qatorda saqlanadi.
 */
+function splitInnerListMarkers(value: string) {
+  const source = String(value || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+
+  if (!source) {
+    return [] as string[];
+  }
+
+  /*
+    QONUNCHILIK TESTLARIDA savol ichidagi quyidagi markerlar
+    bir PDF qatoriga yopishib kelishi mumkin:
+
+      I. ... II. ... III. ... IV. ...
+      1. ... 2. ... 3. ...
+      1) ... 2) ... 3) ...
+      a) ... b) ... c) ... d) ...
+
+    Ularni alohida qatorlarga ajratamiz.
+
+    MUHIM:
+    - faqat kichik a/b/c/d... ichki band hisoblanadi;
+    - katta A) B) C) D) JAVOB VARIANTLARI bu funksiyada
+      bo‘linmaydi — ular parseQuestion() ichida alohida olinadi;
+    - A. yoki B. kabi shaxs belgilari ham javob varianti emas.
+  */
+  const markerRegex =
+    /(^|\s)((?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)[\.)]|\d{1,3}[\.)]|[a-z][\.)])\s+(?=\S)/g;
+
+  const starts: number[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = markerRegex.exec(source)) !== null) {
+    const leading = match[1]?.length ?? 0;
+    starts.push(match.index + leading);
+  }
+
+  if (starts.length === 0) {
+    return [source];
+  }
+
+  const uniqueStarts = [...new Set(starts)].sort((a, b) => a - b);
+  const result: string[] = [];
+
+  if (uniqueStarts[0] > 0) {
+    const before = source.slice(0, uniqueStarts[0]).trim();
+
+    if (before) {
+      result.push(before);
+    }
+  }
+
+  for (let index = 0; index < uniqueStarts.length; index++) {
+    const from = uniqueStarts[index];
+    const to = uniqueStarts[index + 1] ?? source.length;
+    const part = source.slice(from, to).trim();
+
+    if (part) {
+      result.push(part);
+    }
+  }
+
+  return result;
+}
+
+function isInnerListItemStart(value: string) {
+  const line = String(value || "").trim();
+
+  return /^(?:(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)[\.)]|\d{1,3}[\.)]|[a-z][\.)])\s+\S/.test(
+    line
+  );
+}
+
 function normalizeQuestionText(parts: string[]) {
   const rawLines = parts
     .flatMap((part) => String(part || "").split(/\r?\n/))
@@ -181,7 +255,12 @@ function normalizeQuestionText(parts: string[]) {
         .replace(/[ \t]+/g, " ")
         .trim()
     )
-    .filter(Boolean);
+    .filter(Boolean)
+    /*
+      Bitta PDF satriga yopishgan I/II/III/IV, 1/2/3 yoki
+      a/b/c/d bandlarini shu yerning o‘zida ajratamiz.
+    */
+    .flatMap((line) => splitInnerListMarkers(line));
 
   const paragraphs: string[] = [];
   let current = "";
@@ -221,29 +300,27 @@ function normalizeQuestionText(parts: string[]) {
 
   for (const line of rawLines) {
     /*
-      Yangi ichki band boshlanishi:
-        1) ...
-        2) ...
+      Ichki ro‘yxatning HAR BIR bandi alohida qatorda qoladi:
+        I. ...
+        II. ...
+        III. ...
+        IV. ...
+
+        1. ...
+        2. ...
+
         a) ...
         b) ...
 
-      MUHIM:
-      Bandning keyingi vizual PDF qatorlari shu bandning DAVOMI
-      hisoblanadi. Oldingi kod ularni alohida paragraph qilib yuborardi.
+      Bandning keyingi oddiy PDF qatori esa o‘sha bandning davomi
+      sifatida birlashtiriladi.
     */
-    const startsInnerListItem =
-      /^(?:\d{1,3}|[a-zA-Z])[\)\.]\s+\S/.test(line);
-
-    if (startsInnerListItem) {
+    if (isInnerListItemStart(line)) {
       flushCurrent();
       current = line;
       continue;
     }
 
-    /*
-      Oddiy qator — hozirgi gap/bandning davomi.
-      Shuning uchun yangi \n qo‘ymaymiz, shu qatorga ulaymiz.
-    */
     appendLine(line);
   }
 
@@ -1359,7 +1436,7 @@ function parseQuestion(
   pageInfos: Map<number, PageInfo>
 ) {
   /*
-    QONUNCHILIK PARSERI:
+    QONUNCHILIK PARSERI — FINAL V2:
     savol raqamidan qat’i nazar barcha savollar A/B/C/D yopiq savol.
     36–45 uchun maxsus ochiq savol qoidasi yo‘q.
   */
@@ -2527,7 +2604,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      parser: "legislation",
+      parser: "legislation-v2",
       questions: finalQuestions,
       total: finalQuestions.length,
       expectedTotal: maxQuestionNumber,
