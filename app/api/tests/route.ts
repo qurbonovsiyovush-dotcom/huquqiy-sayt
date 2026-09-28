@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
@@ -101,7 +102,19 @@ function optionIsCorrect(option: IncomingOption) {
   return option?.isCorrect === true || option?.correct === true;
 }
 
-function normalizeIds(value: unknown): string[] {
+function normalizeTestIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function normalizeNumericIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
 
   return Array.from(
@@ -439,8 +452,11 @@ async function createChunkedTest(body: any) {
     completed: false,
   };
 
+  const newTestId = randomUUID();
+
   const inserted = await sql`
     INSERT INTO legacy_tests (
+      id,
       title,
       subject,
       duration,
@@ -455,6 +471,7 @@ async function createChunkedTest(body: any) {
       updated_at
     )
     VALUES (
+      ${newTestId},
       ${title},
       ${subject},
       ${normalizePositiveInt(body?.duration, 30)},
@@ -499,7 +516,7 @@ async function appendQuestionsChunk(body: any) {
     ? body.questions
     : [];
 
-  if (!/^\d+$/.test(testId)) {
+  if (!testId) {
     return NextResponse.json(
       { success: false, message: "testId noto‘g‘ri." },
       { status: 400 }
@@ -606,7 +623,7 @@ async function appendQuestionsChunk(body: any) {
 async function finalizeChunkedTest(body: any) {
   const testId = String(body?.testId || "").trim();
 
-  if (!/^\d+$/.test(testId)) {
+  if (!testId) {
     return NextResponse.json(
       { success: false, message: "testId noto‘g‘ri." },
       { status: 400 }
@@ -680,7 +697,7 @@ async function finalizeChunkedTest(body: any) {
 ========================================================= */
 
 async function bulkPublishTests(body: any) {
-  const testIds = normalizeIds(body?.testIds);
+  const testIds = normalizeTestIds(body?.testIds);
 
   if (testIds.length === 0) {
     return NextResponse.json(
@@ -694,7 +711,7 @@ async function bulkPublishTests(body: any) {
     SET
       status = 'published',
       updated_at = NOW()
-    WHERE t.id = ANY(${testIds}::bigint[])
+    WHERE t.id::text = ANY(${testIds}::text[])
       AND EXISTS (
         SELECT 1
         FROM legacy_test_questions q
@@ -719,7 +736,7 @@ async function bulkPublishTests(body: any) {
 ========================================================= */
 
 async function bulkDeleteTests(body: any) {
-  const testIds = normalizeIds(body?.testIds);
+  const testIds = normalizeTestIds(body?.testIds);
   const onlyDrafts = body?.onlyDrafts !== false;
 
   if (testIds.length === 0) {
@@ -732,13 +749,13 @@ async function bulkDeleteTests(body: any) {
   const deleted: any[] = onlyDrafts
     ? await sql`
         DELETE FROM legacy_tests
-        WHERE id = ANY(${testIds}::bigint[])
+        WHERE id::text = ANY(${testIds}::text[])
           AND status = 'draft'
         RETURNING id
       `
     : await sql`
         DELETE FROM legacy_tests
-        WHERE id = ANY(${testIds}::bigint[])
+        WHERE id::text = ANY(${testIds}::text[])
         RETURNING id
       `;
 
@@ -761,7 +778,7 @@ async function setTestStatus(body: any) {
   const testId = String(body?.testId || "").trim();
   const status = normalizeStatus(body?.status);
 
-  if (!/^\d+$/.test(testId)) {
+  if (!testId) {
     return NextResponse.json(
       { success: false, message: "Test ID noto‘g‘ri." },
       { status: 400 }
@@ -809,7 +826,7 @@ async function setTestStatus(body: any) {
 async function loadEditorPage(body: any) {
   const testId = String(body?.testId || "").trim();
 
-  if (!/^\d+$/.test(testId)) {
+  if (!testId) {
     return NextResponse.json(
       { success: false, message: "Test ID noto‘g‘ri." },
       { status: 400 }
@@ -954,7 +971,7 @@ async function loadEditorPage(body: any) {
 async function patchTest(body: any) {
   const testId = String(body?.testId || "").trim();
 
-  if (!/^\d+$/.test(testId)) {
+  if (!testId) {
     return NextResponse.json(
       { success: false, message: "Test ID noto‘g‘ri." },
       { status: 400 }
@@ -1022,7 +1039,7 @@ async function patchTest(body: any) {
     WHERE id = ${testId}
   `;
 
-  const deletedQuestionIds = normalizeIds(body?.deletedQuestionIds);
+  const deletedQuestionIds = normalizeNumericIds(body?.deletedQuestionIds);
 
   if (deletedQuestionIds.length > 0) {
     await sql`
@@ -1215,9 +1232,11 @@ async function createNormalTest(body: any) {
   }
 
   const status = normalizeStatus(body?.status);
+  const newTestId = randomUUID();
 
   const inserted: any[] = await sql`
     INSERT INTO legacy_tests (
+      id,
       title,
       subject,
       duration,
@@ -1232,6 +1251,7 @@ async function createNormalTest(body: any) {
       updated_at
     )
     VALUES (
+      ${newTestId},
       ${title},
       ${subject},
       ${normalizePositiveInt(body?.duration, 30)},
