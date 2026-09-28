@@ -1,116 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { del, get, list, put } from "@vercel/blob";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const TESTS_BLOB_PATH = "huquqiy-sayt/tests.json";
-
-const IMPORT_ROOT = "huquqiy-sayt/test-imports";
-
-function importMetaPath(testId: string) {
-  return `${IMPORT_ROOT}/${testId}/meta.json`;
-}
-
-function importChunkPath(testId: string, startIndex: number) {
-  return `${IMPORT_ROOT}/${testId}/chunks/${String(startIndex).padStart(8, "0")}.json`;
-}
-
-function importChunkPrefix(testId: string) {
-  return `${IMPORT_ROOT}/${testId}/chunks/`;
-}
-
-function importFinalPath(testId: string) {
-  return `${IMPORT_ROOT}/${testId}/final.json`;
-}
-
-const IMPORT_FINAL_SUFFIX = "/final.json";
-
-/*
-  DURABLE STATUS REGISTRY
-
-  tests.json katta umumiy fayl.
-  Uning overwrite/read kechikishi statusni orqaga qaytarishi mumkin.
-
-  Shu sabab status alohida kichik registryda saqlanadi:
-  huquqiy-sayt/test-status/<testId>/published.json
-  huquqiy-sayt/test-status/<testId>/draft.json
-
-  readTests() eng yangi markerga qaraydi.
-*/
-const TEST_STATUS_ROOT =
-  "huquqiy-sayt/test-status";
-
-function testStatusMarkerPath(
-  testId: string,
-  status: TestStatus
-) {
-  return `${TEST_STATUS_ROOT}/${testId}/${status}.json`;
-}
-
-
 type TestStatus = "draft" | "published";
 
-type TestData = {
-  id: string;
-
-  title?: string;
-  subject?: string;
-  duration?: number;
-  description?: string;
-
-  testType?: string;
-  customTestTypeName?: string;
-
-  status?: TestStatus;
-
-  questions?: unknown[];
-
-  attemptLimit?: number | null;
-
-  importState?: {
-    mode?: "chunked";
-    expectedQuestions?: number;
-    receivedQuestions?: number;
-    completed?: boolean;
-  };
-
-  createdAt?: string;
-  updatedAt?: string;
-
-  [key: string]: unknown;
+type IncomingOption = {
+  id?: unknown;
+  label?: unknown;
+  text?: unknown;
+  optionText?: unknown;
+  html?: unknown;
+  isCorrect?: unknown;
+  correct?: unknown;
 };
 
-/* =========================================================
-   HELPERS
-========================================================= */
+type IncomingQuestion = {
+  id?: unknown;
+  number?: unknown;
+  questionText?: unknown;
+  questionHtml?: unknown;
+  points?: unknown;
+  shapes?: unknown;
+  options?: IncomingOption[];
+};
 
-function checkBlobToken() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
+function normalizeStatus(value: unknown): TestStatus {
+  return value === "published" ? "published" : "draft";
 }
 
-function normalizeTests(
-  value: unknown
-): TestData[] {
-  if (!Array.isArray(value)) {
-    throw new Error(
-      "tests.json formati noto‘g‘ri."
-    );
-  }
-
-  return value as TestData[];
-}
-
-function normalizeAttemptLimit(
-  value: unknown
-): number | null {
+function normalizeAttemptLimit(value: unknown): number | null {
   if (
     value === null ||
     value === undefined ||
@@ -120,495 +42,366 @@ function normalizeAttemptLimit(
     return null;
   }
 
-  const parsed =
-    Number(value);
-
-  if (
-    !Number.isFinite(parsed) ||
-    parsed < 1
-  ) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
     return null;
   }
 
   return Math.floor(parsed);
 }
 
-function normalizeStatus(
-  value: unknown
-): TestStatus {
-  return value === "published"
-    ? "published"
-    : "draft";
+function normalizePositiveInt(value: unknown, fallback = 1) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.max(1, Math.floor(parsed));
 }
 
-/* =========================================================
-   BLOB READ
-========================================================= */
-
-async function readTests(): Promise<TestData[]> {
-  checkBlobToken();
-
-  const result =
-    await get(
-      TESTS_BLOB_PATH,
-      {
-        access: "private",
-      }
-    );
-
-  if (
-    !result ||
-    result.statusCode !==
-      200 ||
-    !result.stream
-  ) {
-    throw new Error(
-      `tests.json o‘qilmadi. Status: ${
-        result?.statusCode ??
-        "noma'lum"
-      }`
-    );
-  }
-
-  const text =
-    await new Response(
-      result.stream
-    ).text();
-
-  if (
-    !text.trim()
-  ) {
-    throw new Error(
-      "tests.json bo‘sh."
-    );
-  }
-
-  const baseTests =
-    normalizeTests(
-      JSON.parse(
-        text
-      )
-    );
-
-  const byId =
-    new Map(
-      baseTests.map(
-        (test) => [
-          test.id,
-          test,
-        ]
-      )
-    );
-
-  /*
-    1) final.json faqat SAVOLLARNI tiklaydi.
-       U statusni tests.json ustidan bosmaydi.
-  */
-  try {
-    let cursor:
-      string | undefined =
-      undefined;
-
-    do {
-      const finals: {
-        blobs: Array<{
-          pathname: string;
-          uploadedAt?: Date | string;
-        }>;
-        hasMore: boolean;
-        cursor?: string;
-      } =
-        await list({
-          prefix:
-            `${IMPORT_ROOT}/`,
-          limit: 1000,
-          ...(cursor
-            ? {
-                cursor,
-              }
-            : {}),
-        });
-
-      const finalBlobs =
-        finals.blobs.filter(
-          (blob) =>
-            blob.pathname.endsWith(
-              IMPORT_FINAL_SUFFIX
-            )
-        );
-
-      for (
-        const blob of
-        finalBlobs
-      ) {
-        try {
-          const finalResult =
-            await get(
-      blob.pathname,
-      {
-        access: "private",
-      }
-    );
-
-          if (
-            !finalResult ||
-            finalResult.statusCode !==
-              200 ||
-            !finalResult.stream
-          ) {
-            continue;
-          }
-
-          const finalText =
-            await new Response(
-              finalResult.stream
-            ).text();
-
-          if (
-            !finalText.trim()
-          ) {
-            continue;
-          }
-
-          const finalTest =
-            JSON.parse(
-              finalText
-            ) as TestData;
-
-          if (
-            !finalTest?.id
-          ) {
-            continue;
-          }
-
-          const current =
-            byId.get(
-              finalTest.id
-            );
-
-          const finalCount =
-            Array.isArray(
-              finalTest.questions
-            )
-              ? finalTest
-                  .questions.length
-              : 0;
-
-          const currentCount =
-            Array.isArray(
-              current?.questions
-            )
-              ? current
-                  .questions
-                  .length
-              : 0;
-
-          if (!current) {
-            byId.set(
-              finalTest.id,
-              finalTest
-            );
-            continue;
-          }
-
-          if (
-            finalCount >
-            currentCount
-          ) {
-            byId.set(
-              finalTest.id,
-              {
-                ...finalTest,
-                ...current,
-
-                /*
-                  Savollar va import holati final snapshotdan.
-                  Status/title va boshqa keyingi metadata currentdan.
-                */
-                questions:
-                  finalTest.questions,
-                importState:
-                  finalTest.importState,
-              }
-            );
-          }
-        } catch (
-          finalReadError
-        ) {
-          console.warn(
-            "FINAL SNAPSHOT READ ERROR:",
-            blob.pathname,
-            finalReadError
-          );
-        }
-      }
-
-      cursor =
-        finals.hasMore
-          ? finals.cursor
-          : undefined;
-    } while (cursor);
-  } catch (
-    finalListError
-  ) {
-    console.warn(
-      "FINAL SNAPSHOT LIST ERROR:",
-      finalListError
-    );
-  }
-
-  /*
-    2) DURABLE STATUS markerlari.
-
-       Ular TEST_STATUS_ROOT ostida alohida saqlanadi.
-       published.json va draft.json ikkalasi mavjud bo‘lsa,
-       uploadedAt bo‘yicha ENG YANGISI yutadi.
-
-       Shu qatlam tests.json va final.json statusidan ustun.
-  */
-  try {
-    const newestStatus =
-      new Map<
-        string,
-        {
-          status:
-            TestStatus;
-          time:
-            number;
-        }
-      >();
-
-    let cursor:
-      string | undefined =
-      undefined;
-
-    do {
-      const statusList: {
-        blobs: Array<{
-          pathname: string;
-          uploadedAt?: Date | string;
-        }>;
-        hasMore: boolean;
-        cursor?: string;
-      } =
-        await list({
-          prefix:
-            `${TEST_STATUS_ROOT}/`,
-          limit: 1000,
-          ...(cursor
-            ? {
-                cursor,
-              }
-            : {}),
-        });
-
-      for (
-        const blob of
-        statusList.blobs
-      ) {
-        const prefix =
-          `${TEST_STATUS_ROOT}/`;
-
-        if (
-          !blob.pathname.startsWith(
-            prefix
-          )
-        ) {
-          continue;
-        }
-
-        let status:
-          TestStatus | null =
-          null;
-
-        let suffix =
-          "";
-
-        if (
-          blob.pathname.endsWith(
-            "/published.json"
-          )
-        ) {
-          status =
-            "published";
-          suffix =
-            "/published.json";
-        } else if (
-          blob.pathname.endsWith(
-            "/draft.json"
-          )
-        ) {
-          status =
-            "draft";
-          suffix =
-            "/draft.json";
-        }
-
-        if (!status) {
-          continue;
-        }
-
-        const testId =
-          blob.pathname.slice(
-            prefix.length,
-            -suffix.length
-          );
-
-        if (!testId) {
-          continue;
-        }
-
-        const uploadedAt =
-          blob.uploadedAt
-            ? new Date(
-                blob.uploadedAt
-              ).getTime()
-            : 0;
-
-        const previous =
-          newestStatus.get(
-            testId
-          );
-
-        if (
-          !previous ||
-          uploadedAt >=
-            previous.time
-        ) {
-          newestStatus.set(
-            testId,
-            {
-              status,
-              time:
-                uploadedAt,
-            }
-          );
-        }
-      }
-
-      cursor =
-        statusList.hasMore
-          ? statusList.cursor
-          : undefined;
-    } while (cursor);
-
-    for (
-      const [
-        testId,
-        marker,
-      ] of newestStatus
-    ) {
-      const current =
-        byId.get(
-          testId
-        );
-
-      if (!current) {
-        continue;
-      }
-
-      byId.set(
-        testId,
-        {
-          ...current,
-          status:
-            marker.status,
-        }
-      );
-    }
-  } catch (
-    statusListError
-  ) {
-    console.warn(
-      "STATUS REGISTRY LIST ERROR:",
-      statusListError
-    );
-  }
-
-  return [
-    ...byId.values(),
-  ];
+function asObject(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, any>)
+    : {};
 }
 
-/* =========================================================
-   BLOB WRITE
-========================================================= */
+function optionKey(index: number, option?: IncomingOption) {
+  const incoming = String(option?.label ?? "")
+    .trim()
+    .toUpperCase();
 
-async function writeTests(
-  tests: TestData[]
-) {
-  checkBlobToken();
+  if (/^[A-Z]$/.test(incoming)) {
+    return incoming;
+  }
 
-  await put(
-    TESTS_BLOB_PATH,
-    JSON.stringify(
-      tests,
-      null,
-      2
-    ),
-    {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge: 0,
-    }
+  return String.fromCharCode(65 + index);
+}
+
+function questionTextFromIncoming(question: IncomingQuestion) {
+  return String(
+    question?.questionText ?? question?.questionHtml ?? ""
+  ).trim();
+}
+
+function questionHtmlFromIncoming(question: IncomingQuestion) {
+  const text = questionTextFromIncoming(question);
+  return String(question?.questionHtml ?? text);
+}
+
+function optionTextFromIncoming(option: IncomingOption) {
+  return String(option?.optionText ?? option?.text ?? "");
+}
+
+function optionHtmlFromIncoming(option: IncomingOption) {
+  const text = optionTextFromIncoming(option);
+  const html = String(option?.html ?? "");
+  return html || text;
+}
+
+function optionIsCorrect(option: IncomingOption) {
+  return option?.isCorrect === true || option?.correct === true;
+}
+
+function normalizeIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item ?? "").trim())
+        .filter((item) => /^\d+$/.test(item))
+    )
   );
 }
 
+async function isAdmin() {
+  const cookieStore = await cookies();
+
+  return Boolean(
+    cookieStore.get("qurbonov_session")?.value &&
+      cookieStore.get("qurbonov_role")?.value === "admin"
+  );
+}
+
+async function requireAdmin() {
+  if (await isAdmin()) {
+    return null;
+  }
+
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Bu amal faqat administrator uchun.",
+    },
+    { status: 403 }
+  );
+}
+
+async function getQuestionCount(testId: string | number) {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS count
+    FROM legacy_test_questions
+    WHERE test_id = ${testId}
+  `;
+
+  return Number(rows[0]?.count || 0);
+}
+
+async function insertQuestion(
+  testId: string | number,
+  questionNumber: number,
+  question: IncomingQuestion
+) {
+  const questionText = questionTextFromIncoming(question);
+  const questionHtml = questionHtmlFromIncoming(question);
+  const shapes = Array.isArray(question?.shapes) ? question.shapes : [];
+  const points = normalizePositiveInt(question?.points, 1);
+
+  const inserted = await sql`
+    INSERT INTO legacy_test_questions (
+      test_id,
+      question_number,
+      question_text,
+      question_html,
+      points,
+      shapes_json,
+      extra_json,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${testId},
+      ${questionNumber},
+      ${questionText},
+      ${questionHtml},
+      ${points},
+      ${JSON.stringify(shapes)}::jsonb,
+      ${JSON.stringify({ sourceId: question?.id ?? null })}::jsonb,
+      NOW(),
+      NOW()
+    )
+    RETURNING id
+  `;
+
+  const questionId = Number(inserted[0]?.id);
+  if (!Number.isFinite(questionId)) {
+    throw new Error(`${questionNumber}-savolni Neon bazaga yozib bo‘lmadi.`);
+  }
+
+  const options = Array.isArray(question?.options) ? question.options : [];
+
+  for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
+    const option = options[optionIndex] || {};
+
+    await sql`
+      INSERT INTO legacy_test_options (
+        question_id,
+        option_key,
+        option_text,
+        option_html,
+        is_correct,
+        extra_json,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${questionId},
+        ${optionKey(optionIndex, option)},
+        ${optionTextFromIncoming(option)},
+        ${optionHtmlFromIncoming(option)},
+        ${optionIsCorrect(option)},
+        ${JSON.stringify({ sourceId: option?.id ?? null })}::jsonb,
+        NOW(),
+        NOW()
+      )
+    `;
+  }
+
+  return questionId;
+}
+
+async function readOneTest(testId: string | number) {
+  const testRows = await sql`
+    SELECT
+      id,
+      title,
+      subject,
+      duration,
+      description,
+      test_type,
+      custom_test_type_name,
+      status,
+      attempt_limit,
+      extra_json,
+      created_at,
+      updated_at
+    FROM legacy_tests
+    WHERE id = ${testId}
+    LIMIT 1
+  `;
+
+  if (testRows.length === 0) {
+    return null;
+  }
+
+  const testRow: any = testRows[0];
+
+  const questionRows: any[] = await sql`
+    SELECT
+      id,
+      question_number,
+      question_text,
+      question_html,
+      points,
+      shapes_json,
+      extra_json
+    FROM legacy_test_questions
+    WHERE test_id = ${testId}
+    ORDER BY question_number ASC, id ASC
+  `;
+
+  const optionsByQuestion = new Map<string, any[]>();
+
+  if (questionRows.length > 0) {
+    const optionRows: any[] = await sql`
+      SELECT
+        o.id,
+        o.question_id,
+        o.option_key,
+        o.option_text,
+        o.option_html,
+        o.is_correct,
+        o.extra_json
+      FROM legacy_test_options o
+      JOIN legacy_test_questions q ON q.id = o.question_id
+      WHERE q.test_id = ${testId}
+      ORDER BY
+        q.question_number ASC,
+        q.id ASC,
+        o.option_key ASC,
+        o.id ASC
+    `;
+
+    for (const row of optionRows) {
+      const key = String(row.question_id);
+      const current = optionsByQuestion.get(key) || [];
+
+      current.push({
+        id: String(row.id),
+        label: String(row.option_key || ""),
+        text: String(row.option_text || row.option_html || ""),
+        optionText: String(row.option_text || ""),
+        html: String(row.option_html || row.option_text || ""),
+        isCorrect: row.is_correct === true,
+        correct: row.is_correct === true,
+        ...asObject(row.extra_json),
+      });
+
+      optionsByQuestion.set(key, current);
+    }
+  }
+
+  const questions = questionRows.map((row: any) => ({
+    id: String(row.id),
+    number: Number(row.question_number) || 0,
+    questionText: String(row.question_text || ""),
+    questionHtml: String(row.question_html || row.question_text || ""),
+    points: Number(row.points) || 1,
+    shapes: Array.isArray(row.shapes_json) ? row.shapes_json : [],
+    options: optionsByQuestion.get(String(row.id)) || [],
+    ...asObject(row.extra_json),
+  }));
+
+  return {
+    id: String(testRow.id),
+    title: String(testRow.title || ""),
+    subject: String(testRow.subject || ""),
+    duration: Number(testRow.duration) || 30,
+    description: String(testRow.description || ""),
+    testType:
+      testRow.test_type == null ? undefined : String(testRow.test_type),
+    customTestTypeName:
+      testRow.custom_test_type_name == null
+        ? undefined
+        : String(testRow.custom_test_type_name),
+    status: normalizeStatus(testRow.status),
+    attemptLimit:
+      testRow.attempt_limit == null ? null : Number(testRow.attempt_limit),
+    questions,
+    questionCount: questions.length,
+    storage: "legacy",
+    createdAt: testRow.created_at
+      ? new Date(testRow.created_at).toISOString()
+      : undefined,
+    updatedAt: testRow.updated_at
+      ? new Date(testRow.updated_at).toISOString()
+      : undefined,
+    ...asObject(testRow.extra_json),
+  };
+}
+
 /* =========================================================
-   GET
+   GET — Vercel Blob EMAS, Neon legacy_tests
 ========================================================= */
 
 export async function GET() {
   try {
-    const tests =
-      await readTests();
+    const rows: any[] = await sql`
+      SELECT
+        t.id,
+        t.title,
+        t.subject,
+        t.duration,
+        t.description,
+        t.test_type,
+        t.custom_test_type_name,
+        t.status,
+        t.attempt_limit,
+        t.extra_json,
+        t.created_at,
+        t.updated_at,
+        COUNT(q.id)::int AS question_count
+      FROM legacy_tests t
+      LEFT JOIN legacy_test_questions q ON q.test_id = t.id
+      GROUP BY t.id
+      ORDER BY COALESCE(t.updated_at, t.created_at) DESC, t.id DESC
+    `;
 
-    const sortedTests =
-      [...tests].sort(
-        (a, b) => {
-          const aTime =
-            new Date(
-              String(
-                a.updatedAt ||
-                a.createdAt ||
-                ""
-              )
-            ).getTime() || 0;
-
-          const bTime =
-            new Date(
-              String(
-                b.updatedAt ||
-                b.createdAt ||
-                ""
-              )
-            ).getTime() || 0;
-
-          return bTime - aTime;
-        }
-      );
+    const tests = rows.map((row: any) => ({
+      id: String(row.id),
+      title: String(row.title || ""),
+      subject: String(row.subject || ""),
+      duration: Number(row.duration) || 30,
+      description: String(row.description || ""),
+      testType: row.test_type == null ? undefined : String(row.test_type),
+      customTestTypeName:
+        row.custom_test_type_name == null
+          ? undefined
+          : String(row.custom_test_type_name),
+      status: normalizeStatus(row.status),
+      attemptLimit:
+        row.attempt_limit == null ? null : Number(row.attempt_limit),
+      questionCount: Number(row.question_count) || 0,
+      questions: [],
+      storage: "legacy",
+      createdAt: row.created_at
+        ? new Date(row.created_at).toISOString()
+        : undefined,
+      updatedAt: row.updated_at
+        ? new Date(row.updated_at).toISOString()
+        : undefined,
+      ...asObject(row.extra_json),
+    }));
 
     return NextResponse.json(
+      { success: true, tests },
       {
-        success: true,
-        tests: sortedTests,
-      },
-      {
-        status: 200,
         headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
         },
       }
     );
   } catch (error) {
-    console.error(
-      "GET /api/tests ERROR:",
-      error
-    );
+    console.error("GET /api/tests NEON ERROR:", error);
 
     return NextResponse.json(
       {
@@ -616,11 +409,9 @@ export async function GET() {
         message:
           error instanceof Error
             ? error.message
-            : "Testlarni yuklashda server xatosi.",
+            : "Testlarni Neon bazadan yuklab bo‘lmadi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
@@ -629,2230 +420,850 @@ export async function GET() {
    CREATE CHUNKED TEST
 ========================================================= */
 
-async function createChunkedTest(
-  body: any
-) {
-  const title =
-    String(
-      body?.title || ""
-    ).trim();
-
-  const subject =
-    String(
-      body?.subject || ""
-    ).trim();
+async function createChunkedTest(body: any) {
+  const title = String(body?.title || "").trim();
+  const subject = String(body?.subject || "").trim();
 
   if (!title) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test nomi kiritilmagan.",
-      },
-      {
-        status: 400,
-      }
+      { success: false, message: "Test nomi kiritilmagan." },
+      { status: 400 }
     );
   }
 
-  const now =
-    new Date().toISOString();
-
-  const expectedQuestions =
-    Math.max(
-      1,
-      Number(
-        body?.expectedQuestions
-      ) || 1
-    );
-
-  const id =
-    crypto.randomUUID();
-
-  const newTest: TestData = {
-    id,
-
-    title,
-    subject,
-
-    duration:
-      Math.max(
-        1,
-        Number(
-          body?.duration
-        ) || 30
-      ),
-
-    description:
-      String(
-        body?.description || ""
-      ),
-
-    testType:
-      String(
-        body?.testType || ""
-      ),
-
-    customTestTypeName:
-      String(
-        body?.customTestTypeName ||
-        ""
-      ),
-
-    status: "draft",
-
-    attemptLimit:
-      normalizeAttemptLimit(
-        body?.attemptLimit
-      ),
-
-    questions: [],
-
-    importState: {
-      mode: "chunked",
-      expectedQuestions,
-      receivedQuestions: 0,
-      completed: false,
-    },
-
-    createdAt: now,
-    updatedAt: now,
+  const expectedQuestions = normalizePositiveInt(body?.expectedQuestions, 1);
+  const importState = {
+    mode: "chunked",
+    expectedQuestions,
+    receivedQuestions: 0,
+    completed: false,
   };
 
-  /*
-    MUHIM ARXITEKTURA:
-    Import metama'lumoti UNIQUE blob path'ga yoziladi.
-    Bu fayl overwrite qilinmaydi, shuning uchun Vercel Blob stale-read
-    muammosi chunklar orasida paydo bo‘lmaydi.
-  */
-  await put(
-    importMetaPath(id),
-    JSON.stringify(newTest),
-    {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge: 0,
-    }
-  );
+  const inserted = await sql`
+    INSERT INTO legacy_tests (
+      title,
+      subject,
+      duration,
+      description,
+      test_type,
+      custom_test_type_name,
+      status,
+      attempt_limit,
+      questions_json,
+      extra_json,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${title},
+      ${subject},
+      ${normalizePositiveInt(body?.duration, 30)},
+      ${String(body?.description || "")},
+      ${body?.testType ? String(body.testType) : null},
+      ${body?.customTestTypeName ? String(body.customTestTypeName) : null},
+      'draft',
+      ${normalizeAttemptLimit(body?.attemptLimit)},
+      '[]'::jsonb,
+      ${JSON.stringify({ importState })}::jsonb,
+      NOW(),
+      NOW()
+    )
+    RETURNING id
+  `;
 
-  /*
-    Admin ro‘yxatida qoralama darhol ko‘rinishi uchun placeholderni
-    tests.json'ga ham yozishga harakat qilamiz. Keyingi chunklar esa
-    tests.json'ni qayta-qayta overwrite QILMAYDI.
-  */
-  const tests =
-    await readTests();
-
-  tests.push(newTest);
-
-  await writeTests(tests);
+  const testId = String(inserted[0]?.id || "");
+  if (!testId) {
+    throw new Error("Yangi test ID olinmadi.");
+  }
 
   return NextResponse.json(
     {
       success: true,
-      testId: id,
+      testId,
       receivedQuestions: 0,
       expectedQuestions,
     },
-    {
-      status: 201,
-    }
+    { status: 201 }
   );
 }
 
 /* =========================================================
-   APPEND QUESTIONS CHUNK
-   Har bir chunk alohida UNIQUE blob faylga yoziladi.
-   Shu sabab 0 -> 10 -> 20 -> ... ketma-ketligida tests.json'ni
-   qayta-qayta o‘qish/yozish shart emas.
+   APPEND QUESTIONS
+   Idempotent: aynan shu question_number oralig‘i avval o‘chiriladi.
 ========================================================= */
 
-async function appendQuestionsChunk(
-  body: any
-) {
-  const testId =
-    String(
-      body?.testId || ""
-    ).trim();
+async function appendQuestionsChunk(body: any) {
+  const testId = String(body?.testId || "").trim();
+  const startIndex = Number(body?.startIndex);
+  const chunk: IncomingQuestion[] = Array.isArray(body?.questions)
+    ? body.questions
+    : [];
 
-  if (!testId) {
+  if (!/^\d+$/.test(testId)) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "testId topilmadi.",
-      },
-      {
-        status: 400,
-      }
+      { success: false, message: "testId noto‘g‘ri." },
+      { status: 400 }
     );
   }
 
-  const chunk =
-    Array.isArray(
-      body?.questions
-    )
-      ? body.questions
-      : [];
+  if (!Number.isInteger(startIndex) || startIndex < 0) {
+    return NextResponse.json(
+      { success: false, message: "startIndex noto‘g‘ri." },
+      { status: 400 }
+    );
+  }
+
+  if (chunk.length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Savollar bo‘lagi bo‘sh." },
+      { status: 400 }
+    );
+  }
+
+  const testRows: any[] = await sql`
+    SELECT id, extra_json
+    FROM legacy_tests
+    WHERE id = ${testId}
+    LIMIT 1
+  `;
+
+  if (testRows.length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Test topilmadi." },
+      { status: 404 }
+    );
+  }
+
+  const extra = asObject(testRows[0].extra_json);
+  const importState = asObject(extra.importState);
+  const expectedQuestions = Number(importState.expectedQuestions || 0);
 
   if (
-    chunk.length === 0
+    expectedQuestions > 0 &&
+    startIndex + chunk.length > expectedQuestions
   ) {
     return NextResponse.json(
       {
         success: false,
-        message:
-          "Savollar bo‘lagi bo‘sh.",
+        message: `Savollar soni kutilgan miqdordan oshmoqda: ${
+          startIndex + chunk.length
+        }/${expectedQuestions}.`,
       },
-      {
-        status: 400,
-      }
+      { status: 400 }
     );
   }
 
-  const startIndex =
-    Number(
-      body?.startIndex
-    );
+  const fromQuestion = startIndex + 1;
+  const toQuestion = startIndex + chunk.length;
 
-  if (
-    !Number.isInteger(
-      startIndex
-    ) ||
-    startIndex < 0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "startIndex noto‘g‘ri.",
-      },
-      {
-        status: 400,
-      }
-    );
+  await sql`
+    DELETE FROM legacy_test_questions
+    WHERE test_id = ${testId}
+      AND question_number BETWEEN ${fromQuestion} AND ${toQuestion}
+  `;
+
+  for (let index = 0; index < chunk.length; index++) {
+    await insertQuestion(testId, startIndex + index + 1, chunk[index]);
   }
 
-  /*
-    Meta UNIQUE path'da. Bu yerda tests.json'ga qaramaymiz.
-  */
-  const metaResult =
-    await get(
-      importMetaPath(testId),
-      {
-        access: "private",
-      }
-    );
+  const receivedQuestions = await getQuestionCount(testId);
 
-  if (
-    !metaResult ||
-    metaResult.statusCode !== 200 ||
-    !metaResult.stream
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Import metama’lumoti topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  const metaText =
-    await new Response(
-      metaResult.stream
-    ).text();
-
-  const meta =
-    JSON.parse(metaText) as TestData;
-
-  const expectedQuestions =
-    Number(
-      meta.importState
-        ?.expectedQuestions
-    ) || 0;
-
-  if (
-    startIndex +
-      chunk.length >
-    expectedQuestions
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          `Savollar soni kutilgan miqdordan oshmoqda: ${startIndex + chunk.length}/${expectedQuestions}.`,
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const chunkPayload = {
-    testId,
-    startIndex,
-    count: chunk.length,
-    questions: chunk,
-    createdAt:
-      new Date().toISOString(),
+  const nextExtra = {
+    ...extra,
+    importState: {
+      ...importState,
+      mode: "chunked",
+      expectedQuestions: expectedQuestions || Math.max(receivedQuestions, toQuestion),
+      receivedQuestions,
+      completed: false,
+    },
   };
 
-  /*
-    Bir xil startIndex qayta yuborilsa shu fayl overwrite bo‘ladi.
-    Demak append idempotent — savollar dublikat bo‘lib ketmaydi.
-  */
-  await put(
-    importChunkPath(
-      testId,
-      startIndex
-    ),
-    JSON.stringify(
-      chunkPayload
-    ),
-    {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge: 0,
-    }
-  );
+  await sql`
+    UPDATE legacy_tests
+    SET
+      extra_json = ${JSON.stringify(nextExtra)}::jsonb,
+      updated_at = NOW()
+    WHERE id = ${testId}
+  `;
 
-  return NextResponse.json(
-    {
-      success: true,
-      testId,
-      receivedQuestions:
-        Math.min(
-          expectedQuestions,
-          startIndex +
-            chunk.length
-        ),
-      expectedQuestions,
-      remaining:
-        Math.max(
-          0,
-          expectedQuestions -
-            (
-              startIndex +
-              chunk.length
-            )
-        ),
-    },
-    {
-      status: 200,
-    }
-  );
+  return NextResponse.json({
+    success: true,
+    testId,
+    receivedQuestions,
+    expectedQuestions: expectedQuestions || null,
+    remaining:
+      expectedQuestions > 0
+        ? Math.max(0, expectedQuestions - receivedQuestions)
+        : null,
+  });
 }
 
 /* =========================================================
    FINALIZE CHUNKED TEST
-   Barcha UNIQUE chunk bloblarini yig‘ib, faqat SHU YERDA tests.json'ga
-   to‘liq testni bir marta yozamiz.
 ========================================================= */
 
-async function finalizeChunkedTest(
-  body: any
-) {
-  const testId =
-    String(
-      body?.testId || ""
-    ).trim();
+async function finalizeChunkedTest(body: any) {
+  const testId = String(body?.testId || "").trim();
 
-  if (!testId) {
+  if (!/^\d+$/.test(testId)) {
+    return NextResponse.json(
+      { success: false, message: "testId noto‘g‘ri." },
+      { status: 400 }
+    );
+  }
+
+  const rows: any[] = await sql`
+    SELECT id, extra_json
+    FROM legacy_tests
+    WHERE id = ${testId}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Test topilmadi." },
+      { status: 404 }
+    );
+  }
+
+  const extra = asObject(rows[0].extra_json);
+  const importState = asObject(extra.importState);
+  const expectedQuestions = Number(importState.expectedQuestions || 0);
+  const receivedQuestions = await getQuestionCount(testId);
+
+  if (expectedQuestions > 0 && receivedQuestions !== expectedQuestions) {
     return NextResponse.json(
       {
         success: false,
-        message:
-          "testId topilmadi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const metaResult =
-    await get(
-      importMetaPath(testId),
-      {
-        access: "private",
-      }
-    );
-
-  if (
-    !metaResult ||
-    metaResult.statusCode !== 200 ||
-    !metaResult.stream
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Import metama’lumoti topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  const metaText =
-    await new Response(
-      metaResult.stream
-    ).text();
-
-  const meta =
-    JSON.parse(metaText) as TestData;
-
-  const expectedQuestions =
-    Number(
-      meta.importState
-        ?.expectedQuestions
-    ) || 0;
-
-  /*
-    list() yangi yaratilgan alohida chunk bloblarini topadi.
-    840 ta savol 10 tadan bo‘lsa taxminan 84 ta chunk — limitdan ancha kam.
-  */
-  const listed =
-    await list({
-      prefix:
-        importChunkPrefix(
-          testId
-        ),
-      limit: 1000,
-    });
-
-  const chunkBlobs =
-    [...listed.blobs].sort(
-      (a, b) =>
-        a.pathname.localeCompare(
-          b.pathname
-        )
-    );
-
-  if (
-    chunkBlobs.length === 0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Birorta savol bo‘lagi topilmadi.",
-      },
-      {
-        status: 409,
-      }
-    );
-  }
-
-  const chunkRows: {
-    startIndex: number;
-    questions: unknown[];
-  }[] = [];
-
-  for (const blob of chunkBlobs) {
-    const chunkResult =
-      await get(
-      blob.pathname,
-      {
-        access: "private",
-      }
-    );
-
-    if (
-      !chunkResult ||
-      chunkResult.statusCode !== 200 ||
-      !chunkResult.stream
-    ) {
-      continue;
-    }
-
-    const chunkText =
-      await new Response(
-        chunkResult.stream
-      ).text();
-
-    const parsed =
-      JSON.parse(chunkText);
-
-    const startIndex =
-      Number(
-        parsed?.startIndex
-      );
-
-    const questions =
-      Array.isArray(
-        parsed?.questions
-      )
-        ? parsed.questions
-        : [];
-
-    if (
-      Number.isInteger(
-        startIndex
-      ) &&
-      startIndex >= 0 &&
-      questions.length > 0
-    ) {
-      chunkRows.push({
-        startIndex,
-        questions,
-      });
-    }
-  }
-
-  chunkRows.sort(
-    (a, b) =>
-      a.startIndex -
-      b.startIndex
-  );
-
-  const assembled: unknown[] = [];
-  let expectedStart = 0;
-
-  for (const row of chunkRows) {
-    if (
-      row.startIndex !==
-      expectedStart
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            `Savol bo‘laklarida uzilish bor. Server ${expectedStart}-savoldan boshlanuvchi bo‘lakni kutmoqda, ammo ${row.startIndex}-savoldan boshlanuvchi bo‘lak topildi.`,
-          expectedStartIndex:
-            expectedStart,
-          foundStartIndex:
-            row.startIndex,
-        },
-        {
-          status: 409,
-        }
-      );
-    }
-
-    assembled.push(
-      ...row.questions
-    );
-
-    expectedStart =
-      assembled.length;
-  }
-
-  if (
-    assembled.length !==
-    expectedQuestions
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          `Test hali to‘liq saqlanmagan. ${assembled.length}/${expectedQuestions} ta savol chunklarda mavjud.`,
-        receivedQuestions:
-          assembled.length,
+        message: `Test hali to‘liq saqlanmagan. ${receivedQuestions}/${expectedQuestions} ta savol Neon bazada mavjud.`,
+        receivedQuestions,
         expectedQuestions,
       },
-      {
-        status: 409,
-      }
+      { status: 409 }
     );
   }
 
-  const now =
-    new Date().toISOString();
-
-  const finalStatus =
-    normalizeStatus(
-      body?.status
-    );
-
-  const completedTest: TestData = {
-    ...meta,
-    questions: assembled,
-    status: finalStatus,
+  const finalStatus = normalizeStatus(body?.status);
+  const nextExtra = {
+    ...extra,
     importState: {
+      ...importState,
       mode: "chunked",
-      expectedQuestions,
-      receivedQuestions:
-        assembled.length,
+      expectedQuestions: expectedQuestions || receivedQuestions,
+      receivedQuestions,
       completed: true,
     },
-    updatedAt: now,
   };
 
-  /*
-    ENG MUHIM QISM:
-    To‘liq testni avval testId ga tegishli UNIQUE final.json ga yozamiz.
-    tests.json keyingi test saqlanishida stale-read sabab orqaga qaytsa
-    ham bu snapshot yo‘qolmaydi.
-  */
-  await put(
-    importFinalPath(testId),
-    JSON.stringify(
-      completedTest
-    ),
-    {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge: 0,
-    }
-  );
+  await sql`
+    UPDATE legacy_tests
+    SET
+      status = ${finalStatus},
+      extra_json = ${JSON.stringify(nextExtra)}::jsonb,
+      updated_at = NOW()
+    WHERE id = ${testId}
+  `;
 
-  /*
-    Yangi import qilingan testning boshlang‘ich durable holati — draft.
-  */
-  await put(
-    testStatusMarkerPath(
-      testId,
-      finalStatus
-    ),
-    JSON.stringify(
-      {
-        id:
-          testId,
-        status:
-          finalStatus,
-        updatedAt:
-          now,
-      }
-    ),
-    {
-      access:
-        "private",
-      addRandomSuffix:
-        false,
-      allowOverwrite:
-        true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge:
-        0,
-    }
-  );
-
-  /*
-    tests.json'da placeholder topilsa update qilamiz;
-    stale read sabab topilmasa ham testni yo‘qotmaymiz — qo‘shamiz.
-  */
-  const tests =
-    await readTests();
-
-  const index =
-    tests.findIndex(
-      (item) =>
-        item.id === testId
-    );
-
-  if (index >= 0) {
-    tests[index] =
-      completedTest;
-  } else {
-    tests.push(
-      completedTest
-    );
-  }
-
-  await writeTests(tests);
-
-  /*
-    Vaqtinchalik meta va chunklarni tozalash.
-    final.json O‘CHIRILMAYDI — u yakunlangan testning ishonchli
-    snapshoti bo‘lib qoladi.
-    Cleanup xato qilsa test saqlanishiga ta'sir qilmaydi.
-  */
-  try {
-    const pathsToDelete = [
-      importMetaPath(testId),
-      ...chunkBlobs.map(
-        (blob) =>
-          blob.pathname
-      ),
-    ];
-
-    if (
-      pathsToDelete.length > 0
-    ) {
-      await del(
-        pathsToDelete
-      );
-    }
-  } catch (cleanupError) {
-    console.warn(
-      "TEMP IMPORT CLEANUP ERROR:",
-      cleanupError
-    );
-  }
-
-  return NextResponse.json(
-    {
-      success: true,
-      message:
-        "Test to‘liq saqlandi.",
-      test:
-        completedTest,
-    },
-    {
-      status: 200,
-    }
-  );
-}
-
-
-/* =========================================================
-   BIR YO‘LA KO‘P TESTNI E’LON QILISH
-
-   Bitta request.
-   tests.json bir marta o‘qiladi va bir marta yoziladi.
-========================================================= */
-
-async function bulkPublishTests(
-  body: any
-) {
-  const cookieStore =
-    await cookies();
-
-  const isAdmin =
-    Boolean(
-      cookieStore.get(
-        "qurbonov_session"
-      )?.value
-    ) &&
-    cookieStore.get(
-      "qurbonov_role"
-    )?.value ===
-      "admin";
-
-  if (!isAdmin) {
-    return NextResponse.json(
-      {
-        success:
-          false,
-        message:
-          "Bu amal faqat administrator uchun.",
-      },
-      {
-        status: 403,
-      }
-    );
-  }
-
-  const rawIds =
-    Array.isArray(
-      body?.testIds
-    )
-      ? body.testIds
-      : [];
-
-  const requestedIds: string[] =
-    Array.from<string>(
-      new Set(
-        rawIds
-          .map(
-            (
-              value:
-                unknown
-            ) =>
-              String(
-                value
-              ).trim()
-          )
-          .filter(
-            Boolean
-          )
-      )
-    );
-
-  if (
-    requestedIds.length ===
-    0
-  ) {
-    return NextResponse.json(
-      {
-        success:
-          false,
-        message:
-          "E’lon qilinadigan testlar tanlanmagan.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  if (
-    requestedIds.length >
-    500
-  ) {
-    return NextResponse.json(
-      {
-        success:
-          false,
-        message:
-          "Bir so‘rovda ko‘pi bilan 500 ta test e’lon qilinadi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const tests =
-    await readTests();
-
-  const existingIds =
-    new Set<string>(
-      tests.map(
-        (test) =>
-          test.id
-      )
-    );
-
-  /*
-    MUHIM:
-    Endi questions.length === 0 sharti bilan testni tashlab yubormaymiz.
-
-    Chunki stale tests.json ayrim testni vaqtincha 0-savolli placeholder
-    qilib ko‘rsatishi mumkin, final.json esa haqiqiy savollarni saqlaydi.
-
-    Admin yuborgan va bazada mavjud bo‘lgan ID lar publish qilinadi.
-  */
-  const publishIds: string[] =
-    requestedIds.filter(
-      (id) =>
-        existingIds.has(
-          id
-        )
-    );
-
-  if (
-    publishIds.length ===
-    0
-  ) {
-    return NextResponse.json(
-      {
-        success:
-          false,
-        message:
-          "E’lon qilinadigan testlar bazadan topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  const now =
-    new Date().toISOString();
-
-  /*
-    Har bir test uchun UNIQUE marker.
-    Bu operatsiyalar bir-birini overwrite qilmaydi.
-  */
-  const markerResults =
-    await Promise.allSettled(
-      publishIds.map(
-        async (
-          testId
-        ) => {
-          await put(
-            testStatusMarkerPath(
-              testId,
-              "published"
-            ),
-            JSON.stringify(
-              {
-                id:
-                  testId,
-                status:
-                  "published",
-                updatedAt:
-                  now,
-              }
-            ),
-            {
-              access:
-                "private",
-              addRandomSuffix:
-                false,
-              allowOverwrite:
-                true,
-              contentType:
-                "application/json; charset=utf-8",
-              cacheControlMaxAge:
-                0,
-            }
-          );
-
-          return testId;
-        }
-      )
-    );
-
-  const publishedIds =
-    markerResults
-      .filter(
-        (
-          result
-        ): result is PromiseFulfilledResult<string> =>
-          result.status ===
-          "fulfilled"
-      )
-      .map(
-        (result) =>
-          result.value
-      );
-
-  const failedIds =
-    markerResults
-      .map(
-        (
-          result,
-          index
-        ) => ({
-          result,
-          id:
-            publishIds[
-              index
-            ],
-        })
-      )
-      .filter(
-        (item) =>
-          item.result.status ===
-          "rejected"
-      )
-      .map(
-        (item) =>
-          item.id
-      );
-
-  if (
-    publishedIds.length ===
-    0
-  ) {
-    return NextResponse.json(
-      {
-        success:
-          false,
-        message:
-          "Published markerlarini saqlab bo‘lmadi.",
-        failedIds,
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-
-  const publishedSet =
-    new Set(
-      publishedIds
-    );
-
-  /*
-    Umumiy tests.json ham bir marta yangilanadi.
-    Lekin endi statusning yagona manbai emas.
-  */
-  const nextTests =
-    tests.map(
-      (test) =>
-        publishedSet.has(
-          test.id
-        )
-          ? {
-              ...test,
-              status:
-                "published" as const,
-              updatedAt:
-                now,
-            }
-          : test
-    );
-
-  await writeTests(
-    nextTests
-  );
-
-  return NextResponse.json(
-    {
-      success:
-        failedIds.length ===
-        0,
-
-      message:
-        failedIds.length ===
-        0
-          ? `${publishedIds.length} ta testning statusi mustahkam e’lon qilindi.`
-          : `${publishedIds.length} ta test e’lon qilindi, ${failedIds.length} tasida marker yozilmadi.`,
-
-      publishedCount:
-        publishedIds.length,
-      publishedIds,
-
-      failedCount:
-        failedIds.length,
-      failedIds,
-
-      missingCount:
-        requestedIds.length -
-        publishIds.length,
-    },
-    {
-      status:
-        failedIds.length ===
-        0
-          ? 200
-          : 207,
-      headers: {
-        "Cache-Control":
-          "no-store, no-cache, must-revalidate",
-      },
-    }
-  );
+  return NextResponse.json({
+    success: true,
+    message: "Test Neon bazasiga to‘liq saqlandi.",
+    testId,
+    receivedQuestions,
+    expectedQuestions: expectedQuestions || receivedQuestions,
+    status: finalStatus,
+  });
 }
 
 /* =========================================================
-   BIR YO‘LA KO‘P TESTNI O‘CHIRISH
-
-   Brauzer bitta so‘rov yuboradi.
-   tests.json bir marta o‘qiladi va bir marta yoziladi.
+   BULK PUBLISH
 ========================================================= */
 
-async function bulkDeleteTests(
-  body: any
-) {
-  const cookieStore =
-    await cookies();
+async function bulkPublishTests(body: any) {
+  const testIds = normalizeIds(body?.testIds);
 
-  const isAdmin =
-    Boolean(
-      cookieStore.get(
-        "qurbonov_session"
-      )?.value
-    ) &&
-    cookieStore.get(
-      "qurbonov_role"
-    )?.value === "admin";
-
-  if (!isAdmin) {
+  if (testIds.length === 0) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Bu amal faqat administrator uchun.",
-      },
-      {
-        status: 403,
-      }
+      { success: false, message: "E’lon qilinadigan testlar tanlanmagan." },
+      { status: 400 }
     );
   }
 
-  const rawIds =
-    Array.isArray(
-      body?.testIds
-    )
-      ? body.testIds
-      : [];
-
-  const requestedIds =
-    Array.from(
-      new Set(
-        rawIds
-          .map(
-            (value: unknown) =>
-              String(value)
-                .trim()
-          )
-          .filter(Boolean)
+  const updated: any[] = await sql`
+    UPDATE legacy_tests t
+    SET
+      status = 'published',
+      updated_at = NOW()
+    WHERE t.id = ANY(${testIds}::bigint[])
+      AND EXISTS (
+        SELECT 1
+        FROM legacy_test_questions q
+        WHERE q.test_id = t.id
       )
-    );
+    RETURNING t.id
+  `;
 
-  if (
-    requestedIds.length ===
-    0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "O‘chiriladigan testlar tanlanmagan.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
+  const publishedIds = updated.map((row: any) => String(row.id));
 
-  /*
-    Juda katta yoki tasodifiy requestdan himoya.
-    Admin paneldagi real ish uchun 500 yetarli.
-  */
-  if (
-    requestedIds.length >
-    500
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Bir so‘rovda ko‘pi bilan 500 ta test o‘chiriladi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const onlyDrafts =
-    body?.onlyDrafts !==
-    false;
-
-  const tests =
-    await readTests();
-
-  const requestedSet =
-    new Set(
-      requestedIds
-    );
-
-  const deletableIds =
-    new Set<string>();
-
-  for (
-    const test of tests
-  ) {
-    if (
-      !requestedSet.has(
-        test.id
-      )
-    ) {
-      continue;
-    }
-
-    if (
-      onlyDrafts &&
-      test.status ===
-        "published"
-    ) {
-      continue;
-    }
-
-    deletableIds.add(
-      test.id
-    );
-  }
-
-  if (
-    deletableIds.size ===
-    0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "O‘chirish uchun mos qoralama test topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  /*
-    readTests() final.json snapshotlarni ham qayta qo‘shadi.
-    Shuning uchun tests.json ni yozishdan OLDIN o‘chiriladigan
-    testlarning barcha import snapshot/temp bloblarini tozalaymiz.
-  */
-  const blobPathsToDelete:
-    string[] = [];
-
-  for (
-    const testId of
-    deletableIds
-  ) {
-    try {
-      const listed =
-        await list({
-          prefix:
-            `${IMPORT_ROOT}/${testId}/`,
-          limit: 1000,
-        });
-
-      for (
-        const blob of
-        listed.blobs
-      ) {
-        blobPathsToDelete.push(
-          blob.pathname
-        );
-      }
-    } catch (
-      listError
-    ) {
-      console.warn(
-        "BULK DELETE BLOB LIST ERROR:",
-        testId,
-        listError
-      );
-    }
-
-    try {
-      const statusListed =
-        await list({
-          prefix:
-            `${TEST_STATUS_ROOT}/${testId}/`,
-          limit: 20,
-        });
-
-      for (
-        const blob of
-        statusListed.blobs
-      ) {
-        blobPathsToDelete.push(
-          blob.pathname
-        );
-      }
-    } catch (
-      statusListError
-    ) {
-      console.warn(
-        "BULK DELETE STATUS LIST ERROR:",
-        testId,
-        statusListError
-      );
-    }
-  }
-
-  if (
-    blobPathsToDelete.length >
-    0
-  ) {
-    /*
-      Vercel Blob del() ko‘p path qabul qiladi.
-      Juda katta massiv bo‘lmasligi uchun paketlab yuboramiz.
-    */
-    const deleteBatchSize =
-      250;
-
-    for (
-      let index = 0;
-      index <
-      blobPathsToDelete.length;
-      index +=
-        deleteBatchSize
-    ) {
-      const batch =
-        blobPathsToDelete.slice(
-          index,
-          index +
-            deleteBatchSize
-        );
-
-      await del(
-        batch
-      );
-    }
-  }
-
-  const nextTests =
-    tests.filter(
-      (test) =>
-        !deletableIds.has(
-          test.id
-        )
-    );
-
-  /*
-    Barcha testlar bitta filter bilan olib tashlanadi
-    va tests.json faqat BIR MARTA overwrite qilinadi.
-  */
-  await writeTests(
-    nextTests
-  );
-
-  return NextResponse.json(
-    {
-      success: true,
-      message:
-        `${deletableIds.size} ta test bir yo‘la o‘chirildi.`,
-      deletedCount:
-        deletableIds.size,
-      deletedIds:
-        Array.from(
-          deletableIds
-        ),
-      skippedCount:
-        requestedIds.length -
-        deletableIds.size,
-    },
-    {
-      status: 200,
-      headers: {
-        "Cache-Control":
-          "no-store, no-cache, must-revalidate",
-      },
-    }
-  );
+  return NextResponse.json({
+    success: true,
+    message: `${publishedIds.length} ta test e’lon qilindi.`,
+    publishedCount: publishedIds.length,
+    publishedIds,
+    missingCount: testIds.length - publishedIds.length,
+  });
 }
 
-
 /* =========================================================
-   TEST STATUSINI O‘ZGARTIRISH
-
-   Katta testlarda (780/840 ta savol) butun testni qayta PUT qilmaymiz.
-   Faqat testId + status yuboriladi.
+   BULK DELETE
 ========================================================= */
 
-async function setTestStatus(
-  body: any
-) {
-  const cookieStore =
-    await cookies();
+async function bulkDeleteTests(body: any) {
+  const testIds = normalizeIds(body?.testIds);
+  const onlyDrafts = body?.onlyDrafts !== false;
 
-  const isAdmin =
-    Boolean(
-      cookieStore.get(
-        "qurbonov_session"
-      )?.value
-    ) &&
-    cookieStore.get(
-      "qurbonov_role"
-    )?.value === "admin";
-
-  if (!isAdmin) {
+  if (testIds.length === 0) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Bu amal faqat administrator uchun.",
-      },
-      {
-        status: 403,
-      }
+      { success: false, message: "O‘chiriladigan testlar tanlanmagan." },
+      { status: 400 }
     );
   }
 
-  const testId =
-    String(
-      body?.testId || ""
-    ).trim();
+  const deleted: any[] = onlyDrafts
+    ? await sql`
+        DELETE FROM legacy_tests
+        WHERE id = ANY(${testIds}::bigint[])
+          AND status = 'draft'
+        RETURNING id
+      `
+    : await sql`
+        DELETE FROM legacy_tests
+        WHERE id = ANY(${testIds}::bigint[])
+        RETURNING id
+      `;
 
-  if (!testId) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test ID topilmadi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
+  const deletedIds = deleted.map((row: any) => String(row.id));
 
-  const status: TestStatus =
-    body?.status ===
-    "published"
-      ? "published"
-      : body?.status ===
-        "draft"
-      ? "draft"
-      : "draft";
-
-  const tests =
-    await readTests();
-
-  const index =
-    tests.findIndex(
-      (item) =>
-        item.id === testId
-    );
-
-  if (index < 0) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  const current =
-    tests[index];
-
-  const questions =
-    Array.isArray(
-      current.questions
-    )
-      ? current.questions
-      : [];
-
-  if (
-    status === "published" &&
-    questions.length === 0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Savolsiz testni e’lon qilib bo‘lmaydi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const updatedTest: TestData = {
-    ...current,
-    status,
-    updatedAt:
-      new Date().toISOString(),
-  };
-
-  tests[index] =
-    updatedTest;
-
-  await put(
-    testStatusMarkerPath(
-      testId,
-      status
-    ),
-    JSON.stringify(
-      {
-        id:
-          testId,
-        status,
-        updatedAt:
-          updatedTest.updatedAt,
-      }
-    ),
-    {
-      access:
-        "private",
-      addRandomSuffix:
-        false,
-      allowOverwrite:
-        true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge:
-        0,
-    }
-  );
-
-  await writeTests(
-    tests
-  );
-
-  return NextResponse.json(
-    {
-      success: true,
-      message:
-        status === "published"
-          ? "Test muvaffaqiyatli e’lon qilindi."
-          : "Test qoralama holatiga qaytarildi.",
-
-      /*
-        MUHIM:
-        780/840 ta savolli katta testni response ichida qaytarmaymiz.
-        Aks holda Vercel response hajmi limitiga urilishi mumkin.
-        Admin panelga faqat yangilangan metadata yetadi.
-      */
-      test: {
-        id: updatedTest.id,
-        status: updatedTest.status,
-        updatedAt: updatedTest.updatedAt,
-      },
-    },
-    {
-      status: 200,
-      headers: {
-        "Cache-Control":
-          "no-store, no-cache, must-revalidate",
-      },
-    }
-  );
+  return NextResponse.json({
+    success: true,
+    message: `${deletedIds.length} ta test o‘chirildi.`,
+    deletedCount: deletedIds.length,
+    deletedIds,
+    skippedCount: testIds.length - deletedIds.length,
+  });
 }
 
-
-
 /* =========================================================
-   TEST MUHARRIRI — 30 TADAN YUKLASH
-
-   Brauzerga 780/840 ta savolning hammasini yubormaydi.
-   Faqat so‘ralgan sahifadagi savollarni qaytaradi.
+   SET STATUS
 ========================================================= */
 
-async function loadEditorPage(
-  body: any
-) {
-  const cookieStore =
-    await cookies();
+async function setTestStatus(body: any) {
+  const testId = String(body?.testId || "").trim();
+  const status = normalizeStatus(body?.status);
 
-  const isAdmin =
-    Boolean(
-      cookieStore.get(
-        "qurbonov_session"
-      )?.value
-    ) &&
-    cookieStore.get(
-      "qurbonov_role"
-    )?.value === "admin";
-
-  if (!isAdmin) {
+  if (!/^\d+$/.test(testId)) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Bu amal faqat administrator uchun.",
-      },
-      {
-        status: 403,
-      }
+      { success: false, message: "Test ID noto‘g‘ri." },
+      { status: 400 }
     );
   }
 
-  const testId =
-    String(
-      body?.testId || ""
-    ).trim();
-
-  if (!testId) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test ID topilmadi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const requestedPage =
-    Math.max(
-      1,
-      Math.floor(
-        Number(
-          body?.page
-        ) || 1
-      )
-    );
-
-  const requestedPageSize =
-    Math.floor(
-      Number(
-        body?.pageSize
-      ) || 30
-    );
-
-  /*
-    Juda katta pageSize yuborib barcha savollarni
-    qayta yuklashga yo‘l qo‘ymaymiz.
-  */
-  const pageSize =
-    Math.min(
-      50,
-      Math.max(
-        10,
-        requestedPageSize
-      )
-    );
-
-  const tests =
-    await readTests();
-
-  const test =
-    tests.find(
-      (item) =>
-        item.id === testId
-    );
-
-  if (!test) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  const allQuestions:
-    unknown[] =
-    Array.isArray(
-      test.questions
-    )
-      ? test.questions
-      : [];
-
-  const totalQuestions =
-    allQuestions.length;
-
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        totalQuestions /
-          pageSize
-      )
-    );
-
-  const page =
-    Math.min(
-      requestedPage,
-      totalPages
-    );
-
-  const startIndex =
-    (page - 1) *
-    pageSize;
-
-  const questions =
-    allQuestions.slice(
-      startIndex,
-      startIndex +
-        pageSize
-    );
-
-  return NextResponse.json(
-    {
-      success: true,
-
-      test: {
-        id:
-          test.id,
-
-        title:
-          test.title || "",
-
-        subject:
-          test.subject || "",
-
-        duration:
-          Number(
-            test.duration
-          ) || 30,
-
-        description:
-          test.description || "",
-
-        status:
-          test.status ===
-          "published"
-            ? "published"
-            : "draft",
-
-        testType:
-          test.testType,
-
-        customTestTypeName:
-          test.customTestTypeName,
-
-        attemptLimit:
-          test.attemptLimit,
-
-        createdAt:
-          test.createdAt,
-
-        updatedAt:
-          test.updatedAt,
-      },
-
-      questions,
-
-      pagination: {
-        page,
-        pageSize,
-        startIndex,
-        totalQuestions,
-        totalPages,
-        from:
-          totalQuestions === 0
-            ? 0
-            : startIndex + 1,
-        to:
-          Math.min(
-            startIndex +
-              pageSize,
-            totalQuestions
-          ),
-      },
-    },
-    {
-      status: 200,
-      headers: {
-        "Cache-Control":
-          "no-store, no-cache, must-revalidate",
-      },
-    }
-  );
-}
-
-
-/* =========================================================
-   KATTA TESTNI QISMAN TAHRIRLASH
-
-   780/840 ta savolning hammasini brauzerdan qayta yubormaydi.
-   Faqat o‘zgargan/yangi/o‘chirilgan savollar keladi.
-========================================================= */
-
-async function patchTest(
-  body: any
-) {
-  const cookieStore =
-    await cookies();
-
-  const isAdmin =
-    Boolean(
-      cookieStore.get(
-        "qurbonov_session"
-      )?.value
-    ) &&
-    cookieStore.get(
-      "qurbonov_role"
-    )?.value === "admin";
-
-  if (!isAdmin) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Bu amal faqat administrator uchun.",
-      },
-      {
-        status: 403,
-      }
-    );
-  }
-
-  const testId =
-    String(
-      body?.testId || ""
-    ).trim();
-
-  if (!testId) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test ID topilmadi.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const tests =
-    await readTests();
-
-  const testIndex =
-    tests.findIndex(
-      (item) =>
-        item.id === testId
-    );
-
-  if (
-    testIndex < 0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test topilmadi.",
-      },
-      {
-        status: 404,
-      }
-    );
-  }
-
-  const currentTest =
-    tests[testIndex];
-
-  let nextQuestions:
-    any[] =
-    Array.isArray(
-      currentTest.questions
-    )
-      ? [
-          ...currentTest.questions,
-        ]
-      : [];
-
-  const changedQuestions:
-    any[] =
-    Array.isArray(
-      body?.changedQuestions
-    )
-      ? body.changedQuestions
-      : [];
-
-  const deletedQuestionIds =
-    new Set(
-      Array.isArray(
-        body?.deletedQuestionIds
-      )
-        ? body.deletedQuestionIds.map(
-            (value: unknown) =>
-              String(value)
-          )
-        : []
-    );
-
-  /*
-    1. O‘chirilgan savollar.
-  */
-  if (
-    deletedQuestionIds.size >
-    0
-  ) {
-    nextQuestions =
-      nextQuestions.filter(
-        (question: any) =>
-          !deletedQuestionIds.has(
-            String(
-              question?.id || ""
-            )
-          )
-      );
-  }
-
-  /*
-    2. O‘zgargan savollarni joyida almashtirish.
-       Yangi savol bo‘lsa oxiriga qo‘shish.
-  */
-  for (
-    const incoming of
-    changedQuestions
-  ) {
-    const incomingId =
-      String(
-        incoming?.id || ""
-      ).trim();
-
-    if (!incomingId) {
-      continue;
-    }
-
-    const questionIndex =
-      nextQuestions.findIndex(
-        (question: any) =>
-          String(
-            question?.id || ""
-          ) === incomingId
-      );
-
-    if (
-      questionIndex >= 0
-    ) {
-      nextQuestions[
-        questionIndex
-      ] = {
-        ...nextQuestions[
-          questionIndex
-        ],
-        ...incoming,
-        id: incomingId,
-      };
-    } else {
-      nextQuestions.push({
-        ...incoming,
-        id: incomingId,
-      });
-    }
-  }
-
-  /*
-    3. Agar savollar tartibi o‘zgargan bo‘lsa,
-       ID ro‘yxati asosida qayta tartiblaymiz.
-  */
-  const questionOrder =
-    Array.isArray(
-      body?.questionOrder
-    )
-      ? body.questionOrder.map(
-          (value: unknown) =>
-            String(value)
-        )
-      : [];
-
-  if (
-    questionOrder.length >
-    0
-  ) {
-    const questionMap =
-      new Map(
-        nextQuestions.map(
-          (question: any) => [
-            String(
-              question?.id || ""
-            ),
-            question,
-          ]
-        )
-      );
-
-    const ordered:
-      any[] = [];
-
-    for (
-      const id of
-      questionOrder
-    ) {
-      const question =
-        questionMap.get(
-          id
-        );
-
-      if (question) {
-        ordered.push(
-          question
-        );
-        questionMap.delete(
-          id
-        );
-      }
-    }
-
-    /*
-      Ro‘yxatda tasodifan bo‘lmagan yangi elementlar
-      yo‘qolib ketmasligi uchun oxiriga qo‘shamiz.
-    */
-    for (
-      const question of
-      questionMap.values()
-    ) {
-      ordered.push(
-        question
-      );
-    }
-
-    nextQuestions =
-      ordered;
-  }
-
-  if (
-    nextQuestions.length ===
-    0
-  ) {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Testda kamida bitta savol bo‘lishi kerak.",
-      },
-      {
-        status: 400,
-      }
-    );
-  }
-
-  const status:
-    TestStatus =
-    body?.status ===
-    "published"
-      ? "published"
-      : body?.status ===
-        "draft"
-      ? "draft"
-      : currentTest.status ===
-        "published"
-      ? "published"
-      : "draft";
-
-  /*
-    E’lon qilinayotgan bo‘lsa barcha savollarda
-    aynan bitta to‘g‘ri javob borligini tekshiramiz.
-  */
-  if (
-    status ===
-    "published"
-  ) {
-    const invalid =
-      nextQuestions.some(
-        (question: any) => {
-          const options =
-            Array.isArray(
-              question?.options
-            )
-              ? question.options
-              : [];
-
-          return (
-            options.filter(
-              (option: any) =>
-                option?.isCorrect ===
-                  true ||
-                option?.correct ===
-                  true
-            ).length !== 1
-          );
-        }
-      );
-
-    if (invalid) {
+  if (status === "published") {
+    const count = await getQuestionCount(testId);
+    if (count <= 0) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Har bir savolda aynan bitta to‘g‘ri javob bo‘lishi kerak.",
-        },
-        {
-          status: 400,
-        }
+        { success: false, message: "Savolsiz testni e’lon qilib bo‘lmaydi." },
+        { status: 400 }
       );
     }
   }
 
-  const now =
-    new Date().toISOString();
+  const updated: any[] = await sql`
+    UPDATE legacy_tests
+    SET
+      status = ${status},
+      updated_at = NOW()
+    WHERE id = ${testId}
+    RETURNING id, status, updated_at
+  `;
 
-  const updatedTest:
-    TestData = {
-    ...currentTest,
+  if (updated.length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Test topilmadi." },
+      { status: 404 }
+    );
+  }
 
-    title:
-      body?.title !==
-      undefined
-        ? String(
-            body.title
-          ).trim()
-        : currentTest.title,
-
-    subject:
-      body?.subject !==
-      undefined
-        ? String(
-            body.subject
-          ).trim()
-        : currentTest.subject,
-
-    duration:
-      body?.duration !==
-      undefined
-        ? Math.max(
-            1,
-            Number(
-              body.duration
-            ) || 30
-          )
-        : currentTest.duration,
-
-    description:
-      body?.description !==
-      undefined
-        ? String(
-            body.description
-          )
-        : currentTest.description,
-
+  return NextResponse.json({
+    success: true,
+    testId,
     status,
+    updatedAt: updated[0].updated_at,
+  });
+}
 
-    questions:
-      nextQuestions,
+/* =========================================================
+   LOAD EDITOR PAGE
+========================================================= */
 
-    updatedAt: now,
-  };
+async function loadEditorPage(body: any) {
+  const testId = String(body?.testId || "").trim();
 
-  tests[
-    testIndex
-  ] = updatedTest;
+  if (!/^\d+$/.test(testId)) {
+    return NextResponse.json(
+      { success: false, message: "Test ID noto‘g‘ri." },
+      { status: 400 }
+    );
+  }
 
-  await writeTests(
-    tests
+  const requestedPage = Math.max(1, Math.floor(Number(body?.page) || 1));
+  const pageSize = Math.min(
+    50,
+    Math.max(10, Math.floor(Number(body?.pageSize) || 30))
   );
 
-  /*
-    MUHIM:
-    780/840 ta savolni response ichida qaytarmaymiz.
-  */
-  return NextResponse.json(
-    {
-      success: true,
+  const testRows: any[] = await sql`
+    SELECT
+      id,
+      title,
+      subject,
+      duration,
+      description,
+      test_type,
+      custom_test_type_name,
+      status,
+      attempt_limit,
+      created_at,
+      updated_at
+    FROM legacy_tests
+    WHERE id = ${testId}
+    LIMIT 1
+  `;
 
-      message:
-        "Testdagi o‘zgarishlar saqlandi.",
+  if (testRows.length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Test topilmadi." },
+      { status: 404 }
+    );
+  }
 
-      test: {
-        id:
-          updatedTest.id,
+  const totalQuestions = await getQuestionCount(testId);
+  const totalPages = Math.max(1, Math.ceil(totalQuestions / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * pageSize;
 
-        title:
-          updatedTest.title,
+  const questionRows: any[] = await sql`
+    SELECT
+      id,
+      question_number,
+      question_text,
+      question_html,
+      points,
+      shapes_json,
+      extra_json
+    FROM legacy_test_questions
+    WHERE test_id = ${testId}
+    ORDER BY question_number ASC, id ASC
+    LIMIT ${pageSize}
+    OFFSET ${offset}
+  `;
 
-        subject:
-          updatedTest.subject,
+  const optionsByQuestion = new Map<string, any[]>();
 
-        duration:
-          updatedTest.duration,
+  if (questionRows.length > 0) {
+    const questionIds = questionRows.map((row: any) => String(row.id));
 
-        status:
-          updatedTest.status,
+    const optionRows: any[] = await sql`
+      SELECT
+        id,
+        question_id,
+        option_key,
+        option_text,
+        option_html,
+        is_correct,
+        extra_json
+      FROM legacy_test_options
+      WHERE question_id = ANY(${questionIds}::bigint[])
+      ORDER BY question_id ASC, option_key ASC, id ASC
+    `;
 
-        questionCount:
-          nextQuestions.length,
-
-        updatedAt:
-          updatedTest.updatedAt,
-      },
-
-      changedCount:
-        changedQuestions.length,
-
-      deletedCount:
-        deletedQuestionIds.size,
-    },
-    {
-      status: 200,
-      headers: {
-        "Cache-Control":
-          "no-store, no-cache, must-revalidate",
-      },
+    for (const row of optionRows) {
+      const key = String(row.question_id);
+      const current = optionsByQuestion.get(key) || [];
+      current.push({
+        id: String(row.id),
+        label: String(row.option_key || ""),
+        text: String(row.option_text || row.option_html || ""),
+        html: String(row.option_html || row.option_text || ""),
+        isCorrect: row.is_correct === true,
+      });
+      optionsByQuestion.set(key, current);
     }
-  );
+  }
+
+  const questions = questionRows.map((row: any) => ({
+    id: String(row.id),
+    number: Number(row.question_number) || 0,
+    questionText: String(row.question_text || ""),
+    questionHtml: String(row.question_html || row.question_text || ""),
+    points: Number(row.points) || 1,
+    shapes: Array.isArray(row.shapes_json) ? row.shapes_json : [],
+    options: optionsByQuestion.get(String(row.id)) || [],
+    ...asObject(row.extra_json),
+  }));
+
+  const testRow: any = testRows[0];
+
+  return NextResponse.json({
+    success: true,
+    test: {
+      id: String(testRow.id),
+      title: String(testRow.title || ""),
+      subject: String(testRow.subject || ""),
+      duration: Number(testRow.duration) || 30,
+      description: String(testRow.description || ""),
+      status: normalizeStatus(testRow.status),
+      testType:
+        testRow.test_type == null ? undefined : String(testRow.test_type),
+      customTestTypeName:
+        testRow.custom_test_type_name == null
+          ? undefined
+          : String(testRow.custom_test_type_name),
+      attemptLimit:
+        testRow.attempt_limit == null ? null : Number(testRow.attempt_limit),
+      createdAt: testRow.created_at,
+      updatedAt: testRow.updated_at,
+    },
+    questions,
+    pagination: {
+      page,
+      pageSize,
+      startIndex: offset,
+      totalQuestions,
+      totalPages,
+      from: totalQuestions === 0 ? 0 : offset + 1,
+      to: Math.min(offset + pageSize, totalQuestions),
+    },
+  });
+}
+
+/* =========================================================
+   PATCH TEST
+========================================================= */
+
+async function patchTest(body: any) {
+  const testId = String(body?.testId || "").trim();
+
+  if (!/^\d+$/.test(testId)) {
+    return NextResponse.json(
+      { success: false, message: "Test ID noto‘g‘ri." },
+      { status: 400 }
+    );
+  }
+
+  const existingRows: any[] = await sql`
+    SELECT *
+    FROM legacy_tests
+    WHERE id = ${testId}
+    LIMIT 1
+  `;
+
+  if (existingRows.length === 0) {
+    return NextResponse.json(
+      { success: false, message: "Test topilmadi." },
+      { status: 404 }
+    );
+  }
+
+  const current: any = existingRows[0];
+  const status =
+    body?.status === undefined ? normalizeStatus(current.status) : normalizeStatus(body.status);
+
+  await sql`
+    UPDATE legacy_tests
+    SET
+      title = ${
+        body?.title === undefined ? String(current.title || "") : String(body.title || "").trim()
+      },
+      subject = ${
+        body?.subject === undefined ? String(current.subject || "") : String(body.subject || "").trim()
+      },
+      duration = ${
+        body?.duration === undefined
+          ? Number(current.duration) || 30
+          : normalizePositiveInt(body.duration, 30)
+      },
+      description = ${
+        body?.description === undefined
+          ? String(current.description || "")
+          : String(body.description || "")
+      },
+      test_type = ${
+        body?.testType === undefined
+          ? current.test_type
+          : body?.testType
+          ? String(body.testType)
+          : null
+      },
+      custom_test_type_name = ${
+        body?.customTestTypeName === undefined
+          ? current.custom_test_type_name
+          : body?.customTestTypeName
+          ? String(body.customTestTypeName)
+          : null
+      },
+      attempt_limit = ${
+        body?.attemptLimit === undefined
+          ? current.attempt_limit
+          : normalizeAttemptLimit(body.attemptLimit)
+      },
+      status = ${status},
+      updated_at = NOW()
+    WHERE id = ${testId}
+  `;
+
+  const deletedQuestionIds = normalizeIds(body?.deletedQuestionIds);
+
+  if (deletedQuestionIds.length > 0) {
+    await sql`
+      DELETE FROM legacy_test_questions
+      WHERE test_id = ${testId}
+        AND id = ANY(${deletedQuestionIds}::bigint[])
+    `;
+  }
+
+  const changedQuestions: IncomingQuestion[] = Array.isArray(body?.changedQuestions)
+    ? body.changedQuestions
+    : [];
+
+  let nextNumber = (await getQuestionCount(testId)) + 1;
+  let changedCount = 0;
+
+  for (const question of changedQuestions) {
+    const incomingId = String(question?.id ?? "").trim();
+    let questionId: string | null = null;
+
+    if (/^\d+$/.test(incomingId)) {
+      const belongs: any[] = await sql`
+        SELECT id, question_number
+        FROM legacy_test_questions
+        WHERE id = ${incomingId}
+          AND test_id = ${testId}
+        LIMIT 1
+      `;
+
+      if (belongs.length > 0) {
+        questionId = String(belongs[0].id);
+
+        await sql`
+          UPDATE legacy_test_questions
+          SET
+            question_text = ${questionTextFromIncoming(question)},
+            question_html = ${questionHtmlFromIncoming(question)},
+            points = ${normalizePositiveInt(question?.points, 1)},
+            shapes_json = ${JSON.stringify(
+              Array.isArray(question?.shapes) ? question.shapes : []
+            )}::jsonb,
+            updated_at = NOW()
+          WHERE id = ${questionId}
+            AND test_id = ${testId}
+        `;
+
+        await sql`
+          DELETE FROM legacy_test_options
+          WHERE question_id = ${questionId}
+        `;
+
+        const options = Array.isArray(question?.options) ? question.options : [];
+        for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
+          const option = options[optionIndex] || {};
+          await sql`
+            INSERT INTO legacy_test_options (
+              question_id,
+              option_key,
+              option_text,
+              option_html,
+              is_correct,
+              extra_json,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              ${questionId},
+              ${optionKey(optionIndex, option)},
+              ${optionTextFromIncoming(option)},
+              ${optionHtmlFromIncoming(option)},
+              ${optionIsCorrect(option)},
+              '{}'::jsonb,
+              NOW(),
+              NOW()
+            )
+          `;
+        }
+      }
+    }
+
+    if (!questionId) {
+      await insertQuestion(testId, nextNumber++, question);
+    }
+
+    changedCount++;
+  }
+
+  const questionOrder = Array.isArray(body?.questionOrder)
+    ? body.questionOrder.map((value: unknown) => String(value ?? "").trim())
+    : [];
+
+  if (questionOrder.length > 0) {
+    const existingQuestions: any[] = await sql`
+      SELECT id, extra_json
+      FROM legacy_test_questions
+      WHERE test_id = ${testId}
+      ORDER BY question_number ASC, id ASC
+    `;
+
+    const sourceIdMap = new Map<string, string>();
+    for (const row of existingQuestions) {
+      sourceIdMap.set(String(row.id), String(row.id));
+      const sourceId = String(asObject(row.extra_json).sourceId ?? "").trim();
+      if (sourceId) sourceIdMap.set(sourceId, String(row.id));
+    }
+
+    let orderNumber = 1;
+    const used = new Set<string>();
+
+    for (const requestedId of questionOrder) {
+      const realId = sourceIdMap.get(requestedId);
+      if (!realId || used.has(realId)) continue;
+
+      await sql`
+        UPDATE legacy_test_questions
+        SET question_number = ${orderNumber}, updated_at = NOW()
+        WHERE id = ${realId}
+          AND test_id = ${testId}
+      `;
+      used.add(realId);
+      orderNumber++;
+    }
+
+    for (const row of existingQuestions) {
+      const realId = String(row.id);
+      if (used.has(realId)) continue;
+
+      await sql`
+        UPDATE legacy_test_questions
+        SET question_number = ${orderNumber}, updated_at = NOW()
+        WHERE id = ${realId}
+          AND test_id = ${testId}
+      `;
+      orderNumber++;
+    }
+  }
+
+  const questionCount = await getQuestionCount(testId);
+
+  if (status === "published" && questionCount === 0) {
+    await sql`
+      UPDATE legacy_tests
+      SET status = 'draft', updated_at = NOW()
+      WHERE id = ${testId}
+    `;
+
+    return NextResponse.json(
+      { success: false, message: "Savolsiz testni e’lon qilib bo‘lmaydi." },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: "Testdagi o‘zgarishlar Neon bazasida saqlandi.",
+    test: {
+      id: testId,
+      status,
+      questionCount,
+      updatedAt: new Date().toISOString(),
+    },
+    changedCount,
+    deletedCount: deletedQuestionIds.length,
+  });
 }
 
 /* =========================================================
    LEGACY / NORMAL POST
 ========================================================= */
 
-async function createNormalTest(
-  body: any
-) {
-  const title =
-    String(
-      body?.title || ""
-    ).trim();
-
-  const subject =
-    String(
-      body?.subject || ""
-    ).trim();
+async function createNormalTest(body: any) {
+  const title = String(body?.title || "").trim();
+  const subject = String(body?.subject || "").trim();
+  const questions: IncomingQuestion[] = Array.isArray(body?.questions)
+    ? body.questions
+    : [];
 
   if (!title) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Test nomi kiritilmagan.",
-      },
-      {
-        status: 400,
-      }
+      { success: false, message: "Test nomi kiritilmagan." },
+      { status: 400 }
     );
   }
 
-  const questions =
-    Array.isArray(
-      body?.questions
-    )
-      ? body.questions
-      : [];
-
-  if (
-    questions.length === 0
-  ) {
+  if (questions.length === 0) {
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Kamida bitta savol bo‘lishi kerak.",
-      },
-      {
-        status: 400,
-      }
+      { success: false, message: "Kamida bitta savol bo‘lishi kerak." },
+      { status: 400 }
     );
   }
 
-  const tests =
-    await readTests();
+  const status = normalizeStatus(body?.status);
 
-  const now =
-    new Date().toISOString();
+  const inserted: any[] = await sql`
+    INSERT INTO legacy_tests (
+      title,
+      subject,
+      duration,
+      description,
+      test_type,
+      custom_test_type_name,
+      status,
+      attempt_limit,
+      questions_json,
+      extra_json,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${title},
+      ${subject},
+      ${normalizePositiveInt(body?.duration, 30)},
+      ${String(body?.description || "")},
+      ${body?.testType ? String(body.testType) : null},
+      ${body?.customTestTypeName ? String(body.customTestTypeName) : null},
+      ${status},
+      ${normalizeAttemptLimit(body?.attemptLimit)},
+      '[]'::jsonb,
+      '{}'::jsonb,
+      NOW(),
+      NOW()
+    )
+    RETURNING id
+  `;
 
-  const newTest: TestData = {
-    ...body,
+  const testId = String(inserted[0]?.id || "");
 
-    id:
-      crypto.randomUUID(),
+  for (let index = 0; index < questions.length; index++) {
+    await insertQuestion(testId, index + 1, questions[index]);
+  }
 
-    title,
-    subject,
-
-    duration:
-      Math.max(
-        1,
-        Number(
-          body?.duration
-        ) || 30
-      ),
-
-    description:
-      String(
-        body?.description || ""
-      ),
-
-    questions,
-
-    status:
-      normalizeStatus(
-        body?.status
-      ),
-
-    attemptLimit:
-      normalizeAttemptLimit(
-        body?.attemptLimit
-      ),
-
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  tests.push(
-    newTest
-  );
-
-  await writeTests(
-    tests
-  );
+  const test = await readOneTest(testId);
 
   return NextResponse.json(
     {
       success: true,
-
-      message:
-        "Test muvaffaqiyatli yaratildi.",
-
-      test:
-        newTest,
+      message: "Test Neon bazasida yaratildi.",
+      testId,
+      test,
     },
-    {
-      status: 201,
-    }
+    { status: 201 }
   );
 }
 
@@ -2860,115 +1271,59 @@ async function createNormalTest(
    POST ROUTER
 ========================================================= */
 
-export async function POST(
-  request: NextRequest
-) {
+export async function POST(request: NextRequest) {
   try {
-    const body =
-      await request.json();
+    const adminError = await requireAdmin();
+    if (adminError) return adminError;
 
-    const action =
-      String(
-        body?.action || ""
-      );
+    const body = await request.json().catch(() => ({}));
+    const action = String(body?.action || "").trim();
 
-    if (
-      action ===
-      "create-chunked-test"
-    ) {
-      return await createChunkedTest(
-        body
-      );
+    if (action === "create-chunked-test") {
+      return await createChunkedTest(body);
     }
 
-    if (
-      action ===
-      "append-questions"
-    ) {
-      return await appendQuestionsChunk(
-        body
-      );
+    if (action === "append-questions") {
+      return await appendQuestionsChunk(body);
     }
 
-    if (
-      action ===
-      "finalize-chunked-test"
-    ) {
-      return await finalizeChunkedTest(
-        body
-      );
+    if (action === "finalize-chunked-test") {
+      return await finalizeChunkedTest(body);
     }
 
-    if (
-      action ===
-      "bulk-publish-tests"
-    ) {
-      return await bulkPublishTests(
-        body
-      );
+    if (action === "bulk-publish-tests") {
+      return await bulkPublishTests(body);
     }
 
-    if (
-      action ===
-      "bulk-delete-tests"
-    ) {
-      return await bulkDeleteTests(
-        body
-      );
+    if (action === "bulk-delete-tests") {
+      return await bulkDeleteTests(body);
     }
 
-    if (
-      action ===
-      "set-status"
-    ) {
-      return await setTestStatus(
-        body
-      );
+    if (action === "set-status") {
+      return await setTestStatus(body);
     }
 
-    if (
-      action ===
-      "patch-test"
-    ) {
-      return await patchTest(
-        body
-      );
+    if (action === "patch-test") {
+      return await patchTest(body);
     }
 
-    if (
-      action ===
-      "load-editor-page"
-    ) {
-      return await loadEditorPage(
-        body
-      );
+    if (action === "load-editor-page") {
+      return await loadEditorPage(body);
     }
 
-    /*
-      Eski test editor ishlashi uchun
-      oddiy POST saqlanib qoladi.
-    */
-    return await createNormalTest(
-      body
-    );
+    return await createNormalTest(body);
   } catch (error) {
-    console.error(
-      "POST /api/tests ERROR:",
-      error
-    );
+    console.error("POST /api/tests NEON ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-
         message:
           error instanceof Error
             ? error.message
-            : "Testni yaratishda server xatosi.",
+            : "Testni Neon bazasiga saqlashda server xatosi yuz berdi.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
