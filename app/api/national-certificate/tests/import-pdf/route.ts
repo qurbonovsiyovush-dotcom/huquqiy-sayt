@@ -822,16 +822,16 @@ function shouldInsertWordSpace(
   }
 
   // Ro'yxat/variant markeridan keyin bo'shliq kerak.
-  if (/^(?:[IVXLCDM]+|\\d{1,4}|[ABCD])[\\.\\)]$/i.test(left)) {
+  if (/^(?:[IVXLCDM]+|\d{1,4}|[ABCD])[.)]$/i.test(left)) {
     return true;
   }
 
   // Tinish belgisi oldidan yoki ochuvchi qavsdan keyin bo'shliq qo'shmaymiz.
-  if (/^[,.;:!?%\\)\\]\\}]/u.test(right)) {
+  if (/^[,.;:!?%)\]}]/u.test(right)) {
     return false;
   }
 
-  if (/[\\(\\[\\{]$/u.test(left)) {
+  if (/(?:\(|\[|\{)$/u.test(left)) {
     return false;
   }
 
@@ -848,8 +848,8 @@ function shouldInsertWordSpace(
     )
   );
 
-  const leftCore = left.replace(/[^\\p{L}\\p{N}]/gu, "");
-  const rightCore = right.replace(/[^\\p{L}\\p{N}]/gu, "");
+  const leftCore = left.replace(/[^\p{L}\p{N}]/gu, "");
+  const rightCore = right.replace(/[^\p{L}\p{N}]/gu, "");
 
   // Bell MT/Word PDFlarida so'z ichidagi fragment gaplari 3-6pt gacha
   // chiqishi mumkin. Shuning uchun oddiy word-space thresholdni balandroq
