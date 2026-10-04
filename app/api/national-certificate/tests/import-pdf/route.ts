@@ -221,11 +221,37 @@ function normalizeText(value: string) {
   yangi qatorga ajratadi; A/B/C/D variant markerlariga tegmaydi.
 */
 function splitInlineRomanListItems(value: string) {
-  return String(value || "")
-    .replace(
-      /\s+(?=(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)[\.\)]\s+\S)/g,
-      "\n"
-    )
+  /*
+    PDF.js ba'zan keyingi Rim bandini oldingi gapga umuman bo'shliqsiz
+    yopishtiradi:
+      III. ... mumkin.IV. ...
+
+    Shuning uchun faqat " bo'shliq + IV." holatini emas,
+    "gap tugashi + IV." holatini ham ajratamiz. A/B/C/D variantlariga
+    bu qoida tegmaydi.
+  */
+  const roman =
+    "(?:XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)";
+
+  let text = String(value || "");
+
+  text = text.replace(
+    new RegExp(
+      `([.!?])\\s*(?=(${roman})[\\.\\)]\\s+\\S)`,
+      "g"
+    ),
+    "$1\n"
+  );
+
+  text = text.replace(
+    new RegExp(
+      `\\s+(?=(${roman})[\\.\\)]\\s+\\S)`,
+      "g"
+    ),
+    "\n"
+  );
+
+  return text
     .split(/\r?\n/)
     .map((part) => part.trim())
     .filter(Boolean);
@@ -873,27 +899,34 @@ function shouldInsertPdfSyntheticSpace(
     Bu oldingi 0.18em dan kattaroq: shrift/subset almashganda paydo
     bo‘ladigan 2.5–3.5pt texnik bo‘shliqlar endi so‘zni bo‘lmaydi.
   */
+  /*
+    Bu PDFlar asosan Word/Docs'dan chiqyapti va haqiqiy so'z oralig'i
+    ko'p hollarda item.str ichidagi whitespace orqali allaqachon keladi.
+    Shuning uchun koordinataga qarab space qo'shish faqat JUDA ANIQLANGAN
+    katta bo'shliqda ishlaydi. Bu "yetm agan", "m uom ala", "TO‘G‘ R I"
+    kabi bitta so'zning PDF fragmentlariga bo'linib ketishini to'xtatadi.
+  */
   let threshold = Math.max(
-    3.6,
+    6.4,
     Math.min(
-      4.8,
-      fontHeight * 0.28
+      9.2,
+      fontHeight * 0.52
     )
   );
 
   /*
-    "R espublikasi", "D arslikda", "m a’nosida", "TO‘G‘ R I"
-    kabi bitta harfli PDF fragmentlari uchun yanada ehtiyotkor threshold.
+    Bitta harfli yoki juda qisqa fragmentlar PDF font subsetlarida eng ko'p
+    noto'g'ri masofa beradi. Ular uchun yanada konservativ bo'lamiz.
   */
   if (
-    leftCore.length === 1 ||
-    rightCore.length === 1
+    leftCore.length <= 2 ||
+    rightCore.length <= 2
   ) {
     threshold = Math.max(
       threshold,
       Math.min(
-        5.4,
-        fontHeight * 0.36
+        10.5,
+        fontHeight * 0.66
       )
     );
   }
