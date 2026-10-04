@@ -72,6 +72,10 @@ type PdfTextItem = {
 
 type PositionedText = {
   text: string;
+  rawText: string;
+  hasLeadingSpace: boolean;
+  hasTrailingSpace: boolean;
+  isWhitespaceOnly: boolean;
   x: number;
   y: number;
   width: number;
@@ -738,7 +742,7 @@ function buildPositionedItems(
     .filter(
       (item) =>
         typeof item.str === "string" &&
-        item.str.trim()
+        item.str.length > 0
     )
     .map((item) => {
       const transform =
@@ -759,16 +763,43 @@ function buildPositionedItems(
             fontName
         );
 
+      /*
+        MUHIM:
+        PDF.js ayrim Word/Bell MT PDFlarda bitta so'zni bir nechta
+        text-itemga ajratadi:
+
+          "H" + "uquqbuzarlikning "
+          "yetm" + "aganlarning "
+          "m" + "uom" + "ala "
+
+        Eski kod item.str.trim() qilib, PDFning o'zidagi haqiqiy
+        bo'shliq signalini yo'qotardi. Keyin geometrik gap asosida
+        noto'g'ri bo'shliq qo'shilardi.
+
+        Endi rawText saqlanadi. Haqiqiy space birinchi navbatda
+        rawTextdan olinadi; koordinata faqat fallback sifatida ishlaydi.
+      */
+      const rawText =
+        String(item.str || "")
+          .replace(/\u00a0/g, " ");
+
       return {
-        text: item.str.trim(),
+        text: rawText.trim(),
+        rawText,
+        hasLeadingSpace:
+          /^\s/u.test(rawText),
+        hasTrailingSpace:
+          /\s$/u.test(rawText),
+        isWhitespaceOnly:
+          rawText.trim().length === 0,
         x:
           Number(transform[4]) || 0,
         y:
           Number(transform[5]) || 0,
         width:
           Math.max(
-            1,
-            Number(item.width) || 1
+            0,
+            Number(item.width) || 0
           ),
         height:
           Math.max(
@@ -794,18 +825,22 @@ function buildPositionedItems(
 }
 
 /*
-  PDF.js ayrim Word/Bell MT PDFlarida bitta so'zni bir nechta text-itemga
-  bo'lib beradi. Masalan:
-    "H" + "uquqbuzarlikning"
-    "yetm" + "aganlarning"
-    "m" + "uomala"
-    "TO'G'" + "R" + "I"
+  PDF TEXT SPACING — FINAL STRATEGY
 
-  Oldingi 2.5pt / 0.18em chegara bunday fragmentlar orasiga noto'g'ri
-  bo'shliq qo'shib yuborardi. Bu funksiya faqat aniq katta geometrik
-  oraliqda word-space qo'shadi.
+  1) Agar PDF itemning o'zida leading/trailing space bo'lsa,
+     aynan shu signalga ishonamiz.
+  2) Pure-space text-item bo'lsa, uni ham real word-space deb olamiz.
+  3) Faqat PDF umuman space signal bermagan joyda koordinata fallback
+     ishlaydi.
+  4) Geometrik fallback juda katta gapdagina space qo'shadi.
+     Shu sabab:
+       H + uquqbuzarlikning  => Huquqbuzarlikning
+       yetm + aganlarning    => yetmaganlarning
+       m + uom + ala         => muomala
+       TO'G' + R + I         => TO'G'RI
+     kabi so'zlar ichidan bo'linmaydi.
 */
-function shouldInsertWordSpace(
+function shouldInsertFallbackSpace(
   previous: PositionedText,
   current: PositionedText,
   gap: number
@@ -814,70 +849,217 @@ function shouldInsertWordSpace(
     return false;
   }
 
-  const left = String(previous.text || "").trim();
-  const right = String(current.text || "").trim();
+  const left =
+    String(previous.text || "").trim();
+
+  const right =
+    String(current.text || "").trim();
 
   if (!left || !right) {
     return false;
   }
 
-  // Ro'yxat/variant markeridan keyin bo'shliq kerak.
-  if (/^(?:[IVXLCDM]+|\d{1,4}|[ABCD])[.)]$/i.test(left)) {
-    return true;
-  }
-
-  // Tinish belgisi oldidan yoki ochuvchi qavsdan keyin bo'shliq qo'shmaymiz.
+  /*
+    Tinish belgisi oldidan space kerak emas.
+  */
   if (/^[,.;:!?%)\]}]/u.test(right)) {
     return false;
   }
 
+  /*
+    Ochuvchi qavsdan keyin space kerak emas.
+  */
   if (/(?:\(|\[|\{)$/u.test(left)) {
     return false;
   }
 
-  // Gap tugagach keyingi text-item so'z bo'lsa, normal bo'shliq qoldiramiz.
-  if (/[!?;:]$/u.test(left)) {
-    return gap > 1.2;
+  const fontHeight =
+    Math.max(
+      8,
+      Math.min(
+        36,
+        (previous.height + current.height) / 2
+      )
+    );
+
+  /*
+    PDF ichida so'z bo'laklari orasida ham 6–10pt gacha sun'iy gap
+    chiqishi mumkin. Shuning uchun fallback threshold ataylab katta.
+    Normal word-space rawText orqali topiladi.
+  */
+  const threshold =
+    Math.max(
+      11,
+      fontHeight * 0.78
+    );
+
+  return gap > threshold;
+}
+
+
+function geometricThresholdForLine(
+  group: PositionedText[]
+) {
+  const visible =
+    group
+      .filter(
+        (item) =>
+          !item.isWhitespaceOnly &&
+          item.text.length > 0
+      )
+      .sort(
+        (a, b) => a.x - b.x
+      );
+
+  const heights =
+    visible
+      .map((item) => item.height)
+      .filter(
+        (value) =>
+          Number.isFinite(value) &&
+          value > 0
+      )
+      .sort((a, b) => a - b);
+
+  const medianHeight =
+    heights.length > 0
+      ? heights[
+          Math.floor(
+            heights.length / 2
+          )
+        ]
+      : 12;
+
+  const gaps: number[] = [];
+
+  for (
+    let index = 1;
+    index < visible.length;
+    index++
+  ) {
+    const previous =
+      visible[index - 1];
+
+    const current =
+      visible[index];
+
+    const gap =
+      current.x -
+      (
+        previous.x +
+        previous.width
+      );
+
+    if (
+      Number.isFinite(gap) &&
+      gap > 0 &&
+      gap <
+        Math.max(
+          40,
+          medianHeight * 2.2
+        )
+    ) {
+      gaps.push(gap);
+    }
   }
 
-  const fontHeight = Math.max(
-    8,
-    Math.min(
-      30,
-      (previous.height + current.height) / 2
-    )
-  );
-
-  const leftCore = left.replace(/[^\p{L}\p{N}]/gu, "");
-  const rightCore = right.replace(/[^\p{L}\p{N}]/gu, "");
-
-  // Bell MT/Word PDFlarida so'z ichidagi fragment gaplari 3-6pt gacha
-  // chiqishi mumkin. Shuning uchun oddiy word-space thresholdni balandroq
-  // qilamiz.
-  let threshold = Math.max(
-    6.4,
-    Math.min(
-      9.4,
-      fontHeight * 0.52
-    )
-  );
-
-  // Bitta/ikkita harfli fragmentlar eng ko'p noto'g'ri ajraladi:
-  // H + uquq..., m + uomala, R + I.
-  if (
-    leftCore.length <= 2 ||
-    rightCore.length <= 2
-  ) {
-    threshold = Math.max(
-      threshold,
-      Math.min(
-        11.0,
-        fontHeight * 0.70
-      )
+  if (gaps.length === 0) {
+    return Math.max(
+      4,
+      medianHeight * 0.30
     );
   }
 
-  return gap > threshold;
+  const sorted =
+    [...gaps].sort(
+      (a, b) => a - b
+    );
+
+  if (sorted.length === 1) {
+    return Math.max(
+      1.5,
+      sorted[0] * 0.72
+    );
+  }
+
+  /*
+    Ikki klasterli oddiy deterministic ajratish:
+      kichik gaplar  -> bir so'z ichidagi PDF fragmentlari
+      katta gaplar   -> haqiqiy word-space
+
+    Bu qism FAQAT rawTextda umuman space signali bo'lmagan
+    PDFlar uchun fallback.
+  */
+  let low =
+    sorted[0];
+
+  let high =
+    sorted[
+      sorted.length - 1
+    ];
+
+  for (
+    let iteration = 0;
+    iteration < 8;
+    iteration++
+  ) {
+    const lowGroup: number[] = [];
+    const highGroup: number[] = [];
+
+    for (const gap of sorted) {
+      if (
+        Math.abs(gap - low) <=
+        Math.abs(gap - high)
+      ) {
+        lowGroup.push(gap);
+      } else {
+        highGroup.push(gap);
+      }
+    }
+
+    if (
+      lowGroup.length === 0 ||
+      highGroup.length === 0
+    ) {
+      break;
+    }
+
+    low =
+      lowGroup.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) / lowGroup.length;
+
+    high =
+      highGroup.reduce(
+        (sum, value) =>
+          sum + value,
+        0
+      ) / highGroup.length;
+  }
+
+  if (
+    high - low >=
+    Math.max(
+      1.25,
+      medianHeight * 0.08
+    )
+  ) {
+    return (
+      low + high
+    ) / 2;
+  }
+
+  /*
+    Hamma gaplar deyarli bir xil bo'lsa, PDF odatda har bir
+    so'zni alohida item qilib bergan bo'ladi. Shunda gapning
+    o'zidan sal past threshold ishlatamiz.
+  */
+  return Math.max(
+    1.5,
+    sorted[0] * 0.72
+  );
 }
 
 function groupItemsIntoLines(
@@ -949,40 +1131,87 @@ function groupItemsIntoLines(
           a.x - b.x
       );
 
+      const groupHasExplicitWhitespace =
+        group.some(
+          (item) =>
+            item.isWhitespaceOnly ||
+            item.hasLeadingSpace ||
+            item.hasTrailingSpace
+        );
+
+      const lineFallbackThreshold =
+        groupHasExplicitWhitespace
+          ? null
+          : geometricThresholdForLine(
+              group
+            );
+
       let text = "";
-      let previousRight:
-        number | null = null;
-      let previousItem:
+      let previousVisibleItem:
         PositionedText | null = null;
+      let pendingExplicitSpace =
+        false;
 
       for (const item of group) {
-        if (
-          previousRight !== null &&
-          previousItem
-        ) {
-          const gap =
-            item.x -
-            previousRight;
-
-          if (
-            shouldInsertWordSpace(
-              previousItem,
-              item,
-              gap
-            )
-          ) {
-            text += " ";
+        /*
+          PDFdagi alohida " " text-item ham so'z chegarasidir.
+          Uni matnga bevosita qo'shmaymiz, faqat keyingi visible item
+          oldidan space qo'yish signalini saqlaymiz.
+        */
+        if (item.isWhitespaceOnly) {
+          if (text) {
+            pendingExplicitSpace = true;
           }
+          continue;
         }
 
-        // MUHIM: item.str ning bosh/oxiridagi PDF artefakt space'lariga
-        // ishonmaymiz. Faqat koordinata orqali haqiqiy word-space qo'shiladi.
-        text += item.text.trim();
+        const explicitSpace =
+          pendingExplicitSpace ||
+          item.hasLeadingSpace ||
+          Boolean(
+            previousVisibleItem?.hasTrailingSpace
+          );
 
-        previousRight =
-          item.x +
-          item.width;
-        previousItem = item;
+        const gap =
+          previousVisibleItem
+            ? item.x -
+              (
+                previousVisibleItem.x +
+                previousVisibleItem.width
+              )
+            : 0;
+
+        const fallbackSpace =
+          previousVisibleItem
+            ? groupHasExplicitWhitespace
+              ? shouldInsertFallbackSpace(
+                  previousVisibleItem,
+                  item,
+                  gap
+                )
+              : (
+                  lineFallbackThreshold !==
+                    null &&
+                  gap >
+                    lineFallbackThreshold
+                )
+            : false;
+
+        if (
+          text &&
+          (explicitSpace || fallbackSpace) &&
+          !text.endsWith(" ")
+        ) {
+          text += " ";
+        }
+
+        text += item.text;
+
+        pendingExplicitSpace =
+          item.hasTrailingSpace;
+
+        previousVisibleItem =
+          item;
       }
 
       const x =
