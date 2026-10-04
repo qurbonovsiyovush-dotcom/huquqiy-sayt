@@ -212,49 +212,41 @@ function normalizeText(value: string) {
 }
 
 /*
-  PDF ichida Rim raqamlari ba'zan bitta text-line ichiga yopishib qoladi:
+  Rim raqamli ichki bandlar PDFdan ba'zan oldingi gapga yopishib keladi:
+    III. ... mumkin. IV. Voyaga ...
+    III. ... mumkin.IV.Voyaga ...
 
-    III. ... mumkin. IV. ...
-
-  Bunday holatda IV. alohida band bo‘lishi kerak. Bu helper FAQAT
-  Rim raqami markerini (I. / II. / III. / IV. ... yoki I) / II) ...)
-  yangi qatorga ajratadi; A/B/C/D variant markerlariga tegmaydi.
+  Bu helper faqat gap tugaganidan keyin kelgan I./II./III./IV./... markerini
+  yangi qatorga o'tkazadi. A)/B)/C)/D) variantlariga tegmaydi.
 */
-function splitInlineRomanListItems(value: string) {
-  /*
-    PDF.js ba'zan keyingi Rim bandini oldingi gapga umuman bo'shliqsiz
-    yopishtiradi:
-      III. ... mumkin.IV. ...
-
-    Shuning uchun faqat " bo'shliq + IV." holatini emas,
-    "gap tugashi + IV." holatini ham ajratamiz. A/B/C/D variantlariga
-    bu qoida tegmaydi.
-  */
+function forceRomanListLineBreaks(value: string) {
   const roman =
-    "(?:XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)";
+    "(?:X|IX|VIII|VII|VI|V|IV|III|II|I)";
 
-  let text = String(value || "");
-
-  text = text.replace(
-    new RegExp(
-      `([.!?])\\s*(?=(${roman})[\\.\\)]\\s+\\S)`,
-      "g"
-    ),
-    "$1\n"
-  );
-
-  text = text.replace(
-    new RegExp(
-      `\\s+(?=(${roman})[\\.\\)]\\s+\\S)`,
-      "g"
-    ),
-    "\n"
-  );
-
-  return text
-    .split(/\r?\n/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+  return String(value || "")
+    .replace(
+      new RegExp(
+        `([.!?;:])(?:[\\s\\u00a0]*)` +
+          `(?=(${roman})\\.(?:[\\s\\u00a0]*)(?:\\p{Lu}|\\p{Ll}))`,
+        "gu"
+      ),
+      "$1\n"
+    )
+    .replace(
+      new RegExp(
+        `(?<!^)(?<!\\n)[ \\t\\u00a0]+` +
+          `(?=(${roman})\\.(?:[ \\t\\u00a0]*)(?:\\p{Lu}|\\p{Ll}))`,
+        "gu"
+      ),
+      "\n"
+    )
+    .replace(
+      new RegExp(
+        `(^|\\n)(${roman})\\.(?:[ \t\u00a0]*)`,
+        "gmu"
+      ),
+      "$1$2. "
+    );
 }
 
 /*
@@ -278,8 +270,11 @@ function splitInlineRomanListItems(value: string) {
 */
 function normalizeQuestionText(parts: string[]) {
   const rawLines = parts
-    .flatMap((part) => String(part || "").split(/\r?\n/))
-    .flatMap((line) => splitInlineRomanListItems(line))
+    .flatMap((part) =>
+      forceRomanListLineBreaks(
+        String(part || "")
+      ).split(/\r?\n/)
+    )
     .map((line) =>
       normalizeQuestionMarkSpacing(
         cleanPdfInlineNoise(
@@ -382,11 +377,15 @@ function normalizeQuestionText(parts: string[]) {
 
   flushCurrent();
 
-  return normalizeQuestionMarkSpacing(
+  const result = normalizeQuestionMarkSpacing(
     paragraphs
       .join("\n")
       .replace(/\s+([,.;:!])/g, "$1")
   ).trim();
+
+  // Final safety pass: paragraph yig'ilgandan keyin ham IV. oldingi bandga
+  // yopishib qolmasin.
+  return forceRomanListLineBreaks(result).trim();
 }
 
 function normalizeOneLine(value: string) {
@@ -761,18 +760,7 @@ function buildPositionedItems(
         );
 
       return {
-        /*
-          MUHIM:
-          item.str ichidagi bosh/oxirgi real bo‘shliqni yo‘qotmaymiz.
-          PDF.js ko‘pincha haqiqiy so‘z oralig‘ini aynan shu whitespace
-          bilan beradi. Oldingi .trim() bu signalni o‘chirib yuborib,
-          keyin koordinata bo‘yicha "D arslikda", "R espublikasi",
-          "m a’lumot" kabi sun’iy bo‘shliqlar paydo bo‘lishiga sabab bo‘lardi.
-
-          groupItemsIntoLines() yakunda normalizeOneLine() orqali ortiqcha
-          whitespace'larni baribir bitta bo‘shliqqa keltiradi.
-        */
-        text: item.str.replace(/\u00a0/g, " "),
+        text: item.str.trim(),
         x:
           Number(transform[4]) || 0,
         y:
@@ -806,81 +794,50 @@ function buildPositionedItems(
 }
 
 /*
-  PDF text-itemlar orasiga sun'iy bo‘shliq qo‘yish qoidasi.
+  PDF.js ayrim Word/Bell MT PDFlarida bitta so'zni bir nechta text-itemga
+  bo'lib beradi. Masalan:
+    "H" + "uquqbuzarlikning"
+    "yetm" + "aganlarning"
+    "m" + "uomala"
+    "TO'G'" + "R" + "I"
 
-  Muammo:
-    ayrim shriftlarda bitta so‘z bir necha PDF itemga bo‘linadi:
-      "D" + "arslikda"
-      "R" + "espublikasi"
-      "m" + "a’lum" + "otlarni"
-
-  Oldingi 2.5pt threshold juda kichik bo‘lgani uchun bunday fragmentlar
-  alohida so‘z deb qabul qilinardi.
-
-  Yechim:
-    1) PDFning o‘zida real leading/trailing space bo‘lsa, o‘sha signalga
-       ishonamiz va qo‘shimcha space qo‘shmaymiz.
-    2) I./II./III./IV. kabi ro‘yxat markeridan keyin matnni ajratamiz.
-    3) Qolgan joyda font balandligiga mos konservativ threshold ishlatamiz.
-       Bitta harfli fragmentlarda threshold biroz kattaroq bo‘ladi.
+  Oldingi 2.5pt / 0.18em chegara bunday fragmentlar orasiga noto'g'ri
+  bo'shliq qo'shib yuborardi. Bu funksiya faqat aniq katta geometrik
+  oraliqda word-space qo'shadi.
 */
-function shouldInsertPdfSyntheticSpace(
+function shouldInsertWordSpace(
   previous: PositionedText,
   current: PositionedText,
   gap: number
 ) {
-  if (!Number.isFinite(gap) || gap <= 0.6) {
+  if (!Number.isFinite(gap) || gap <= 0) {
     return false;
   }
 
-  const previousRaw = String(previous.text || "");
-  const currentRaw = String(current.text || "");
-
-  /*
-    PDFning o‘zi haqiqiy word-space bergan bo‘lsa, uni saqlab qolganmiz.
-    text += item.text qilganda bu space avtomatik tushadi.
-  */
-  if (
-    /\s$/u.test(previousRaw) ||
-    /^\s/u.test(currentRaw)
-  ) {
-    return false;
-  }
-
-  const left = previousRaw.trim();
-  const right = currentRaw.trim();
+  const left = String(previous.text || "").trim();
+  const right = String(current.text || "").trim();
 
   if (!left || !right) {
     return false;
   }
 
-  /*
-    I. Matn / II. Matn / 1) Matn / A) Matn kabi markerlardan keyin
-    bo‘shliq bo‘lishi shart.
-  */
-  if (
-    /^(?:[IVXLCDM]+|\d{1,4}|[ABCD])[\.\)]$/i.test(left)
-  ) {
+  // Ro'yxat/variant markeridan keyin bo'shliq kerak.
+  if (/^(?:[IVXLCDM]+|\\d{1,4}|[ABCD])[\\.\\)]$/i.test(left)) {
     return true;
   }
 
-  /*
-    Ochuvchi qavsdan keyin yoki yopuvchi tinish belgisidan oldin
-    sun'iy space qo‘ymaymiz.
-  */
-  if (
-    /^[\(\[\{]$/u.test(left) ||
-    /^[,.;:!?%\)\]\}]/u.test(right)
-  ) {
+  // Tinish belgisi oldidan yoki ochuvchi qavsdan keyin bo'shliq qo'shmaymiz.
+  if (/^[,.;:!?%\\)\\]\\}]/u.test(right)) {
     return false;
   }
 
-  /*
-    Gap tugaganidan keyin yangi text-item kelsa, juda kichik texnik
-    masofa bo‘lsa ham so‘zlar yopishib ketmasin.
-  */
+  if (/[\\(\\[\\{]$/u.test(left)) {
+    return false;
+  }
+
+  // Gap tugagach keyingi text-item so'z bo'lsa, normal bo'shliq qoldiramiz.
   if (/[!?;:]$/u.test(left)) {
-    return true;
+    return gap > 1.2;
   }
 
   const fontHeight = Math.max(
@@ -891,33 +848,22 @@ function shouldInsertPdfSyntheticSpace(
     )
   );
 
-  const leftCore = left.replace(/[^\p{L}\p{N}]/gu, "");
-  const rightCore = right.replace(/[^\p{L}\p{N}]/gu, "");
+  const leftCore = left.replace(/[^\\p{L}\\p{N}]/gu, "");
+  const rightCore = right.replace(/[^\\p{L}\\p{N}]/gu, "");
 
-  /*
-    Oddiy fragmentlar uchun taxminan 0.28em.
-    Bu oldingi 0.18em dan kattaroq: shrift/subset almashganda paydo
-    bo‘ladigan 2.5–3.5pt texnik bo‘shliqlar endi so‘zni bo‘lmaydi.
-  */
-  /*
-    Bu PDFlar asosan Word/Docs'dan chiqyapti va haqiqiy so'z oralig'i
-    ko'p hollarda item.str ichidagi whitespace orqali allaqachon keladi.
-    Shuning uchun koordinataga qarab space qo'shish faqat JUDA ANIQLANGAN
-    katta bo'shliqda ishlaydi. Bu "yetm agan", "m uom ala", "TO‘G‘ R I"
-    kabi bitta so'zning PDF fragmentlariga bo'linib ketishini to'xtatadi.
-  */
+  // Bell MT/Word PDFlarida so'z ichidagi fragment gaplari 3-6pt gacha
+  // chiqishi mumkin. Shuning uchun oddiy word-space thresholdni balandroq
+  // qilamiz.
   let threshold = Math.max(
     6.4,
     Math.min(
-      9.2,
+      9.4,
       fontHeight * 0.52
     )
   );
 
-  /*
-    Bitta harfli yoki juda qisqa fragmentlar PDF font subsetlarida eng ko'p
-    noto'g'ri masofa beradi. Ular uchun yanada konservativ bo'lamiz.
-  */
+  // Bitta/ikkita harfli fragmentlar eng ko'p noto'g'ri ajraladi:
+  // H + uquq..., m + uomala, R + I.
   if (
     leftCore.length <= 2 ||
     rightCore.length <= 2
@@ -925,8 +871,8 @@ function shouldInsertPdfSyntheticSpace(
     threshold = Math.max(
       threshold,
       Math.min(
-        10.5,
-        fontHeight * 0.66
+        11.0,
+        fontHeight * 0.70
       )
     );
   }
@@ -1006,7 +952,6 @@ function groupItemsIntoLines(
       let text = "";
       let previousRight:
         number | null = null;
-
       let previousItem:
         PositionedText | null = null;
 
@@ -1020,7 +965,7 @@ function groupItemsIntoLines(
             previousRight;
 
           if (
-            shouldInsertPdfSyntheticSpace(
+            shouldInsertWordSpace(
               previousItem,
               item,
               gap
@@ -1030,15 +975,14 @@ function groupItemsIntoLines(
           }
         }
 
-        text +=
-          item.text;
+        // MUHIM: item.str ning bosh/oxiridagi PDF artefakt space'lariga
+        // ishonmaymiz. Faqat koordinata orqali haqiqiy word-space qo'shiladi.
+        text += item.text.trim();
 
         previousRight =
           item.x +
           item.width;
-
-        previousItem =
-          item;
+        previousItem = item;
       }
 
       const x =
