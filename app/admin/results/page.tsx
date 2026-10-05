@@ -34,6 +34,8 @@ export default function AdminResultsPage() {
   const [testFilter, setTestFilter] = useState("all");
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   useEffect(() => {
     loadResults();
@@ -251,6 +253,49 @@ export default function AdminResultsPage() {
   }
 
   /* =========================================================
+     TANLASH
+  ========================================================= */
+
+  const filteredIds = useMemo(
+    () => filteredResults.map((item) => item.id),
+    [filteredResults]
+  );
+
+  const selectedCount = selectedIds.size;
+
+  const allFilteredSelected =
+    filteredIds.length > 0 &&
+    filteredIds.every((id) => selectedIds.has(id));
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleAllFiltered() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (allFilteredSelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  }
+
+  /* =========================================================
      DELETE
   ========================================================= */
 
@@ -297,8 +342,98 @@ export default function AdminResultsPage() {
             item.id !== id
         )
       );
+
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function deleteSelected() {
+    const ids = Array.from(selectedIds);
+
+    if (ids.length === 0) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `${ids.length} ta tanlangan natija o‘chirilsinmi? Bu amalni qaytarib bo‘lmaydi.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+
+    try {
+      const responses = await Promise.all(
+        ids.map(async (id) => {
+          const response = await fetch(
+            `/api/admin/results?id=${encodeURIComponent(id)}`,
+            { method: "DELETE" }
+          );
+
+          const data = await response
+            .json()
+            .catch(() => ({}));
+
+          return {
+            id,
+            ok: response.ok,
+            message:
+              data?.message ||
+              (response.ok
+                ? "Natija o‘chirildi."
+                : "Natija o‘chirilmadi."),
+          };
+        })
+      );
+
+      const deletedIds = new Set(
+        responses
+          .filter((item) => item.ok)
+          .map((item) => item.id)
+      );
+
+      const failed = responses.filter(
+        (item) => !item.ok
+      );
+
+      if (deletedIds.size > 0) {
+        setResults((current) =>
+          current.filter(
+            (item) => !deletedIds.has(item.id)
+          )
+        );
+
+        setSelectedIds((current) => {
+          const next = new Set(current);
+          deletedIds.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
+
+      if (failed.length > 0) {
+        alert(
+          `${deletedIds.size} ta natija o‘chirildi, ${failed.length} tasi o‘chmadi. Sahifani yangilab qayta urinib ko‘ring.`
+        );
+      }
+    } catch (error) {
+      console.error(
+        "SELECTED RESULTS DELETE ERROR:",
+        error
+      );
+
+      alert(
+        "Tanlangan natijalarni o‘chirishda xatolik yuz berdi."
+      );
+    } finally {
+      setDeletingSelected(false);
     }
   }
 
@@ -339,6 +474,7 @@ export default function AdminResultsPage() {
     }
 
     setResults([]);
+    setSelectedIds(new Set());
   }
 
   /* =========================================================
@@ -788,10 +924,24 @@ export default function AdminResultsPage() {
           </button>
 
           <button
+            className="deleteSelectedButton"
+            onClick={deleteSelected}
+            disabled={
+              selectedCount === 0 ||
+              deletingSelected
+            }
+          >
+            {deletingSelected
+              ? "O‘chirilmoqda..."
+              : `Tanlanganlarni o‘chirish (${selectedCount})`}
+          </button>
+
+          <button
             className="deleteAllButton"
             onClick={deleteAll}
             disabled={
-              results.length === 0
+              results.length === 0 ||
+              deletingSelected
             }
           >
             Barchasini o‘chirish
@@ -825,6 +975,15 @@ export default function AdminResultsPage() {
 
               <thead>
                 <tr>
+                  <th className="selectCell">
+                    <input
+                      type="checkbox"
+                      className="selectCheckbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleAllFiltered}
+                      aria-label="Ko‘rinib turgan natijalarning barchasini tanlash"
+                    />
+                  </th>
                   <th>№</th>
                   <th>Foydalanuvchi</th>
                   <th>Test</th>
@@ -845,7 +1004,22 @@ export default function AdminResultsPage() {
 
                     <tr
                       key={item.id}
+                      className={
+                        selectedIds.has(item.id)
+                          ? "selectedRow"
+                          : ""
+                      }
                     >
+
+                      <td className="selectCell">
+                        <input
+                          type="checkbox"
+                          className="selectCheckbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => toggleSelected(item.id)}
+                          aria-label={`${item.userName} natijasini tanlash`}
+                        />
+                      </td>
 
                       <td>
                         {index + 1}
@@ -1077,6 +1251,7 @@ export default function AdminResultsPage() {
         .refreshButton,
         .exportButton,
         .pdfButton,
+        .deleteSelectedButton,
         .deleteAllButton {
           min-height: 48px;
           padding: 0 18px;
@@ -1536,6 +1711,7 @@ export default function AdminResultsPage() {
             auto
             auto
             auto
+            auto
             auto;
 
           gap: 10px;
@@ -1599,6 +1775,21 @@ export default function AdminResultsPage() {
             0 4px 0 #277144;
 
           color: #125a32;
+        }
+
+        .deleteSelectedButton {
+          border-color: #a85f00;
+
+          background:
+            linear-gradient(
+              #ffe6b3,
+              #f1a642
+            );
+
+          box-shadow:
+            0 4px 0 #8a560f;
+
+          color: #6b3e00;
         }
 
         .deleteAllButton {
@@ -1717,6 +1908,27 @@ export default function AdminResultsPage() {
         .silver,
         .bronze {
           font-size: 24px;
+        }
+
+        .selectCell {
+          width: 54px;
+          min-width: 54px;
+          text-align: center;
+        }
+
+        .selectCheckbox {
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+          accent-color: #0b6fa4;
+        }
+
+        tbody tr.selectedRow {
+          background: #fff3c9;
+        }
+
+        tbody tr.selectedRow:hover {
+          background: #ffe9a0;
         }
 
         .userCell {
