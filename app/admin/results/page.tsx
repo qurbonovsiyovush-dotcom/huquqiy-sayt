@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 type TestResult = {
   id: string;
+  userId?: string;
   userName: string;
   testId: string;
   testTitle: string;
@@ -34,8 +35,12 @@ export default function AdminResultsPage() {
   const [testFilter, setTestFilter] = useState("all");
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
+
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadResults();
@@ -69,6 +74,8 @@ export default function AdminResultsPage() {
           ? data.results
           : []
       );
+
+      setSelectedIds(new Set());
     } catch (err) {
       setError(
         err instanceof Error
@@ -160,6 +167,144 @@ export default function AdminResultsPage() {
   ]);
 
   /* =========================================================
+     FOYDALANUVCHILAR BO‘YICHA GURUHLASH
+
+     Asosiy jadvalda har bir foydalanuvchi bir marta turadi.
+     Foydalanuvchi ochilganda uning barcha mos natijalari chiqadi.
+  ========================================================= */
+
+  const groupedUsers = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        userName: string;
+        results: TestResult[];
+      }
+    >();
+
+    filteredResults.forEach((item) => {
+      const normalizedName =
+        String(item.userName || "")
+          .trim()
+          .toLocaleLowerCase();
+
+      const key =
+        item.userId
+          ? `id:${item.userId}`
+          : `name:${normalizedName}`;
+
+      const current = map.get(key);
+
+      if (current) {
+        current.results.push(item);
+      } else {
+        map.set(key, {
+          key,
+          userName:
+            String(item.userName || "").trim() ||
+            "Foydalanuvchi",
+          results: [item],
+        });
+      }
+    });
+
+    return Array.from(map.values()).map((group) => {
+      const sorted = [...group.results].sort(
+        (a, b) =>
+          (new Date(b.finishedAt).getTime() || 0) -
+          (new Date(a.finishedAt).getTime() || 0)
+      );
+
+      const uniqueTests =
+        new Set(
+          sorted.map(
+            (item) =>
+              item.testId ||
+              item.testTitle
+          )
+        ).size;
+
+      const subjects =
+        Array.from(
+          new Set(
+            sorted
+              .map((item) =>
+                String(item.subject || "").trim()
+              )
+              .filter(Boolean)
+          )
+        );
+
+      const average =
+        sorted.length > 0
+          ? Math.round(
+              (sorted.reduce(
+                (sum, item) =>
+                  sum + Number(item.percentage || 0),
+                0
+              ) /
+                sorted.length) *
+                1000
+            ) / 1000
+          : 0;
+
+      const best =
+        sorted.length > 0
+          ? Math.max(
+              ...sorted.map(
+                (item) =>
+                  Number(item.percentage || 0)
+              )
+            )
+          : 0;
+
+      const totalCorrect =
+        sorted.reduce(
+          (sum, item) =>
+            sum + Number(item.correct || 0),
+          0
+        );
+
+      const totalIncorrect =
+        sorted.reduce(
+          (sum, item) =>
+            sum + Number(item.incorrect || 0),
+          0
+        );
+
+      const totalUnanswered =
+        sorted.reduce(
+          (sum, item) =>
+            sum + Number(item.unanswered || 0),
+          0
+        );
+
+      const totalSpentSeconds =
+        sorted.reduce(
+          (sum, item) =>
+            sum + Number(item.spentSeconds || 0),
+          0
+        );
+
+      return {
+        ...group,
+        results: sorted,
+        uniqueTests,
+        subjects,
+        average,
+        best,
+        totalCorrect,
+        totalIncorrect,
+        totalUnanswered,
+        totalSpentSeconds,
+        latestFinishedAt:
+          sorted[0]?.finishedAt || "",
+      };
+    });
+  }, [filteredResults]);
+
+  /* =========================================================
      STATISTIKA
   ========================================================= */
 
@@ -189,8 +334,14 @@ export default function AdminResultsPage() {
 
     const users =
       new Set(
-        results.map(
-          (item) => item.userName
+        results.map((item) =>
+          item.userId
+            ? `id:${item.userId}`
+            : `name:${String(
+                item.userName || ""
+              )
+                .trim()
+                .toLocaleLowerCase()}`
         )
       ).size;
 
@@ -253,7 +404,7 @@ export default function AdminResultsPage() {
   }
 
   /* =========================================================
-     TANLASH
+     TANLASH VA FOYDALANUVCHINI OCHISH/YOPISH
   ========================================================= */
 
   const filteredIds = useMemo(
@@ -266,6 +417,18 @@ export default function AdminResultsPage() {
   const allFilteredSelected =
     filteredIds.length > 0 &&
     filteredIds.every((id) => selectedIds.has(id));
+
+  function toggleSelectionMode() {
+    setSelectionMode((current) => {
+      const next = !current;
+
+      if (!next) {
+        setSelectedIds(new Set());
+      }
+
+      return next;
+    });
+  }
 
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
@@ -289,6 +452,46 @@ export default function AdminResultsPage() {
         filteredIds.forEach((id) => next.delete(id));
       } else {
         filteredIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  }
+
+  function toggleUserSelection(
+    ids: string[]
+  ) {
+    const allSelected =
+      ids.length > 0 &&
+      ids.every((id) =>
+        selectedIds.has(id)
+      );
+
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      ids.forEach((id) => {
+        if (allSelected) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+      });
+
+      return next;
+    });
+  }
+
+  function toggleUser(
+    key: string
+  ) {
+    setExpandedUsers((current) => {
+      const next = new Set(current);
+
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
       }
 
       return next;
@@ -897,8 +1100,23 @@ export default function AdminResultsPage() {
           </select>
 
           <button
+            className={
+              selectionMode
+                ? "selectModeButton active"
+                : "selectModeButton"
+            }
+            onClick={toggleSelectionMode}
+            type="button"
+          >
+            {selectionMode
+              ? "Tanlashni yopish"
+              : "Tanlash"}
+          </button>
+
+          <button
             className="refreshButton"
             onClick={loadResults}
+            type="button"
           >
             Yangilash
           </button>
@@ -909,6 +1127,7 @@ export default function AdminResultsPage() {
             disabled={
               filteredResults.length === 0
             }
+            type="button"
           >
             PDF saqlash
           </button>
@@ -919,22 +1138,26 @@ export default function AdminResultsPage() {
             disabled={
               filteredResults.length === 0
             }
+            type="button"
           >
             CSV saqlash
           </button>
 
-          <button
-            className="deleteSelectedButton"
-            onClick={deleteSelected}
-            disabled={
-              selectedCount === 0 ||
-              deletingSelected
-            }
-          >
-            {deletingSelected
-              ? "O‘chirilmoqda..."
-              : `Tanlanganlarni o‘chirish (${selectedCount})`}
-          </button>
+          {selectionMode && (
+            <button
+              className="deleteSelectedButton"
+              onClick={deleteSelected}
+              disabled={
+                selectedCount === 0 ||
+                deletingSelected
+              }
+              type="button"
+            >
+              {deletingSelected
+                ? "O‘chirilmoqda..."
+                : `Tanlanganlarni o‘chirish (${selectedCount})`}
+            </button>
+          )}
 
           <button
             className="deleteAllButton"
@@ -943,6 +1166,7 @@ export default function AdminResultsPage() {
               results.length === 0 ||
               deletingSelected
             }
+            type="button"
           >
             Barchasini o‘chirish
           </button>
@@ -975,15 +1199,17 @@ export default function AdminResultsPage() {
 
               <thead>
                 <tr>
-                  <th className="selectCell">
-                    <input
-                      type="checkbox"
-                      className="selectCheckbox"
-                      checked={allFilteredSelected}
-                      onChange={toggleAllFiltered}
-                      aria-label="Ko‘rinib turgan natijalarning barchasini tanlash"
-                    />
-                  </th>
+                  {selectionMode && (
+                    <th className="selectCell">
+                      <input
+                        type="checkbox"
+                        className="selectCheckbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleAllFiltered}
+                        aria-label="Ko‘rinib turgan barcha natijalarni tanlash"
+                      />
+                    </th>
+                  )}
                   <th>№</th>
                   <th>Foydalanuvchi</th>
                   <th>Test</th>
@@ -999,136 +1225,313 @@ export default function AdminResultsPage() {
 
               <tbody>
 
-                {filteredResults.map(
-                  (item, index) => (
+                {groupedUsers.map(
+                  (group, userIndex) => {
+                    const isExpanded =
+                      expandedUsers.has(
+                        group.key
+                      );
 
-                    <tr
-                      key={item.id}
-                      className={
-                        selectedIds.has(item.id)
-                          ? "selectedRow"
-                          : ""
-                      }
-                    >
+                    const groupIds =
+                      group.results.map(
+                        (item) => item.id
+                      );
 
-                      <td className="selectCell">
-                        <input
-                          type="checkbox"
-                          className="selectCheckbox"
-                          checked={selectedIds.has(item.id)}
-                          onChange={() => toggleSelected(item.id)}
-                          aria-label={`${item.userName} natijasini tanlash`}
-                        />
-                      </td>
+                    const groupAllSelected =
+                      groupIds.length > 0 &&
+                      groupIds.every((id) =>
+                        selectedIds.has(id)
+                      );
 
-                      <td>
-                        {index + 1}
-                      </td>
+                    const subjectText =
+                      group.subjects.length > 0
+                        ? group.subjects.join(", ")
+                        : "—";
 
-                      <td className="userCell">
-                        {item.userName}
-                      </td>
-
-                      <td>
-                        {item.testTitle}
-                      </td>
-
-                      <td>
-                        {item.subject ||
-                          "—"}
-                      </td>
-
-                      <td>
-
-                        <span
+                    return (
+                      <Fragment
+                        key={group.key}
+                      >
+                        <tr
                           className={
-                            item.percentage >=
-                            71
-                              ? "score goodScore"
-                              : item.percentage >=
-                                56
-                              ? "score middleScore"
-                              : "score lowScore"
+                            groupAllSelected &&
+                            selectionMode
+                              ? "userSummaryRow selectedRow"
+                              : "userSummaryRow"
                           }
                         >
-                          {
-                            item.percentage
-                          }
-                          %
-                        </span>
+                          {selectionMode && (
+                            <td className="selectCell">
+                              <input
+                                type="checkbox"
+                                className="selectCheckbox"
+                                checked={
+                                  groupAllSelected
+                                }
+                                onChange={() =>
+                                  toggleUserSelection(
+                                    groupIds
+                                  )
+                                }
+                                aria-label={`${group.userName} foydalanuvchisining barcha natijalarini tanlash`}
+                              />
+                            </td>
+                          )}
 
-                      </td>
+                          <td>
+                            {userIndex + 1}
+                          </td>
 
-                      <td>
+                          <td className="userCell">
+                            <button
+                              type="button"
+                              className="userExpandButton"
+                              onClick={() =>
+                                toggleUser(
+                                  group.key
+                                )
+                              }
+                              aria-expanded={
+                                isExpanded
+                              }
+                            >
+                              <span
+                                className={
+                                  isExpanded
+                                    ? "expandArrow open"
+                                    : "expandArrow"
+                                }
+                              >
+                                ▶
+                              </span>
+                              <span>
+                                {group.userName}
+                              </span>
+                            </button>
+                          </td>
 
-                        <div className="answerStats">
+                          <td>
+                            <strong>
+                              {group.uniqueTests} ta test
+                            </strong>
+                            <div className="summarySubtext">
+                              {group.results.length} ta urinish
+                            </div>
+                          </td>
 
-                          <span className="correctText">
-                            ✓ {item.correct}
-                          </span>
+                          <td className="groupSubjectCell">
+                            {subjectText}
+                          </td>
 
-                          <span className="wrongText">
-                            × {item.incorrect}
-                          </span>
+                          <td>
+                            <span
+                              className={
+                                group.average >= 71
+                                  ? "score goodScore"
+                                  : group.average >= 56
+                                  ? "score middleScore"
+                                  : "score lowScore"
+                              }
+                            >
+                              {group.average}%
+                            </span>
+                            <div className="summarySubtext">
+                              o‘rtacha
+                            </div>
+                          </td>
 
-                          <span>
-                            —{" "}
-                            {
-                              item.unanswered
-                            }
-                          </span>
+                          <td>
+                            <div className="answerStats">
+                              <span className="correctText">
+                                ✓ {group.totalCorrect}
+                              </span>
 
-                        </div>
+                              <span className="wrongText">
+                                × {group.totalIncorrect}
+                              </span>
 
-                      </td>
+                              <span>
+                                — {group.totalUnanswered}
+                              </span>
+                            </div>
+                          </td>
 
-                      <td>
-                        {
-                          item.earnedPoints
-                        }
-                        /
-                        {
-                          item.totalPoints
-                        }
-                      </td>
+                          <td>
+                            <span className="bestResultText">
+                              Eng yuqori:
+                              {" "}
+                              {group.best}%
+                            </span>
+                          </td>
 
-                      <td>
-                        {formatDuration(
-                          item.spentSeconds
-                        )}
-                      </td>
+                          <td>
+                            {formatDuration(
+                              group.totalSpentSeconds
+                            )}
+                          </td>
 
-                      <td className="dateCell">
-                        {formatDate(
-                          item.finishedAt
-                        )}
-                      </td>
+                          <td className="dateCell">
+                            {formatDate(
+                              group.latestFinishedAt
+                            )}
+                          </td>
 
-                      <td>
+                          <td>
+                            <button
+                              type="button"
+                              className="openUserButton"
+                              onClick={() =>
+                                toggleUser(
+                                  group.key
+                                )
+                              }
+                            >
+                              {isExpanded
+                                ? "Yopish"
+                                : "Testlarni ko‘rish"}
+                            </button>
+                          </td>
+                        </tr>
 
-                        <button
-                          className="deleteButton"
-                          disabled={
-                            deletingId ===
-                            item.id
-                          }
-                          onClick={() =>
-                            deleteResult(
-                              item.id
+                        {isExpanded &&
+                          group.results.map(
+                            (
+                              item,
+                              attemptIndex
+                            ) => (
+                              <tr
+                                key={item.id}
+                                className={
+                                  selectedIds.has(
+                                    item.id
+                                  ) &&
+                                  selectionMode
+                                    ? "childResultRow selectedRow"
+                                    : "childResultRow"
+                                }
+                              >
+                                {selectionMode && (
+                                  <td className="selectCell">
+                                    <input
+                                      type="checkbox"
+                                      className="selectCheckbox"
+                                      checked={selectedIds.has(
+                                        item.id
+                                      )}
+                                      onChange={() =>
+                                        toggleSelected(
+                                          item.id
+                                        )
+                                      }
+                                      aria-label={`${group.userName} — ${item.testTitle} natijasini tanlash`}
+                                    />
+                                  </td>
+                                )}
+
+                                <td className="childNumber">
+                                  {userIndex + 1}.
+                                  {attemptIndex + 1}
+                                </td>
+
+                                <td className="childUserCell">
+                                  ↳
+                                </td>
+
+                                <td className="childTestCell">
+                                  {item.testTitle}
+                                </td>
+
+                                <td>
+                                  {item.subject ||
+                                    "—"}
+                                </td>
+
+                                <td>
+                                  <span
+                                    className={
+                                      item.percentage >=
+                                      71
+                                        ? "score goodScore"
+                                        : item.percentage >=
+                                          56
+                                        ? "score middleScore"
+                                        : "score lowScore"
+                                    }
+                                  >
+                                    {
+                                      item.percentage
+                                    }
+                                    %
+                                  </span>
+                                </td>
+
+                                <td>
+                                  <div className="answerStats">
+                                    <span className="correctText">
+                                      ✓ {item.correct}
+                                    </span>
+
+                                    <span className="wrongText">
+                                      × {item.incorrect}
+                                    </span>
+
+                                    <span>
+                                      —{" "}
+                                      {
+                                        item.unanswered
+                                      }
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td>
+                                  {
+                                    item.earnedPoints
+                                  }
+                                  /
+                                  {
+                                    item.totalPoints
+                                  }
+                                </td>
+
+                                <td>
+                                  {formatDuration(
+                                    item.spentSeconds
+                                  )}
+                                </td>
+
+                                <td className="dateCell">
+                                  {formatDate(
+                                    item.finishedAt
+                                  )}
+                                </td>
+
+                                <td>
+                                  <button
+                                    className="deleteButton"
+                                    disabled={
+                                      deletingId ===
+                                      item.id
+                                    }
+                                    onClick={() =>
+                                      deleteResult(
+                                        item.id
+                                      )
+                                    }
+                                    type="button"
+                                  >
+                                    {deletingId ===
+                                    item.id
+                                      ? "..."
+                                      : "O‘chirish"}
+                                  </button>
+                                </td>
+                              </tr>
                             )
-                          }
-                        >
-                          {deletingId ===
-                          item.id
-                            ? "..."
-                            : "O‘chirish"}
-                        </button>
-
-                      </td>
-
-                    </tr>
-
-                  )
+                          )}
+                      </Fragment>
+                    );
+                  }
                 )}
 
               </tbody>
@@ -1249,6 +1652,7 @@ export default function AdminResultsPage() {
 
         .headerButtons button,
         .refreshButton,
+        .selectModeButton,
         .exportButton,
         .pdfButton,
         .deleteSelectedButton,
@@ -1712,6 +2116,7 @@ export default function AdminResultsPage() {
             auto
             auto
             auto
+            auto
             auto;
 
           gap: 10px;
@@ -1745,6 +2150,36 @@ export default function AdminResultsPage() {
           background: white;
 
           font-size: 15px;
+        }
+
+        .selectModeButton {
+          border-color: #35667f;
+
+          background:
+            linear-gradient(
+              #eaf8ff,
+              #8ccce9
+            );
+
+          box-shadow:
+            0 4px 0 #315f75;
+
+          color: #123f55;
+        }
+
+        .selectModeButton.active {
+          border-color: #8a5b12;
+
+          background:
+            linear-gradient(
+              #fff0bd,
+              #e9b84c
+            );
+
+          box-shadow:
+            0 4px 0 #7b5313;
+
+          color: #624000;
         }
 
         .pdfButton {
@@ -1883,10 +2318,6 @@ export default function AdminResultsPage() {
           font-size: 15px;
         }
 
-        tbody tr:nth-child(even) {
-          background: #f3f3f3;
-        }
-
         tbody tr:hover {
           background: #eaf7ff;
         }
@@ -1908,6 +2339,122 @@ export default function AdminResultsPage() {
         .silver,
         .bronze {
           font-size: 24px;
+        }
+
+        .userSummaryRow {
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #edf5f9
+            );
+        }
+
+        .userSummaryRow:hover {
+          background: #e5f4fb;
+        }
+
+        .userExpandButton {
+          width: 100%;
+          padding: 7px 5px;
+
+          display: inline-flex;
+          align-items: center;
+          justify-content: flex-start;
+          gap: 10px;
+
+          border: 0;
+          background: transparent;
+
+          color: #111;
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 700;
+          text-align: left;
+        }
+
+        .userExpandButton:hover {
+          color: #07517e;
+        }
+
+        .expandArrow {
+          display: inline-block;
+          color: #07517e;
+          font-size: 14px;
+
+          transition:
+            transform .15s ease;
+        }
+
+        .expandArrow.open {
+          transform:
+            rotate(90deg);
+        }
+
+        .summarySubtext {
+          margin-top: 4px;
+
+          color: #666;
+
+          font-size: 12px;
+          font-weight: 400;
+        }
+
+        .groupSubjectCell {
+          max-width: 180px;
+        }
+
+        .bestResultText {
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .openUserButton {
+          min-height: 38px;
+          padding: 0 12px;
+
+          border:
+            1px solid #35667f;
+
+          border-radius: 7px;
+
+          background:
+            linear-gradient(
+              #eaf8ff,
+              #8ccce9
+            );
+
+          color: #123f55;
+
+          font-weight: 700;
+        }
+
+        .childResultRow {
+          background: #fafafa;
+        }
+
+        .childResultRow:hover {
+          background: #f1f8fc;
+        }
+
+        .childResultRow td {
+          border-bottom-color: #d7d7d7;
+        }
+
+        .childNumber,
+        .childUserCell {
+          color: #666;
+          font-size: 13px;
+        }
+
+        .childUserCell {
+          font-size: 21px;
+          font-weight: 700;
+        }
+
+        .childTestCell {
+          text-align: left;
+          padding-left: 18px;
         }
 
         .selectCell {
