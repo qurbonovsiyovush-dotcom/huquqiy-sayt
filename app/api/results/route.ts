@@ -3,19 +3,11 @@ import {
   NextResponse,
 } from "next/server";
 
-import {
-  get,
-  put,
-} from "@vercel/blob";
-
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const RESULTS_BLOB_PATH =
-  "huquqiy-sayt/test-results.json";
 
 /* =========================================================
    TYPES
@@ -23,7 +15,6 @@ const RESULTS_BLOB_PATH =
 
 type TestResult = {
   id: string;
-
   userId?: string;
   userName: string;
 
@@ -46,10 +37,7 @@ type TestResult = {
 
   spentSeconds: number;
 
-  answers?: Record<
-    string,
-    unknown
-  >;
+  answers?: Record<string, unknown>;
 
   finishedAt: string;
 };
@@ -57,12 +45,8 @@ type TestResult = {
 type VerifiedQuestion = {
   questionId: string;
   questionNumber: number;
-  selectedAnswer:
-    | string
-    | null;
-  correctAnswer:
-    | string
-    | null;
+  selectedAnswer: string | null;
+  correctAnswer: string | null;
   answerStatus:
     | "correct"
     | "incorrect"
@@ -78,20 +62,15 @@ function safeNumber(
   value: unknown,
   fallback = 0
 ) {
-  const parsed =
-    Number(value);
+  const parsed = Number(value);
 
-  return Number.isFinite(
-    parsed
-  )
+  return Number.isFinite(parsed)
     ? parsed
     : fallback;
 }
 
 function decodeCookieValue(
-  value:
-    | string
-    | undefined,
+  value: string | undefined,
   fallback: string
 ) {
   if (!value) {
@@ -99,117 +78,10 @@ function decodeCookieValue(
   }
 
   try {
-    return decodeURIComponent(
-      value
-    );
+    return decodeURIComponent(value);
   } catch {
     return value;
   }
-}
-
-/* =========================================================
-   BLOB'DAN NATIJALARNI O‘QISH
-========================================================= */
-
-async function readResults():
-  Promise<TestResult[]> {
-  if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-
-  try {
-    const result =
-      await get(
-        RESULTS_BLOB_PATH,
-        {
-          access:
-            "private",
-        }
-      );
-
-    if (
-      !result ||
-      result.statusCode !==
-        200 ||
-      !result.stream
-    ) {
-      return [];
-    }
-
-    const text =
-      await new Response(
-        result.stream
-      ).text();
-
-    if (!text.trim()) {
-      return [];
-    }
-
-    const parsed =
-      JSON.parse(text);
-
-    return Array.isArray(
-      parsed
-    )
-      ? parsed
-      : [];
-  } catch (error) {
-    /*
-      Blob hali yaratilmagan
-      bo‘lsa birinchi natijadan
-      boshlaymiz.
-    */
-
-    console.log(
-      "Natijalar Blob hali mavjud emas:",
-      error
-    );
-
-    return [];
-  }
-}
-
-/* =========================================================
-   NATIJALARNI BLOB'GA YOZISH
-========================================================= */
-
-async function writeResults(
-  results: TestResult[]
-) {
-  if (
-    !process.env
-      .BLOB_READ_WRITE_TOKEN
-  ) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-
-  await put(
-    RESULTS_BLOB_PATH,
-    JSON.stringify(
-      results,
-      null,
-      2
-    ),
-    {
-      access:
-        "private",
-      addRandomSuffix:
-        false,
-      allowOverwrite:
-        true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge:
-        60,
-    }
-  );
 }
 
 /* =========================================================
@@ -219,8 +91,11 @@ async function writeResults(
    1) Foydalanuvchini tekshiradi
    2) Testni Neon'dan oladi
    3) answers mavjud bo‘lsa serverning o‘zi tekshiradi
-   4) Eski Test natijalari bo‘limi uchun Blob'ga yozadi
-   5) Reyting uchun Neon'ga savolma-savol yozadi
+   4) Barcha test natijalarini ranking_attempts ga yozadi
+   5) Server tekshirgan real javoblarni
+      ranking_question_results ga yozadi
+
+   VERCEL BLOB ISHLATILMAYDI.
 ========================================================= */
 
 export async function POST(
@@ -258,12 +133,11 @@ export async function POST(
        USER ID
     ===================================================== */
 
-    let userId =
-      String(
-        request.cookies.get(
-          "qurbonov_user_id"
-        )?.value || ""
-      ).trim();
+    let userId = String(
+      request.cookies.get(
+        "qurbonov_user_id"
+      )?.value || ""
+    ).trim();
 
     if (
       role === "admin" &&
@@ -274,19 +148,15 @@ export async function POST(
 
     /*
       Eski session bilan kirib turgan
-      foydalanuvchida bu cookie
-      bo‘lmasligi mumkin.
-
-      Logout -> qayta login qilinsa
-      avtomatik paydo bo‘ladi.
+      foydalanuvchida bu cookie bo‘lmasligi mumkin.
+      Logout -> qayta login qilinsa avtomatik paydo bo‘ladi.
     */
 
     if (!userId) {
       return NextResponse.json(
         {
           success: false,
-          code:
-            "USER_ID_MISSING",
+          code: "USER_ID_MISSING",
           message:
             "Foydalanuvchi ID topilmadi. Tizimdan chiqib qayta kiring.",
         },
@@ -298,7 +168,6 @@ export async function POST(
 
     /* =====================================================
        FOYDALANUVCHI ISMI
-
        Oddiy user bo‘lsa ismni cookie'dan emas,
        Neon access_codes jadvalidan olamiz.
     ===================================================== */
@@ -311,28 +180,22 @@ export async function POST(
         "Foydalanuvchi"
       );
 
-    if (
-      role !== "admin"
-    ) {
-      const userRows =
-        await sql`
-          SELECT
-            id,
-            name,
-            active,
-            approved
-          FROM access_codes
-          WHERE id = ${userId}
-          LIMIT 1
-        `;
+    if (role !== "admin") {
+      const userRows = await sql`
+        SELECT
+          id,
+          name,
+          active,
+          approved
+        FROM access_codes
+        WHERE id = ${userId}
+        LIMIT 1
+      `;
 
-      if (
-        userRows.length === 0
-      ) {
+      if (userRows.length === 0) {
         return NextResponse.json(
           {
-            success:
-              false,
+            success: false,
             message:
               "Foydalanuvchi topilmadi.",
           },
@@ -342,19 +205,15 @@ export async function POST(
         );
       }
 
-      const user: any =
-        userRows[0];
+      const user: any = userRows[0];
 
       if (
-        user.active !==
-          true ||
-        user.approved !==
-          true
+        user.active !== true ||
+        user.approved !== true
       ) {
         return NextResponse.json(
           {
-            success:
-              false,
+            success: false,
             message:
               "Foydalanuvchi uchun test natijasini saqlashga ruxsat yo‘q.",
           },
@@ -364,11 +223,10 @@ export async function POST(
         );
       }
 
-      userName =
-        String(
-          user.name ||
-            "Foydalanuvchi"
-        );
+      userName = String(
+        user.name ||
+          "Foydalanuvchi"
+      );
     }
 
     /* =====================================================
@@ -403,24 +261,20 @@ export async function POST(
        clientdan ishonib olmaymiz.
     ===================================================== */
 
-    const testRows =
-      await sql`
-        SELECT
-          id,
-          title,
-          subject,
-          test_type,
-          custom_test_type_name,
-          status
-        FROM legacy_tests
-        WHERE id =
-          ${requestedTestId}
-        LIMIT 1
-      `;
+    const testRows = await sql`
+      SELECT
+        id,
+        title,
+        subject,
+        test_type,
+        custom_test_type_name,
+        status
+      FROM legacy_tests
+      WHERE id = ${requestedTestId}
+      LIMIT 1
+    `;
 
-    if (
-      testRows.length === 0
-    ) {
+    if (testRows.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -438,8 +292,7 @@ export async function POST(
 
     if (
       role !== "admin" &&
-      test.status !==
-        "published"
+      test.status !== "published"
     ) {
       return NextResponse.json(
         {
@@ -456,42 +309,33 @@ export async function POST(
     const testId =
       String(test.id);
 
-    const testTitle =
-      String(
-        test.title ||
-          "Nomsiz test"
-      );
+    const testTitle = String(
+      test.title || "Nomsiz test"
+    );
 
-    const subject =
-      String(
-        test.subject || ""
-      );
+    const subject = String(
+      test.subject || ""
+    );
 
-    const testType =
-      String(
-        test.test_type ||
-          test.custom_test_type_name ||
-          "other"
-      );
+    const testType = String(
+      test.test_type ||
+        test.custom_test_type_name ||
+        "other"
+    );
 
     /* =====================================================
        ANSWERS
     ===================================================== */
 
     let answers:
-      | Record<
-          string,
-          unknown
-        >
+      | Record<string, unknown>
       | undefined;
 
     if (
       body?.answers &&
       typeof body.answers ===
         "object" &&
-      !Array.isArray(
-        body.answers
-      )
+      !Array.isArray(body.answers)
     ) {
       answers =
         body.answers as Record<
@@ -501,107 +345,82 @@ export async function POST(
     }
 
     /*
-      Hozirgi eski frontend answers yubormasa
-      sayt buzilib qolmasligi uchun
-      vaqtincha backward-compatible ishlaymiz.
+      Eski frontend answers yubormasa ham
+      sayt buzilmasligi uchun client yuborgan
+      natijalarni vaqtincha qabul qilamiz.
 
-      Keyingi qadamda frontend ham answers yuboradi.
+      answers mavjud bo‘lsa quyida server
+      natijani qayta hisoblaydi.
     */
 
-    let total =
+    let total = Math.max(
+      0,
+      safeNumber(body?.total)
+    );
+
+    let correct = Math.max(
+      0,
+      safeNumber(body?.correct)
+    );
+
+    let incorrect = Math.max(
+      0,
+      safeNumber(body?.incorrect)
+    );
+
+    let unanswered = Math.max(
+      0,
+      safeNumber(body?.unanswered)
+    );
+
+    let percentage = Math.min(
+      100,
       Math.max(
         0,
+        safeNumber(body?.percentage)
+      )
+    );
+
+    let earnedPoints = Math.max(
+      0,
+      safeNumber(body?.earnedPoints)
+    );
+
+    let totalPoints = Math.max(
+      0,
+      safeNumber(body?.totalPoints)
+    );
+
+    const spentSeconds = Math.max(
+      0,
+      Math.floor(
         safeNumber(
-          body?.total
+          body?.spentSeconds
         )
-      );
-
-    let correct =
-      Math.max(
-        0,
-        safeNumber(
-          body?.correct
-        )
-      );
-
-    let incorrect =
-      Math.max(
-        0,
-        safeNumber(
-          body?.incorrect
-        )
-      );
-
-    let unanswered =
-      Math.max(
-        0,
-        safeNumber(
-          body?.unanswered
-        )
-      );
-
-    let percentage =
-      Math.min(
-        100,
-        Math.max(
-          0,
-          safeNumber(
-            body?.percentage
-          )
-        )
-      );
-
-    let earnedPoints =
-      Math.max(
-        0,
-        safeNumber(
-          body?.earnedPoints
-        )
-      );
-
-    let totalPoints =
-      Math.max(
-        0,
-        safeNumber(
-          body?.totalPoints
-        )
-      );
-
-    const spentSeconds =
-      Math.max(
-        0,
-        Math.floor(
-          safeNumber(
-            body?.spentSeconds
-          )
-        )
-      );
+      )
+    );
 
     let verifiedQuestions:
-      VerifiedQuestion[] =
-        [];
+      VerifiedQuestion[] = [];
 
-    let serverVerified =
-      false;
+    let serverVerified = false;
 
     /* =====================================================
        SERVER TOMONIDA SAVOLMA-SAVOL TEKSHIRISH
     ===================================================== */
 
     if (answers) {
-      const questionRows =
-        await sql`
-          SELECT
-            id,
-            question_number,
-            points
-          FROM legacy_test_questions
-          WHERE test_id =
-            ${testId}
-          ORDER BY
-            question_number ASC,
-            id ASC
-        `;
+      const questionRows = await sql`
+        SELECT
+          id,
+          question_number,
+          points
+        FROM legacy_test_questions
+        WHERE test_id = ${testId}
+        ORDER BY
+          question_number ASC,
+          id ASC
+      `;
 
       const questionIds =
         questionRows.map(
@@ -612,10 +431,7 @@ export async function POST(
       let correctOptionRows:
         any[] = [];
 
-      if (
-        questionIds.length >
-          0
-      ) {
+      if (questionIds.length > 0) {
         correctOptionRows =
           await sql`
             SELECT
@@ -623,13 +439,10 @@ export async function POST(
               question_id
             FROM legacy_test_options
             WHERE
-              question_id =
-                ANY(
-                  ${questionIds}
-                )
-              AND
-              is_correct =
-                TRUE
+              question_id = ANY(
+                ${questionIds}
+              )
+              AND is_correct = TRUE
             ORDER BY
               question_id ASC,
               id ASC
@@ -637,9 +450,8 @@ export async function POST(
       }
 
       /*
-        Bir savolda bir nechta
-        to‘g‘ri variant bo‘lsa ham
-        ishlashi uchun Set ishlatamiz.
+        Bir savolda bir nechta to‘g‘ri variant
+        bo‘lsa ham ishlashi uchun Set ishlatamiz.
       */
 
       const correctOptions =
@@ -650,23 +462,18 @@ export async function POST(
 
       for (
         const option of
-          correctOptionRows
+        correctOptionRows
       ) {
-        const qid =
-          String(
-            option.question_id
-          );
+        const qid = String(
+          option.question_id
+        );
 
         const current =
-          correctOptions.get(
-            qid
-          ) ||
+          correctOptions.get(qid) ||
           new Set<string>();
 
         current.add(
-          String(
-            option.id
-          )
+          String(option.id)
         );
 
         correctOptions.set(
@@ -675,29 +482,19 @@ export async function POST(
         );
       }
 
-      let verifiedCorrect =
-        0;
-
-      let verifiedIncorrect =
-        0;
-
-      let verifiedUnanswered =
-        0;
-
-      let verifiedEarned =
-        0;
-
-      let verifiedTotalPoints =
-        0;
+      let verifiedCorrect = 0;
+      let verifiedIncorrect = 0;
+      let verifiedUnanswered = 0;
+      let verifiedEarned = 0;
+      let verifiedTotalPoints = 0;
 
       for (
         const question of
-          questionRows
+        questionRows
       ) {
-        const questionId =
-          String(
-            question.id
-          );
+        const questionId = String(
+          question.id
+        );
 
         const questionNumber =
           Number(
@@ -705,44 +502,32 @@ export async function POST(
           ) || 0;
 
         const points =
-          Number(
-            question.points
-          ) > 0
+          Number(question.points) > 0
             ? Number(
                 question.points
               )
             : 1;
 
-        verifiedTotalPoints +=
-          points;
+        verifiedTotalPoints += points;
 
         const rawSelected =
-          answers[
-            questionId
-          ];
+          answers[questionId];
 
         const selected =
-          rawSelected ===
-            undefined ||
-          rawSelected ===
-            null ||
-          String(
-            rawSelected
-          ).trim() === ""
+          rawSelected === undefined ||
+          rawSelected === null ||
+          String(rawSelected).trim() ===
+            ""
             ? null
-            : String(
-                rawSelected
-              );
+            : String(rawSelected);
 
         const correctSet =
           correctOptions.get(
             questionId
-          ) ||
-          new Set<string>();
+          ) || new Set<string>();
 
         const correctAnswer =
-          correctSet.size >
-            0
+          correctSet.size > 0
             ? Array.from(
                 correctSet
               ).join(",")
@@ -751,58 +536,48 @@ export async function POST(
         if (!selected) {
           verifiedUnanswered++;
 
-          verifiedQuestions.push(
-            {
-              questionId,
-              questionNumber,
-              selectedAnswer:
-                null,
-              correctAnswer,
-              answerStatus:
-                "unanswered",
-              points: 0,
-            }
-          );
+          verifiedQuestions.push({
+            questionId,
+            questionNumber,
+            selectedAnswer: null,
+            correctAnswer,
+            answerStatus:
+              "unanswered",
+            points: 0,
+          });
 
           continue;
         }
 
         if (
-          correctSet.has(
-            selected
-          )
+          correctSet.has(selected)
         ) {
           verifiedCorrect++;
-          verifiedEarned +=
-            points;
+          verifiedEarned += points;
 
-          verifiedQuestions.push(
-            {
-              questionId,
-              questionNumber,
-              selectedAnswer:
-                selected,
-              correctAnswer,
-              answerStatus:
-                "correct",
-              points,
-            }
-          );
+          verifiedQuestions.push({
+            questionId,
+            questionNumber,
+            selectedAnswer:
+              selected,
+            correctAnswer,
+            answerStatus:
+              "correct",
+            points,
+          });
         } else {
           verifiedIncorrect++;
 
-          verifiedQuestions.push(
-            {
-              questionId,
-              questionNumber,
-              selectedAnswer:
-                selected,
-              correctAnswer,
-              answerStatus:
-                "incorrect",
-              points: 0,
-            }
-          );
+          verifiedQuestions.push({
+            questionId,
+            questionNumber,
+            selectedAnswer:
+              selected,
+            correctAnswer,
+            answerStatus:
+              "incorrect",
+            points: 0,
+          });
         }
       }
 
@@ -827,16 +602,12 @@ export async function POST(
       percentage =
         total > 0
           ? Math.round(
-              (
-                correct /
-                total
-              ) *
+              (correct / total) *
                 100
             )
           : 0;
 
-      serverVerified =
-        true;
+      serverVerified = true;
     }
 
     /* =====================================================
@@ -847,24 +618,15 @@ export async function POST(
       crypto.randomUUID();
 
     const finishedAt =
-      new Date()
-        .toISOString();
+      new Date().toISOString();
 
-    /* =====================================================
-       ESKI TEST NATIJALARI BO‘LIMI UCHUN BLOB
-    ===================================================== */
-
-    const result:
-      TestResult = {
-      id:
-        resultId,
+    const result: TestResult = {
+      id: resultId,
 
       userId,
       userName,
 
-      source:
-        "legacy",
-
+      source: "legacy",
       testType,
 
       testId,
@@ -883,179 +645,106 @@ export async function POST(
 
       spentSeconds,
 
-      /*
-        Reyting Neon'ga yozilmay qolsa,
-        keyinchalik tiklash imkoniyati
-        bo‘lishi uchun answers Blob'da
-        ham saqlanadi.
-      */
       answers,
 
       finishedAt,
     };
 
-    /*
-      Vercel Blob eski "Test natijalari" bo‘limi uchun
-      ishlatiladi. Blob vaqtincha suspend bo‘lsa ham
-      umumiy reyting Neon'ga yozilishi to‘xtamasligi kerak.
-    */
+    /* =====================================================
+       ASOSIY NATIJANI NEON'GA SAQLASH
 
-    let blobSaved =
-      false;
+       MUHIM:
+       Bu attempt reyting yoqilgan yoki yoqilmaganidan
+       qat'i nazar saqlanadi.
 
-    let blobWarning:
-      string | null =
-        null;
+       Reytingning o‘zi ranking_question_results va
+       user_profiles.ranking_enabled orqali hisoblanadi.
+    ===================================================== */
 
-    try {
-      const results =
-        await readResults();
+    const attemptRows = await sql`
+      INSERT INTO ranking_attempts (
+        user_id,
+        user_name,
+        source,
+        test_type,
+        test_id,
+        test_title,
+        subject,
+        total_questions,
+        correct_count,
+        incorrect_count,
+        unanswered_count,
+        percentage,
+        earned_points,
+        total_points,
+        spent_seconds,
+        source_attempt_id,
+        finished_at,
+        created_at
+      )
+      VALUES (
+        ${userId},
+        ${userName},
+        'legacy',
+        ${testType},
+        ${testId},
+        ${testTitle},
+        ${subject},
+        ${total},
+        ${correct},
+        ${incorrect},
+        ${unanswered},
+        ${percentage},
+        ${earnedPoints},
+        ${totalPoints},
+        ${spentSeconds},
+        ${resultId},
+        ${finishedAt}::timestamptz,
+        NOW()
+      )
+      RETURNING
+        id
+    `;
 
-      results.unshift(
-        result
+    const rankingAttemptId =
+      String(
+        attemptRows[0]?.id || ""
       );
 
-      await writeResults(
-        results
+    if (!rankingAttemptId) {
+      throw new Error(
+        "Test natijasini Neon bazasiga saqlab bo‘lmadi."
       );
-
-      blobSaved =
-        true;
-    } catch (blobError) {
-      console.error(
-        "BLOB SAVE ERROR:",
-        blobError
-      );
-
-      blobWarning =
-        blobError instanceof Error
-          ? blobError.message
-          : "Vercel Blob'ga yozib bo‘lmadi.";
-
-      /*
-        MUHIM:
-        Bu xato reytingni to‘xtatmaydi.
-        Quyida Neon'ga yozishni davom ettiramiz.
-      */
     }
 
     /* =====================================================
-       REYTINGNI NEON'GA YOZISH
+       REYTING UCHUN SAVOLMA-SAVOL NATIJALAR
 
-       Faqat answers mavjud bo‘lsa.
-       Shunda natija server tomonidan
-       savolma-savol tekshirilgan bo‘ladi.
+       Faqat server tekshirgan va real javob berilgan
+       savollar ranking_question_results ga yoziladi.
+
+       unanswered bu jadvalga yozilmaydi.
     ===================================================== */
 
-    let rankingSaved =
-      false;
-
-    let rankingAttemptId:
-      string | null =
-        null;
+    let rankingSaved = false;
+    let rankingWarning:
+      string | null = null;
 
     if (
       serverVerified &&
-      verifiedQuestions.length >
-        0
+      verifiedQuestions.length > 0
     ) {
-      try {
-        const attempts =
-          await sql`
-            INSERT INTO ranking_attempts (
-              user_id,
-              user_name,
-              source,
-              test_type,
-              test_id,
-              test_title,
-              subject,
-              total_questions,
-              correct_count,
-              incorrect_count,
-              unanswered_count,
-              percentage,
-              earned_points,
-              total_points,
-              spent_seconds,
-              source_attempt_id,
-              finished_at,
-              created_at
-            )
-            VALUES (
-              ${userId},
-              ${userName},
-              'legacy',
-              ${testType},
-              ${testId},
-              ${testTitle},
-              ${subject},
-              ${total},
-              ${correct},
-              ${incorrect},
-              ${unanswered},
-              ${percentage},
-              ${earnedPoints},
-              ${totalPoints},
-              ${spentSeconds},
-              ${resultId},
-              ${finishedAt}::timestamptz,
-              NOW()
-            )
-            RETURNING id
-          `;
+      const answeredQuestions =
+        verifiedQuestions.filter(
+          (question) =>
+            question.answerStatus !==
+            "unanswered"
+        );
 
-        rankingAttemptId =
-          String(
-            attempts[0]?.id ||
-              ""
-          );
-
-        if (
-          !rankingAttemptId
-        ) {
-          throw new Error(
-            "Ranking attempt ID yaratilmadi."
-          );
-        }
-
-        /*
-          MUHIM OPTIMIZATSIYA:
-
-          Masalan KONS 840 testida foydalanuvchi
-          faqat 5 ta savol ishlasa, 840 ta qator
-          yozish shart emas.
-
-          Reyting uchun faqat real javob berilgan
-          savollarni saqlaymiz:
-          - correct
-          - incorrect
-
-          unanswered soni ranking_attempts ichida
-          baribir saqlanadi.
-        */
-
-        const answeredQuestions =
-          verifiedQuestions.filter(
-            (question) =>
-              question.answerStatus !==
-              "unanswered"
-          );
-
-        if (
-          answeredQuestions.length >
-          0
-        ) {
-          /*
-            Barcha savollarni bitta SQL query bilan
-            Neon'ga yuboramiz.
-
-            Oldingi variant 840 ta savol bo‘lsa
-            840 ta alohida query yuborardi.
-            Shu sabab request uzoq "pending"
-            holatda qolishi mumkin edi.
-          */
-
+      if (
+        answeredQuestions.length > 0
+      ) {
+        try {
           const bulkQuestionResults =
             answeredQuestions.map(
               (question) => ({
@@ -1129,44 +818,55 @@ export async function POST(
               points numeric
             )
           `;
-        }
 
-        rankingSaved =
-          true;
-      } catch (
-        rankingError
-      ) {
-        console.error(
-          "RANKING SAVE ERROR:",
-          rankingError
-        );
+          rankingSaved = true;
+        } catch (rankingError) {
+          console.error(
+            "RANKING QUESTION SAVE ERROR:",
+            rankingError
+          );
 
-        /*
-          Yarim yozilgan attempt qolib
-          ketmasligi uchun o‘chiramiz.
-          ON DELETE CASCADE sabab
-          question_results ham o‘chadi.
-        */
+          rankingWarning =
+            rankingError instanceof Error
+              ? rankingError.message
+              : "Reyting savollarini Neon bazasiga yozib bo‘lmadi.";
 
-        if (
-          rankingAttemptId
-        ) {
+          /*
+            Asosiy ranking_attempts qatori O‘CHIRILMAYDI.
+            Chunki endi u Test natijalari bo‘limining
+            asosiy tarix yozuvi hisoblanadi.
+
+            Faqat shu attemptga tegishli yarim yozilgan
+            savol natijalari bo‘lsa tozalaymiz.
+          */
+
           try {
             await sql`
               DELETE FROM
-                ranking_attempts
-              WHERE id =
-                ${rankingAttemptId}
+                ranking_question_results
+              WHERE
+                ranking_attempt_id =
+                  ${rankingAttemptId}
             `;
           } catch (
             cleanupError
           ) {
             console.error(
-              "RANKING CLEANUP ERROR:",
+              "RANKING QUESTION CLEANUP ERROR:",
               cleanupError
             );
           }
+
+          rankingSaved = false;
         }
+      } else {
+        /*
+          Server tekshirgan, lekin foydalanuvchi
+          birorta savolga javob bermagan.
+          Natija attempt sifatida saqlanadi,
+          reytingga real javob qo‘shilmaydi.
+        */
+        rankingSaved = true;
       }
     }
 
@@ -1175,31 +875,23 @@ export async function POST(
     ===================================================== */
 
     console.log(
-      "NATIJA SAQLANDI:",
+      "NATIJA NEON'GA SAQLANDI:",
       {
-        id:
-          result.id,
-
+        id: result.id,
+        neonAttemptId:
+          rankingAttemptId,
         userId:
           result.userId,
-
         userName:
           result.userName,
-
         testTitle:
           result.testTitle,
-
         correct:
           result.correct,
-
         percentage:
           result.percentage,
-
         serverVerified,
-
         rankingSaved,
-
-        blobSaved,
       }
     );
 
@@ -1212,72 +904,46 @@ export async function POST(
         success: true,
 
         message:
-          rankingSaved
-            ? (
-                blobSaved
-                  ? "Natija va reyting muvaffaqiyatli saqlandi."
-                  : "Reyting Neon bazasiga saqlandi. Vercel Blob vaqtincha ishlamayapti."
-              )
-            : (
-                blobSaved
-                  ? "Natija saqlandi."
-                  : "Natijani Vercel Blob'ga saqlab bo‘lmadi."
-              ),
+          rankingWarning
+            ? "Test natijasi Neon bazasiga saqlandi, lekin reyting savollarini saqlashda xatolik yuz berdi."
+            : "Test natijasi Neon bazasiga muvaffaqiyatli saqlandi.",
 
         serverVerified,
-
+        resultSaved: true,
         rankingSaved,
-
-        blobSaved,
-
-        blobWarning,
+        rankingWarning,
+        rankingAttemptId,
 
         result: {
-          id:
-            result.id,
-
+          id: result.id,
           userId:
             result.userId,
-
           userName:
             result.userName,
-
           testId:
             result.testId,
-
           testTitle:
             result.testTitle,
-
           subject:
             result.subject,
-
           testType:
             result.testType,
-
           total:
             result.total,
-
           correct:
             result.correct,
-
           incorrect:
             result.incorrect,
-
           unanswered:
             result.unanswered,
-
           percentage:
             result.percentage,
-
           earnedPoints:
             result.earnedPoints,
-
           totalPoints:
             result.totalPoints,
-
           spentSeconds:
             result.spentSeconds,
-
           finishedAt:
             result.finishedAt,
         },
@@ -1295,7 +961,6 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-
         message:
           error instanceof Error
             ? error.message
@@ -1310,7 +975,10 @@ export async function POST(
 
 /* =========================================================
    GET
-   HOZIRCHA TEKSHIRISH UCHUN
+   NATIJALARNI NEON'DAN OLISH
+
+   Hozirgi eski endpoint xulqini saqlaymiz:
+   session bo‘lsa natijalar qaytariladi.
 ========================================================= */
 
 export async function GET(
@@ -1335,14 +1003,117 @@ export async function GET(
       );
     }
 
-    const results =
-      await readResults();
+    const rows = await sql`
+      SELECT
+        id::text AS id,
+        user_id::text AS user_id,
+        user_name,
+        source,
+        test_type,
+        test_id::text AS test_id,
+        test_title,
+        subject,
+        total_questions,
+        correct_count,
+        incorrect_count,
+        unanswered_count,
+        percentage,
+        earned_points,
+        total_points,
+        spent_seconds,
+        source_attempt_id,
+        finished_at
+      FROM ranking_attempts
+      ORDER BY
+        finished_at DESC,
+        id DESC
+    `;
+
+    const results = rows.map(
+      (row: any) => ({
+        id: String(
+          row.id || ""
+        ),
+
+        userId: String(
+          row.user_id || ""
+        ),
+
+        userName: String(
+          row.user_name ||
+            "Foydalanuvchi"
+        ),
+
+        source: String(
+          row.source || ""
+        ),
+
+        testType: String(
+          row.test_type || ""
+        ),
+
+        testId: String(
+          row.test_id || ""
+        ),
+
+        testTitle: String(
+          row.test_title ||
+            "Nomsiz test"
+        ),
+
+        subject: String(
+          row.subject || ""
+        ),
+
+        total: Number(
+          row.total_questions || 0
+        ),
+
+        correct: Number(
+          row.correct_count || 0
+        ),
+
+        incorrect: Number(
+          row.incorrect_count || 0
+        ),
+
+        unanswered: Number(
+          row.unanswered_count || 0
+        ),
+
+        percentage: Number(
+          row.percentage || 0
+        ),
+
+        earnedPoints: Number(
+          row.earned_points || 0
+        ),
+
+        totalPoints: Number(
+          row.total_points || 0
+        ),
+
+        spentSeconds: Number(
+          row.spent_seconds || 0
+        ),
+
+        sourceAttemptId: String(
+          row.source_attempt_id || ""
+        ),
+
+        finishedAt:
+          row.finished_at
+            ? new Date(
+                row.finished_at
+              ).toISOString()
+            : "",
+      })
+    );
 
     return NextResponse.json(
       {
         success: true,
-        count:
-          results.length,
+        count: results.length,
         results,
       },
       {
@@ -1363,7 +1134,9 @@ export async function GET(
       {
         success: false,
         message:
-          "Natijalarni yuklashda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Natijalarni Neon bazasidan yuklashda server xatosi.",
       },
       {
         status: 500,
