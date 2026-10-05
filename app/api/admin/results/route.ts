@@ -1,33 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { get, put } from "@vercel/blob";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const RESULTS_BLOB_PATH =
-  "huquqiy-sayt/test-results.json";
-
-/* =========================================================
-   TYPES
-========================================================= */
-
-type TestResult = {
-  id: string;
-  userName: string;
-  testId: string;
-  testTitle: string;
-  subject: string;
-  total: number;
-  correct: number;
-  incorrect: number;
-  unanswered: number;
-  percentage: number;
-  earnedPoints: number;
-  totalPoints: number;
-  spentSeconds: number;
-  answers?: Record<string, unknown>;
-  finishedAt: string;
-};
 
 /* =========================================================
    ADMIN TEKSHIRISH
@@ -51,100 +30,15 @@ function adminAllowed(
 }
 
 /* =========================================================
-   BLOB'DAN NATIJALARNI O‘QISH
-========================================================= */
-
-async function readResults(): Promise<TestResult[]> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-
-  try {
-    const result = await get(
-      RESULTS_BLOB_PATH,
-      {
-        access: "private",
-      }
-    );
-
-    if (
-      !result ||
-      result.statusCode !== 200 ||
-      !result.stream
-    ) {
-      return [];
-    }
-
-    const text =
-      await new Response(
-        result.stream
-      ).text();
-
-    if (!text.trim()) {
-      return [];
-    }
-
-    const parsed =
-      JSON.parse(text);
-
-    return Array.isArray(parsed)
-      ? parsed
-      : [];
-  } catch (error) {
-    console.error(
-      "ADMIN RESULT BLOB READ ERROR:",
-      error
-    );
-
-    return [];
-  }
-}
-
-/* =========================================================
-   BLOB'GA NATIJALARNI YOZISH
-========================================================= */
-
-async function writeResults(
-  results: TestResult[]
-) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN topilmadi."
-    );
-  }
-
-  await put(
-    RESULTS_BLOB_PATH,
-    JSON.stringify(
-      results,
-      null,
-      2
-    ),
-    {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType:
-        "application/json; charset=utf-8",
-      cacheControlMaxAge: 60,
-    }
-  );
-}
-
-/* =========================================================
    GET
-   BARCHA NATIJALARNI OLISH
+   NEON'DAN BARCHA TEST NATIJALARINI OLISH
 ========================================================= */
 
 export async function GET(
   request: NextRequest
 ) {
   try {
-    if (
-      !adminAllowed(request)
-    ) {
+    if (!adminAllowed(request)) {
       return NextResponse.json(
         {
           success: false,
@@ -157,37 +51,103 @@ export async function GET(
       );
     }
 
-    const results =
-      await readResults();
+    const rows = await sql`
+      SELECT
+        id::text AS id,
+        user_id::text AS user_id,
+        user_name,
+        test_id::text AS test_id,
+        test_title,
+        subject,
+        total_questions,
+        correct_count,
+        incorrect_count,
+        unanswered_count,
+        percentage,
+        earned_points,
+        total_points,
+        spent_seconds,
+        finished_at
+      FROM ranking_attempts
+      ORDER BY
+        finished_at DESC,
+        id DESC
+    `;
 
-    /*
-      Eng yangi natija tepada.
-    */
+    const results = rows.map(
+      (row: any) => ({
+        id: String(
+          row.id || ""
+        ),
 
-    const sortedResults =
-      [...results].sort(
-        (a, b) => {
-          const aTime =
-            new Date(
-              a.finishedAt
-            ).getTime() || 0;
+        userId: String(
+          row.user_id || ""
+        ),
 
-          const bTime =
-            new Date(
-              b.finishedAt
-            ).getTime() || 0;
+        userName: String(
+          row.user_name ||
+            "Foydalanuvchi"
+        ),
 
-          return bTime - aTime;
-        }
-      );
+        testId: String(
+          row.test_id || ""
+        ),
+
+        testTitle: String(
+          row.test_title ||
+            "Nomsiz test"
+        ),
+
+        subject: String(
+          row.subject || ""
+        ),
+
+        total: Number(
+          row.total_questions || 0
+        ),
+
+        correct: Number(
+          row.correct_count || 0
+        ),
+
+        incorrect: Number(
+          row.incorrect_count || 0
+        ),
+
+        unanswered: Number(
+          row.unanswered_count || 0
+        ),
+
+        percentage: Number(
+          row.percentage || 0
+        ),
+
+        earnedPoints: Number(
+          row.earned_points || 0
+        ),
+
+        totalPoints: Number(
+          row.total_points || 0
+        ),
+
+        spentSeconds: Number(
+          row.spent_seconds || 0
+        ),
+
+        finishedAt:
+          row.finished_at
+            ? new Date(
+                row.finished_at
+              ).toISOString()
+            : "",
+      })
+    );
 
     return NextResponse.json(
       {
         success: true,
-        count:
-          sortedResults.length,
-        results:
-          sortedResults,
+        count: results.length,
+        results,
       },
       {
         status: 200,
@@ -207,7 +167,9 @@ export async function GET(
       {
         success: false,
         message:
-          "Natijalarni yuklashda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Natijalarni yuklashda server xatosi.",
       },
       {
         status: 500,
@@ -224,9 +186,7 @@ export async function DELETE(
   request: NextRequest
 ) {
   try {
-    if (
-      !adminAllowed(request)
-    ) {
+    if (!adminAllowed(request)) {
       return NextResponse.json(
         {
           success: false,
@@ -255,17 +215,34 @@ export async function DELETE(
       ) === "1";
 
     /* =====================================================
-       HAMMASINI O‘CHIRISH
+       BARCHA NATIJALARNI O‘CHIRISH
     ===================================================== */
 
     if (deleteAll) {
-      await writeResults([]);
+      const countRows =
+        await sql`
+          SELECT
+            COUNT(*)::int
+              AS count
+          FROM ranking_attempts
+        `;
+
+      const deletedCount =
+        Number(
+          countRows[0]?.count || 0
+        );
+
+      await sql`
+        DELETE FROM
+          ranking_attempts
+      `;
 
       return NextResponse.json(
         {
           success: true,
+          deletedCount,
           message:
-            "Barcha natijalar o‘chirildi.",
+            "Barcha test natijalari Neon bazasidan o‘chirildi.",
         },
         {
           status: 200,
@@ -290,17 +267,17 @@ export async function DELETE(
       );
     }
 
-    const results =
-      await readResults();
+    const deleted =
+      await sql`
+        DELETE FROM
+          ranking_attempts
+        WHERE
+          id::text = ${id}
+        RETURNING
+          id::text AS id
+      `;
 
-    const exists =
-      results.some(
-        (item) =>
-          String(item.id) ===
-          String(id)
-      );
-
-    if (!exists) {
+    if (deleted.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -313,22 +290,12 @@ export async function DELETE(
       );
     }
 
-    const nextResults =
-      results.filter(
-        (item) =>
-          String(item.id) !==
-          String(id)
-      );
-
-    await writeResults(
-      nextResults
-    );
-
     return NextResponse.json(
       {
         success: true,
+        id,
         message:
-          "Natija o‘chirildi.",
+          "Natija Neon bazasidan o‘chirildi.",
       },
       {
         status: 200,
@@ -344,7 +311,9 @@ export async function DELETE(
       {
         success: false,
         message:
-          "Natijani o‘chirishda server xatosi.",
+          error instanceof Error
+            ? error.message
+            : "Natijani o‘chirishda server xatosi.",
       },
       {
         status: 500,
