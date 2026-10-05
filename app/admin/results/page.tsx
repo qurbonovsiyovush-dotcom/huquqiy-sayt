@@ -167,6 +167,19 @@ export default function AdminResultsPage() {
   ]);
 
   /* =========================================================
+     FOYDALANUVCHI NOMINI BIR XIL KO‘RINISHGA KELTIRISH
+  ========================================================= */
+
+  function normalizeUserName(value: string) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/[‘’ʻʼ`´]/g, "'")
+      .replace(/\s*[:;,.]+\s*$/g, "")
+      .toLocaleLowerCase();
+  }
+
+  /* =========================================================
      FOYDALANUVCHILAR BO‘YICHA GURUHLASH
 
      Asosiy jadvalda har bir foydalanuvchi bir marta turadi.
@@ -185,14 +198,12 @@ export default function AdminResultsPage() {
 
     filteredResults.forEach((item) => {
       const normalizedName =
-        String(item.userName || "")
-          .trim()
-          .toLocaleLowerCase();
+        normalizeUserName(
+          item.userName
+        );
 
       const key =
-        item.userId
-          ? `id:${item.userId}`
-          : `name:${normalizedName}`;
+        `name:${normalizedName}`;
 
       const current = map.get(key);
 
@@ -334,14 +345,11 @@ export default function AdminResultsPage() {
 
     const users =
       new Set(
-        results.map((item) =>
-          item.userId
-            ? `id:${item.userId}`
-            : `name:${String(
-                item.userName || ""
-              )
-                .trim()
-                .toLocaleLowerCase()}`
+        results.map(
+          (item) =>
+            `name:${normalizeUserName(
+              item.userName
+            )}`
         )
       ).size;
 
