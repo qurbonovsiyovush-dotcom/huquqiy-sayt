@@ -158,90 +158,6 @@ export default function AdminResultsPage() {
   ]);
 
   /* =========================================================
-     REYTING
-
-     Bir foydalanuvchining bir testdagi
-     ENG YAXSHI natijasi olinadi.
-  ========================================================= */
-
-  const ranking = useMemo(() => {
-    const bestMap =
-      new Map<string, TestResult>();
-
-    filteredResults.forEach((item) => {
-      const key = `${item.testId}|||${item.userName
-        .trim()
-        .toLocaleLowerCase()}`;
-
-      const old =
-        bestMap.get(key);
-
-      if (!old) {
-        bestMap.set(key, item);
-        return;
-      }
-
-      const isBetter =
-        item.correct > old.correct ||
-        (item.correct === old.correct &&
-          item.percentage > old.percentage) ||
-        (item.correct === old.correct &&
-          item.percentage === old.percentage &&
-          item.spentSeconds < old.spentSeconds);
-
-      if (isBetter) {
-        bestMap.set(key, item);
-      }
-    });
-
-    return Array.from(
-      bestMap.values()
-    ).sort((a, b) => {
-      if (b.correct !== a.correct) {
-        return b.correct - a.correct;
-      }
-
-      if (
-        b.percentage !== a.percentage
-      ) {
-        return (
-          b.percentage -
-          a.percentage
-        );
-      }
-
-      if (
-        b.earnedPoints !==
-        a.earnedPoints
-      ) {
-        return (
-          b.earnedPoints -
-          a.earnedPoints
-        );
-      }
-
-      if (
-        a.spentSeconds !==
-        b.spentSeconds
-      ) {
-        return (
-          a.spentSeconds -
-          b.spentSeconds
-        );
-      }
-
-      return (
-        new Date(
-          a.finishedAt
-        ).getTime() -
-        new Date(
-          b.finishedAt
-        ).getTime()
-      );
-    });
-  }, [filteredResults]);
-
-  /* =========================================================
      STATISTIKA
   ========================================================= */
 
@@ -440,7 +356,7 @@ export default function AdminResultsPage() {
   function exportCsv() {
     const rows = [
       [
-        "O‘rin",
+        "№",
         "Foydalanuvchi",
         "Test",
         "Fan",
@@ -453,7 +369,7 @@ export default function AdminResultsPage() {
         "Topshirilgan sana",
       ],
 
-      ...ranking.map(
+      ...filteredResults.map(
         (item, index) => [
           index + 1,
           item.userName,
@@ -505,7 +421,7 @@ export default function AdminResultsPage() {
     link.href = url;
 
     link.download =
-      `reyting-${new Date()
+      `test-natijalari-${new Date()
         .toISOString()
         .slice(0, 10)}.csv`;
 
@@ -526,7 +442,7 @@ export default function AdminResultsPage() {
 
   function exportPdf() {
     if (
-      ranking.length === 0
+      filteredResults.length === 0
     ) {
       return;
     }
@@ -556,7 +472,7 @@ export default function AdminResultsPage() {
     doc.setFontSize(18);
 
     doc.text(
-      "TEST NATIJALARI - REYTING",
+      "TEST NATIJALARI",
       148,
       15,
       {
@@ -579,7 +495,7 @@ export default function AdminResultsPage() {
     );
 
     doc.text(
-      `Qatnashchilar: ${ranking.length}`,
+      `Natijalar soni: ${filteredResults.length}`,
       14,
       37
     );
@@ -597,7 +513,7 @@ export default function AdminResultsPage() {
 
       head: [
         [
-          "O'rin",
+          "№",
           "F.I.Sh.",
           "Test",
           "Fan",
@@ -611,7 +527,7 @@ export default function AdminResultsPage() {
         ],
       ],
 
-      body: ranking.map(
+      body: filteredResults.map(
         (item, index) => [
           index + 1,
           item.userName,
@@ -658,7 +574,7 @@ export default function AdminResultsPage() {
     });
 
     doc.save(
-      `test-reyting-${new Date()
+      `test-natijalari-${new Date()
         .toISOString()
         .slice(0, 10)}.pdf`
     );
@@ -784,51 +700,6 @@ export default function AdminResultsPage() {
 
         </div>
 
-        {/* TOP 3 */}
-
-        {ranking.length > 0 && (
-          <div className="topThree">
-
-            <div className="topCard first">
-              <span>🥇 1-o‘rin</span>
-              <strong>
-                {ranking[0]?.userName}
-              </strong>
-              <small>
-                {ranking[0]?.correct} ta to‘g‘ri •{" "}
-                {ranking[0]?.percentage}%
-              </small>
-            </div>
-
-            {ranking[1] && (
-              <div className="topCard second">
-                <span>🥈 2-o‘rin</span>
-                <strong>
-                  {ranking[1].userName}
-                </strong>
-                <small>
-                  {ranking[1].correct} ta to‘g‘ri •{" "}
-                  {ranking[1].percentage}%
-                </small>
-              </div>
-            )}
-
-            {ranking[2] && (
-              <div className="topCard third">
-                <span>🥉 3-o‘rin</span>
-                <strong>
-                  {ranking[2].userName}
-                </strong>
-                <small>
-                  {ranking[2].correct} ta to‘g‘ri •{" "}
-                  {ranking[2].percentage}%
-                </small>
-              </div>
-            )}
-
-          </div>
-        )}
-
         <div className="filterBar">
 
           <input
@@ -900,7 +771,7 @@ export default function AdminResultsPage() {
             className="pdfButton"
             onClick={exportPdf}
             disabled={
-              ranking.length === 0
+              filteredResults.length === 0
             }
           >
             PDF saqlash
@@ -910,7 +781,7 @@ export default function AdminResultsPage() {
             className="exportButton"
             onClick={exportCsv}
             disabled={
-              ranking.length === 0
+              filteredResults.length === 0
             }
           >
             CSV saqlash
@@ -940,7 +811,7 @@ export default function AdminResultsPage() {
             {error}
           </div>
 
-        ) : ranking.length === 0 ? (
+        ) : filteredResults.length === 0 ? (
 
           <div className="stateBox">
             Hozircha natijalar mavjud emas.
@@ -954,7 +825,7 @@ export default function AdminResultsPage() {
 
               <thead>
                 <tr>
-                  <th>O‘rin</th>
+                  <th>№</th>
                   <th>Foydalanuvchi</th>
                   <th>Test</th>
                   <th>Fan</th>
@@ -969,7 +840,7 @@ export default function AdminResultsPage() {
 
               <tbody>
 
-                {ranking.map(
+                {filteredResults.map(
                   (item, index) => (
 
                     <tr
@@ -977,25 +848,7 @@ export default function AdminResultsPage() {
                     >
 
                       <td>
-                        <span
-                          className={
-                            index === 0
-                              ? "rank gold"
-                              : index === 1
-                              ? "rank silver"
-                              : index === 2
-                              ? "rank bronze"
-                              : "rank"
-                          }
-                        >
-                          {index === 0
-                            ? "🥇"
-                            : index === 1
-                            ? "🥈"
-                            : index === 2
-                            ? "🥉"
-                            : index + 1}
-                        </span>
+                        {index + 1}
                       </td>
 
                       <td className="userCell">
