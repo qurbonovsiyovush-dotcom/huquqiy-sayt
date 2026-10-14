@@ -1,1 +1,124 @@
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+import { sql } from "@/lib/db";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+// Joriy legacy test API dagi admin cookie tekshiruvi bilan mos.
+async function isAdmin() {
+  const cookieStore = await cookies();
+  return Boolean(
+    cookieStore.get("qurbonov_session")?.value &&
+      cookieStore.get("qurbonov_role")?.value === "admin"
+  );
+}
+
+function forbidden() {
+  return NextResponse.json(
+    { success: false, message: "Faqat administrator uchun." },
+    { status: 403 }
+  );
+}
+
+export async function GET(_request: NextRequest, context: RouteContext) {
+  if (!(await isAdmin())) return forbidden();
+
+  try {
+    const { id } = await context.params;
+    const rows = await sql`
+      SELECT attempt_limit
+      FROM legacy_tests
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Test topilmadi." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        attemptLimit:
+          rows[0].attempt_limit == null
+            ? null
+            : Number(rows[0].attempt_limit),
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    console.error("GET TEST ATTEMPT LIMIT ERROR:", error);
+    return NextResponse.json(
+      { success: false, message: "Urinishlar limitini o‘qib bo‘lmadi." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  if (!(await isAdmin())) return forbidden();
+
+  try {
+    const body = await request.json();
+    if (!body || typeof body !== "object" || !("attemptLimit" in body)) {
+      return NextResponse.json(
+        { success: false, message: "Urinishlar soni yuborilmadi." },
+        { status: 400 }
+      );
+    }
+
+    const attemptLimit: number | null = body.attemptLimit;
+
+    // null — cheklanmagan. Faqat 1..1000000 butun son qabul qilinadi.
+    if (
+      attemptLimit !== null &&
+      (!Number.isSafeInteger(attemptLimit) ||
+        attemptLimit < 1 ||
+        attemptLimit > 1_000_000)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Urinishlar soni musbat butun son bo‘lishi kerak." },
+        { status: 400 }
+      );
+    }
+
+    const { id } = await context.params;
+    const rows = await sql`
+      UPDATE legacy_tests
+      SET attempt_limit = ${attemptLimit}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING attempt_limit
+    `;
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Test topilmadi." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      attemptLimit:
+        rows[0].attempt_limit == null
+          ? null
+          : Number(rows[0].attempt_limit),
+    });
+  } catch (error) {
+    console.error("PATCH TEST ATTEMPT LIMIT ERROR:", error);
+    return NextResponse.json(
+      { success: false, message: "Urinishlar limitini saqlab bo‘lmadi." },
+      { status: 500 }
+    );
+  }
+}
 
