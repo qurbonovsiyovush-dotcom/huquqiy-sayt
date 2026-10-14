@@ -101,6 +101,9 @@ type TestData = {
 
   duration: number;
 
+  // null — cheklanmagan, musbat butun son — urinishlar limiti.
+  attemptLimit?: number | null;
+
   description: string;
 
   questions: TestQuestion[];
@@ -244,6 +247,11 @@ function TestEditorPageContent() {
     description,
     setDescription,
   ] = useState("");
+
+  const [attemptLimit, setAttemptLimit] = useState<number | null>(null);
+  const [attemptLimitLoading, setAttemptLimitLoading] = useState(Boolean(editingId));
+  const [attemptLimitError, setAttemptLimitError] = useState("");
+  const originalAttemptLimitRef = useRef<number | null>(null);
 
   const [
     questions,
@@ -394,6 +402,81 @@ function TestEditorPageContent() {
 
     checkAdmin();
   }, [router]);
+
+  /* =======================================================
+     URINISHLAR LIMITI — FAQAT METADATA, SAVOLLAR YUKLANMAYDI
+  ======================================================= */
+
+  useEffect(() => {
+    if (!adminChecked || !editingId) return;
+
+    const controller = new AbortController();
+
+    async function loadAttemptLimit() {
+      setAttemptLimitLoading(true);
+      setAttemptLimitError("");
+
+      try {
+        const response = await fetch(
+          `/api/tests/${encodeURIComponent(editingId!)}/attempt-limit`,
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "include",
+            signal: controller.signal,
+          }
+        );
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !("attemptLimit" in data)) {
+          throw new Error(data.message || "Urinishlar limitini yuklab bo‘lmadi.");
+        }
+
+        const loadedLimit = data.attemptLimit === null
+          ? null
+          : Number(data.attemptLimit);
+
+        if (loadedLimit !== null && (!Number.isSafeInteger(loadedLimit) || loadedLimit < 1)) {
+          throw new Error("Bazadagi urinishlar limiti noto‘g‘ri.");
+        }
+
+        if (!controller.signal.aborted) {
+          setAttemptLimit(loadedLimit);
+          originalAttemptLimitRef.current = loadedLimit;
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setAttemptLimitError(
+            error instanceof Error ? error.message : "Urinishlar limitini yuklab bo‘lmadi."
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setAttemptLimitLoading(false);
+      }
+    }
+
+    void loadAttemptLimit();
+    return () => controller.abort();
+  }, [adminChecked, editingId]);
+
+  async function persistAttemptLimit(testId: string, limit: number | null) {
+    const response = await fetch(
+      `/api/tests/${encodeURIComponent(testId)}/attempt-limit`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ attemptLimit: limit }),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "Urinishlar limitini saqlab bo‘lmadi.");
+    }
+
+    originalAttemptLimitRef.current = limit;
+  }
 
   /* =======================================================
      EXISTING TEST LOAD — FAQAT 30 TA SAVOL
@@ -1512,6 +1595,20 @@ function TestEditorPageContent() {
   ) {
     saveEditorHtml();
 
+    if (editingId && (attemptLimitLoading || attemptLimitError)) {
+      alert(
+        attemptLimitError
+          ? `Urinishlar limiti yuklanmagan: ${attemptLimitError}. Sahifani qayta yuklang.`
+          : "Urinishlar limiti hali yuklanmoqda. Biroz kuting."
+      );
+      return;
+    }
+
+    if (attemptLimit !== null && (!Number.isSafeInteger(attemptLimit) || attemptLimit < 1)) {
+      alert("Urinishlar soni 1 yoki undan katta butun son bo‘lishi kerak.");
+      return;
+    }
+
     if (!title.trim()) {
       alert(
         "Test nomini kiriting."
@@ -1750,11 +1847,25 @@ function TestEditorPageContent() {
           return;
         }
 
-        alert(
-          status ===
-            "published"
-            ? "O‘zgarishlar saqlandi va test e’lon qilindi."
-            : "O‘zgarishlar saqlandi."
+         // Urinishlar limiti maxsus API orqali yangilanadi;
+         // 30 talik sahifalarni yoki test savollarini qayta yozmaydi.
+         if (attemptLimit !== originalAttemptLimitRef.current) {
+           try {
+             await persistAttemptLimit(editingId, attemptLimit);
+           } catch (error) {
+             alert(
+               "Testning asosiy ma’lumotlari saqlandi, lekin urinishlar limiti saqlanmadi: " +
+               (error instanceof Error ? error.message : "Server xatosi")
+             );
+             return;
+           }
+         }
+
+         alert(
+           status ===
+             "published"
+             ? "O‘zgarishlar saqlandi va test e’lon qilindi."
+             : "O‘zgarishlar saqlandi."
         );
 
         router.push(
@@ -1781,16 +1892,18 @@ function TestEditorPageContent() {
         subject:
           subject.trim(),
 
-        duration:
-          Math.max(
-            1,
-            Number(duration) ||
-              30
-          ),
+         duration:
+           Math.max(
+             1,
+             Number(duration) ||
+               30
+           ),
 
-        description,
+         attemptLimit,
 
-        questions:
+         description,
+
+         questions:
           payloadQuestions,
 
         status,
@@ -1847,11 +1960,31 @@ function TestEditorPageContent() {
         return;
       }
 
-      alert(
-        status ===
-          "published"
-          ? "Test yaratildi va e’lon qilindi."
-          : "Test qoralama sifatida saqlandi."
+       if (attemptLimit !== null) {
+         const createdId = data.testId ?? data.test?.id ?? data.id;
+         if (!createdId) {
+           alert(
+             "Test yaratildi, ammo urinishlar limitini tasdiqlash uchun server test ID qaytarmadi. " +
+             "Admin paneldan testni qayta ochib limitni tekshiring."
+           );
+           return;
+         }
+         try {
+           await persistAttemptLimit(String(createdId), attemptLimit);
+         } catch (error) {
+           alert(
+             "Test yaratildi, ammo urinishlar limiti saqlanmadi: " +
+             (error instanceof Error ? error.message : "Server xatosi")
+           );
+           return;
+         }
+       }
+
+       alert(
+         status ===
+           "published"
+           ? "Test yaratildi va e’lon qilindi."
+           : "Test qoralama sifatida saqlandi."
       );
 
       router.push(
@@ -1905,8 +2038,9 @@ function TestEditorPageContent() {
         id: editingId || undefined,
         title: title.trim(),
         subject: subject.trim(),
-        duration: Math.max(1, Number(duration) || 30),
-        description,
+         duration: Math.max(1, Number(duration) || 30),
+         attemptLimit,
+         description,
         questions: exportQuestions,
         status: "draft" as TestStatus,
       },
@@ -2076,9 +2210,51 @@ function TestEditorPageContent() {
               </strong>
 
             </div>
-          </label>
+           </label>
 
-          <label className="descriptionField">
+           <label className="attemptField">
+             <span>Urinishlar soni</span>
+
+             <div className="attemptRow">
+               <select
+                 aria-label="Urinishlarni cheklash"
+                 value={attemptLimit === null ? "unlimited" : "limited"}
+                 disabled={attemptLimitLoading || Boolean(attemptLimitError) || saving}
+                 onChange={(event) =>
+                   setAttemptLimit(event.target.value === "unlimited" ? null : 1)
+                 }
+               >
+                 <option value="unlimited">Cheklanmagan</option>
+                 <option value="limited">Cheklangan</option>
+               </select>
+
+               {attemptLimit !== null && (
+                 <input
+                   type="number"
+                   aria-label="Urinishlar soni"
+                   min={1}
+                   max={1000000}
+                   step={1}
+                   value={attemptLimit}
+                   disabled={attemptLimitLoading || Boolean(attemptLimitError) || saving}
+                   onChange={(event) => {
+                     const n = Number(event.target.value);
+                     setAttemptLimit(
+                       Number.isSafeInteger(n) ? Math.max(1, Math.min(1000000, n)) : 1
+                     );
+                   }}
+                 />
+               )}
+             </div>
+             {attemptLimitLoading && <small>Urinishlar yuklanmoqda...</small>}
+             {attemptLimitError && (
+               <small className="attemptError">
+                 {attemptLimitError} — sahifani yangilang.
+               </small>
+             )}
+           </label>
+
+           <label className="descriptionField">
 
             <span>
               Test haqida
@@ -2674,10 +2850,11 @@ function TestEditorPageContent() {
 
           display: grid;
 
-          grid-template-columns:
-            minmax(0, 2fr)
-            minmax(0, 1.6fr)
-            minmax(220px, .8fr);
+           grid-template-columns:
+             minmax(0, 1.7fr)
+             minmax(0, 1.3fr)
+             minmax(180px, .75fr)
+             minmax(235px, 1.2fr);
 
           align-items: center;
 
@@ -2721,8 +2898,9 @@ function TestEditorPageContent() {
           font-weight: 700;
         }
 
-        .infoPanel input,
-        .infoPanel textarea {
+         .infoPanel input,
+         .infoPanel select,
+         .infoPanel textarea {
           width: 100%;
 
           border:
@@ -2742,12 +2920,40 @@ function TestEditorPageContent() {
           font-size: 17px;
         }
 
-        .infoPanel input {
-          height: 58px;
+         .infoPanel input,
+         .infoPanel select {
+           height: 58px;
+           padding: 0 12px;
+         }
 
-          padding:
-            0 16px;
-        }
+         .attemptRow {
+           display: flex;
+           gap: 8px;
+           min-width: 0;
+           align-items: center;
+         }
+
+         .attemptRow select {
+           width: 100%;
+           min-width: 0;
+           font-size: 15px;
+         }
+
+         .attemptRow input {
+           width: 90px;
+           flex: 0 0 90px;
+         }
+
+         .attemptField small {
+           text-align: center;
+           font-weight: 400;
+           font-size: 13px;
+         }
+
+         .attemptField .attemptError {
+           color: #9c1111;
+           font-weight: 700;
+         }
 
         .infoPanel textarea {
           min-height: 95px;
