@@ -171,8 +171,10 @@ function buildPdfLikeQuestionHtml(
   const structuredLinePattern =
     /^(?:(?:\d{1,3})|(?:[IVXLCDM]{1,8})|(?:[a-z]))[.)]\s+\S/u;
 
+  // I., V., X. kabi rim raqamlarini A. / B. kabi shaxs qisqartmasi deb o‘qimaymiz.
+  // Oldingi regex "I. Qonunchilik palatasi"ni shaxs deb olib, Bold qo‘ymas edi.
   const namedCasePersonPattern =
-    /^[A-ZА-ЯЁ][.]\s+\S/u;
+    /^(?!(?:I|V|X|L|C|D|M)\.\s)[A-ZА-ЯЁ][.]\s+\S/u;
 
   const finalContinuationPattern =
     /^(?:necha|nechta|qancha|qanday|qaysi|qachon|qayer|kim|nima|eng\s+kechi|muddat|tartib|holat|vaziyat|javob|qo['’ʻʼ`]?yishi|bajarishi|tuzilishi|so['’ʻʼ`]?roq)/iu;
