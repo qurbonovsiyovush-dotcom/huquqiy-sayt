@@ -94,7 +94,7 @@ function buildPdfLikeQuestionHtml(
     String(value || "")
       .replace(/[ \t]+/g, " ")
       .replace(/\s+([,.;:!])/g, "$1")
-      .replace(/\s+\?/g, "?")
+      .replace(/[ \t]*\?/g, " ?")
       .trim();
 
   const cleanMultiline = (value: string) =>
@@ -108,7 +108,7 @@ function buildPdfLikeQuestionHtml(
       .trim();
 
   const legalSourceKeywordPattern =
-    /\b(?:konstitutsiya|kodeks|qonun|qonuni|qonunning|qaror|farmon|nizom|modda|moddasi|moddalari|holatiga\s+ko['’ʻʼ`]?ra)\b/iu;
+    /(?:konstitutsiya|kodeks|qonun|qonuni|qonunning|qaror|farmon|nizom|modda|moddasi|moddalari|darslik|darsligi|\d+\s*[-–—]\s*\d+\s*[-–—]?betlar?|holatiga\s+ko['’ʻʼ`]?ra)/iu;
 
   function findLegalSource(value: string) {
     let depth = 0;
@@ -541,11 +541,21 @@ function buildPdfLikeQuestionHtml(
       )}</strong>`
     : "";
 
-  const headingText = beforeSource
-    .split(/\n+/)
-    .map(cleanInline)
-    .filter(Boolean)
-    .join(" ");
+  // Manba oldidan ba'zan bandlar ham chiqishi mumkin: ular sarlavhaga yopishmasin.
+  const beforeLines = mergeDetachedMarkers(
+    beforeSource.split(/\n+/).map(cleanInline).filter(Boolean)
+  );
+  const beforeFirstItem = beforeLines.findIndex((line) =>
+    structuredLinePattern.test(line) && !namedCasePersonPattern.test(line)
+  );
+  const beforeHeadingLines = beforeFirstItem < 0
+    ? beforeLines
+    : beforeLines.slice(0, beforeFirstItem);
+  const beforeItemLines = beforeFirstItem < 0
+    ? []
+    : beforeLines.slice(beforeFirstItem);
+
+  const headingText = beforeHeadingLines.join(" ");
 
   const headingHtml = headingText
     ? `<strong data-pdf-main="true">${escapeHtml(
@@ -566,10 +576,8 @@ function buildPdfLikeQuestionHtml(
       )}</em></div>`
     : "";
 
-  const finalShouldBeBold =
-    !openPrefix ||
-    questionNumber === undefined ||
-    [36, 37, 39, 43, 44, 45].includes(questionNumber);
+  // Barcha yakuniy savollar bir xil qalinlikda yoziladi.
+  const finalShouldBeBold = true;
 
   const finalHtml = finalQuestion
     ? `<div data-pdf-final-question="true" style="margin-top:11px;line-height:1.5;font-weight:${
@@ -613,8 +621,8 @@ function buildPdfLikeQuestionHtml(
   }
 
   return `<div data-pdf-question-layout="true">${headingRow}${sourceHtml}${renderBody(
-    caseText
-  )}${finalHtml}</div>`;
+    beforeItemLines.join("\n")
+  )}${renderBody(caseText)}${finalHtml}</div>`;
 }
 
 
