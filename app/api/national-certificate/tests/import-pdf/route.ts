@@ -197,7 +197,7 @@ function normalizeQuestionMarkSpacing(
       "aniqlang ?" -> "aniqlang?"
   */
   return String(value || "")
-    .replace(/\s+\?/g, "?");
+    .replace(/[ \t]*\?/g, " ?");
 }
 
 function normalizeText(value: string) {
